@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Mi Turno</string>
+    <string name="title_activity_main">Mi Turno</string>
+    <string name="package_name">com.mijornada.app</string>
+    <string name="custom_url_scheme">com.mijornada.app</string>
+</resources>
