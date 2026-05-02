@@ -1,4 +1,4 @@
-const CACHE = 'mi-turno-v3';
+const CACHE = 'mi-turno-v4';
 const ASSETS = [
   './',
   './index.html',
@@ -23,14 +23,28 @@ self.addEventListener('activate', e => {
 });
 
 self.addEventListener('fetch', e => {
+  const url = new URL(e.request.url);
+
+  if (url.protocol !== 'http:' && url.protocol !== 'https:') return;
+  if (url.hostname === 'localhost' && url.port === '3000') return;
+  if (url.pathname.startsWith('/@')) return;
+
   e.respondWith(
-    caches.match(e.request).then(cached => cached || fetch(e.request).then(response => {
-      // Cache JS/CSS assets from Vite build dynamically
-      if (response.ok && (e.request.url.includes('/assets/') || e.request.url.endsWith('.js'))) {
-        const clone = response.clone();
-        caches.open(CACHE).then(c => c.put(e.request, clone));
-      }
-      return response;
-    }).catch(() => cached))
+    caches.match(e.request).then(cached => {
+      if (cached) return cached;
+
+      return fetch(e.request).then(response => {
+        if (response.ok && (url.pathname.includes('/assets/') || url.pathname.endsWith('.js'))) {
+          const clone = response.clone();
+          caches.open(CACHE).then(c => c.put(e.request, clone));
+        }
+        return response;
+      }).catch(() => {
+        if (url.origin === location.origin && url.pathname.endsWith('.html')) {
+          return caches.match('./index.html');
+        }
+        return new Response('Offline', { status: 503, statusText: 'Service Unavailable' });
+      });
+    })
   );
 });
