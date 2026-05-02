@@ -984,12 +984,13 @@ function App() {
                   }
                 });
               }}
-              style={S.dangerBtn}
+              style={{ padding: '16px 0', borderRadius: 18, border: '1px solid rgba(255,60,60,0.3)', background: 'rgba(255,60,60,0.08)', color: 'rgba(255,90,90,0.85)', fontSize: 16, fontWeight: 700, cursor: 'pointer', marginTop: 8 }}
             >
-              Borrar jornada
+              🗑️ Eliminar jornada
             </button>
           </div>
         </div>
+        {confirmDialog && <ConfirmDialog {...confirmDialog} onCancel={() => setConfirmDialog(null)} />}
       </Shell>
     );
   }
@@ -1042,27 +1043,27 @@ function App() {
 
     return (
       <Shell burst={false}>
-        <div style={{ flex: 1, padding: "12px 20px" }}>
-          <button style={S.iconBtn} onClick={() => { setScreen("main"); setSingleMode(null); setValS(""); setNoteS(""); }}>
+        <div style={{ flex: 1, padding: "12px 20px", display: "flex", flexDirection: "column", minHeight: 0, overflow: "hidden" }}>
+          <button style={{ ...S.iconBtn, flexShrink: 0 }} onClick={() => { setScreen("main"); setSingleMode(null); setValS(""); setNoteS(""); }}>
             <IconBack />
           </button>
-          <div style={{ fontSize: 40, fontWeight: 900, color: accent, margin: "20px 0" }}>
+          <div style={{ fontSize: 40, fontWeight: 900, color: accent, margin: "16px 0", flexShrink: 0 }}>
             {valS || "0"}€
           </div>
           <input
             placeholder="Nota (opcional)"
             value={noteS}
             onChange={(e) => setNoteS(e.target.value)}
-            style={{ width: "100%", padding: 10, borderRadius: 8, background: "rgba(255,255,255,0.05)", border: "none", color: "white", outline: "none" }}
+            style={{ width: "100%", padding: 10, borderRadius: 8, background: "rgba(255,255,255,0.05)", border: "none", color: "white", outline: "none", flexShrink: 0, marginBottom: 12 }}
           />
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8, marginTop: 20 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8, flex: 1, minHeight: 0 }}>
             {["1", "2", "3", "4", "5", "6", "7", "8", "9", ",", "0", "DEL"].map((k) => (
-              <button key={k} onClick={() => kpS(k)} style={{ ...S.keyBtn, padding: 15, background: "rgba(255,255,255,0.05)", color: "white", fontSize: 20, fontWeight: 700 }}>
+              <button key={k} onClick={() => kpS(k)} style={{ ...S.keyBtn, background: "rgba(255,255,255,0.05)", color: "white", fontSize: 20, fontWeight: 700 }}>
                 {k === "DEL" ? <IconDel /> : k}
               </button>
             ))}
           </div>
-          <button onClick={saveS} style={{ width: "100%", padding: 15, marginTop: 20, borderRadius: 12, border: "none", background: accent, color: "black", fontWeight: 700 }}>
+          <button onClick={saveS} style={{ width: "100%", padding: 15, marginTop: 12, borderRadius: 12, border: "none", background: accent, color: "black", fontWeight: 700, flexShrink: 0 }}>
             Guardar
           </button>
         </div>
@@ -1110,8 +1111,8 @@ function App() {
 
     return (
       <Shell burst={false}>
-        <div style={{ flex: 1, padding: "16px 20px 40vh", display: "flex", flexDirection: "column", overflowY: "auto" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 24 }}>
+        <div style={{ flex: 1, padding: "16px 20px", display: "flex", flexDirection: "column", minHeight: 0, overflow: "hidden" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 16, flexShrink: 0 }}>
             <button style={S.iconBtn} onClick={() => setScreen("main")}>
               <IconBack />
             </button>
@@ -1159,18 +1160,18 @@ function App() {
             placeholder={`Nota para ${activeField} (opcional)`}
             value={activeField === "propina" ? noteP : noteD}
             onChange={(e) => activeField === "propina" ? setNoteP(e.target.value) : setNoteD(e.target.value)}
-            style={{ width: "100%", padding: 14, borderRadius: 12, background: "rgba(255,255,255,0.05)", border: "none", color: "white", marginBottom: 20, outline: "none" }}
+            style={{ width: "100%", padding: 14, borderRadius: 12, background: "rgba(255,255,255,0.05)", border: "none", color: "white", marginBottom: 12, outline: "none", flexShrink: 0 }}
           />
 
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8, marginTop: 20 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8, flex: 1, minHeight: 0 }}>
             {["1", "2", "3", "4", "5", "6", "7", "8", "9", ",", "0", "DEL"].map((k) => (
-              <button key={k} onClick={() => kpAdd(k)} style={{ ...S.keyBtn, padding: 16, background: "rgba(255,255,255,0.05)", fontSize: 20, fontWeight: 700, color: "white" }}>
+              <button key={k} onClick={() => kpAdd(k)} style={{ ...S.keyBtn, background: "rgba(255,255,255,0.05)", fontSize: 20, fontWeight: 700, color: "white" }}>
                 {k === "DEL" ? <IconDel /> : k}
               </button>
             ))}
           </div>
 
-          <button onClick={handleSaveAdd} style={{ width: "100%", padding: 18, marginTop: 20, borderRadius: 16, border: "none", background: activeField === "propina" ? G : P, color: "black", fontWeight: 800, fontSize: 18, cursor: "pointer" }}>
+          <button onClick={handleSaveAdd} style={{ width: "100%", padding: 18, marginTop: 12, borderRadius: 16, border: "none", background: activeField === "propina" ? G : P, color: "black", fontWeight: 800, fontSize: 18, cursor: "pointer", flexShrink: 0 }}>
             Guardar
           </button>
         </div>
@@ -1293,7 +1294,7 @@ function App() {
                   <span style={{ fontSize: 13, color: "rgba(255,255,255,0.3)", marginRight: 8 }}>{e.time}</span>
                   <span style={{ fontSize: 16, fontWeight: 800, color: meta.col }}>+{fmt(e.amount)}</span>
                   <button
-                    onClick={() => { setScreen("main"); setTimeout(() => openEditEntry(e), 50); }}
+                    onClick={() => openEditEntry(e)}
                     title="Editar entrada"
                     style={{
                       background: "rgba(255,255,255,0.08)",
@@ -1684,7 +1685,7 @@ function App() {
               )}
             </div>
           ) : (
-            <div style={{ display: "flex", flexDirection: "column", gap: 7, flex: 1, overflowY: "auto", paddingRight: 4 }}>
+            <div style={{ display: "flex", flexDirection: "column", gap: 7, flex: 1, overflowY: "auto", paddingRight: 4, minHeight: 0, WebkitOverflowScrolling: "touch", overscrollBehavior: "contain" }}>
               {[...current.entries]
                 .reverse()
                 .map((e) => {
@@ -1840,6 +1841,23 @@ function App() {
         )}
       </div>
       {confirmDialog && <ConfirmDialog {...confirmDialog} onCancel={() => setConfirmDialog(null)} />}
+      {editEntry && (
+        <EditEntryDialog
+          entry={editEntry}
+          amount={editEntryAmount}
+          note={editEntryNote}
+          onAmountChange={setEditEntryAmount}
+          onNoteChange={setEditEntryNote}
+          onSave={saveEditEntry}
+          onDelete={() => {
+            setConfirmDialog({
+              text: "¿Seguro que quieres eliminar esta entrada?",
+              onConfirm: deleteEditEntry,
+            });
+          }}
+          onCancel={() => setEditEntry(null)}
+        />
+      )}
     </Shell>
   );
 }
