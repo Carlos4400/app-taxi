@@ -1056,9 +1056,9 @@ function App() {
             onChange={(e) => setNoteS(e.target.value)}
             style={{ width: "100%", padding: 10, borderRadius: 8, background: "rgba(255,255,255,0.05)", border: "none", color: "white", outline: "none", flexShrink: 0, marginBottom: 12 }}
           />
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8, flex: 1, minHeight: 0 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8, flexShrink: 0 }}>
             {["1", "2", "3", "4", "5", "6", "7", "8", "9", ",", "0", "DEL"].map((k) => (
-              <button key={k} onClick={() => kpS(k)} style={{ ...S.keyBtn, background: "rgba(255,255,255,0.05)", color: "white", fontSize: 20, fontWeight: 700 }}>
+              <button key={k} onClick={() => kpS(k)} style={{ ...S.keyBtn, padding: "20px 0", background: "rgba(255,255,255,0.05)", color: "white", fontSize: 22, fontWeight: 700 }}>
                 {k === "DEL" ? <IconDel /> : k}
               </button>
             ))}
@@ -1163,9 +1163,9 @@ function App() {
             style={{ width: "100%", padding: 14, borderRadius: 12, background: "rgba(255,255,255,0.05)", border: "none", color: "white", marginBottom: 12, outline: "none", flexShrink: 0 }}
           />
 
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8, flex: 1, minHeight: 0 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8, flexShrink: 0 }}>
             {["1", "2", "3", "4", "5", "6", "7", "8", "9", ",", "0", "DEL"].map((k) => (
-              <button key={k} onClick={() => kpAdd(k)} style={{ ...S.keyBtn, background: "rgba(255,255,255,0.05)", fontSize: 20, fontWeight: 700, color: "white" }}>
+              <button key={k} onClick={() => kpAdd(k)} style={{ ...S.keyBtn, padding: "20px 0", background: "rgba(255,255,255,0.05)", fontSize: 22, fontWeight: 700, color: "white" }}>
                 {k === "DEL" ? <IconDel /> : k}
               </button>
             ))}
@@ -1359,107 +1359,96 @@ function App() {
   if (screen === "confirmEnd") {
     return (
       <Shell burst={false}>
-        <div style={{ flex: 1, display: "flex", flexDirection: "column", padding: "12px 20px 32px", overflowY: "auto", animation: "slideIn 0.25s ease" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 28 }}>
+        <div style={{ flex: 1, display: "flex", flexDirection: "column", padding: "10px 16px 14px", overflow: "hidden", minHeight: 0, animation: "slideIn 0.25s ease" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 12, flexShrink: 0 }}>
             <button style={S.iconBtn} onClick={() => setScreen("main")}><IconBack /></button>
             <span style={{ fontSize: 20, fontWeight: 700, color: "white" }}>Terminar jornada</span>
           </div>
 
           {/* Dinero / KM inputs */}
-          <div style={{ display: "flex", gap: 10, marginBottom: 14 }}>
-            <div style={{ flex: 1, background: "oklch(0.20 0.06 150)", borderRadius: 16, padding: "14px", border: "1px solid oklch(0.60 0.16 150 / 0.35)" }}>
-              <div style={{ fontSize: 11, fontWeight: 700, color: "rgba(255,255,255,0.5)", textTransform: "uppercase", letterSpacing: "0.6px", marginBottom: 8 }}>€ Dinero</div>
+          <div style={{ display: "flex", gap: 8, marginBottom: 10, flexShrink: 0 }}>
+            <div style={{ flex: 1, background: "oklch(0.20 0.06 150)", borderRadius: 14, padding: "10px 12px", border: "1px solid oklch(0.60 0.16 150 / 0.35)" }}>
+              <div style={{ fontSize: 10, fontWeight: 700, color: "rgba(255,255,255,0.5)", textTransform: "uppercase", letterSpacing: "0.6px", marginBottom: 4 }}>€ Dinero</div>
               <input inputMode="decimal" value={dineroJ} onChange={e => setDineroJ(e.target.value.replace(/[^0-9,\.]/g, ""))} placeholder="0"
-                style={{ background: "transparent", border: "none", outline: "none", color: "oklch(0.78 0.18 150)", fontSize: 22, fontWeight: 900, width: "100%", letterSpacing: "-0.5px" }} />
+                style={{ background: "transparent", border: "none", outline: "none", color: "oklch(0.78 0.18 150)", fontSize: 19, fontWeight: 900, width: "100%", letterSpacing: "-0.5px" }} />
             </div>
-            <div style={{ flex: 1, background: "oklch(0.19 0.05 220)", borderRadius: 16, padding: "14px", border: "1px solid oklch(0.65 0.14 220 / 0.35)" }}>
-              <div style={{ fontSize: 11, fontWeight: 700, color: "rgba(255,255,255,0.5)", textTransform: "uppercase", letterSpacing: "0.6px", marginBottom: 8 }}>→ KM</div>
+            <div style={{ flex: 1, background: "oklch(0.19 0.05 220)", borderRadius: 14, padding: "10px 12px", border: "1px solid oklch(0.65 0.14 220 / 0.35)" }}>
+              <div style={{ fontSize: 10, fontWeight: 700, color: "rgba(255,255,255,0.5)", textTransform: "uppercase", letterSpacing: "0.6px", marginBottom: 4 }}>→ KM</div>
               <input inputMode="decimal" value={kmJ} onChange={e => setKmJ(e.target.value.replace(/[^0-9,\.]/g, ""))} placeholder="0"
-                style={{ background: "transparent", border: "none", outline: "none", color: "oklch(0.80 0.14 220)", fontSize: 22, fontWeight: 900, width: "100%", letterSpacing: "-0.5px" }} />
+                style={{ background: "transparent", border: "none", outline: "none", color: "oklch(0.80 0.14 220)", fontSize: 19, fontWeight: 900, width: "100%", letterSpacing: "-0.5px" }} />
             </div>
           </div>
 
           {/* Resumen previo */}
-          <div style={{ background: "rgba(255,255,255,0.04)", borderRadius: 22, padding: "20px", border: "1px solid rgba(255,255,255,0.07)", marginBottom: 16 }}>
-            <div style={{ fontSize: 12, fontWeight: 600, color: "rgba(255,255,255,0.3)", textTransform: "uppercase", letterSpacing: "0.8px", marginBottom: 14 }}>
+          <div style={{ background: "rgba(255,255,255,0.04)", borderRadius: 16, padding: "12px", border: "1px solid rgba(255,255,255,0.07)", marginBottom: 10, flexShrink: 0 }}>
+            <div style={{ fontSize: 10, fontWeight: 600, color: "rgba(255,255,255,0.3)", textTransform: "uppercase", letterSpacing: "0.8px", marginBottom: 8 }}>
               Resumen de hoy
             </div>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-              <div style={{ background: PBG, borderRadius: 16, padding: "14px", border: `1px solid ${P}33` }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 8 }}>
-                  <IconCard s={16} c={P} />
-                  <span style={{ fontSize: 12, fontWeight: 600, color: "rgba(255,255,255,0.4)" }}>Datáfono</span>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6 }}>
+              <div style={{ background: PBG, borderRadius: 12, padding: "8px 10px", border: `1px solid ${P}33` }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 4, marginBottom: 2 }}>
+                  <IconCard s={13} c={P} />
+                  <span style={{ fontSize: 11, fontWeight: 600, color: "rgba(255,255,255,0.4)" }}>Datáfono</span>
                 </div>
-                <div style={{ fontSize: 22, fontWeight: 900, color: P, letterSpacing: "-0.5px" }}>{fmt(totalD)}</div>
-                <div style={{ fontSize: 11, color: "rgba(255,255,255,0.2)", marginTop: 4 }}>{datafonos.length} entrada{datafonos.length !== 1 ? "s" : ""}</div>
+                <div style={{ fontSize: 16, fontWeight: 900, color: P, letterSpacing: "-0.3px" }}>{fmt(totalD)}</div>
               </div>
-              <div style={{ background: GBG, borderRadius: 16, padding: "14px", border: `1px solid ${G}33` }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 8 }}>
-                  <IconCoin s={16} c={G} />
-                  <span style={{ fontSize: 12, fontWeight: 600, color: "rgba(255,255,255,0.4)" }}>Propinas</span>
+              <div style={{ background: GBG, borderRadius: 12, padding: "8px 10px", border: `1px solid ${G}33` }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 4, marginBottom: 2 }}>
+                  <IconCoin s={13} c={G} />
+                  <span style={{ fontSize: 11, fontWeight: 600, color: "rgba(255,255,255,0.4)" }}>Propinas</span>
                 </div>
-                <div style={{ fontSize: 22, fontWeight: 900, color: G, letterSpacing: "-0.5px" }}>{fmt(totalP)}</div>
-                <div style={{ fontSize: 11, color: "rgba(255,255,255,0.2)", marginTop: 4 }}>{propinas.length} entrada{propinas.length !== 1 ? "s" : ""}</div>
+                <div style={{ fontSize: 16, fontWeight: 900, color: G, letterSpacing: "-0.3px" }}>{fmt(totalP)}</div>
               </div>
-              <div style={{ background: ABG, borderRadius: 16, padding: "14px", border: `1px solid ${A}33` }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 8 }}>
-                  <IconAgency s={16} c={A} />
-                  <span style={{ fontSize: 12, fontWeight: 600, color: "rgba(255,255,255,0.4)" }}>Agencias</span>
+              <div style={{ background: ABG, borderRadius: 12, padding: "8px 10px", border: `1px solid ${A}33` }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 4, marginBottom: 2 }}>
+                  <IconAgency s={13} c={A} />
+                  <span style={{ fontSize: 11, fontWeight: 600, color: "rgba(255,255,255,0.4)" }}>Agencias</span>
                 </div>
-                <div style={{ fontSize: 22, fontWeight: 900, color: A, letterSpacing: "-0.5px" }}>{fmt(totalA)}</div>
-                <div style={{ fontSize: 11, color: "rgba(255,255,255,0.2)", marginTop: 4 }}>{agencias.length} entrada{agencias.length !== 1 ? "s" : ""}</div>
+                <div style={{ fontSize: 16, fontWeight: 900, color: A, letterSpacing: "-0.3px" }}>{fmt(totalA)}</div>
               </div>
-              <div style={{ background: EBG, borderRadius: 16, padding: "14px", border: `1px solid ${E}33` }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 8 }}>
-                  <IconExtra s={16} c={E} />
-                  <span style={{ fontSize: 12, fontWeight: 600, color: "rgba(255,255,255,0.4)" }}>Extras</span>
+              <div style={{ background: EBG, borderRadius: 12, padding: "8px 10px", border: `1px solid ${E}33` }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 4, marginBottom: 2 }}>
+                  <IconExtra s={13} c={E} />
+                  <span style={{ fontSize: 11, fontWeight: 600, color: "rgba(255,255,255,0.4)" }}>Extras</span>
                 </div>
-                <div style={{ fontSize: 22, fontWeight: 900, color: E, letterSpacing: "-0.5px" }}>{fmt(totalE)}</div>
-                <div style={{ fontSize: 11, color: "rgba(255,255,255,0.2)", marginTop: 4 }}>{extras.length} entrada{extras.length !== 1 ? "s" : ""}</div>
+                <div style={{ fontSize: 16, fontWeight: 900, color: E, letterSpacing: "-0.3px" }}>{fmt(totalE)}</div>
               </div>
-              <div style={{ background: FBG, borderRadius: 16, padding: "14px", border: `1px solid ${F}33` }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 8 }}>
-                  <IconFuel s={16} c={F} />
-                  <span style={{ fontSize: 12, fontWeight: 600, color: "rgba(255,255,255,0.4)" }}>Gasolina</span>
+              <div style={{ background: FBG, borderRadius: 12, padding: "8px 10px", border: `1px solid ${F}33` }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 4, marginBottom: 2 }}>
+                  <IconFuel s={13} c={F} />
+                  <span style={{ fontSize: 11, fontWeight: 600, color: "rgba(255,255,255,0.4)" }}>Gasolina</span>
                 </div>
-                <div style={{ fontSize: 22, fontWeight: 900, color: F, letterSpacing: "-0.5px" }}>{fmt(totalF)}</div>
-                <div style={{ fontSize: 11, color: "rgba(255,255,255,0.2)", marginTop: 4 }}>{gasolinas.length} entrada{gasolinas.length !== 1 ? "s" : ""}</div>
+                <div style={{ fontSize: 16, fontWeight: 900, color: F, letterSpacing: "-0.3px" }}>{fmt(totalF)}</div>
               </div>
-              <div style={{ background: NBG, borderRadius: 16, padding: "14px", border: `1px solid ${N}33` }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 8 }}>
-                  <IconNulo s={16} c={N} />
-                  <span style={{ fontSize: 12, fontWeight: 600, color: "rgba(255,255,255,0.4)" }}>Nulos</span>
+              <div style={{ background: NBG, borderRadius: 12, padding: "8px 10px", border: `1px solid ${N}33` }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 4, marginBottom: 2 }}>
+                  <IconNulo s={13} c={N} />
+                  <span style={{ fontSize: 11, fontWeight: 600, color: "rgba(255,255,255,0.4)" }}>Nulos</span>
                 </div>
-                <div style={{ fontSize: 22, fontWeight: 900, color: N, letterSpacing: "-0.5px" }}>{fmt(totalN)}</div>
-                <div style={{ fontSize: 11, color: "rgba(255,255,255,0.2)", marginTop: 4 }}>{nulos.length} entrada{nulos.length !== 1 ? "s" : ""}</div>
+                <div style={{ fontSize: 16, fontWeight: 900, color: N, letterSpacing: "-0.3px" }}>{fmt(totalN)}</div>
               </div>
             </div>
             {current.startTime && (
-              <div style={{ fontSize: 12, color: "rgba(255,255,255,0.22)", marginTop: 14, textAlign: "center" }}>
-                Jornada iniciada a las {current.startTime}
+              <div style={{ fontSize: 11, color: "rgba(255,255,255,0.22)", marginTop: 8, textAlign: "center" }}>
+                Iniciada a las {current.startTime}
               </div>
             )}
           </div>
 
           {/* Notas */}
-          <div style={{ background: "rgba(255,255,255,0.04)", borderRadius: 16, padding: "14px 16px", border: "1px solid rgba(255,255,255,0.08)", marginBottom: 14 }}>
-            <div style={{ fontSize: 11, fontWeight: 700, color: "rgba(255,255,255,0.5)", textTransform: "uppercase", letterSpacing: "0.6px", marginBottom: 8 }}>📝 Notas</div>
-            <textarea value={notesJ} onChange={e => setNotesJ(e.target.value)} placeholder="Añade notas de la jornada..." rows={3}
-              style={{ background: "transparent", border: "none", outline: "none", color: "rgba(255,255,255,0.9)", fontSize: 15, width: "100%", resize: "none", fontFamily: "inherit", lineHeight: 1.4 }} />
+          <div style={{ background: "rgba(255,255,255,0.04)", borderRadius: 14, padding: "10px 12px", border: "1px solid rgba(255,255,255,0.08)", marginBottom: 10, flex: 1, minHeight: 0, display: "flex", flexDirection: "column" }}>
+            <div style={{ fontSize: 10, fontWeight: 700, color: "rgba(255,255,255,0.5)", textTransform: "uppercase", letterSpacing: "0.6px", marginBottom: 4, flexShrink: 0 }}>📝 Notas</div>
+            <textarea value={notesJ} onChange={e => setNotesJ(e.target.value)} placeholder="Añade notas..."
+              style={{ background: "transparent", border: "none", outline: "none", color: "rgba(255,255,255,0.9)", fontSize: 14, width: "100%", resize: "none", fontFamily: "inherit", lineHeight: 1.4, flex: 1, minHeight: 40 }} />
           </div>
 
-          <div style={{ fontSize: 15, color: "rgba(255,255,255,0.4)", textAlign: "center", marginBottom: 16, lineHeight: 1.6 }}>
-            ¿Seguro que quieres cerrar la jornada?<br />
-            <span style={{ fontSize: 13, color: "rgba(255,255,255,0.22)" }}>Se guardará en el historial.</span>
-          </div>
-
-          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+          <div style={{ display: "flex", flexDirection: "column", gap: 8, flexShrink: 0 }}>
             <button onClick={handleEndJornada}
-              style={{ padding: "18px 0", borderRadius: 18, border: "none", background: "rgba(255,60,60,0.12)", color: "rgba(255,110,110,0.9)", fontSize: 17, fontWeight: 800, cursor: "pointer", outline: "1.5px solid rgba(255,60,60,0.25)" }}>
+              style={{ padding: "14px 0", borderRadius: 16, border: "none", background: "rgba(255,60,60,0.12)", color: "rgba(255,110,110,0.9)", fontSize: 16, fontWeight: 800, cursor: "pointer", outline: "1.5px solid rgba(255,60,60,0.25)" }}>
               Sí, terminar jornada
             </button>
             <button onClick={() => setScreen("main")}
-              style={{ padding: "16px 0", borderRadius: 18, border: "none", background: "rgba(255,255,255,0.06)", color: "rgba(255,255,255,0.5)", fontSize: 16, fontWeight: 700, cursor: "pointer" }}>
+              style={{ padding: "12px 0", borderRadius: 16, border: "none", background: "rgba(255,255,255,0.06)", color: "rgba(255,255,255,0.5)", fontSize: 15, fontWeight: 700, cursor: "pointer" }}>
               Cancelar
             </button>
           </div>
@@ -2167,7 +2156,7 @@ function ConfirmDialog({ text, onConfirm, onCancel }: any) {
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
-        zIndex: 9999,
+        zIndex: 10000,
         animation: "fadeIn 0.2s ease",
       }}
     >
