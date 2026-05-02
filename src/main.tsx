@@ -1110,7 +1110,7 @@ function App() {
 
     return (
       <Shell burst={false}>
-        <div style={{ flex: 1, padding: "16px 20px", display: "flex", flexDirection: "column", overflowY: "auto" }}>
+        <div style={{ flex: 1, padding: "16px 20px 40vh", display: "flex", flexDirection: "column", overflowY: "auto" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 24 }}>
             <button style={S.iconBtn} onClick={() => setScreen("main")}>
               <IconBack />
@@ -1162,7 +1162,7 @@ function App() {
             style={{ width: "100%", padding: 14, borderRadius: 12, background: "rgba(255,255,255,0.05)", border: "none", color: "white", marginBottom: 20, outline: "none" }}
           />
 
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8, marginTop: "auto" }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8, marginTop: 20 }}>
             {["1", "2", "3", "4", "5", "6", "7", "8", "9", ",", "0", "DEL"].map((k) => (
               <button key={k} onClick={() => kpAdd(k)} style={{ ...S.keyBtn, padding: 16, background: "rgba(255,255,255,0.05)", fontSize: 20, fontWeight: 700, color: "white" }}>
                 {k === "DEL" ? <IconDel /> : k}
@@ -1170,7 +1170,7 @@ function App() {
             ))}
           </div>
 
-          <button onClick={handleSaveAdd} style={{ width: "100%", padding: 18, marginTop: 16, borderRadius: 16, border: "none", background: activeField === "propina" ? G : P, color: "black", fontWeight: 800, fontSize: 18, cursor: "pointer" }}>
+          <button onClick={handleSaveAdd} style={{ width: "100%", padding: 18, marginTop: 20, borderRadius: 16, border: "none", background: activeField === "propina" ? G : P, color: "black", fontWeight: 800, fontSize: 18, cursor: "pointer" }}>
             Guardar
           </button>
         </div>
@@ -1293,7 +1293,7 @@ function App() {
                   <span style={{ fontSize: 13, color: "rgba(255,255,255,0.3)", marginRight: 8 }}>{e.time}</span>
                   <span style={{ fontSize: 16, fontWeight: 800, color: meta.col }}>+{fmt(e.amount)}</span>
                   <button
-                    onClick={() => openEditEntry(e)}
+                    onClick={() => { setScreen("main"); setTimeout(() => openEditEntry(e), 50); }}
                     title="Editar entrada"
                     style={{
                       background: "rgba(255,255,255,0.08)",
