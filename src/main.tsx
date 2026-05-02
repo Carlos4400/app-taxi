@@ -420,6 +420,7 @@ function App() {
   const [editJ, setEditJ] = useState<any>(null);
   const [confirmDialog, setConfirmDialog] = useState<{ text: string; onConfirm: () => void } | null>(null);
   const [updateMsg, setUpdateMsg] = useState("");
+  const [downloadUrl, setDownloadUrl] = useState("");
   const [editEntry, setEditEntry] = useState<Entry | null>(null);
   const [editEntryAmount, setEditEntryAmount] = useState("");
   const [editEntryNote, setEditEntryNote] = useState("");
@@ -514,16 +515,25 @@ function App() {
 
   async function checkUpdate() {
     setUpdateMsg("Buscando actualizaciones...");
+    setDownloadUrl("");
     try {
-      const res = await fetch("https://raw.githubusercontent.com/Carlos4400/app-taxi/main/package.json?nocache=" + Date.now());
+      const res = await fetch("https://api.github.com/repos/Carlos4400/app-taxi/releases/latest");
+      if (!res.ok) throw new Error("No se encontró el release");
       const data = await res.json();
-      if (data.version !== APP_VERSION) {
-        setUpdateMsg(`¡Nueva versión ${data.version} disponible en GitHub!`);
+      const latestVersion = data.tag_name ? data.tag_name.replace(/[^0-9.]/g, '') : null;
+
+      if (latestVersion && latestVersion !== APP_VERSION) {
+        setUpdateMsg(`¡Nueva versión ${latestVersion} disponible!`);
+        if (data.assets && data.assets.length > 0) {
+          setDownloadUrl(data.assets[0].browser_download_url);
+        } else {
+          setDownloadUrl(data.html_url);
+        }
       } else {
         setUpdateMsg("Tienes la última versión instalada.");
       }
     } catch (e) {
-      setUpdateMsg("Error al comprobar actualizaciones.");
+      setUpdateMsg("Error al conectar con GitHub.");
     }
   }
 
@@ -674,7 +684,7 @@ function App() {
       <Shell burst={false}>
         <div style={{ flex: 1, padding: "16px 20px", display: "flex", flexDirection: "column" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 32 }}>
-            <button style={S.iconBtn} onClick={() => { setScreen("home"); setUpdateMsg(""); }}><IconBack /></button>
+            <button style={S.iconBtn} onClick={() => { setScreen("home"); setUpdateMsg(""); setDownloadUrl(""); }}><IconBack /></button>
             <div style={{ fontSize: 24, fontWeight: 800, color: "white" }}>Ajustes</div>
           </div>
 
@@ -694,6 +704,15 @@ function App() {
               <div style={{ marginTop: 16, fontSize: 14, color: updateMsg.includes("Nueva") ? "oklch(0.68 0.20 145)" : "rgba(255,255,255,0.6)", fontWeight: updateMsg.includes("Nueva") ? 700 : 400, background: "rgba(0,0,0,0.2)", padding: "12px", borderRadius: 12 }}>
                 {updateMsg}
               </div>
+            )}
+
+            {downloadUrl && (
+              <button
+                onClick={() => window.open(downloadUrl, "_blank")}
+                style={{ width: "100%", padding: "14px 0", marginTop: 12, borderRadius: 16, border: "none", background: "oklch(0.68 0.20 145)", color: "black", fontSize: 16, fontWeight: 800, cursor: "pointer" }}
+              >
+                ⬇️ Descargar nueva versión
+              </button>
             )}
           </div>
         </div>
