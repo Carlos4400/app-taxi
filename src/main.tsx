@@ -1,5 +1,8 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
+import { Capacitor } from "@capacitor/core";
+import { Filesystem, Directory, Encoding } from "@capacitor/filesystem";
+import { Share } from "@capacitor/share";
 
 const { useState, useEffect } = React;
 
@@ -80,7 +83,7 @@ function csvEscape(value: string | number): string {
   return s;
 }
 
-function exportHistoryCSV(jornadas: Jornada[]): void {
+function buildHistoryCSV(jornadas: Jornada[]): string {
   const header = [
     "fecha",
     "inicio",
@@ -95,8 +98,6 @@ function exportHistoryCSV(jornadas: Jornada[]): void {
   ];
   const rows: string[] = [header.join(";")];
 
-  // Una fila por cada entrada, repitiendo los datos de la jornada para
-  // que el CSV sea fácilmente filtrable en Excel/Sheets.
   for (const j of jornadas) {
     if (j.entries.length === 0) {
       rows.push(
@@ -132,14 +133,49 @@ function exportHistoryCSV(jornadas: Jornada[]): void {
       );
     }
   }
+  // BOM UTF-8 para que Excel reconozca los acentos.
+  return "﻿" + rows.join("\r\n");
+}
 
-  // BOM UTF-8 para que Excel reconozca los acentos correctamente.
-  const csv = "﻿" + rows.join("\r\n");
+async function exportHistoryCSV(jornadas: Jornada[]): Promise<void> {
+  const csv = buildHistoryCSV(jornadas);
+  const filename = `mi-turno-${today()}.csv`;
+
+  // En Capacitor (APK Android) usamos Filesystem + Share porque
+  // el truco <a download> no funciona dentro del WebView nativo.
+  if (Capacitor.isNativePlatform()) {
+    try {
+      const result = await Filesystem.writeFile({
+        path: filename,
+        data: csv,
+        directory: Directory.Documents,
+        encoding: Encoding.UTF8,
+        recursive: true,
+      });
+      try {
+        await Share.share({
+          title: "Historial Mi Turno",
+          text: "Exportación CSV de jornadas",
+          url: result.uri,
+          dialogTitle: "Compartir CSV",
+        });
+      } catch (shareErr) {
+        // Si el usuario cancela o no hay app de compartir, al menos el
+        // archivo ya está guardado en Documents.
+        alert("CSV guardado en Documentos del dispositivo:\n" + filename);
+      }
+    } catch (e) {
+      alert("No se pudo exportar el CSV: " + (e as Error).message);
+    }
+    return;
+  }
+
+  // Navegador (PWA): descarga clásica con <a download>.
   const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
-  a.download = `mi-turno-${today()}.csv`;
+  a.download = filename;
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
@@ -384,6 +420,42 @@ function App() {
   const [editJ, setEditJ] = useState<any>(null);
   const [confirmDialog, setConfirmDialog] = useState<{ text: string; onConfirm: () => void } | null>(null);
   const [updateMsg, setUpdateMsg] = useState("");
+  const [editEntry, setEditEntry] = useState<Entry | null>(null);
+  const [editEntryAmount, setEditEntryAmount] = useState("");
+  const [editEntryNote, setEditEntryNote] = useState("");
+
+  function openEditEntry(e: Entry) {
+    setEditEntry(e);
+    setEditEntryAmount(e.amount.toFixed(2).replace(".", ","));
+    setEditEntryNote(e.note || "");
+  }
+
+  function saveEditEntry() {
+    if (!editEntry) return;
+    const amt = parseFloat(editEntryAmount.replace(",", "."));
+    if (isNaN(amt) || amt <= 0) {
+      alert("El importe debe ser un número mayor que 0.");
+      return;
+    }
+    setCurrent((prev) => ({
+      ...prev,
+      entries: prev.entries.map((x) =>
+        x.id === editEntry.id
+          ? { ...x, amount: amt, note: editEntryNote.trim() }
+          : x
+      ),
+    }));
+    setEditEntry(null);
+  }
+
+  function deleteEditEntry() {
+    if (!editEntry) return;
+    setCurrent((prev) => ({
+      ...prev,
+      entries: prev.entries.filter((x) => x.id !== editEntry.id),
+    }));
+    setEditEntry(null);
+  }
 
   useEffect(() => {
     localStorage.setItem(KEY_CURRENT, JSON.stringify(current));
@@ -1186,15 +1258,14 @@ function App() {
                   <span style={{ fontSize: 13, color: "rgba(255,255,255,0.3)", marginRight: 8 }}>{e.time}</span>
                   <span style={{ fontSize: 16, fontWeight: 800, color: meta.col }}>+{fmt(e.amount)}</span>
                   <button
-                    onClick={() => {
-                      setConfirmDialog({ text: "¿Seguro que quieres eliminar esta entrada?", onConfirm: () => handleDelete(e.id) });
-                    }}
+                    onClick={() => openEditEntry(e)}
+                    title="Editar entrada"
                     style={{
-                      background: "rgba(255,60,60,0.1)",
+                      background: "rgba(255,255,255,0.08)",
                       border: "none",
                       borderRadius: 7,
-                      color: "rgba(255,80,80,0.55)",
-                      fontSize: 12,
+                      color: "rgba(255,255,255,0.7)",
+                      fontSize: 13,
                       cursor: "pointer",
                       width: 28,
                       height: 28,
@@ -1204,7 +1275,7 @@ function App() {
                       marginLeft: 8,
                     }}
                   >
-                    ✕
+                    ✏️
                   </button>
                 </div>
               );
@@ -1228,6 +1299,23 @@ function App() {
           )}
         </div>
         {confirmDialog && <ConfirmDialog {...confirmDialog} onCancel={() => setConfirmDialog(null)} />}
+        {editEntry && (
+          <EditEntryDialog
+            entry={editEntry}
+            amount={editEntryAmount}
+            note={editEntryNote}
+            onAmountChange={setEditEntryAmount}
+            onNoteChange={setEditEntryNote}
+            onSave={saveEditEntry}
+            onDelete={() => {
+              setConfirmDialog({
+                text: "¿Seguro que quieres eliminar esta entrada?",
+                onConfirm: deleteEditEntry,
+              });
+            }}
+            onCancel={() => setEditEntry(null)}
+          />
+        )}
       </Shell>
     );
   }
@@ -1352,7 +1440,8 @@ function App() {
           display: "flex",
           flexDirection: "column",
           padding: "12px 20px 24px",
-          overflowY: "auto",
+          overflowY: "hidden",
+          minHeight: 0,
         }}
       >
         <div
@@ -1646,15 +1735,14 @@ function App() {
                         +{fmt(e.amount)}
                       </span>
                       <button
-                        onClick={() => {
-                          setConfirmDialog({ text: "¿Seguro que quieres eliminar esta entrada?", onConfirm: () => handleDelete(e.id) });
-                        }}
+                        onClick={() => openEditEntry(e)}
+                        title="Editar entrada"
                         style={{
-                          background: "rgba(255,60,60,0.1)",
+                          background: "rgba(255,255,255,0.08)",
                           border: "none",
                           borderRadius: 7,
-                          color: "rgba(255,80,80,0.55)",
-                          fontSize: 11,
+                          color: "rgba(255,255,255,0.7)",
+                          fontSize: 12,
                           cursor: "pointer",
                           width: 24,
                           height: 24,
@@ -1664,7 +1752,7 @@ function App() {
                           marginLeft: 6,
                         }}
                       >
-                        ✕
+                        ✏️
                       </button>
                     </div>
                   );
@@ -1855,6 +1943,158 @@ function MainCard({
         style={{ fontSize: 12, color: "rgba(255,255,255,0.22)", marginTop: 8 }}
       >
         {count} entrada{count !== 1 ? "s" : ""}
+      </div>
+    </div>
+  );
+}
+
+function EditEntryDialog({
+  entry,
+  amount,
+  note,
+  onAmountChange,
+  onNoteChange,
+  onSave,
+  onDelete,
+  onCancel,
+}: {
+  entry: Entry;
+  amount: string;
+  note: string;
+  onAmountChange: (v: string) => void;
+  onNoteChange: (v: string) => void;
+  onSave: () => void;
+  onDelete: () => void;
+  onCancel: () => void;
+}) {
+  const meta: { col: string; lbl: string } =
+    entry.type === "propina" ? { col: G, lbl: "Propina" }
+    : entry.type === "datafono" ? { col: P, lbl: "Datáfono" }
+    : entry.type === "agencia" ? { col: A, lbl: "Agencia" }
+    : entry.type === "extra" ? { col: E, lbl: "Extra" }
+    : entry.type === "gasolina" ? { col: F, lbl: "Gasolina" }
+    : { col: N, lbl: "Nulo" };
+  return (
+    <div
+      style={{
+        position: "fixed",
+        top: 0, left: 0, right: 0, bottom: 0,
+        background: "rgba(0,0,0,0.6)",
+        backdropFilter: "blur(4px)",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        zIndex: 9999,
+      }}
+    >
+      <div
+        style={{
+          background: "oklch(0.18 0.03 260)",
+          borderRadius: 20,
+          padding: 24,
+          width: "90%",
+          maxWidth: 360,
+          border: "1px solid rgba(255,255,255,0.1)",
+          boxShadow: "0 20px 40px rgba(0,0,0,0.5)",
+          animation: "fadeUp 0.25s ease",
+        }}
+      >
+        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 16 }}>
+          <span style={{ fontSize: 13, fontWeight: 700, color: meta.col, textTransform: "uppercase", letterSpacing: "0.5px" }}>
+            Editar {meta.lbl}
+          </span>
+          <span style={{ fontSize: 12, color: "rgba(255,255,255,0.3)", marginLeft: "auto" }}>{entry.time}</span>
+        </div>
+
+        <div style={{ marginBottom: 14 }}>
+          <div style={{ fontSize: 11, fontWeight: 700, color: "rgba(255,255,255,0.5)", marginBottom: 6, textTransform: "uppercase", letterSpacing: "0.6px" }}>Importe (€)</div>
+          <input
+            inputMode="decimal"
+            value={amount}
+            onChange={(ev) => onAmountChange(ev.target.value.replace(/[^0-9,\.]/g, ""))}
+            style={{
+              width: "100%",
+              background: "rgba(0,0,0,0.3)",
+              border: `1px solid ${meta.col}55`,
+              borderRadius: 12,
+              color: meta.col,
+              padding: "12px 14px",
+              fontSize: 22,
+              fontWeight: 900,
+              outline: "none",
+            }}
+          />
+        </div>
+
+        <div style={{ marginBottom: 20 }}>
+          <div style={{ fontSize: 11, fontWeight: 700, color: "rgba(255,255,255,0.5)", marginBottom: 6, textTransform: "uppercase", letterSpacing: "0.6px" }}>Nota</div>
+          <input
+            value={note}
+            onChange={(ev) => onNoteChange(ev.target.value)}
+            placeholder="Nota opcional"
+            style={{
+              width: "100%",
+              background: "rgba(0,0,0,0.3)",
+              border: "1px solid rgba(255,255,255,0.1)",
+              borderRadius: 12,
+              color: "white",
+              padding: "10px 14px",
+              fontSize: 14,
+              outline: "none",
+            }}
+          />
+        </div>
+
+        <div style={{ display: "flex", gap: 8 }}>
+          <button
+            onClick={onCancel}
+            style={{
+              flex: 1,
+              padding: "14px",
+              borderRadius: 12,
+              border: "none",
+              background: "rgba(255,255,255,0.08)",
+              color: "rgba(255,255,255,0.7)",
+              fontWeight: 700,
+              fontSize: 14,
+              cursor: "pointer",
+            }}
+          >
+            Cancelar
+          </button>
+          <button
+            onClick={onDelete}
+            style={{
+              flex: 1,
+              padding: "14px",
+              borderRadius: 12,
+              border: "none",
+              background: "rgba(255,60,60,0.15)",
+              color: "#ff7b7b",
+              fontWeight: 700,
+              fontSize: 14,
+              cursor: "pointer",
+            }}
+          >
+            Eliminar
+          </button>
+          <button
+            onClick={onSave}
+            style={{
+              flex: 1.2,
+              padding: "14px",
+              borderRadius: 12,
+              border: "none",
+              background: meta.col,
+              color: "black",
+              fontWeight: 800,
+              fontSize: 14,
+              cursor: "pointer",
+            }}
+          >
+            Guardar
+          </button>
+        </div>
       </div>
     </div>
   );
