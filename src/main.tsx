@@ -53,7 +53,7 @@ const NBG = "oklch(0.18 0.03 260)";
 
 const KEY_CURRENT = "taxi_current_v3";
 const KEY_HISTORY = "taxi_history_v3";
-const APP_VERSION = "1.0.0";
+const APP_VERSION = "1.0.1";
 
 function today(): string {
   return new Date().toISOString().slice(0, 10);
