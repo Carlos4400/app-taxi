@@ -36,3 +36,6 @@ android/capacitor-cordova-android-plugins/
 .env
 .env.local
 .env.*.local
+
+# Iconos web autogenerados por @capacitor/assets
+icons/

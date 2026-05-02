@@ -26,11 +26,13 @@ interface Jornada {
   dinero: number;
   km: number;
   notes: string;
+  startDate: string | null;
 }
 
 interface CurrentState {
   entries: Entry[];
   startTime: string | null;
+  startDate: string | null;
 }
 
 const G = "oklch(0.68 0.20 145)";
@@ -48,6 +50,7 @@ const NBG = "oklch(0.18 0.03 260)";
 
 const KEY_CURRENT = "taxi_current_v3";
 const KEY_HISTORY = "taxi_history_v3";
+const APP_VERSION = "1.0.0";
 
 function today(): string {
   return new Date().toISOString().slice(0, 10);
@@ -148,7 +151,7 @@ function loadCurrent(): CurrentState {
     const d = JSON.parse(localStorage.getItem(KEY_CURRENT)!);
     if (d) return d;
   } catch (e) { }
-  return { entries: [], startTime: null };
+  return { entries: [], startTime: null, startDate: null };
 }
 function loadHistory(): Jornada[] {
   try {
@@ -380,6 +383,7 @@ function App() {
   const [notesJ, setNotesJ] = useState("");
   const [editJ, setEditJ] = useState<any>(null);
   const [confirmDialog, setConfirmDialog] = useState<{ text: string; onConfirm: () => void } | null>(null);
+  const [updateMsg, setUpdateMsg] = useState("");
 
   useEffect(() => {
     localStorage.setItem(KEY_CURRENT, JSON.stringify(current));
@@ -425,14 +429,30 @@ function App() {
       dinero: parseFloat(dineroJ.replace(",", ".")) || 0,
       km: parseFloat(kmJ.replace(",", ".")) || 0,
       notes: notesJ.trim(),
+      startDate: current.startDate,
     };
     setHistory((h) => [jornada, ...h]);
-    setCurrent({ entries: [], startTime: null });
+    setCurrent({ entries: [], startTime: null, startDate: null });
     setDineroJ("");
     setKmJ("");
     setNotesJ("");
     setViewJornada(jornada);
     setScreen("summary");
+  }
+
+  async function checkUpdate() {
+    setUpdateMsg("Buscando actualizaciones...");
+    try {
+      const res = await fetch("https://raw.githubusercontent.com/Carlos4400/app-taxi/main/package.json?nocache=" + Date.now());
+      const data = await res.json();
+      if (data.version !== APP_VERSION) {
+        setUpdateMsg(`¡Nueva versión ${data.version} disponible en GitHub!`);
+      } else {
+        setUpdateMsg("Tienes la última versión instalada.");
+      }
+    } catch (e) {
+      setUpdateMsg("Error al comprobar actualizaciones.");
+    }
   }
 
   const S = {
@@ -506,6 +526,7 @@ function App() {
                 weekday: "long",
                 day: "numeric",
                 month: "long",
+                year: "numeric",
               })}
             </div>
           </div>
@@ -553,6 +574,57 @@ function App() {
             </button>
           </div>
         </div>
+        <button
+          onClick={() => setScreen("settings")}
+          style={{
+            position: "absolute",
+            bottom: 32,
+            right: 28,
+            background: "rgba(255,255,255,0.06)",
+            border: "1px solid rgba(255,255,255,0.1)",
+            borderRadius: 16,
+            padding: 14,
+            cursor: "pointer",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            fontSize: 22
+          }}
+        >
+          ⚙️
+        </button>
+      </Shell>
+    );
+  }
+
+  if (screen === "settings") {
+    return (
+      <Shell burst={false}>
+        <div style={{ flex: 1, padding: "16px 20px", display: "flex", flexDirection: "column" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 32 }}>
+            <button style={S.iconBtn} onClick={() => { setScreen("home"); setUpdateMsg(""); }}><IconBack /></button>
+            <div style={{ fontSize: 24, fontWeight: 800, color: "white" }}>Ajustes</div>
+          </div>
+
+          <div style={{ background: "rgba(255,255,255,0.03)", borderRadius: 20, padding: 24, border: "1px solid rgba(255,255,255,0.07)", textAlign: "center" }}>
+            <div style={{ fontSize: 48, marginBottom: 12 }}>🚕</div>
+            <div style={{ fontSize: 20, fontWeight: 800, color: "white", marginBottom: 4 }}>Mi Turno</div>
+            <div style={{ fontSize: 14, color: "rgba(255,255,255,0.4)", marginBottom: 24 }}>Versión {APP_VERSION}</div>
+
+            <button
+              onClick={checkUpdate}
+              style={{ width: "100%", padding: "16px 0", borderRadius: 16, border: "none", background: "rgba(255,255,255,0.1)", color: "white", fontSize: 16, fontWeight: 700, cursor: "pointer", transition: "all 0.2s" }}
+            >
+              🔄 Buscar actualizaciones
+            </button>
+
+            {updateMsg && (
+              <div style={{ marginTop: 16, fontSize: 14, color: updateMsg.includes("Nueva") ? "oklch(0.68 0.20 145)" : "rgba(255,255,255,0.6)", fontWeight: updateMsg.includes("Nueva") ? 700 : 400, background: "rgba(0,0,0,0.2)", padding: "12px", borderRadius: 12 }}>
+                {updateMsg}
+              </div>
+            )}
+          </div>
+        </div>
       </Shell>
     );
   }
@@ -585,7 +657,9 @@ function App() {
             <div style={{ flex: 1 }}>
               <div style={{ fontSize: 20, fontWeight: 800, color: 'white' }}>Resumen de jornada</div>
               <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.3)', textTransform: 'capitalize', marginTop: 1 }}>
-                {fmtDate(viewJornada.date)} · {viewJornada.startTime} – {viewJornada.endTime}
+                {viewJornada.startDate && viewJornada.startDate !== viewJornada.date
+                     ? <>{fmtDate(viewJornada.startDate)} {viewJornada.startTime} – {fmtDate(viewJornada.date)} {viewJornada.endTime}</>
+                     : <>{fmtDate(viewJornada.date)} · {viewJornada.startTime} – {viewJornada.endTime}</>}
               </div>
             </div>
             <button style={{ ...S.iconBtn, background: 'rgba(255,255,255,0.09)' }} onClick={() => {
@@ -651,10 +725,18 @@ function App() {
   // ── EDIT JORNADA SCREEN ───────────────────────────────────────
   if (screen === 'editJornada' && editJ) {
     function saveEdit() {
+      const finalDinero = editJ.dineroStr !== undefined
+        ? parseFloat(editJ.dineroStr.replace(',', '.')) || 0
+        : (editJ.dinero || 0);
+      const finalKm = editJ.kmStr !== undefined
+        ? parseFloat(editJ.kmStr.replace(',', '.')) || 0
+        : (editJ.km || 0);
       const updated = {
         ...editJ,
-        dinero: parseFloat((editJ.dineroStr || '0').replace(',', '.')) || 0,
-        km: parseFloat((editJ.kmStr || '0').replace(',', '.')) || 0,
+        dinero: finalDinero,
+        km: finalKm,
+        dineroStr: undefined,
+        kmStr: undefined,
         totalP: editJ.entries.filter((e: any) => e.type === 'propina').reduce((s: number, e: any) => s + e.amount, 0),
         totalD: editJ.entries.filter((e: any) => e.type === 'datafono').reduce((s: number, e: any) => s + e.amount, 0),
         totalA: editJ.entries.filter((e: any) => e.type === 'agencia').reduce((s: number, e: any) => s + e.amount, 0),
@@ -662,7 +744,6 @@ function App() {
         totalF: editJ.entries.filter((e: any) => e.type === 'gasolina').reduce((s: number, e: any) => s + e.amount, 0),
         totalN: editJ.entries.filter((e: any) => e.type === 'nulo').reduce((s: number, e: any) => s + e.amount, 0),
       };
-      delete updated.dineroStr; delete updated.kmStr;
       setHistory((h: any[]) => h.map((j: any) => j.id === updated.id ? updated : j));
       setViewJornada(updated);
       setEditJ(null);
@@ -843,6 +924,7 @@ function App() {
       setCurrent((prev) => ({
         ...prev,
         startTime: prev.startTime || now,
+        startDate: prev.startDate || today(),
         entries: [...prev.entries, entry],
       }));
       setValS("");
@@ -864,11 +946,11 @@ function App() {
             placeholder="Nota (opcional)"
             value={noteS}
             onChange={(e) => setNoteS(e.target.value)}
-            style={{ width: "100%", padding: 10, borderRadius: 8, background: "rgba(255,255,255,0.05)", border: "none", color: "white" }}
+            style={{ width: "100%", padding: 10, borderRadius: 8, background: "rgba(255,255,255,0.05)", border: "none", color: "white", outline: "none" }}
           />
           <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8, marginTop: 20 }}>
             {["1", "2", "3", "4", "5", "6", "7", "8", "9", ",", "0", "DEL"].map((k) => (
-              <button key={k} onClick={() => kpS(k)} style={{ ...S.keyBtn, padding: 15, background: "rgba(255,255,255,0.05)" }}>
+              <button key={k} onClick={() => kpS(k)} style={{ ...S.keyBtn, padding: 15, background: "rgba(255,255,255,0.05)", color: "white", fontSize: 20, fontWeight: 700 }}>
                 {k === "DEL" ? <IconDel /> : k}
               </button>
             ))}
@@ -912,6 +994,7 @@ function App() {
       setCurrent((prev) => ({
         ...prev,
         startTime: prev.startTime || now,
+        startDate: prev.startDate || today(),
         entries: [...prev.entries, ...newEntries],
       }));
       setValP(""); setValD(""); setNoteP(""); setNoteD("");
@@ -920,7 +1003,7 @@ function App() {
 
     return (
       <Shell burst={false}>
-        <div style={{ flex: 1, padding: "16px 20px", display: "flex", flexDirection: "column" }}>
+        <div style={{ flex: 1, padding: "16px 20px", display: "flex", flexDirection: "column", overflowY: "auto" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 24 }}>
             <button style={S.iconBtn} onClick={() => setScreen("main")}>
               <IconBack />
@@ -969,7 +1052,7 @@ function App() {
             placeholder={`Nota para ${activeField} (opcional)`}
             value={activeField === "propina" ? noteP : noteD}
             onChange={(e) => activeField === "propina" ? setNoteP(e.target.value) : setNoteD(e.target.value)}
-            style={{ width: "100%", padding: 14, borderRadius: 12, background: "rgba(255,255,255,0.05)", border: "none", color: "white", marginBottom: 20 }}
+            style={{ width: "100%", padding: 14, borderRadius: 12, background: "rgba(255,255,255,0.05)", border: "none", color: "white", marginBottom: 20, outline: "none" }}
           />
 
           <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8, marginTop: "auto" }}>
@@ -980,7 +1063,7 @@ function App() {
             ))}
           </div>
 
-          <button onClick={handleSaveAdd} style={{ width: "100%", padding: 18, marginTop: 16, borderRadius: 16, border: "none", background: "white", color: "black", fontWeight: 800, fontSize: 18, cursor: "pointer" }}>
+          <button onClick={handleSaveAdd} style={{ width: "100%", padding: 18, marginTop: 16, borderRadius: 16, border: "none", background: activeField === "propina" ? G : P, color: "black", fontWeight: 800, fontSize: 18, cursor: "pointer" }}>
             Guardar
           </button>
         </div>
@@ -1133,7 +1216,7 @@ function App() {
                 setConfirmDialog({
                   text: "¿Seguro que quieres borrar TODAS las entradas de hoy?",
                   onConfirm: () => {
-                    setCurrent({ entries: [], startTime: current.startTime });
+                    setCurrent({ entries: [], startTime: current.startTime, startDate: current.startDate });
                     setScreen("main");
                   }
                 });
@@ -1307,7 +1390,11 @@ function App() {
                   marginTop: 4,
                 }}
               >
-                desde {current.startTime}
+{(() => {
+                       const dateToUse = current.startDate || today();
+                       const [d, m, y] = dateToUse.split("-").reverse();
+                       return `${d}/${m}/${y} desde ${current.startTime}`;
+                     })()}
               </div>
             )}
           </div>
@@ -1410,7 +1497,7 @@ function App() {
             }}
           />
         </div>
-        <div style={{ flex: 1 }}>
+        <div style={{ flex: 1, display: "flex", flexDirection: "column", minHeight: 0 }}>
           <div
             style={{
               fontSize: 12,
@@ -1448,6 +1535,7 @@ function App() {
                           hour: "2-digit",
                           minute: "2-digit",
                         }),
+                        startDate: today(),
                       });
                       setBurst(true);
                       setTimeout(() => setBurst(false), 800);
@@ -1472,10 +1560,9 @@ function App() {
               )}
             </div>
           ) : (
-            <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
+            <div style={{ display: "flex", flexDirection: "column", gap: 7, flex: 1, overflowY: "auto", paddingRight: 4 }}>
               {[...current.entries]
                 .reverse()
-                .slice(0, 4)
                 .map((e) => {
                   const meta =
                     e.type === "propina"
