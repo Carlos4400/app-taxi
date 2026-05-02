@@ -972,6 +972,22 @@ function App() {
               style={{ padding: '16px 0', borderRadius: 18, border: 'none', background: 'rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.5)', fontSize: 16, fontWeight: 700, cursor: 'pointer' }}>
               Cancelar
             </button>
+            <button
+              onClick={() => {
+                setConfirmDialog({
+                  text: "¿Seguro que quieres eliminar esta jornada completa? Esta acción no se puede deshacer.",
+                  onConfirm: () => {
+                    setHistory((h) => h.filter((j) => j.id !== editJ.id));
+                    setEditJ(null);
+                    setViewJornada(null);
+                    setScreen("pastHistory");
+                  }
+                });
+              }}
+              style={S.dangerBtn}
+            >
+              Borrar jornada
+            </button>
           </div>
         </div>
       </Shell>
