@@ -533,16 +533,12 @@ function App() {
   }
 
   function handleEndTurno() {
-    // Las entradas tipo "nota" ya se han consolidado en `notesJ` al pulsar
-    // "Terminar Turno" en la pantalla anterior, por lo que las quitamos
-    // aquí para que no aparezcan duplicadas en el histórico.
-    const cleanEntries = current.entries.filter((e) => e.type !== "nota");
     const turno = {
       id: Date.now(),
       date: today(),
       startTime: current.startTime,
       endTime: timeNow(),
-      entries: cleanEntries,
+      entries: current.entries,
       totalP,
       totalD,
       totalA,
@@ -839,36 +835,8 @@ function App() {
             </div>
 
             {(() => {
-              const entriesWithNotes = viewTurno.entries.filter((e: any) => e.type !== 'nota' && e.note && e.note.trim());
-              if (entriesWithNotes.length === 0) return null;
-              return (
-                <div style={{ marginTop: 16, paddingTop: 14, borderTop: '1px solid rgba(255,255,255,0.06)', display: 'flex', flexDirection: 'column', gap: 8 }}>
-                  <div style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '0.6px', marginBottom: 4 }}>📌 Notas detalladas</div>
-                  {entriesWithNotes.map((e: any) => {
-                    const col = e.type === 'propina' ? G : e.type === 'datafono' ? P : e.type === 'agencia' ? A : e.type === 'extra' ? E : e.type === 'gasolina' ? F : N;
-                    return (
-                      <div key={e.id} style={{ fontSize: 13, background: 'rgba(255,255,255,0.02)', padding: '10px 12px', borderRadius: 12, border: '1px solid rgba(255,255,255,0.04)', display: 'flex', alignItems: 'baseline', gap: 8 }}>
-                        <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.25)', fontWeight: 600 }}>{e.time}</span>
-                        <span style={{ fontWeight: 900, color: col, fontSize: 10, textTransform: 'uppercase', minWidth: 60 }}>{e.type}</span>
-                        <span style={{ color: 'rgba(255,255,255,0.85)', lineHeight: 1.4 }}>{e.note}</span>
-                        <span style={{ marginLeft: 'auto', fontSize: 11, color: 'rgba(255,255,255,0.2)', fontWeight: 600 }}>{fmt(e.amount)}</span>
-                      </div>
-                    );
-                  })}
-                </div>
-              );
-            })()}
-
-            {(() => {
               const generalNotes = viewTurno.entries.filter((e: any) => e.type === 'nota');
-              if (generalNotes.length === 0) {
-                return (
-                  <div style={{ marginTop: 16, paddingTop: 14, borderTop: '1px solid rgba(255,255,255,0.06)' }}>
-                    <div style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '0.6px', marginBottom: 8 }}>📝 Nota del Turno</div>
-                    <div style={{ fontSize: 14, color: 'rgba(255,255,255,0.2)', fontStyle: 'italic' }}>Sin nota general</div>
-                  </div>
-                );
-              }
+              if (generalNotes.length === 0 && !viewTurno.notes) return null;
               return (
                 <div style={{ marginTop: 16, paddingTop: 14, borderTop: '1px solid rgba(255,255,255,0.06)' }}>
                   <div style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '0.6px', marginBottom: 8 }}>📝 Nota del Turno</div>
@@ -884,6 +852,32 @@ function App() {
               );
             })()}
           </div>
+
+          {/* Notas Detalladas (Fuera del recuadro principal) */}
+          {(() => {
+            const entriesWithNotes = viewTurno.entries.filter((e: any) => e.type !== 'nota' && e.note && e.note.trim());
+            if (entriesWithNotes.length === 0) return null;
+            return (
+              <div style={{ background: 'rgba(255,255,255,0.03)', borderRadius: 22, padding: '16px', border: '1px solid rgba(255,255,255,0.07)' }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '0.6px', marginBottom: 12, display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <span>📌</span> Notas detalladas
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  {entriesWithNotes.map((e: any) => {
+                    const col = e.type === 'propina' ? G : e.type === 'datafono' ? P : e.type === 'agencia' ? A : e.type === 'extra' ? E : e.type === 'gasolina' ? F : N;
+                    return (
+                      <div key={e.id} style={{ fontSize: 13, background: 'rgba(255,255,255,0.02)', padding: '10px 12px', borderRadius: 12, border: '1px solid rgba(255,255,255,0.04)', display: 'flex', alignItems: 'baseline', gap: 8 }}>
+                        <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.25)', fontWeight: 600 }}>{e.time}</span>
+                        <span style={{ fontWeight: 900, color: col, fontSize: 10, textTransform: 'uppercase', minWidth: 60 }}>{e.type}</span>
+                        <span style={{ color: 'rgba(255,255,255,0.85)', lineHeight: 1.4 }}>{e.note}</span>
+                        <span style={{ marginLeft: 'auto', fontSize: 11, color: 'rgba(255,255,255,0.2)', fontWeight: 600 }}>{fmt(e.amount)}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })()}
 
           {isToday && (
             <button onClick={() => setScreen('home')}
@@ -1059,8 +1053,6 @@ function App() {
                   </div>
                 ))}
 
-                <textarea value={editJ.notes} onChange={e => setEditJ({ ...editJ, notes: e.target.value })} placeholder="Añade una nota final..." rows={3}
-                  style={{ background: 'transparent', border: 'none', outline: 'none', color: 'rgba(255,255,255,0.9)', fontSize: 15, width: '100%', resize: 'none', fontFamily: 'inherit', lineHeight: 1.4, marginTop: generalNotes.length > 0 ? 8 : 0 }} />
               </div>
             );
           })()}
@@ -1691,6 +1683,28 @@ function App() {
                 <div style={{ fontSize: 11, color: "rgba(255,255,255,0.2)", marginTop: 2 }}>{nulos.length} entrada{nulos.length !== 1 ? "s" : ""}</div>
               </div>
             </div>
+
+            {/* Notas añadidas durante el turno */}
+            {(() => {
+              const gNotes = current.entries.filter(e => e.type === 'nota');
+              if (gNotes.length > 0) {
+                return (
+                  <div style={{ marginTop: 16, paddingTop: 14, borderTop: "1px solid rgba(255,255,255,0.06)" }}>
+                    <div style={{ fontSize: 11, fontWeight: 700, color: "rgba(255,255,255,0.4)", textTransform: "uppercase", letterSpacing: "0.6px", marginBottom: 8 }}>📝 Notas del Turno</div>
+                    <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                      {gNotes.map(e => (
+                        <div key={e.id} style={{ color: "rgba(255,255,255,0.8)", fontSize: 13, lineHeight: 1.4, background: "rgba(255,255,255,0.02)", padding: "8px 10px", borderRadius: 8 }}>
+                          <span style={{ color: "rgba(255,255,255,0.25)", fontSize: 11, marginRight: 6, fontWeight: 600 }}>{e.time}</span>
+                          {e.note}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                );
+              }
+              return null;
+            })()}
+
           </div>
 
           {(() => {
@@ -1714,17 +1728,6 @@ function App() {
             );
           })()}
 
-          {/* Nota del Turno — único textarea, ya pre-rellenado al venir de "Terminar Turno" */}
-          <div style={{ background: "rgba(255,255,255,0.04)", borderRadius: 16, padding: "12px 14px", border: "1px solid rgba(255,255,255,0.08)", marginBottom: 12, flexShrink: 0 }}>
-            <div style={{ fontSize: 11, fontWeight: 700, color: "rgba(255,255,255,0.5)", textTransform: "uppercase", letterSpacing: "0.6px", marginBottom: 6 }}>📝 Nota del Turno</div>
-            <textarea
-              value={notesJ}
-              onChange={e => setNotesJ(e.target.value)}
-              placeholder="Añade una nota general del Turno..."
-              rows={4}
-              style={{ background: "transparent", border: "none", outline: "none", color: "rgba(255,255,255,0.9)", fontSize: 14, width: "100%", resize: "none", fontFamily: "inherit", lineHeight: 1.45 }}
-            />
-          </div>
 
           <div style={{ display: "flex", flexDirection: "column", gap: 8, flexShrink: 0, marginTop: "auto" }}>
             <button onClick={handleEndTurno}
@@ -2178,16 +2181,7 @@ function App() {
 
         {active && (
           <button
-            onClick={() => {
-              const notas = current.entries.filter(e => e.type === "nota");
-              if (notas.length > 0) {
-                const combined = notas
-                  .map(n => `[${n.time}] ${n.note}`)
-                  .join("\n");
-                setNotesJ(prev => prev.trim() ? prev : combined);
-              }
-              setScreen("confirmEnd");
-            }}
+            onClick={() => setScreen("confirmEnd")}
             style={{
               marginTop: 10,
               padding: "15px 0",
