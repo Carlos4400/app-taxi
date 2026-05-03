@@ -1,7 +1,7 @@
 {
   "name": "Mi Turno - Taxista",
   "short_name": "Mi Turno",
-  "description": "App para gestionar tu turno laboral como taxista",
+  "description": "App para gestionar tu Turno laboral como taxista",
   "version": "1.0.11",
   "start_url": "./index.html",
   "scope": "./",

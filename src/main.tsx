@@ -157,7 +157,7 @@ async function exportHistoryCSV(turnos: Turno[]): Promise<void> {
       try {
         await Share.share({
           title: "Historial Mi Turno",
-          text: "Exportación CSV de turnos",
+          text: "Exportación CSV de Turnos",
           url: result.uri,
           dialogTitle: "Compartir CSV",
         });
@@ -534,7 +534,7 @@ function App() {
 
   function handleEndTurno() {
     // Las entradas tipo "nota" ya se han consolidado en `notesJ` al pulsar
-    // "Terminar turno" en la pantalla anterior, por lo que las quitamos
+    // "Terminar Turno" en la pantalla anterior, por lo que las quitamos
     // aquí para que no aparezcan duplicadas en el histórico.
     const cleanEntries = current.entries.filter((e) => e.type !== "nota");
     const turno = {
@@ -682,7 +682,7 @@ function App() {
               }}
             >
               <span style={{ fontSize: 22 }}>{hasActive ? "▶" : "🚀"}</span>
-              {hasActive ? "Continuar turno" : "Iniciar turno"}
+              {hasActive ? "Continuar Turno" : "Iniciar Turno"}
             </button>
             <button
               onClick={() => setScreen("pastHistory")}
@@ -804,7 +804,7 @@ function App() {
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
             <button style={S.iconBtn} onClick={() => { setScreen(isToday ? 'home' : 'pastHistory'); setViewTurno(null); }}><IconBack /></button>
             <div style={{ flex: 1 }}>
-              <div style={{ fontSize: 20, fontWeight: 800, color: 'white' }}>Resumen del turno</div>
+              <div style={{ fontSize: 20, fontWeight: 800, color: 'white' }}>Resumen del Turno</div>
               <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.3)', textTransform: 'capitalize', marginTop: 1 }}>
                 {viewTurno.startDate && viewTurno.startDate !== viewTurno.date
                   ? <>{fmtDate(viewTurno.startDate)} {viewTurno.startTime} – {fmtDate(viewTurno.date)} {viewTurno.endTime}</>
@@ -872,14 +872,14 @@ function App() {
               if (generalNotes.length === 0 && !viewTurno.notes) {
                 return (
                   <div style={{ marginTop: 16, paddingTop: 14, borderTop: '1px solid rgba(255,255,255,0.06)' }}>
-                    <div style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '0.6px', marginBottom: 8 }}>📝 Nota del turno</div>
+                    <div style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '0.6px', marginBottom: 8 }}>📝 Nota del Turno</div>
                     <div style={{ fontSize: 14, color: 'rgba(255,255,255,0.2)', fontStyle: 'italic' }}>Sin nota general</div>
                   </div>
                 );
               }
               return (
                 <div style={{ marginTop: 16, paddingTop: 14, borderTop: '1px solid rgba(255,255,255,0.06)' }}>
-                  <div style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '0.6px', marginBottom: 8 }}>📝 Nota del turno</div>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '0.6px', marginBottom: 8 }}>📝 Nota del Turno</div>
                   <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                     {generalNotes.map((e: any) => (
                       <div key={e.id} style={{ color: "rgba(255,255,255,0.9)", fontSize: 13, lineHeight: 1.4, background: "rgba(255,255,255,0.02)", padding: "8px 10px", borderRadius: 8, overflowWrap: "anywhere" }}>
@@ -951,7 +951,7 @@ function App() {
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', padding: '12px 20px 32px', overflowY: 'auto', animation: 'slideIn 0.25s ease' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 20 }}>
             <button style={S.iconBtn} onClick={() => { setEditJ(null); setEndField(null); setScreen('summary'); }}><IconBack /></button>
-            <span style={{ fontSize: 20, fontWeight: 700, color: 'white' }}>Editar turno</span>
+            <span style={{ fontSize: 20, fontWeight: 700, color: 'white' }}>Editar Turno</span>
           </div>
 
           {/* Dinero / KM (clickables) */}
@@ -1061,7 +1061,7 @@ function App() {
             const generalNotes = editJ.entries.filter((e: any) => e.type === 'nota');
             return (
               <div style={{ background: 'rgba(255,255,255,0.04)', borderRadius: 16, padding: '14px 16px', border: '1px solid rgba(255,255,255,0.08)', marginBottom: 14 }}>
-                <div style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', letterSpacing: '0.6px', marginBottom: 8 }}>📝 Nota del turno</div>
+                <div style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', letterSpacing: '0.6px', marginBottom: 8 }}>📝 Nota del Turno</div>
 
                 {generalNotes.map((e: any) => (
                   <div key={e.id} style={{ marginBottom: 8, color: "rgba(255,255,255,0.9)", fontSize: 13, lineHeight: 1.4, background: "rgba(255,255,255,0.02)", padding: "8px 10px", borderRadius: 8, overflowWrap: "anywhere" }}>
@@ -1088,7 +1088,7 @@ function App() {
             <button
               onClick={() => {
                 setConfirmDialog({
-                  text: "¿Seguro que quieres eliminar este turno completo? Esta acción no se puede deshacer.",
+                  text: "¿Seguro que quieres eliminar este Turno completo? Esta acción no se puede deshacer.",
                   onConfirm: () => {
                     setHistory((h) => h.filter((j) => j.id !== editJ.id));
                     setEditJ(null);
@@ -1099,7 +1099,7 @@ function App() {
               }}
               style={{ padding: '16px 0', borderRadius: 18, border: '1px solid rgba(255,60,60,0.3)', background: 'rgba(255,60,60,0.08)', color: 'rgba(255,90,90,0.85)', fontSize: 16, fontWeight: 700, cursor: 'pointer', marginTop: 8 }}
             >
-              🗑️ Eliminar turno
+              🗑️ Eliminar Turno
             </button>
           </div>
         </div>
@@ -1122,7 +1122,7 @@ function App() {
           />
         )}
 
-        {/* Teclado in-app para Dinero / KM en Editar turno */}
+        {/* Teclado in-app para Dinero / KM en Editar Turno */}
         {endField && (
           <div
             onClick={() => setEndField(null)}
@@ -1151,14 +1151,10 @@ function App() {
                 animation: "slideUp 0.25s ease",
               }}
             >
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
+              <div style={{ marginBottom: 12 }}>
                 <span style={{ fontSize: 13, fontWeight: 700, color: endField === "dinero" ? "oklch(0.78 0.18 150)" : "oklch(0.80 0.14 220)", textTransform: "uppercase", letterSpacing: "0.6px" }}>
                   {endField === "dinero" ? "€ Dinero" : "→ KM"}
                 </span>
-                <button onClick={() => setEndField(null)}
-                  style={{ background: "rgba(255,255,255,0.08)", border: "none", borderRadius: 10, color: "white", padding: "6px 14px", fontSize: 13, fontWeight: 700, cursor: "pointer" }}>
-                  Listo
-                </button>
               </div>
               <div style={{ fontSize: 36, fontWeight: 900, color: endField === "dinero" ? "oklch(0.78 0.18 150)" : "oklch(0.80 0.14 220)", marginBottom: 14, textAlign: "center", letterSpacing: "-0.5px" }}>
                 {(endField === "dinero" ? eDinero : eKm) || "0"}
@@ -1171,6 +1167,23 @@ function App() {
                   </button>
                 ))}
               </div>
+              <button
+                onClick={() => setEndField(null)}
+                style={{
+                  width: "100%",
+                  padding: "16px 0",
+                  marginTop: 12,
+                  borderRadius: 14,
+                  border: "none",
+                  background: endField === "dinero" ? "oklch(0.78 0.18 150)" : "oklch(0.80 0.14 220)",
+                  color: "black",
+                  fontSize: 17,
+                  fontWeight: 800,
+                  cursor: "pointer",
+                }}
+              >
+                Guardar
+              </button>
             </div>
           </div>
         )}
@@ -1274,7 +1287,7 @@ function App() {
 
           <div style={{ flex: 1, display: "flex", flexDirection: "column" }}>
             <textarea
-              placeholder="Escribe algo sobre el turno..."
+              placeholder="Escribe algo sobre el Turno..."
               value={noteS}
               onChange={(e) => setNoteS(e.target.value)}
               style={{
@@ -1310,7 +1323,7 @@ function App() {
             }}
             style={{ width: "100%", padding: 18, marginTop: 16, borderRadius: 16, border: "none", background: "white", color: "black", fontWeight: 800, fontSize: 18, cursor: "pointer", flexShrink: 0 }}
           >
-            Añadir al turno
+            Añadir al Turno
           </button>
         </div>
       </Shell>
@@ -1461,7 +1474,7 @@ function App() {
           </div>
           {history.length === 0 ? (
             <div style={{ textAlign: "center", color: "rgba(255,255,255,0.3)", marginTop: 40, fontSize: 15 }}>
-              No hay turnos anteriores.
+              No hay Turnos anteriores.
             </div>
           ) : (
             history.map((j) => (
@@ -1617,7 +1630,7 @@ function App() {
         <div style={{ flex: 1, display: "flex", flexDirection: "column", padding: "12px 20px 16px", overflow: "hidden", minHeight: 0, animation: "slideIn 0.25s ease" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 16, flexShrink: 0 }}>
             <button style={S.iconBtn} onClick={() => { setScreen("main"); setEndField(null); }}><IconBack /></button>
-            <span style={{ fontSize: 20, fontWeight: 700, color: "white" }}>Terminar turno</span>
+            <span style={{ fontSize: 20, fontWeight: 700, color: "white" }}>Terminar Turno</span>
           </div>
 
           {/* Dinero / KM cards (clickables — abren el teclado in-app) */}
@@ -1717,13 +1730,13 @@ function App() {
             );
           })()}
 
-          {/* Nota del turno — único textarea, ya pre-rellenado al venir de "Terminar turno" */}
+          {/* Nota del Turno — único textarea, ya pre-rellenado al venir de "Terminar Turno" */}
           <div style={{ background: "rgba(255,255,255,0.04)", borderRadius: 16, padding: "12px 14px", border: "1px solid rgba(255,255,255,0.08)", marginBottom: 12, flexShrink: 0 }}>
-            <div style={{ fontSize: 11, fontWeight: 700, color: "rgba(255,255,255,0.5)", textTransform: "uppercase", letterSpacing: "0.6px", marginBottom: 6 }}>📝 Nota del turno</div>
+            <div style={{ fontSize: 11, fontWeight: 700, color: "rgba(255,255,255,0.5)", textTransform: "uppercase", letterSpacing: "0.6px", marginBottom: 6 }}>📝 Nota del Turno</div>
             <textarea
               value={notesJ}
               onChange={e => setNotesJ(e.target.value)}
-              placeholder="Añade una nota general del turno..."
+              placeholder="Añade una nota general del Turno..."
               rows={4}
               style={{ background: "transparent", border: "none", outline: "none", color: "rgba(255,255,255,0.9)", fontSize: 14, width: "100%", resize: "none", fontFamily: "inherit", lineHeight: 1.45 }}
             />
@@ -1732,7 +1745,7 @@ function App() {
           <div style={{ display: "flex", flexDirection: "column", gap: 8, flexShrink: 0, marginTop: "auto" }}>
             <button onClick={handleEndTurno}
               style={{ padding: "15px 0", borderRadius: 16, border: "none", background: "rgba(255,60,60,0.12)", color: "rgba(255,110,110,0.9)", fontSize: 16, fontWeight: 800, cursor: "pointer", outline: "1.5px solid rgba(255,60,60,0.25)" }}>
-              Sí, terminar turno
+              Sí, terminar Turno
             </button>
             <button onClick={() => setScreen("main")}
               style={{ padding: "13px 0", borderRadius: 16, border: "none", background: "rgba(255,255,255,0.06)", color: "rgba(255,255,255,0.5)", fontSize: 15, fontWeight: 700, cursor: "pointer" }}>
@@ -1770,14 +1783,10 @@ function App() {
                 animation: "slideUp 0.25s ease",
               }}
             >
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
+              <div style={{ marginBottom: 12 }}>
                 <span style={{ fontSize: 13, fontWeight: 700, color: endField === "dinero" ? "oklch(0.78 0.18 150)" : "oklch(0.80 0.14 220)", textTransform: "uppercase", letterSpacing: "0.6px" }}>
                   {endField === "dinero" ? "€ Dinero" : "→ KM"}
                 </span>
-                <button onClick={() => setEndField(null)}
-                  style={{ background: "rgba(255,255,255,0.08)", border: "none", borderRadius: 10, color: "white", padding: "6px 14px", fontSize: 13, fontWeight: 700, cursor: "pointer" }}>
-                  Listo
-                </button>
               </div>
               <div style={{ fontSize: 36, fontWeight: 900, color: endField === "dinero" ? "oklch(0.78 0.18 150)" : "oklch(0.80 0.14 220)", marginBottom: 14, textAlign: "center", letterSpacing: "-0.5px" }}>
                 {(endField === "dinero" ? dineroJ : kmJ) || "0"}
@@ -1790,6 +1799,23 @@ function App() {
                   </button>
                 ))}
               </div>
+              <button
+                onClick={() => setEndField(null)}
+                style={{
+                  width: "100%",
+                  padding: "16px 0",
+                  marginTop: 12,
+                  borderRadius: 14,
+                  border: "none",
+                  background: endField === "dinero" ? "oklch(0.78 0.18 150)" : "oklch(0.80 0.14 220)",
+                  color: "black",
+                  fontSize: 17,
+                  fontWeight: 800,
+                  cursor: "pointer",
+                }}
+              >
+                Guardar
+              </button>
             </div>
           </div>
         )}
@@ -1976,7 +2002,7 @@ function App() {
                 transition: "all 0.2s"
               }}
             >
-              <span style={{ fontSize: 18 }}>📝</span> Añadir nota al turno
+              <span style={{ fontSize: 18 }}>📝</span> Añadir nota al Turno
             </button>
           </div>
         )}
@@ -2035,10 +2061,10 @@ function App() {
                       cursor: "pointer",
                     }}
                   >
-                    🚀 Iniciar turno
+                    🚀 Iniciar Turno
                   </button>
                   <div style={{ marginTop: 14, fontSize: 13 }}>
-                    Pulsa para comenzar tu turno.
+                    Pulsa para comenzar tu Turno.
                   </div>
                 </div>
               )}
@@ -2170,7 +2196,7 @@ function App() {
           <button
             onClick={() => {
               // Pre-rellenar la nota de turno con todas las notas standalone
-              // (entradas tipo "nota") añadidas durante el turno.
+              // (entradas tipo "nota") añadidas durante el Turno.
               const notas = current.entries.filter(e => e.type === "nota");
               if (notas.length > 0) {
                 const combined = notas
@@ -2194,7 +2220,7 @@ function App() {
               flexShrink: 0,
             }}
           >
-            Terminar turno
+            Terminar Turno
           </button>
         )}
       </div>

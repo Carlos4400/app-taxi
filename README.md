@@ -1,12 +1,12 @@
 # Mi Turno — App para Taxistas
 
-App progresiva (PWA) para gestionar tu turno laboral como taxista. Registra propinas, datáfonos, agencias, extras, gasolina y nulos, y guarda el historial de turnos en el dispositivo.
+App progresiva (PWA) para gestionar tu Turno laboral como taxista. Registra propinas, datáfonos, agencias, extras, gasolina y nulos, y guarda el historial de Turnos en el dispositivo.
 
 ## Funcionalidades
 
 - Registro de entradas por categoría: Propinas, Datáfono, Agencias, Extras, Gasolina y Nulos.
 - Resumen diario con totales y desglose.
-- Historial de turnos anteriores con edición posterior.
+- Historial de Turnos anteriores con edición posterior.
 - Exportación del historial completo a CSV (compatible con Excel).
 - Modo offline (PWA con Service Worker).
 - Teclado numérico adaptado.
@@ -40,10 +40,10 @@ Una vez instalada funciona offline y guarda los datos localmente, igual que el A
 
 ## Uso
 
-1. **Iniciar turno** — Pulsa "Iniciar turno" en la pantalla de inicio.
+1. **Iniciar Turno** — Pulsa "Iniciar Turno" en la pantalla de inicio.
 2. **Añadir entradas** — Usa los botones de cada categoría para registrar importes.
-3. **Terminar turno** — Rellena el resumen (dinero total y km recorridos).
-4. **Historial** — Accede a turnos anteriores, edítalas o expórtalas a CSV.
+3. **Terminar Turno** — Rellena el resumen (dinero total y km recorridos).
+4. **Historial** — Accede a Turnos anteriores, edítalas o expórtalas a CSV.
 
 ## Tecnologías
 
