@@ -533,16 +533,12 @@ function App() {
   }
 
   function handleEndTurno() {
-    // Las entradas tipo "nota" ya se han consolidado en `notesJ` al pulsar
-    // "Terminar Turno" en la pantalla anterior, por lo que las quitamos
-    // aquí para que no aparezcan duplicadas en el histórico.
-    const cleanEntries = current.entries.filter((e) => e.type !== "nota");
     const turno = {
       id: Date.now(),
       date: today(),
       startTime: current.startTime,
       endTime: timeNow(),
-      entries: cleanEntries,
+      entries: current.entries,
       totalP,
       totalD,
       totalA,
@@ -2182,26 +2178,11 @@ function App() {
         {active && (
           <button
             onClick={() => {
-              // Pre-rellenar la nota del Turno con TODAS las notas escritas
-              // durante el turno: tanto las standalone (tipo "nota") como
-              // las que se adjuntaron a entradas concretas (Datáfono, Propina,
-              // Extra, Gasolina, Agencia, Nulo). Así el campo NOTA DEL TURNO
-              // queda como log completo.
-              const labelOf = (t: string) => ({
-                propina: "PROPINA", datafono: "DATÁFONO", agencia: "AGENCIA",
-                extra: "EXTRA", gasolina: "GASOLINA", nulo: "NULO",
-              } as Record<string, string>)[t] || t.toUpperCase();
-              const allWithNote = current.entries
-                .filter(e => e.note && e.note.trim())
-                .slice()
-                .sort((a, b) => (a.time || "").localeCompare(b.time || ""));
-              if (allWithNote.length > 0) {
-                const combined = allWithNote
-                  .map(n => n.type === "nota"
-                    ? `[${n.time}] ${n.note}`
-                    : `[${n.time}] ${labelOf(n.type)}: ${n.note}`)
+              const notas = current.entries.filter(e => e.type === "nota");
+              if (notas.length > 0) {
+                const combined = notas
+                  .map(n => `[${n.time}] ${n.note}`)
                   .join("\n");
-                // Si el usuario ya tenía algo escrito, lo respeta; si no, pre-rellena.
                 setNotesJ(prev => prev.trim() ? prev : combined);
               }
               setScreen("confirmEnd");
