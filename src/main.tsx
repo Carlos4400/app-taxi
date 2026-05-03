@@ -533,12 +533,16 @@ function App() {
   }
 
   function handleEndTurno() {
+    // Las entradas tipo "nota" ya se han consolidado en `notesJ` al pulsar
+    // "Terminar Turno" en la pantalla anterior, por lo que las quitamos
+    // aquí para que no aparezcan duplicadas en el histórico.
+    const cleanEntries = current.entries.filter((e) => e.type !== "nota");
     const turno = {
       id: Date.now(),
       date: today(),
       startTime: current.startTime,
       endTime: timeNow(),
-      entries: current.entries,
+      entries: cleanEntries,
       totalP,
       totalD,
       totalA,
@@ -2178,16 +2182,23 @@ function App() {
         {active && (
           <button
             onClick={() => {
+              // Pre-rellenar la nota del Turno con TODAS las notas escritas
+              // durante el turno: tanto las standalone (tipo "nota") como
+              // las que se adjuntaron a entradas concretas (Datáfono, Propina,
+              // Extra, Gasolina, Agencia, Nulo). Así el campo NOTA DEL TURNO
+              // queda como log completo.
               const labelOf = (t: string) => ({
                 recompensa: "RECOMPENSA", datafono: "DATÁFONO", agencia: "AGENCIA",
                 extra: "EXTRA", gasolina: "GASOLINA", nulo: "NULO", nota: "NOTA",
               } as Record<string, string>)[t] || t.toUpperCase();
-              const allNotes = current.entries
+              const allWithNote = current.entries
                 .filter(e => e.note && e.note.trim())
                 .sort((a, b) => (a.time || "").localeCompare(b.time || ""));
-              if (allNotes.length > 0) {
-                const combined = allNotes
-                  .map(n => `[${n.time}] ${labelOf(n.type)}: ${n.note}`)
+              if (allWithNote.length > 0) {
+                const combined = allWithNote
+                  .map(n => n.type === "nota"
+                    ? `[${n.time}] ${n.note}`
+                    : `[${n.time}] ${labelOf(n.type)}: ${n.note}`)
                   .join("\n");
                 setNotesJ(prev => prev.trim() ? prev : combined);
               }
