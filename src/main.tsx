@@ -533,12 +533,16 @@ function App() {
   }
 
   function handleEndTurno() {
+    // Las entradas tipo "nota" ya se han consolidado en `notesJ` al pulsar
+    // "Terminar Turno" en la pantalla anterior, por lo que las quitamos
+    // aquí para que no aparezcan duplicadas en el histórico.
+    const cleanEntries = current.entries.filter((e) => e.type !== "nota");
     const turno = {
       id: Date.now(),
       date: today(),
       startTime: current.startTime,
       endTime: timeNow(),
-      entries: current.entries,
+      entries: cleanEntries,
       totalP,
       totalD,
       totalA,
