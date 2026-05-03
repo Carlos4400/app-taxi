@@ -1160,7 +1160,7 @@ function App() {
                 {(endField === "dinero" ? eDinero : eKm) || "0"}
               </div>
               <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8 }}>
-                {["1","2","3","4","5","6","7","8","9",",","0","DEL"].map((k) => (
+                {["1", "2", "3", "4", "5", "6", "7", "8", "9", ",", "0", "DEL"].map((k) => (
                   <button key={k} onClick={() => kpEdit(k)}
                     style={{ ...S.keyBtn, padding: "20px 0", background: "rgba(255,255,255,0.05)", color: "white", fontSize: 22, fontWeight: 700 }}>
                     {k === "DEL" ? <IconDel /> : k}
@@ -1281,7 +1281,7 @@ function App() {
               <IconBack />
             </button>
             <div style={{ fontSize: 24, fontWeight: 800, color: "white" }}>
-              Añadir nota
+              Añadir Nota
             </div>
           </div>
 
@@ -1792,7 +1792,7 @@ function App() {
                 {(endField === "dinero" ? dineroJ : kmJ) || "0"}
               </div>
               <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8 }}>
-                {["1","2","3","4","5","6","7","8","9",",","0","DEL"].map((k) => (
+                {["1", "2", "3", "4", "5", "6", "7", "8", "9", ",", "0", "DEL"].map((k) => (
                   <button key={k} onClick={() => kpEnd(k)}
                     style={{ ...S.keyBtn, padding: "20px 0", background: "rgba(255,255,255,0.05)", color: "white", fontSize: 22, fontWeight: 700 }}>
                     {k === "DEL" ? <IconDel /> : k}
@@ -2002,7 +2002,7 @@ function App() {
                 transition: "all 0.2s"
               }}
             >
-              <span style={{ fontSize: 18 }}>📝</span> Añadir nota al Turno
+              <span style={{ fontSize: 18 }}>📝</span> Añadir Nota al Turno
             </button>
           </div>
         )}
@@ -2407,11 +2407,11 @@ function EditEntryDialog({
   const [showKP, setShowKP] = React.useState(false);
   const meta: { col: string; lbl: string } =
     entry.type === "propina" ? { col: G, lbl: "Propina" }
-    : entry.type === "datafono" ? { col: P, lbl: "Datáfono" }
-    : entry.type === "agencia" ? { col: A, lbl: "Agencia" }
-    : entry.type === "extra" ? { col: E, lbl: "Extra" }
-    : entry.type === "gasolina" ? { col: F, lbl: "Gasolina" }
-    : { col: N, lbl: "Nulo" };
+      : entry.type === "datafono" ? { col: P, lbl: "Datáfono" }
+        : entry.type === "agencia" ? { col: A, lbl: "Agencia" }
+          : entry.type === "extra" ? { col: E, lbl: "Extra" }
+            : entry.type === "gasolina" ? { col: F, lbl: "Gasolina" }
+              : { col: N, lbl: "Nulo" };
 
   function kpAmount(k: string) {
     if (k === "DEL") { onAmountChange(amount.slice(0, -1)); return; }
@@ -2479,7 +2479,7 @@ function EditEntryDialog({
         {/* Teclado in-app */}
         {showKP && (
           <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 6, marginBottom: 14, animation: "fadeUp 0.2s ease" }}>
-            {["1","2","3","4","5","6","7","8","9",",","0","DEL"].map((k) => (
+            {["1", "2", "3", "4", "5", "6", "7", "8", "9", ",", "0", "DEL"].map((k) => (
               <button key={k} onClick={(e) => { e.stopPropagation(); kpAmount(k); }}
                 style={{
                   border: "none",
