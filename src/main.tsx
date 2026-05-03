@@ -2178,10 +2178,16 @@ function App() {
         {active && (
           <button
             onClick={() => {
-              const notas = current.entries.filter(e => e.type === "nota");
-              if (notas.length > 0) {
-                const combined = notas
-                  .map(n => `[${n.time}] ${n.note}`)
+              const labelOf = (t: string) => ({
+                recompensa: "RECOMPENSA", datafono: "DATÁFONO", agencia: "AGENCIA",
+                extra: "EXTRA", gasolina: "GASOLINA", nulo: "NULO", nota: "NOTA",
+              } as Record<string, string>)[t] || t.toUpperCase();
+              const allNotes = current.entries
+                .filter(e => e.note && e.note.trim())
+                .sort((a, b) => (a.time || "").localeCompare(b.time || ""));
+              if (allNotes.length > 0) {
+                const combined = allNotes
+                  .map(n => `[${n.time}] ${labelOf(n.type)}: ${n.note}`)
                   .join("\n");
                 setNotesJ(prev => prev.trim() ? prev : combined);
               }
