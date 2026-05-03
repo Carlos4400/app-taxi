@@ -861,7 +861,7 @@ function App() {
 
             {(() => {
               const generalNotes = viewTurno.entries.filter((e: any) => e.type === 'nota');
-              if (generalNotes.length === 0 && !viewTurno.notes) {
+              if (generalNotes.length === 0) {
                 return (
                   <div style={{ marginTop: 16, paddingTop: 14, borderTop: '1px solid rgba(255,255,255,0.06)' }}>
                     <div style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '0.6px', marginBottom: 8 }}>📝 Nota del Turno</div>
@@ -879,9 +879,6 @@ function App() {
                         {e.note}
                       </div>
                     ))}
-                    {viewTurno.notes && (
-                      <div style={{ fontSize: 15, color: 'rgba(255,255,255,0.85)', lineHeight: 1.5, whiteSpace: 'pre-wrap', marginTop: generalNotes.length > 0 ? 4 : 0 }}>{viewTurno.notes}</div>
-                    )}
                   </div>
                 </div>
               );
@@ -2182,23 +2179,10 @@ function App() {
         {active && (
           <button
             onClick={() => {
-              // Pre-rellenar la nota del Turno con TODAS las notas escritas
-              // durante el turno: tanto las standalone (tipo "nota") como
-              // las que se adjuntaron a entradas concretas (Datáfono, Propina,
-              // Extra, Gasolina, Agencia, Nulo). Así el campo NOTA DEL TURNO
-              // queda como log completo.
-              const labelOf = (t: string) => ({
-                recompensa: "RECOMPENSA", datafono: "DATÁFONO", agencia: "AGENCIA",
-                extra: "EXTRA", gasolina: "GASOLINA", nulo: "NULO", nota: "NOTA",
-              } as Record<string, string>)[t] || t.toUpperCase();
-              const allWithNote = current.entries
-                .filter(e => e.note && e.note.trim())
-                .sort((a, b) => (a.time || "").localeCompare(b.time || ""));
-              if (allWithNote.length > 0) {
-                const combined = allWithNote
-                  .map(n => n.type === "nota"
-                    ? `[${n.time}] ${n.note}`
-                    : `[${n.time}] ${labelOf(n.type)}: ${n.note}`)
+              const notas = current.entries.filter(e => e.type === "nota");
+              if (notas.length > 0) {
+                const combined = notas
+                  .map(n => `[${n.time}] ${n.note}`)
                   .join("\n");
                 setNotesJ(prev => prev.trim() ? prev : combined);
               }
