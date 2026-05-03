@@ -1,4 +1,4 @@
-const CACHE = 'mi-turno-v4';
+const CACHE = 'mi-turno-v5';
 const ASSETS = [
   './',
   './index.html',
@@ -7,6 +7,24 @@ const ASSETS = [
   './icon-512.png',
   'https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800;900&display=swap',
 ];
+
+let newVersion = null;
+
+async function checkVersion() {
+  try {
+    const manifestReq = await fetch('./manifest.json?t=' + Date.now());
+    if (manifestReq.ok) {
+      const manifest = await manifestReq.json();
+      if (manifest.version && manifest.version !== VERSION) {
+        newVersion = manifest.version;
+        const clients = await self.clients.matchAll();
+        clients.forEach(client => {
+          client.postMessage({ type: 'NEW_VERSION', version: newVersion });
+        });
+      }
+    }
+  } catch (e) {}
+}
 
 self.addEventListener('install', e => {
   e.waitUntil(
@@ -48,3 +66,5 @@ self.addEventListener('fetch', e => {
     })
   );
 });
+
+setInterval(checkVersion, 30000);
