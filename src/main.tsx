@@ -702,7 +702,7 @@ function App() {
               }}
             >
               <span style={{ fontSize: 20 }}>📋</span>
-              Turnos anteriores
+              Turnos Anteriores
             </button>
           </div>
         </div>
@@ -1447,7 +1447,7 @@ function App() {
               <IconBack />
             </button>
             <div style={{ flex: 1, fontSize: 24, fontWeight: 800, color: "white" }}>
-              Turnos anteriores
+              Turnos Anteriores
             </div>
             {history.length > 0 && (
               <button
@@ -1474,7 +1474,7 @@ function App() {
           </div>
           {history.length === 0 ? (
             <div style={{ textAlign: "center", color: "rgba(255,255,255,0.3)", marginTop: 40, fontSize: 15 }}>
-              No hay Turnos anteriores.
+              No hay Turnos Anteriores.
             </div>
           ) : (
             history.map((j) => (
@@ -1627,7 +1627,7 @@ function App() {
     }
     return (
       <Shell burst={false}>
-        <div style={{ flex: 1, display: "flex", flexDirection: "column", padding: "12px 20px 16px", overflow: "hidden", minHeight: 0, animation: "slideIn 0.25s ease" }}>
+        <div style={{ flex: 1, display: "flex", flexDirection: "column", padding: "12px 20px 16px", overflowY: "auto", animation: "slideIn 0.25s ease", WebkitOverflowScrolling: "touch" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 16, flexShrink: 0 }}>
             <button style={S.iconBtn} onClick={() => { setScreen("main"); setEndField(null); }}><IconBack /></button>
             <span style={{ fontSize: 20, fontWeight: 700, color: "white" }}>Terminar Turno</span>
@@ -1713,7 +1713,7 @@ function App() {
             const entriesWithNotes = current.entries.filter(e => e.type !== 'nota' && e.note && e.note.trim());
             if (entriesWithNotes.length === 0) return null;
             return (
-              <div style={{ marginBottom: 12, display: "flex", flexDirection: "column", gap: 6, flexShrink: 1, overflowY: "auto", paddingRight: 4 }}>
+              <div style={{ marginBottom: 12, display: "flex", flexDirection: "column", gap: 6, flexShrink: 0 }}>
                 <div style={{ fontSize: 11, fontWeight: 700, color: "rgba(255,255,255,0.4)", textTransform: "uppercase", letterSpacing: "0.6px", marginBottom: 2 }}>📌 Notas detalladas</div>
                 {entriesWithNotes.map(e => {
                   const col = e.type === 'propina' ? G : e.type === 'datafono' ? P : e.type === 'agencia' ? A : e.type === 'extra' ? E : e.type === 'gasolina' ? F : N;
@@ -1890,7 +1890,7 @@ function App() {
               <button
                 style={S.iconBtn}
                 onClick={() => setScreen("pastHistory")}
-                title="Turnos anteriores"
+                title="Turnos Anteriores"
               >
                 <IconHistory />
               </button>
@@ -2404,6 +2404,7 @@ function EditEntryDialog({
   onDelete: () => void;
   onCancel: () => void;
 }) {
+  const [showKP, setShowKP] = React.useState(false);
   const meta: { col: string; lbl: string } =
     entry.type === "propina" ? { col: G, lbl: "Propina" }
     : entry.type === "datafono" ? { col: P, lbl: "Datáfono" }
@@ -2411,6 +2412,14 @@ function EditEntryDialog({
     : entry.type === "extra" ? { col: E, lbl: "Extra" }
     : entry.type === "gasolina" ? { col: F, lbl: "Gasolina" }
     : { col: N, lbl: "Nulo" };
+
+  function kpAmount(k: string) {
+    if (k === "DEL") { onAmountChange(amount.slice(0, -1)); return; }
+    if (k === ",") { if (!amount.includes(",")) onAmountChange(amount + ","); return; }
+    if (amount.replace(",", "").length >= 7) return;
+    onAmountChange(amount + k);
+  }
+
   return (
     <div
       style={{
@@ -2428,42 +2437,70 @@ function EditEntryDialog({
         style={{
           background: "oklch(0.18 0.03 260)",
           borderRadius: 20,
-          padding: 24,
-          width: "90%",
-          maxWidth: 360,
+          padding: 20,
+          width: "92%",
+          maxWidth: 380,
           border: "1px solid rgba(255,255,255,0.1)",
           boxShadow: "0 20px 40px rgba(0,0,0,0.5)",
           animation: "fadeUp 0.25s ease",
         }}
       >
-        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 16 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 14 }}>
           <span style={{ fontSize: 13, fontWeight: 700, color: meta.col, textTransform: "uppercase", letterSpacing: "0.5px" }}>
             Editar {meta.lbl}
           </span>
           <span style={{ fontSize: 12, color: "rgba(255,255,255,0.3)", marginLeft: "auto" }}>{entry.time}</span>
         </div>
 
-        <div style={{ marginBottom: 14 }}>
-          <div style={{ fontSize: 11, fontWeight: 700, color: "rgba(255,255,255,0.5)", marginBottom: 6, textTransform: "uppercase", letterSpacing: "0.6px" }}>Importe (€)</div>
-          <input
-            inputMode="decimal"
-            value={amount}
-            onChange={(ev) => onAmountChange(ev.target.value.replace(/[^0-9,\.]/g, ""))}
-            style={{
-              width: "100%",
-              background: "rgba(0,0,0,0.3)",
-              border: `1px solid ${meta.col}55`,
-              borderRadius: 12,
-              color: meta.col,
-              padding: "12px 14px",
-              fontSize: 22,
-              fontWeight: 900,
-              outline: "none",
-            }}
-          />
+        {/* Importe (display + teclado in-app) */}
+        <div style={{ marginBottom: 12, cursor: "pointer" }} onClick={() => setShowKP(true)}>
+          <div style={{ fontSize: 11, fontWeight: 700, color: "rgba(255,255,255,0.5)", marginBottom: 6, textTransform: "uppercase", letterSpacing: "0.6px", display: "flex", justifyContent: "space-between" }}>
+            <span>Importe (€)</span>
+            {!showKP && <span style={{ color: meta.col, fontSize: 10 }}>Toca para editar</span>}
+          </div>
+          <div style={{
+            width: "100%",
+            background: "rgba(0,0,0,0.3)",
+            border: `1px solid ${showKP ? meta.col : "rgba(255,255,255,0.1)"}`,
+            borderRadius: 12,
+            color: showKP ? meta.col : "white",
+            padding: "12px 14px",
+            fontSize: 26,
+            fontWeight: 900,
+            textAlign: "center",
+            minHeight: 32,
+            letterSpacing: "-0.5px",
+            transition: "all 0.2s"
+          }}>
+            {amount || "0"}
+          </div>
         </div>
 
-        <div style={{ marginBottom: 20 }}>
+        {/* Teclado in-app */}
+        {showKP && (
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 6, marginBottom: 14, animation: "fadeUp 0.2s ease" }}>
+            {["1","2","3","4","5","6","7","8","9",",","0","DEL"].map((k) => (
+              <button key={k} onClick={(e) => { e.stopPropagation(); kpAmount(k); }}
+                style={{
+                  border: "none",
+                  borderRadius: 10,
+                  padding: "14px 0",
+                  background: "rgba(255,255,255,0.05)",
+                  color: "white",
+                  fontSize: 20,
+                  fontWeight: 700,
+                  cursor: "pointer",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                }}>
+                {k === "DEL" ? <IconDel /> : k}
+              </button>
+            ))}
+          </div>
+        )}
+
+        <div style={{ marginBottom: 14 }}>
           <div style={{ fontSize: 11, fontWeight: 700, color: "rgba(255,255,255,0.5)", marginBottom: 6, textTransform: "uppercase", letterSpacing: "0.6px" }}>Nota</div>
           <input
             value={note}
