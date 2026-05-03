@@ -482,6 +482,35 @@ function App() {
     localStorage.setItem(KEY_HISTORY, JSON.stringify(history));
   }, [history]);
 
+  // Detección automática de nuevas versiones vía Service Worker.
+  // El SW comprueba el manifest periódicamente y nos manda un postMessage
+  // cuando la versión cambia; aquí lo recibimos y mostramos el aviso.
+  useEffect(() => {
+    if (!("serviceWorker" in navigator)) return;
+    const onMessage = (e: MessageEvent) => {
+      if (e.data && e.data.type === "NEW_VERSION") {
+        setUpdateMsg(`¡Nueva versión ${e.data.version} disponible! Recarga para actualizar.`);
+      }
+    };
+    const onUpdateFound = (reg: ServiceWorkerRegistration) => {
+      const newSW = reg.installing;
+      if (!newSW) return;
+      newSW.addEventListener("statechange", () => {
+        if (newSW.state === "installed" && navigator.serviceWorker.controller) {
+          setUpdateMsg("Nueva versión disponible. Recarga para actualizar.");
+        }
+      });
+    };
+    navigator.serviceWorker.addEventListener("message", onMessage);
+    navigator.serviceWorker.getRegistration().then((reg) => {
+      if (!reg) return;
+      reg.addEventListener("updatefound", () => onUpdateFound(reg));
+    });
+    return () => {
+      navigator.serviceWorker.removeEventListener("message", onMessage);
+    };
+  }, []);
+
   const propinas = current.entries.filter((e) => e.type === "propina");
   const datafonos = current.entries.filter((e) => e.type === "datafono");
   const agencias = current.entries.filter((e) => e.type === "agencia");
@@ -726,7 +755,7 @@ function App() {
                 {updateMsg}
                 {updateMsg.includes("Nueva") && (
                   <button
-                    onClick={() => window.location.reload(true)}
+                    onClick={() => window.location.reload()}
                     style={{ display: "block", width: "100%", marginTop: 10, padding: "10px 0", borderRadius: 10, border: "none", background: "oklch(0.68 0.20 145)", color: "black", fontSize: 14, fontWeight: 700, cursor: "pointer" }}
                   >
                     🔄 Recargar
@@ -2436,32 +2465,10 @@ function ConfirmDialog({ text, onConfirm, onCancel }: any) {
 ReactDOM.createRoot(document.getElementById("root")!).render(<App />);
 
 if ("serviceWorker" in navigator) {
-  let swReg: any = null;
   window.addEventListener("load", () => {
     navigator.serviceWorker
       .register("./sw.js")
-      .then((reg) => {
-        swReg = reg;
-        console.log("SW registered");
-        reg.addEventListener("updatefound", () => {
-          const newSW = reg.installing;
-          newSW.addEventListener("statechange", () => {
-            if (newSW.state === "installed" && navigator.serviceWorker.controller) {
-              setUpdateMsg("Nueva versión disponible. Recarga para actualizar.");
-            }
-          });
-        });
-      })
+      .then((reg) => console.log("SW registered"))
       .catch((err) => console.warn("SW registration failed", err));
   });
-
-  navigator.serviceWorker.addEventListener("message", (e) => {
-    if (e.data && e.data.type === "NEW_VERSION") {
-      window.dispatchEvent(new CustomEvent("app-update-available", { detail: e.data.version }));
-    }
-  });
 }
-
-window.addEventListener("app-update-available", (e: any) => {
-  setUpdateMsg("Nueva versión disponible. Recarga para actualizar.");
-});
