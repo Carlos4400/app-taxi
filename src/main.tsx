@@ -1249,7 +1249,7 @@ function App() {
             </div>
           </div>
           <div style={{ fontSize: 40, fontWeight: 900, color: accent, marginBottom: 16, flexShrink: 0 }}>
-            {valS || "0"}€
+            {valS || "0"} €
           </div>
           <input
             placeholder="Nota (opcional)"
@@ -1395,7 +1395,7 @@ function App() {
               }}
             >
               <div style={{ fontSize: 12, fontWeight: 700, color: "rgba(255,255,255,0.5)", marginBottom: 4 }}>DATÁFONO</div>
-              <div style={{ fontSize: 24, fontWeight: 900, color: activeField === "datafono" ? P : "white" }}>{valD || "0"}€</div>
+              <div style={{ fontSize: 24, fontWeight: 900, color: activeField === "datafono" ? P : "white" }}>{valD || "0"} €</div>
             </div>
             <div
               onClick={() => setActiveField("propina")}
@@ -1411,7 +1411,7 @@ function App() {
               }}
             >
               <div style={{ fontSize: 12, fontWeight: 700, color: "rgba(255,255,255,0.5)", marginBottom: 4 }}>PROPINA</div>
-              <div style={{ fontSize: 24, fontWeight: 900, color: activeField === "propina" ? G : "white" }}>{valP || "0"}€</div>
+              <div style={{ fontSize: 24, fontWeight: 900, color: activeField === "propina" ? G : "white" }}>{valP || "0"} €</div>
             </div>
           </div>
 
@@ -2304,7 +2304,7 @@ function SmallCard({
             marginTop: 2,
           }}
         >
-          {total.toFixed(2).replace(".", ",")}€
+          {fmt(total)}
         </div>
       </div>
     </div>
@@ -2374,7 +2374,7 @@ function MainCard({
           lineHeight: 1,
         }}
       >
-        {total.toFixed(2).replace(".", ",")}€
+        {fmt(total)}
       </div>
       <div
         style={{ fontSize: 12, color: "rgba(255,255,255,0.22)", marginTop: 8 }}
