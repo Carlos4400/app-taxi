@@ -407,7 +407,7 @@ function App() {
   const [screen, setScreen] = useState("home");
   const [burst, setBurst] = useState(false);
   const [viewJornada, setViewJornada] = useState<Jornada | null>(null);
-  const [activeField, setActiveField] = useState("propina");
+  const [activeField, setActiveField] = useState("datafono");
   const [valP, setValP] = useState("");
   const [valD, setValD] = useState("");
   const [noteP, setNoteP] = useState("");
@@ -419,6 +419,8 @@ function App() {
   const [kmJ, setKmJ] = useState("");
   const [endField, setEndField] = useState<"dinero" | "km">("dinero");
   const [notesJ, setNotesJ] = useState("");
+
+
   const [editJ, setEditJ] = useState<any>(null);
   const [confirmDialog, setConfirmDialog] = useState<{ text: string; onConfirm: () => void } | null>(null);
   const [updateMsg, setUpdateMsg] = useState("");
@@ -436,27 +438,40 @@ function App() {
   function saveEditEntry() {
     if (!editEntry) return;
     const amt = parseFloat(editEntryAmount.replace(",", "."));
-    if (isNaN(amt) || amt <= 0) {
+    if (isNaN(amt) || (amt <= 0 && editEntry.type !== 'nota')) {
       alert("El importe debe ser un número mayor que 0.");
       return;
     }
-    setCurrent((prev) => ({
-      ...prev,
-      entries: prev.entries.map((x) =>
-        x.id === editEntry.id
-          ? { ...x, amount: amt, note: editEntryNote.trim() }
-          : x
-      ),
-    }));
+    const updated = { ...editEntry, amount: amt, note: editEntryNote.trim() };
+    if (screen === 'editJornada' && editJ) {
+      setEditJ({
+        ...editJ,
+        entries: editJ.entries.map((x: any) => x.id === updated.id ? updated : x)
+      });
+    } else {
+      setCurrent((prev) => ({
+        ...prev,
+        entries: prev.entries.map((x) =>
+          x.id === editEntry.id ? updated : x
+        ),
+      }));
+    }
     setEditEntry(null);
   }
 
   function deleteEditEntry() {
     if (!editEntry) return;
-    setCurrent((prev) => ({
-      ...prev,
-      entries: prev.entries.filter((x) => x.id !== editEntry.id),
-    }));
+    if (screen === 'editJornada' && editJ) {
+      setEditJ({
+        ...editJ,
+        entries: editJ.entries.filter((x: any) => x.id !== editEntry.id)
+      });
+    } else {
+      setCurrent((prev) => ({
+        ...prev,
+        entries: prev.entries.filter((x) => x.id !== editEntry.id),
+      }));
+    }
     setEditEntry(null);
   }
 
@@ -751,8 +766,8 @@ function App() {
               <div style={{ fontSize: 20, fontWeight: 800, color: 'white' }}>Resumen de jornada</div>
               <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.3)', textTransform: 'capitalize', marginTop: 1 }}>
                 {viewJornada.startDate && viewJornada.startDate !== viewJornada.date
-                     ? <>{fmtDate(viewJornada.startDate)} {viewJornada.startTime} – {fmtDate(viewJornada.date)} {viewJornada.endTime}</>
-                     : <>{fmtDate(viewJornada.date)} · {viewJornada.startTime} – {viewJornada.endTime}</>}
+                  ? <>{fmtDate(viewJornada.startDate)} {viewJornada.startTime} – {fmtDate(viewJornada.date)} {viewJornada.endTime}</>
+                  : <>{fmtDate(viewJornada.date)} · {viewJornada.startTime} – {viewJornada.endTime}</>}
               </div>
             </div>
             <button style={{ ...S.iconBtn, background: 'rgba(255,255,255,0.09)' }} onClick={() => {
@@ -790,18 +805,54 @@ function App() {
               ))}
             </div>
 
-            {viewJornada.notes && (
-              <div style={{ marginTop: 16, paddingTop: 14, borderTop: '1px solid rgba(255,255,255,0.06)' }}>
-                <div style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '0.6px', marginBottom: 8 }}>📝 Notas</div>
-                <div style={{ fontSize: 15, color: 'rgba(255,255,255,0.85)', lineHeight: 1.5, whiteSpace: 'pre-wrap' }}>{viewJornada.notes}</div>
-              </div>
-            )}
-            {!viewJornada.notes && (
-              <div style={{ marginTop: 16, paddingTop: 14, borderTop: '1px solid rgba(255,255,255,0.06)' }}>
-                <div style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '0.6px', marginBottom: 8 }}>📝 Notas</div>
-                <div style={{ fontSize: 14, color: 'rgba(255,255,255,0.2)', fontStyle: 'italic' }}>Sin notas</div>
-              </div>
-            )}
+            {(() => {
+              const entriesWithNotes = viewJornada.entries.filter((e: any) => e.type !== 'nota' && e.note && e.note.trim());
+              if (entriesWithNotes.length === 0) return null;
+              return (
+                <div style={{ marginTop: 16, paddingTop: 14, borderTop: '1px solid rgba(255,255,255,0.06)', display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '0.6px', marginBottom: 4 }}>📌 Notas detalladas</div>
+                  {entriesWithNotes.map((e: any) => {
+                    const col = e.type === 'propina' ? G : e.type === 'datafono' ? P : e.type === 'agencia' ? A : e.type === 'extra' ? E : e.type === 'gasolina' ? F : N;
+                    return (
+                      <div key={e.id} style={{ fontSize: 13, background: 'rgba(255,255,255,0.02)', padding: '10px 12px', borderRadius: 12, border: '1px solid rgba(255,255,255,0.04)', display: 'flex', alignItems: 'baseline', gap: 8 }}>
+                        <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.25)', fontWeight: 600 }}>{e.time}</span>
+                        <span style={{ fontWeight: 900, color: col, fontSize: 10, textTransform: 'uppercase', minWidth: 60 }}>{e.type}</span>
+                        <span style={{ color: 'rgba(255,255,255,0.85)', lineHeight: 1.4 }}>{e.note}</span>
+                        <span style={{ marginLeft: 'auto', fontSize: 11, color: 'rgba(255,255,255,0.2)', fontWeight: 600 }}>{fmt(e.amount)}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              );
+            })()}
+
+            {(() => {
+              const generalNotes = viewJornada.entries.filter((e: any) => e.type === 'nota');
+              if (generalNotes.length === 0 && !viewJornada.notes) {
+                return (
+                  <div style={{ marginTop: 16, paddingTop: 14, borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+                    <div style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '0.6px', marginBottom: 8 }}>📝 Nota de jornada</div>
+                    <div style={{ fontSize: 14, color: 'rgba(255,255,255,0.2)', fontStyle: 'italic' }}>Sin nota general</div>
+                  </div>
+                );
+              }
+              return (
+                <div style={{ marginTop: 16, paddingTop: 14, borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '0.6px', marginBottom: 8 }}>📝 Nota de jornada</div>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                    {generalNotes.map((e: any) => (
+                      <div key={e.id} style={{ color: "rgba(255,255,255,0.9)", fontSize: 13, lineHeight: 1.4, background: "rgba(255,255,255,0.02)", padding: "8px 10px", borderRadius: 8, overflowWrap: "anywhere" }}>
+                        <span style={{ color: "rgba(255,255,255,0.3)", fontSize: 11, marginRight: 6, fontWeight: 600 }}>{e.time}</span>
+                        {e.note}
+                      </div>
+                    ))}
+                    {viewJornada.notes && (
+                      <div style={{ fontSize: 15, color: 'rgba(255,255,255,0.85)', lineHeight: 1.5, whiteSpace: 'pre-wrap', marginTop: generalNotes.length > 0 ? 4 : 0 }}>{viewJornada.notes}</div>
+                    )}
+                  </div>
+                </div>
+              );
+            })()}
           </div>
 
           {isToday && (
@@ -876,17 +927,18 @@ function App() {
                     : e.type === 'agencia' ? { col: A, lbl: 'Agencia' }
                       : e.type === 'extra' ? { col: E, lbl: 'Extra' }
                         : e.type === 'gasolina' ? { col: F, lbl: 'Gasolina' }
-                          : { col: N, lbl: 'Nulo' };
+                          : e.type === 'nota' ? { col: 'white', lbl: 'Nota' }
+                            : { col: N, lbl: 'Nulo' };
                 return (
                   <div key={e.id} style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'rgba(0,0,0,0.2)', borderRadius: 10, padding: '8px 12px' }}>
                     <span style={{ fontSize: 13, fontWeight: 600, color: meta.col, minWidth: 60 }}>{meta.lbl}</span>
-                    <span style={{ fontSize: 15, fontWeight: 700, color: 'white' }}>{fmt(e.amount)}</span>
+                    <span style={{ fontSize: 15, fontWeight: 700, color: 'white' }}>{e.type === 'nota' ? '' : fmt(e.amount)}</span>
                     <div style={{ flex: 1, textAlign: 'right', fontSize: 12, color: 'rgba(255,255,255,0.3)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', paddingRight: 8 }}>
                       {e.note}
                     </div>
-                    <button onClick={() => setEditJ({ ...editJ, entries: editJ.entries.filter((x: any) => x.id !== e.id) })}
-                      style={{ background: 'rgba(255,60,60,0.12)', border: 'none', borderRadius: 7, color: 'rgba(255,80,80,0.7)', fontSize: 11, cursor: 'pointer', width: 26, height: 26, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                      ✕
+                    <button onClick={() => openEditEntry(e)}
+                      style={{ background: 'rgba(255,255,255,0.08)', border: 'none', borderRadius: 7, color: 'rgba(255,255,255,0.7)', fontSize: 11, cursor: 'pointer', width: 26, height: 26, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                      ✏️
                     </button>
                   </div>
                 );
@@ -908,6 +960,7 @@ function App() {
                     <option value="agencia">Agencias</option>
                     <option value="extra">Extras</option>
                     <option value="gasolina">Gasolina</option>
+                    <option value="nota">Nota</option>
                     <option value="nulo">Nulos</option>
                   </select>
                   <input
@@ -920,7 +973,7 @@ function App() {
                   <button
                     onClick={() => {
                       const amt = parseFloat((editJ.newAmount || '').replace(',', '.'));
-                      if (amt > 0) {
+                      if (amt > 0 || editJ.newType === 'nota') {
                         const noteText = editJ.newNote ? editJ.newNote.trim() : '';
                         const newEntry = {
                           id: Date.now(),
@@ -930,15 +983,9 @@ function App() {
                           time: new Date().toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })
                         };
 
-                        let updatedNotes = editJ.notes || '';
-                        if (noteText) {
-                          updatedNotes = updatedNotes ? updatedNotes + '\n' + noteText : noteText;
-                        }
-
                         setEditJ({
                           ...editJ,
                           entries: [newEntry, ...editJ.entries],
-                          notes: updatedNotes,
                           newAmount: '',
                           newNote: ''
                         });
@@ -959,11 +1006,24 @@ function App() {
           </div>
 
           {/* Notas */}
-          <div style={{ background: 'rgba(255,255,255,0.04)', borderRadius: 16, padding: '14px 16px', border: '1px solid rgba(255,255,255,0.08)', marginBottom: 14 }}>
-            <div style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', letterSpacing: '0.6px', marginBottom: 8 }}>📝 Notas</div>
-            <textarea value={editJ.notes} onChange={e => setEditJ({ ...editJ, notes: e.target.value })} placeholder="Notas..." rows={3}
-              style={{ background: 'transparent', border: 'none', outline: 'none', color: 'rgba(255,255,255,0.9)', fontSize: 15, width: '100%', resize: 'none', fontFamily: 'inherit', lineHeight: 1.4 }} />
-          </div>
+          {(() => {
+            const generalNotes = editJ.entries.filter((e: any) => e.type === 'nota');
+            return (
+              <div style={{ background: 'rgba(255,255,255,0.04)', borderRadius: 16, padding: '14px 16px', border: '1px solid rgba(255,255,255,0.08)', marginBottom: 14 }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', letterSpacing: '0.6px', marginBottom: 8 }}>📝 Nota de jornada</div>
+
+                {generalNotes.map((e: any) => (
+                  <div key={e.id} style={{ marginBottom: 8, color: "rgba(255,255,255,0.9)", fontSize: 13, lineHeight: 1.4, background: "rgba(255,255,255,0.02)", padding: "8px 10px", borderRadius: 8, overflowWrap: "anywhere" }}>
+                    <span style={{ color: "rgba(255,255,255,0.3)", fontSize: 11, marginRight: 6, fontWeight: 600 }}>{e.time}</span>
+                    {e.note}
+                  </div>
+                ))}
+
+                <textarea value={editJ.notes} onChange={e => setEditJ({ ...editJ, notes: e.target.value })} placeholder="Añade una nota final..." rows={3}
+                  style={{ background: 'transparent', border: 'none', outline: 'none', color: 'rgba(255,255,255,0.9)', fontSize: 15, width: '100%', resize: 'none', fontFamily: 'inherit', lineHeight: 1.4, marginTop: generalNotes.length > 0 ? 8 : 0 }} />
+              </div>
+            );
+          })()}
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
             <button onClick={saveEdit}
@@ -993,6 +1053,23 @@ function App() {
           </div>
         </div>
         {confirmDialog && <ConfirmDialog {...confirmDialog} onCancel={() => setConfirmDialog(null)} />}
+        {editEntry && (
+          <EditEntryDialog
+            entry={editEntry}
+            amount={editEntryAmount}
+            note={editEntryNote}
+            onAmountChange={setEditEntryAmount}
+            onNoteChange={setEditEntryNote}
+            onSave={saveEditEntry}
+            onDelete={() => {
+              setConfirmDialog({
+                text: "¿Seguro que quieres eliminar esta entrada?",
+                onConfirm: deleteEditEntry,
+              });
+            }}
+            onCancel={() => setEditEntry(null)}
+          />
+        )}
       </Shell>
     );
   }
@@ -1046,10 +1123,15 @@ function App() {
     return (
       <Shell burst={false}>
         <div style={{ flex: 1, padding: "12px 20px", display: "flex", flexDirection: "column", minHeight: 0, overflow: "hidden" }}>
-          <button style={{ ...S.iconBtn, flexShrink: 0 }} onClick={() => { setScreen("main"); setSingleMode(null); setValS(""); setNoteS(""); }}>
-            <IconBack />
-          </button>
-          <div style={{ fontSize: 40, fontWeight: 900, color: accent, margin: "16px 0", flexShrink: 0 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 16, flexShrink: 0 }}>
+            <button style={S.iconBtn} onClick={() => { setScreen("main"); setSingleMode(null); setValS(""); setNoteS(""); }}>
+              <IconBack />
+            </button>
+            <div style={{ fontSize: 24, fontWeight: 800, color: "white" }}>
+              Añadir {label}
+            </div>
+          </div>
+          <div style={{ fontSize: 40, fontWeight: 900, color: accent, marginBottom: 16, flexShrink: 0 }}>
             {valS || "0"}€
           </div>
           <input
@@ -1067,6 +1149,64 @@ function App() {
           </div>
           <button onClick={saveS} style={{ width: "100%", padding: 15, marginTop: 12, borderRadius: 12, border: "none", background: accent, color: "black", fontWeight: 700, flexShrink: 0 }}>
             Guardar
+          </button>
+        </div>
+      </Shell>
+    );
+  }
+
+  if (screen === "addNotaGeneral") {
+    return (
+      <Shell burst={false}>
+        <div style={{ flex: 1, padding: "12px 20px 16px", display: "flex", flexDirection: "column", minHeight: 0, overflow: "hidden", animation: "slideIn 0.25s ease" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 24, flexShrink: 0 }}>
+            <button style={S.iconBtn} onClick={() => { setScreen("main"); setNoteS(""); }}>
+              <IconBack />
+            </button>
+            <div style={{ fontSize: 24, fontWeight: 800, color: "white" }}>
+              Añadir nota
+            </div>
+          </div>
+
+          <div style={{ flex: 1, display: "flex", flexDirection: "column" }}>
+            <textarea
+              placeholder="Escribe algo sobre la jornada..."
+              value={noteS}
+              onChange={(e) => setNoteS(e.target.value)}
+              style={{
+                flex: 1,
+                background: "rgba(255,255,255,0.05)",
+                border: "none",
+                borderRadius: 16,
+                padding: 16,
+                color: "white",
+                fontSize: 16,
+                outline: "none",
+                resize: "none",
+                fontFamily: "inherit",
+                lineHeight: 1.5
+              }}
+            />
+          </div>
+
+          <button
+            onClick={() => {
+              if (noteS.trim()) {
+                const newEntry = {
+                  id: Date.now(),
+                  type: "nota",
+                  amount: 0,
+                  note: noteS.trim(),
+                  time: new Date().toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" })
+                };
+                setCurrent(prev => ({ ...prev, entries: [...prev.entries, newEntry] }));
+              }
+              setNoteS("");
+              setScreen("main");
+            }}
+            style={{ width: "100%", padding: 18, marginTop: 16, borderRadius: 16, border: "none", background: "white", color: "black", fontWeight: 800, fontSize: 18, cursor: "pointer", flexShrink: 0 }}
+          >
+            Añadir a jornada
           </button>
         </div>
       </Shell>
@@ -1119,27 +1259,11 @@ function App() {
               <IconBack />
             </button>
             <div style={{ fontSize: 24, fontWeight: 800, color: "white" }}>
-              Añadir entrada
+              Añadir {activeField === "propina" ? "Propina" : "Datáfono"}
             </div>
           </div>
 
           <div style={{ display: "flex", gap: 10, marginBottom: 20 }}>
-            <div
-              onClick={() => setActiveField("propina")}
-              style={{
-                flex: 1,
-                padding: "16px",
-                borderRadius: 16,
-                background: activeField === "propina" ? "rgba(255,255,255,0.1)" : "rgba(255,255,255,0.03)",
-                border: `1px solid ${activeField === "propina" ? G : "transparent"}`,
-                cursor: "pointer",
-                textAlign: "center",
-                transition: "all 0.2s"
-              }}
-            >
-              <div style={{ fontSize: 12, fontWeight: 700, color: "rgba(255,255,255,0.5)", marginBottom: 4 }}>PROPINA</div>
-              <div style={{ fontSize: 24, fontWeight: 900, color: activeField === "propina" ? G : "white" }}>{valP || "0"}€</div>
-            </div>
             <div
               onClick={() => setActiveField("datafono")}
               style={{
@@ -1155,6 +1279,22 @@ function App() {
             >
               <div style={{ fontSize: 12, fontWeight: 700, color: "rgba(255,255,255,0.5)", marginBottom: 4 }}>DATÁFONO</div>
               <div style={{ fontSize: 24, fontWeight: 900, color: activeField === "datafono" ? P : "white" }}>{valD || "0"}€</div>
+            </div>
+            <div
+              onClick={() => setActiveField("propina")}
+              style={{
+                flex: 1,
+                padding: "16px",
+                borderRadius: 16,
+                background: activeField === "propina" ? "rgba(255,255,255,0.1)" : "rgba(255,255,255,0.03)",
+                border: `1px solid ${activeField === "propina" ? G : "transparent"}`,
+                cursor: "pointer",
+                textAlign: "center",
+                transition: "all 0.2s"
+              }}
+            >
+              <div style={{ fontSize: 12, fontWeight: 700, color: "rgba(255,255,255,0.5)", marginBottom: 4 }}>PROPINA</div>
+              <div style={{ fontSize: 24, fontWeight: 900, color: activeField === "propina" ? G : "white" }}>{valP || "0"}€</div>
             </div>
           </div>
 
@@ -1443,12 +1583,46 @@ function App() {
             )}
           </div>
 
-          {/* Notas */}
-          <div style={{ background: "rgba(255,255,255,0.04)", borderRadius: 16, padding: "12px 14px", border: "1px solid rgba(255,255,255,0.08)", marginBottom: 12, flexShrink: 0 }}>
-            <div style={{ fontSize: 11, fontWeight: 700, color: "rgba(255,255,255,0.5)", textTransform: "uppercase", letterSpacing: "0.6px", marginBottom: 6 }}>📝 Notas</div>
-            <textarea value={notesJ} onChange={e => setNotesJ(e.target.value)} placeholder="Añade notas..." rows={2}
-              style={{ background: "transparent", border: "none", outline: "none", color: "rgba(255,255,255,0.9)", fontSize: 14, width: "100%", resize: "none", fontFamily: "inherit", lineHeight: 1.4 }} />
-          </div>
+          {(() => {
+            const entriesWithNotes = current.entries.filter(e => e.type !== 'nota' && e.note && e.note.trim());
+            if (entriesWithNotes.length === 0) return null;
+            return (
+              <div style={{ marginBottom: 12, display: "flex", flexDirection: "column", gap: 6, flexShrink: 1, overflowY: "auto", paddingRight: 4 }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: "rgba(255,255,255,0.4)", textTransform: "uppercase", letterSpacing: "0.6px", marginBottom: 2 }}>📌 Notas detalladas</div>
+                {entriesWithNotes.map(e => {
+                  const col = e.type === 'propina' ? G : e.type === 'datafono' ? P : e.type === 'agencia' ? A : e.type === 'extra' ? E : e.type === 'gasolina' ? F : N;
+                  return (
+                    <div key={e.id} style={{ fontSize: 13, background: "rgba(255,255,255,0.03)", padding: "10px 12px", borderRadius: 12, border: "1px solid rgba(255,255,255,0.05)", display: "flex", alignItems: "baseline", gap: 8 }}>
+                      <span style={{ fontSize: 11, color: "rgba(255,255,255,0.25)", fontWeight: 600 }}>{e.time}</span>
+                      <span style={{ fontWeight: 900, color: col, fontSize: 10, textTransform: "uppercase", minWidth: 60 }}>{e.type}</span>
+                      <span style={{ color: "rgba(255,255,255,0.8)", lineHeight: 1.4 }}>{e.note}</span>
+                      <span style={{ marginLeft: "auto", fontSize: 11, color: "rgba(255,255,255,0.2)", fontWeight: 600 }}>{fmt(e.amount)}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            );
+          })()}
+
+          {/* Notas Generales */}
+          {(() => {
+            const generalNotes = current.entries.filter(e => e.type === 'nota');
+            return (
+              <div style={{ background: "rgba(255,255,255,0.04)", borderRadius: 16, padding: "12px 14px", border: "1px solid rgba(255,255,255,0.08)", marginBottom: 12, flexShrink: 0 }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: "rgba(255,255,255,0.5)", textTransform: "uppercase", letterSpacing: "0.6px", marginBottom: 6 }}>📝 Nota de jornada</div>
+
+                {generalNotes.map(e => (
+                  <div key={e.id} style={{ marginBottom: 8, color: "rgba(255,255,255,0.9)", fontSize: 13, lineHeight: 1.4, background: "rgba(255,255,255,0.02)", padding: "8px 10px", borderRadius: 8, overflowWrap: "anywhere" }}>
+                    <span style={{ color: "rgba(255,255,255,0.3)", fontSize: 11, marginRight: 6, fontWeight: 600 }}>{e.time}</span>
+                    {e.note}
+                  </div>
+                ))}
+
+                <textarea value={notesJ} onChange={e => setNotesJ(e.target.value)} placeholder={generalNotes.length > 0 ? "Añadir más detalles finales..." : "Añade una nota general..."} rows={2}
+                  style={{ background: "transparent", border: "none", outline: "none", color: "rgba(255,255,255,0.9)", fontSize: 14, width: "100%", resize: "none", fontFamily: "inherit", lineHeight: 1.4, marginTop: generalNotes.length > 0 ? 8 : 0 }} />
+              </div>
+            );
+          })()}
 
           <div style={{ display: "flex", flexDirection: "column", gap: 8, flexShrink: 0, marginTop: "auto" }}>
             <button onClick={handleEndJornada}
@@ -1512,11 +1686,11 @@ function App() {
                   marginTop: 4,
                 }}
               >
-{(() => {
-                       const dateToUse = current.startDate || today();
-                       const [d, m, y] = dateToUse.split("-").reverse();
-                       return `${d}/${m}/${y} desde ${current.startTime}`;
-                     })()}
+                {(() => {
+                  const dateToUse = current.startDate || today();
+                  const [d, m, y] = dateToUse.split("-").reverse();
+                  return `${d}/${m}/${y} desde ${current.startTime}`;
+                })()}
               </div>
             )}
           </div>
@@ -1619,6 +1793,36 @@ function App() {
             }}
           />
         </div>
+
+        {active && current.startTime && (
+          <div style={{ marginBottom: 18 }}>
+            <button
+              onClick={() => {
+                setNoteS("");
+                setScreen("addNotaGeneral");
+              }}
+              style={{
+                width: "100%",
+                padding: "14px 16px",
+                borderRadius: 16,
+                background: "rgba(255,255,255,0.03)",
+                border: "1px solid rgba(255,255,255,0.08)",
+                color: "rgba(255,255,255,0.6)",
+                fontSize: 14,
+                fontWeight: 600,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: 8,
+                cursor: "pointer",
+                transition: "all 0.2s"
+              }}
+            >
+              <span style={{ fontSize: 18 }}>📝</span> Añadir nota a la jornada
+            </button>
+          </div>
+        )}
+
         <div style={{ flex: 1, display: "flex", flexDirection: "column", minHeight: 0 }}>
           <div
             style={{
@@ -1708,16 +1912,10 @@ function App() {
                               lbl: "Extra",
                             }
                             : e.type === "nulo"
-                              ? {
-                                col: N,
-                                ic: <IconNulo s={17} c={N} />,
-                                lbl: "Nulo",
-                              }
-                              : {
-                                col: F,
-                                ic: <IconFuel s={17} c={F} />,
-                                lbl: "Gasolina",
-                              };
+                              ? { col: N, ic: <IconNulo s={17} c={N} />, lbl: "Nulo" }
+                              : e.type === "nota"
+                                ? { col: "white", ic: <span style={{ fontSize: 16 }}>📝</span>, lbl: "Nota" }
+                                : { col: F, ic: <IconFuel s={17} c={F} />, lbl: "Gasolina" };
                   return (
                     <div
                       key={e.id}
@@ -1765,7 +1963,7 @@ function App() {
                       <span
                         style={{ fontSize: 15, fontWeight: 700, color: meta.col }}
                       >
-                        +{fmt(e.amount)}
+                        {e.type !== "nota" && `+${fmt(e.amount)}`}
                       </span>
                       <button
                         onClick={() => openEditEntry(e)}
@@ -1813,11 +2011,6 @@ function App() {
         {active && (
           <button
             onClick={() => {
-              const autoNotes = current.entries
-                .filter((e) => e.note)
-                .map((e) => e.note)
-                .join("\n");
-              setNotesJ(autoNotes);
               setScreen("confirmEnd");
             }}
             style={{
@@ -2019,11 +2212,12 @@ function EditEntryDialog({
 }) {
   const meta: { col: string; lbl: string } =
     entry.type === "propina" ? { col: G, lbl: "Propina" }
-    : entry.type === "datafono" ? { col: P, lbl: "Datáfono" }
-    : entry.type === "agencia" ? { col: A, lbl: "Agencia" }
-    : entry.type === "extra" ? { col: E, lbl: "Extra" }
-    : entry.type === "gasolina" ? { col: F, lbl: "Gasolina" }
-    : { col: N, lbl: "Nulo" };
+      : entry.type === "datafono" ? { col: P, lbl: "Datáfono" }
+        : entry.type === "agencia" ? { col: A, lbl: "Agencia" }
+          : entry.type === "extra" ? { col: E, lbl: "Extra" }
+            : entry.type === "gasolina" ? { col: F, lbl: "Gasolina" }
+              : entry.type === "nota" ? { col: "white", lbl: "Nota" }
+                : { col: N, lbl: "Nulo" };
   return (
     <div
       style={{
@@ -2056,32 +2250,35 @@ function EditEntryDialog({
           <span style={{ fontSize: 12, color: "rgba(255,255,255,0.3)", marginLeft: "auto" }}>{entry.time}</span>
         </div>
 
-        <div style={{ marginBottom: 14 }}>
-          <div style={{ fontSize: 11, fontWeight: 700, color: "rgba(255,255,255,0.5)", marginBottom: 6, textTransform: "uppercase", letterSpacing: "0.6px" }}>Importe (€)</div>
-          <input
-            inputMode="decimal"
-            value={amount}
-            onChange={(ev) => onAmountChange(ev.target.value.replace(/[^0-9,\.]/g, ""))}
-            style={{
-              width: "100%",
-              background: "rgba(0,0,0,0.3)",
-              border: `1px solid ${meta.col}55`,
-              borderRadius: 12,
-              color: meta.col,
-              padding: "12px 14px",
-              fontSize: 22,
-              fontWeight: 900,
-              outline: "none",
-            }}
-          />
-        </div>
+        {entry.type !== 'nota' && (
+          <div style={{ marginBottom: 14 }}>
+            <div style={{ fontSize: 11, fontWeight: 700, color: "rgba(255,255,255,0.5)", marginBottom: 6, textTransform: "uppercase", letterSpacing: "0.6px" }}>Importe (€)</div>
+            <input
+              inputMode="decimal"
+              value={amount}
+              onChange={(ev) => onAmountChange(ev.target.value.replace(/[^0-9,\.]/g, ""))}
+              style={{
+                width: "100%",
+                background: "rgba(0,0,0,0.3)",
+                border: `1px solid ${meta.col.replace(")", " / 0.3)")}`,
+                borderRadius: 12,
+                color: meta.col,
+                padding: "12px 14px",
+                fontSize: 22,
+                fontWeight: 900,
+                outline: "none",
+              }}
+            />
+          </div>
+        )}
 
         <div style={{ marginBottom: 20 }}>
           <div style={{ fontSize: 11, fontWeight: 700, color: "rgba(255,255,255,0.5)", marginBottom: 6, textTransform: "uppercase", letterSpacing: "0.6px" }}>Nota</div>
-          <input
+          <textarea
             value={note}
             onChange={(ev) => onNoteChange(ev.target.value)}
-            placeholder="Nota opcional"
+            placeholder="Escribe la nota..."
+            rows={entry.type === 'nota' ? 4 : 2}
             style={{
               width: "100%",
               background: "rgba(0,0,0,0.3)",
@@ -2091,6 +2288,9 @@ function EditEntryDialog({
               padding: "10px 14px",
               fontSize: 14,
               outline: "none",
+              resize: "none",
+              fontFamily: "inherit",
+              lineHeight: 1.4
             }}
           />
         </div>
