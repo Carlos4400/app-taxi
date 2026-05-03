@@ -14,7 +14,7 @@ interface Entry {
   time: string;
 }
 
-interface Jornada {
+interface Turno {
   id: number;
   date: string;
   startTime: string | null;
@@ -85,7 +85,7 @@ function csvEscape(value: string | number): string {
   return s;
 }
 
-function buildHistoryCSV(jornadas: Jornada[]): string {
+function buildHistoryCSV(turnos: Turno[]): string {
   const header = [
     "fecha",
     "inicio",
@@ -94,13 +94,13 @@ function buildHistoryCSV(jornadas: Jornada[]): string {
     "importe",
     "nota",
     "hora_entrada",
-    "dinero_total_jornada",
-    "km_jornada",
-    "notas_jornada",
+    "dinero_total_turno",
+    "km_turno",
+    "notas_turno",
   ];
   const rows: string[] = [header.join(";")];
 
-  for (const j of jornadas) {
+  for (const j of turnos) {
     if (j.entries.length === 0) {
       rows.push(
         [
@@ -139,8 +139,8 @@ function buildHistoryCSV(jornadas: Jornada[]): string {
   return "﻿" + rows.join("\r\n");
 }
 
-async function exportHistoryCSV(jornadas: Jornada[]): Promise<void> {
-  const csv = buildHistoryCSV(jornadas);
+async function exportHistoryCSV(turnos: Turno[]): Promise<void> {
+  const csv = buildHistoryCSV(turnos);
   const filename = `mi-turno-${today()}.csv`;
 
   // En Capacitor (APK Android) usamos Filesystem + Share porque
@@ -157,7 +157,7 @@ async function exportHistoryCSV(jornadas: Jornada[]): Promise<void> {
       try {
         await Share.share({
           title: "Historial Mi Turno",
-          text: "Exportación CSV de jornadas",
+          text: "Exportación CSV de turnos",
           url: result.uri,
           dialogTitle: "Compartir CSV",
         });
@@ -191,7 +191,7 @@ function loadCurrent(): CurrentState {
   } catch (e) { }
   return { entries: [], startTime: null, startDate: null };
 }
-function loadHistory(): Jornada[] {
+function loadHistory(): Turno[] {
   try {
     const d = JSON.parse(localStorage.getItem(KEY_HISTORY)!);
     if (Array.isArray(d)) return d;
@@ -403,10 +403,10 @@ function Burst() {
 
 function App() {
   const [current, setCurrent] = useState<CurrentState>(loadCurrent);
-  const [history, setHistory] = useState<Jornada[]>(loadHistory);
+  const [history, setHistory] = useState<Turno[]>(loadHistory);
   const [screen, setScreen] = useState("home");
   const [burst, setBurst] = useState(false);
-  const [viewJornada, setViewJornada] = useState<Jornada | null>(null);
+  const [viewTurno, setViewTurno] = useState<Turno | null>(null);
   const [activeField, setActiveField] = useState("datafono");
   const [valP, setValP] = useState("");
   const [valD, setValD] = useState("");
@@ -417,7 +417,7 @@ function App() {
   const [noteS, setNoteS] = useState("");
   const [dineroJ, setDineroJ] = useState("");
   const [kmJ, setKmJ] = useState("");
-  const [endField, setEndField] = useState<"dinero" | "km">("dinero");
+  const [endField, setEndField] = useState<"dinero" | "km" | null>(null);
   const [notesJ, setNotesJ] = useState("");
 
 
@@ -443,7 +443,7 @@ function App() {
       return;
     }
     const updated = { ...editEntry, amount: amt, note: editEntryNote.trim() };
-    if (screen === 'editJornada' && editJ) {
+    if (screen === 'editTurno' && editJ) {
       setEditJ({
         ...editJ,
         entries: editJ.entries.map((x: any) => x.id === updated.id ? updated : x)
@@ -461,7 +461,7 @@ function App() {
 
   function deleteEditEntry() {
     if (!editEntry) return;
-    if (screen === 'editJornada' && editJ) {
+    if (screen === 'editTurno' && editJ) {
       setEditJ({
         ...editJ,
         entries: editJ.entries.filter((x: any) => x.id !== editEntry.id)
@@ -532,12 +532,12 @@ function App() {
     }));
   }
 
-  function handleEndJornada() {
+  function handleEndTurno() {
     // Las entradas tipo "nota" ya se han consolidado en `notesJ` al pulsar
-    // "Terminar jornada" en la pantalla anterior, por lo que las quitamos
+    // "Terminar turno" en la pantalla anterior, por lo que las quitamos
     // aquí para que no aparezcan duplicadas en el histórico.
     const cleanEntries = current.entries.filter((e) => e.type !== "nota");
-    const jornada = {
+    const turno = {
       id: Date.now(),
       date: today(),
       startTime: current.startTime,
@@ -554,12 +554,12 @@ function App() {
       notes: notesJ.trim(),
       startDate: current.startDate,
     };
-    setHistory((h) => [jornada, ...h]);
+    setHistory((h) => [turno, ...h]);
     setCurrent({ entries: [], startTime: null, startDate: null });
     setDineroJ("");
     setKmJ("");
     setNotesJ("");
-    setViewJornada(jornada);
+    setViewTurno(turno);
     setScreen("summary");
   }
 
@@ -682,7 +682,7 @@ function App() {
               }}
             >
               <span style={{ fontSize: 22 }}>{hasActive ? "▶" : "🚀"}</span>
-              {hasActive ? "Continuar jornada" : "Iniciar jornada"}
+              {hasActive ? "Continuar turno" : "Iniciar turno"}
             </button>
             <button
               onClick={() => setScreen("pastHistory")}
@@ -702,7 +702,7 @@ function App() {
               }}
             >
               <span style={{ fontSize: 20 }}>📋</span>
-              Jornadas anteriores
+              Turnos anteriores
             </button>
           </div>
         </div>
@@ -778,42 +778,42 @@ function App() {
     );
   }
 
-  if (screen === 'summary' && viewJornada) {
-    const vP = viewJornada.entries.filter((e: any) => e.type === 'propina').reduce((s: number, e: any) => s + e.amount, 0);
-    const vD = viewJornada.entries.filter((e: any) => e.type === 'datafono').reduce((s: number, e: any) => s + e.amount, 0);
-    const isToday = viewJornada.date === today();
-    const vA = viewJornada.entries.filter((e: any) => e.type === 'agencia').reduce((s: number, e: any) => s + e.amount, 0);
-    const vE = viewJornada.entries.filter((e: any) => e.type === 'extra').reduce((s: number, e: any) => s + e.amount, 0);
-    const vF = viewJornada.entries.filter((e: any) => e.type === 'gasolina').reduce((s: number, e: any) => s + e.amount, 0);
-    const vN = viewJornada.entries.filter((e: any) => e.type === 'nulo').reduce((s: number, e: any) => s + e.amount, 0);
-    const dineroV = viewJornada.dinero || 0;
-    const kmV = viewJornada.km || 0;
+  if (screen === 'summary' && viewTurno) {
+    const vP = viewTurno.entries.filter((e: any) => e.type === 'propina').reduce((s: number, e: any) => s + e.amount, 0);
+    const vD = viewTurno.entries.filter((e: any) => e.type === 'datafono').reduce((s: number, e: any) => s + e.amount, 0);
+    const isToday = viewTurno.date === today();
+    const vA = viewTurno.entries.filter((e: any) => e.type === 'agencia').reduce((s: number, e: any) => s + e.amount, 0);
+    const vE = viewTurno.entries.filter((e: any) => e.type === 'extra').reduce((s: number, e: any) => s + e.amount, 0);
+    const vF = viewTurno.entries.filter((e: any) => e.type === 'gasolina').reduce((s: number, e: any) => s + e.amount, 0);
+    const vN = viewTurno.entries.filter((e: any) => e.type === 'nulo').reduce((s: number, e: any) => s + e.amount, 0);
+    const dineroV = viewTurno.dinero || 0;
+    const kmV = viewTurno.km || 0;
     const totalGeneral = vP + vD + vA + vE + dineroV;
     const eurKm = kmV > 0 ? totalGeneral / kmV : 0;
     const cats = [
-      { key: 'datafono', label: 'Datáfono', color: P, bg: PBG, icon: <IconCard s={18} c={P} />, total: vD, count: viewJornada.entries.filter((e: any) => e.type === 'datafono').length },
-      { key: 'propina', label: 'Propinas', color: G, bg: GBG, icon: <IconCoin s={18} c={G} />, total: vP, count: viewJornada.entries.filter((e: any) => e.type === 'propina').length },
-      { key: 'agencia', label: 'Agencias', color: A, bg: ABG, icon: <IconAgency s={18} c={A} />, total: vA, count: viewJornada.entries.filter((e: any) => e.type === 'agencia').length },
-      { key: 'extra', label: 'Extras', color: E, bg: EBG, icon: <IconExtra s={18} c={E} />, total: vE, count: viewJornada.entries.filter((e: any) => e.type === 'extra').length },
-      { key: 'gasolina', label: 'Gasolina', color: F, bg: FBG, icon: <IconFuel s={18} c={F} />, total: vF, count: viewJornada.entries.filter((e: any) => e.type === 'gasolina').length },
-      { key: 'nulo', label: 'Nulos', color: N, bg: NBG, icon: <IconNulo s={18} c={N} />, total: vN, count: viewJornada.entries.filter((e: any) => e.type === 'nulo').length },
+      { key: 'datafono', label: 'Datáfono', color: P, bg: PBG, icon: <IconCard s={18} c={P} />, total: vD, count: viewTurno.entries.filter((e: any) => e.type === 'datafono').length },
+      { key: 'propina', label: 'Propinas', color: G, bg: GBG, icon: <IconCoin s={18} c={G} />, total: vP, count: viewTurno.entries.filter((e: any) => e.type === 'propina').length },
+      { key: 'agencia', label: 'Agencias', color: A, bg: ABG, icon: <IconAgency s={18} c={A} />, total: vA, count: viewTurno.entries.filter((e: any) => e.type === 'agencia').length },
+      { key: 'extra', label: 'Extras', color: E, bg: EBG, icon: <IconExtra s={18} c={E} />, total: vE, count: viewTurno.entries.filter((e: any) => e.type === 'extra').length },
+      { key: 'gasolina', label: 'Gasolina', color: F, bg: FBG, icon: <IconFuel s={18} c={F} />, total: vF, count: viewTurno.entries.filter((e: any) => e.type === 'gasolina').length },
+      { key: 'nulo', label: 'Nulos', color: N, bg: NBG, icon: <IconNulo s={18} c={N} />, total: vN, count: viewTurno.entries.filter((e: any) => e.type === 'nulo').length },
     ];
     return (
       <Shell burst={false}>
         <div style={{ flex: 1, overflowY: 'auto', padding: '16px 20px 32px', display: 'flex', flexDirection: 'column', gap: 14, animation: 'slideIn 0.3s ease' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-            <button style={S.iconBtn} onClick={() => { setScreen(isToday ? 'home' : 'pastHistory'); setViewJornada(null); }}><IconBack /></button>
+            <button style={S.iconBtn} onClick={() => { setScreen(isToday ? 'home' : 'pastHistory'); setViewTurno(null); }}><IconBack /></button>
             <div style={{ flex: 1 }}>
-              <div style={{ fontSize: 20, fontWeight: 800, color: 'white' }}>Resumen de jornada</div>
+              <div style={{ fontSize: 20, fontWeight: 800, color: 'white' }}>Resumen del turno</div>
               <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.3)', textTransform: 'capitalize', marginTop: 1 }}>
-                {viewJornada.startDate && viewJornada.startDate !== viewJornada.date
-                  ? <>{fmtDate(viewJornada.startDate)} {viewJornada.startTime} – {fmtDate(viewJornada.date)} {viewJornada.endTime}</>
-                  : <>{fmtDate(viewJornada.date)} · {viewJornada.startTime} – {viewJornada.endTime}</>}
+                {viewTurno.startDate && viewTurno.startDate !== viewTurno.date
+                  ? <>{fmtDate(viewTurno.startDate)} {viewTurno.startTime} – {fmtDate(viewTurno.date)} {viewTurno.endTime}</>
+                  : <>{fmtDate(viewTurno.date)} · {viewTurno.startTime} – {viewTurno.endTime}</>}
               </div>
             </div>
             <button style={{ ...S.iconBtn, background: 'rgba(255,255,255,0.09)' }} onClick={() => {
-              setEditJ({ ...viewJornada, entries: [...viewJornada.entries] });
-              setScreen('editJornada');
+              setEditJ({ ...viewTurno, entries: [...viewTurno.entries] });
+              setScreen('editTurno');
             }}>
               <span style={{ fontSize: 16 }}>✏️</span>
             </button>
@@ -847,7 +847,7 @@ function App() {
             </div>
 
             {(() => {
-              const entriesWithNotes = viewJornada.entries.filter((e: any) => e.type !== 'nota' && e.note && e.note.trim());
+              const entriesWithNotes = viewTurno.entries.filter((e: any) => e.type !== 'nota' && e.note && e.note.trim());
               if (entriesWithNotes.length === 0) return null;
               return (
                 <div style={{ marginTop: 16, paddingTop: 14, borderTop: '1px solid rgba(255,255,255,0.06)', display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -868,18 +868,18 @@ function App() {
             })()}
 
             {(() => {
-              const generalNotes = viewJornada.entries.filter((e: any) => e.type === 'nota');
-              if (generalNotes.length === 0 && !viewJornada.notes) {
+              const generalNotes = viewTurno.entries.filter((e: any) => e.type === 'nota');
+              if (generalNotes.length === 0 && !viewTurno.notes) {
                 return (
                   <div style={{ marginTop: 16, paddingTop: 14, borderTop: '1px solid rgba(255,255,255,0.06)' }}>
-                    <div style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '0.6px', marginBottom: 8 }}>📝 Nota de jornada</div>
+                    <div style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '0.6px', marginBottom: 8 }}>📝 Nota del turno</div>
                     <div style={{ fontSize: 14, color: 'rgba(255,255,255,0.2)', fontStyle: 'italic' }}>Sin nota general</div>
                   </div>
                 );
               }
               return (
                 <div style={{ marginTop: 16, paddingTop: 14, borderTop: '1px solid rgba(255,255,255,0.06)' }}>
-                  <div style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '0.6px', marginBottom: 8 }}>📝 Nota de jornada</div>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '0.6px', marginBottom: 8 }}>📝 Nota del turno</div>
                   <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                     {generalNotes.map((e: any) => (
                       <div key={e.id} style={{ color: "rgba(255,255,255,0.9)", fontSize: 13, lineHeight: 1.4, background: "rgba(255,255,255,0.02)", padding: "8px 10px", borderRadius: 8, overflowWrap: "anywhere" }}>
@@ -887,8 +887,8 @@ function App() {
                         {e.note}
                       </div>
                     ))}
-                    {viewJornada.notes && (
-                      <div style={{ fontSize: 15, color: 'rgba(255,255,255,0.85)', lineHeight: 1.5, whiteSpace: 'pre-wrap', marginTop: generalNotes.length > 0 ? 4 : 0 }}>{viewJornada.notes}</div>
+                    {viewTurno.notes && (
+                      <div style={{ fontSize: 15, color: 'rgba(255,255,255,0.85)', lineHeight: 1.5, whiteSpace: 'pre-wrap', marginTop: generalNotes.length > 0 ? 4 : 0 }}>{viewTurno.notes}</div>
                     )}
                   </div>
                 </div>
@@ -907,8 +907,8 @@ function App() {
     );
   }
 
-  // ── EDIT JORNADA SCREEN ───────────────────────────────────────
-  if (screen === 'editJornada' && editJ) {
+  // ── EDIT TURNO SCREEN ───────────────────────────────────────
+  if (screen === 'editTurno' && editJ) {
     function saveEdit() {
       const finalDinero = editJ.dineroStr !== undefined
         ? parseFloat(editJ.dineroStr.replace(',', '.')) || 0
@@ -930,31 +930,41 @@ function App() {
         totalN: editJ.entries.filter((e: any) => e.type === 'nulo').reduce((s: number, e: any) => s + e.amount, 0),
       };
       setHistory((h: any[]) => h.map((j: any) => j.id === updated.id ? updated : j));
-      setViewJornada(updated);
+      setViewTurno(updated);
       setEditJ(null);
       setScreen('summary');
     }
     const eDinero = editJ.dineroStr !== undefined ? editJ.dineroStr : (editJ.dinero || 0).toString().replace('.', ',');
     const eKm = editJ.kmStr !== undefined ? editJ.kmStr : (editJ.km || 0).toString().replace('.', ',');
+    function kpEdit(v: string) {
+      if (!endField) return;
+      const cur = endField === "dinero" ? eDinero : eKm;
+      const key = endField === "dinero" ? "dineroStr" : "kmStr";
+      let next = cur;
+      if (v === "DEL") next = cur.slice(0, -1);
+      else if (v === ",") { if (!cur.includes(",")) next = cur + ","; else return; }
+      else { if (cur.replace(",", "").length >= 7) return; next = cur + v; }
+      setEditJ({ ...editJ, [key]: next });
+    }
     return (
       <Shell burst={false}>
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', padding: '12px 20px 32px', overflowY: 'auto', animation: 'slideIn 0.25s ease' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 20 }}>
-            <button style={S.iconBtn} onClick={() => { setEditJ(null); setScreen('summary'); }}><IconBack /></button>
-            <span style={{ fontSize: 20, fontWeight: 700, color: 'white' }}>Editar jornada</span>
+            <button style={S.iconBtn} onClick={() => { setEditJ(null); setEndField(null); setScreen('summary'); }}><IconBack /></button>
+            <span style={{ fontSize: 20, fontWeight: 700, color: 'white' }}>Editar turno</span>
           </div>
 
-          {/* Dinero / KM */}
+          {/* Dinero / KM (clickables) */}
           <div style={{ display: 'flex', gap: 10, marginBottom: 14 }}>
-            <div style={{ flex: 1, background: 'oklch(0.20 0.06 150)', borderRadius: 16, padding: '14px', border: '1px solid oklch(0.60 0.16 150 / 0.35)' }}>
+            <div onClick={() => setEndField("dinero")}
+              style={{ flex: 1, background: 'oklch(0.20 0.06 150)', borderRadius: 16, padding: '14px', border: `1.5px solid ${endField === "dinero" ? "oklch(0.78 0.18 150)" : "oklch(0.60 0.16 150 / 0.35)"}`, cursor: "pointer" }}>
               <div style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', letterSpacing: '0.6px', marginBottom: 8 }}>€ Dinero</div>
-              <input inputMode="decimal" value={eDinero} onChange={e => setEditJ({ ...editJ, dineroStr: e.target.value.replace(/[^0-9,\.]/g, '') })}
-                style={{ background: 'transparent', border: 'none', outline: 'none', color: 'oklch(0.78 0.18 150)', fontSize: 22, fontWeight: 900, width: '100%' }} />
+              <div style={{ color: 'oklch(0.78 0.18 150)', fontSize: 22, fontWeight: 900, minHeight: 28 }}>{eDinero || "0"}</div>
             </div>
-            <div style={{ flex: 1, background: 'oklch(0.19 0.05 220)', borderRadius: 16, padding: '14px', border: '1px solid oklch(0.65 0.14 220 / 0.35)' }}>
+            <div onClick={() => setEndField("km")}
+              style={{ flex: 1, background: 'oklch(0.19 0.05 220)', borderRadius: 16, padding: '14px', border: `1.5px solid ${endField === "km" ? "oklch(0.80 0.14 220)" : "oklch(0.65 0.14 220 / 0.35)"}`, cursor: "pointer" }}>
               <div style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', letterSpacing: '0.6px', marginBottom: 8 }}>→ KM</div>
-              <input inputMode="decimal" value={eKm} onChange={e => setEditJ({ ...editJ, kmStr: e.target.value.replace(/[^0-9,\.]/g, '') })}
-                style={{ background: 'transparent', border: 'none', outline: 'none', color: 'oklch(0.80 0.14 220)', fontSize: 22, fontWeight: 900, width: '100%' }} />
+              <div style={{ color: 'oklch(0.80 0.14 220)', fontSize: 22, fontWeight: 900, minHeight: 28 }}>{eKm || "0"}</div>
             </div>
           </div>
 
@@ -1051,7 +1061,7 @@ function App() {
             const generalNotes = editJ.entries.filter((e: any) => e.type === 'nota');
             return (
               <div style={{ background: 'rgba(255,255,255,0.04)', borderRadius: 16, padding: '14px 16px', border: '1px solid rgba(255,255,255,0.08)', marginBottom: 14 }}>
-                <div style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', letterSpacing: '0.6px', marginBottom: 8 }}>📝 Nota de jornada</div>
+                <div style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', letterSpacing: '0.6px', marginBottom: 8 }}>📝 Nota del turno</div>
 
                 {generalNotes.map((e: any) => (
                   <div key={e.id} style={{ marginBottom: 8, color: "rgba(255,255,255,0.9)", fontSize: 13, lineHeight: 1.4, background: "rgba(255,255,255,0.02)", padding: "8px 10px", borderRadius: 8, overflowWrap: "anywhere" }}>
@@ -1078,18 +1088,18 @@ function App() {
             <button
               onClick={() => {
                 setConfirmDialog({
-                  text: "¿Seguro que quieres eliminar esta jornada completa? Esta acción no se puede deshacer.",
+                  text: "¿Seguro que quieres eliminar este turno completo? Esta acción no se puede deshacer.",
                   onConfirm: () => {
                     setHistory((h) => h.filter((j) => j.id !== editJ.id));
                     setEditJ(null);
-                    setViewJornada(null);
+                    setViewTurno(null);
                     setScreen("pastHistory");
                   }
                 });
               }}
               style={{ padding: '16px 0', borderRadius: 18, border: '1px solid rgba(255,60,60,0.3)', background: 'rgba(255,60,60,0.08)', color: 'rgba(255,90,90,0.85)', fontSize: 16, fontWeight: 700, cursor: 'pointer', marginTop: 8 }}
             >
-              🗑️ Eliminar jornada
+              🗑️ Eliminar turno
             </button>
           </div>
         </div>
@@ -1110,6 +1120,59 @@ function App() {
             }}
             onCancel={() => setEditEntry(null)}
           />
+        )}
+
+        {/* Teclado in-app para Dinero / KM en Editar turno */}
+        {endField && (
+          <div
+            onClick={() => setEndField(null)}
+            style={{
+              position: "fixed",
+              top: 0, left: 0, right: 0, bottom: 0,
+              background: "rgba(0,0,0,0.65)",
+              backdropFilter: "blur(4px)",
+              display: "flex",
+              alignItems: "flex-end",
+              justifyContent: "center",
+              zIndex: 9999,
+              animation: "fadeIn 0.2s ease",
+            }}
+          >
+            <div
+              onClick={(e) => e.stopPropagation()}
+              style={{
+                width: "100%",
+                maxWidth: 460,
+                background: "#0d0d14",
+                borderTopLeftRadius: 24,
+                borderTopRightRadius: 24,
+                padding: "16px 16px 20px",
+                borderTop: "1px solid rgba(255,255,255,0.08)",
+                animation: "slideUp 0.25s ease",
+              }}
+            >
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
+                <span style={{ fontSize: 13, fontWeight: 700, color: endField === "dinero" ? "oklch(0.78 0.18 150)" : "oklch(0.80 0.14 220)", textTransform: "uppercase", letterSpacing: "0.6px" }}>
+                  {endField === "dinero" ? "€ Dinero" : "→ KM"}
+                </span>
+                <button onClick={() => setEndField(null)}
+                  style={{ background: "rgba(255,255,255,0.08)", border: "none", borderRadius: 10, color: "white", padding: "6px 14px", fontSize: 13, fontWeight: 700, cursor: "pointer" }}>
+                  Listo
+                </button>
+              </div>
+              <div style={{ fontSize: 36, fontWeight: 900, color: endField === "dinero" ? "oklch(0.78 0.18 150)" : "oklch(0.80 0.14 220)", marginBottom: 14, textAlign: "center", letterSpacing: "-0.5px" }}>
+                {(endField === "dinero" ? eDinero : eKm) || "0"}
+              </div>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8 }}>
+                {["1","2","3","4","5","6","7","8","9",",","0","DEL"].map((k) => (
+                  <button key={k} onClick={() => kpEdit(k)}
+                    style={{ ...S.keyBtn, padding: "20px 0", background: "rgba(255,255,255,0.05)", color: "white", fontSize: 22, fontWeight: 700 }}>
+                    {k === "DEL" ? <IconDel /> : k}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
         )}
       </Shell>
     );
@@ -1211,7 +1274,7 @@ function App() {
 
           <div style={{ flex: 1, display: "flex", flexDirection: "column" }}>
             <textarea
-              placeholder="Escribe algo sobre la jornada..."
+              placeholder="Escribe algo sobre el turno..."
               value={noteS}
               onChange={(e) => setNoteS(e.target.value)}
               style={{
@@ -1247,7 +1310,7 @@ function App() {
             }}
             style={{ width: "100%", padding: 18, marginTop: 16, borderRadius: 16, border: "none", background: "white", color: "black", fontWeight: 800, fontSize: 18, cursor: "pointer", flexShrink: 0 }}
           >
-            Añadir a jornada
+            Añadir al turno
           </button>
         </div>
       </Shell>
@@ -1371,7 +1434,7 @@ function App() {
               <IconBack />
             </button>
             <div style={{ flex: 1, fontSize: 24, fontWeight: 800, color: "white" }}>
-              Jornadas anteriores
+              Turnos anteriores
             </div>
             {history.length > 0 && (
               <button
@@ -1398,14 +1461,14 @@ function App() {
           </div>
           {history.length === 0 ? (
             <div style={{ textAlign: "center", color: "rgba(255,255,255,0.3)", marginTop: 40, fontSize: 15 }}>
-              No hay jornadas anteriores.
+              No hay turnos anteriores.
             </div>
           ) : (
             history.map((j) => (
               <div
                 key={j.id}
                 onClick={() => {
-                  setViewJornada(j);
+                  setViewTurno(j);
                   setScreen("summary");
                 }}
                 style={{
@@ -1540,25 +1603,34 @@ function App() {
   }
 
   if (screen === "confirmEnd") {
+    function kpEnd(v: string) {
+      if (!endField) return;
+      const cur = endField === "dinero" ? dineroJ : kmJ;
+      const setVal = endField === "dinero" ? setDineroJ : setKmJ;
+      if (v === "DEL") { setVal(cur.slice(0, -1)); return; }
+      if (v === ",") { if (!cur.includes(",")) setVal(cur + ","); return; }
+      if (cur.replace(",", "").length >= 7) return;
+      setVal(cur + v);
+    }
     return (
       <Shell burst={false}>
         <div style={{ flex: 1, display: "flex", flexDirection: "column", padding: "12px 20px 16px", overflow: "hidden", minHeight: 0, animation: "slideIn 0.25s ease" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 16, flexShrink: 0 }}>
-            <button style={S.iconBtn} onClick={() => setScreen("main")}><IconBack /></button>
-            <span style={{ fontSize: 20, fontWeight: 700, color: "white" }}>Terminar jornada</span>
+            <button style={S.iconBtn} onClick={() => { setScreen("main"); setEndField(null); }}><IconBack /></button>
+            <span style={{ fontSize: 20, fontWeight: 700, color: "white" }}>Terminar turno</span>
           </div>
 
-          {/* Dinero / KM inputs */}
+          {/* Dinero / KM cards (clickables — abren el teclado in-app) */}
           <div style={{ display: "flex", gap: 10, marginBottom: 12, flexShrink: 0 }}>
-            <div style={{ flex: 1, background: "oklch(0.20 0.06 150)", borderRadius: 16, padding: "14px", border: "1px solid oklch(0.60 0.16 150 / 0.35)" }}>
+            <div onClick={() => setEndField("dinero")}
+              style={{ flex: 1, background: "oklch(0.20 0.06 150)", borderRadius: 16, padding: "14px", border: `1.5px solid ${endField === "dinero" ? "oklch(0.78 0.18 150)" : "oklch(0.60 0.16 150 / 0.35)"}`, cursor: "pointer", transition: "border 0.15s" }}>
               <div style={{ fontSize: 11, fontWeight: 700, color: "rgba(255,255,255,0.5)", textTransform: "uppercase", letterSpacing: "0.6px", marginBottom: 8 }}>€ Dinero</div>
-              <input inputMode="decimal" value={dineroJ} onChange={e => setDineroJ(e.target.value.replace(/[^0-9,\.]/g, ""))} placeholder="0"
-                style={{ background: "transparent", border: "none", outline: "none", color: "oklch(0.78 0.18 150)", fontSize: 22, fontWeight: 900, width: "100%", letterSpacing: "-0.5px" }} />
+              <div style={{ color: "oklch(0.78 0.18 150)", fontSize: 22, fontWeight: 900, letterSpacing: "-0.5px", minHeight: 28 }}>{dineroJ || "0"}</div>
             </div>
-            <div style={{ flex: 1, background: "oklch(0.19 0.05 220)", borderRadius: 16, padding: "14px", border: "1px solid oklch(0.65 0.14 220 / 0.35)" }}>
+            <div onClick={() => setEndField("km")}
+              style={{ flex: 1, background: "oklch(0.19 0.05 220)", borderRadius: 16, padding: "14px", border: `1.5px solid ${endField === "km" ? "oklch(0.80 0.14 220)" : "oklch(0.65 0.14 220 / 0.35)"}`, cursor: "pointer", transition: "border 0.15s" }}>
               <div style={{ fontSize: 11, fontWeight: 700, color: "rgba(255,255,255,0.5)", textTransform: "uppercase", letterSpacing: "0.6px", marginBottom: 8 }}>→ KM</div>
-              <input inputMode="decimal" value={kmJ} onChange={e => setKmJ(e.target.value.replace(/[^0-9,\.]/g, ""))} placeholder="0"
-                style={{ background: "transparent", border: "none", outline: "none", color: "oklch(0.80 0.14 220)", fontSize: 22, fontWeight: 900, width: "100%", letterSpacing: "-0.5px" }} />
+              <div style={{ color: "oklch(0.80 0.14 220)", fontSize: 22, fontWeight: 900, letterSpacing: "-0.5px", minHeight: 28 }}>{kmJ || "0"}</div>
             </div>
           </div>
 
@@ -1645,22 +1717,22 @@ function App() {
             );
           })()}
 
-          {/* Nota de jornada — único textarea, ya pre-rellenado al venir de "Terminar jornada" */}
+          {/* Nota del turno — único textarea, ya pre-rellenado al venir de "Terminar turno" */}
           <div style={{ background: "rgba(255,255,255,0.04)", borderRadius: 16, padding: "12px 14px", border: "1px solid rgba(255,255,255,0.08)", marginBottom: 12, flexShrink: 0 }}>
-            <div style={{ fontSize: 11, fontWeight: 700, color: "rgba(255,255,255,0.5)", textTransform: "uppercase", letterSpacing: "0.6px", marginBottom: 6 }}>📝 Nota de jornada</div>
+            <div style={{ fontSize: 11, fontWeight: 700, color: "rgba(255,255,255,0.5)", textTransform: "uppercase", letterSpacing: "0.6px", marginBottom: 6 }}>📝 Nota del turno</div>
             <textarea
               value={notesJ}
               onChange={e => setNotesJ(e.target.value)}
-              placeholder="Añade una nota general de la jornada..."
+              placeholder="Añade una nota general del turno..."
               rows={4}
               style={{ background: "transparent", border: "none", outline: "none", color: "rgba(255,255,255,0.9)", fontSize: 14, width: "100%", resize: "none", fontFamily: "inherit", lineHeight: 1.45 }}
             />
           </div>
 
           <div style={{ display: "flex", flexDirection: "column", gap: 8, flexShrink: 0, marginTop: "auto" }}>
-            <button onClick={handleEndJornada}
+            <button onClick={handleEndTurno}
               style={{ padding: "15px 0", borderRadius: 16, border: "none", background: "rgba(255,60,60,0.12)", color: "rgba(255,110,110,0.9)", fontSize: 16, fontWeight: 800, cursor: "pointer", outline: "1.5px solid rgba(255,60,60,0.25)" }}>
-              Sí, terminar jornada
+              Sí, terminar turno
             </button>
             <button onClick={() => setScreen("main")}
               style={{ padding: "13px 0", borderRadius: 16, border: "none", background: "rgba(255,255,255,0.06)", color: "rgba(255,255,255,0.5)", fontSize: 15, fontWeight: 700, cursor: "pointer" }}>
@@ -1668,6 +1740,59 @@ function App() {
             </button>
           </div>
         </div>
+
+        {/* Teclado in-app para Dinero / KM */}
+        {endField && (
+          <div
+            onClick={() => setEndField(null)}
+            style={{
+              position: "fixed",
+              top: 0, left: 0, right: 0, bottom: 0,
+              background: "rgba(0,0,0,0.65)",
+              backdropFilter: "blur(4px)",
+              display: "flex",
+              alignItems: "flex-end",
+              justifyContent: "center",
+              zIndex: 9999,
+              animation: "fadeIn 0.2s ease",
+            }}
+          >
+            <div
+              onClick={(e) => e.stopPropagation()}
+              style={{
+                width: "100%",
+                maxWidth: 460,
+                background: "#0d0d14",
+                borderTopLeftRadius: 24,
+                borderTopRightRadius: 24,
+                padding: "16px 16px 20px",
+                borderTop: "1px solid rgba(255,255,255,0.08)",
+                animation: "slideUp 0.25s ease",
+              }}
+            >
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
+                <span style={{ fontSize: 13, fontWeight: 700, color: endField === "dinero" ? "oklch(0.78 0.18 150)" : "oklch(0.80 0.14 220)", textTransform: "uppercase", letterSpacing: "0.6px" }}>
+                  {endField === "dinero" ? "€ Dinero" : "→ KM"}
+                </span>
+                <button onClick={() => setEndField(null)}
+                  style={{ background: "rgba(255,255,255,0.08)", border: "none", borderRadius: 10, color: "white", padding: "6px 14px", fontSize: 13, fontWeight: 700, cursor: "pointer" }}>
+                  Listo
+                </button>
+              </div>
+              <div style={{ fontSize: 36, fontWeight: 900, color: endField === "dinero" ? "oklch(0.78 0.18 150)" : "oklch(0.80 0.14 220)", marginBottom: 14, textAlign: "center", letterSpacing: "-0.5px" }}>
+                {(endField === "dinero" ? dineroJ : kmJ) || "0"}
+              </div>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8 }}>
+                {["1","2","3","4","5","6","7","8","9",",","0","DEL"].map((k) => (
+                  <button key={k} onClick={() => kpEnd(k)}
+                    style={{ ...S.keyBtn, padding: "20px 0", background: "rgba(255,255,255,0.05)", color: "white", fontSize: 22, fontWeight: 700 }}>
+                    {k === "DEL" ? <IconDel /> : k}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
       </Shell>
     );
   }
@@ -1739,7 +1864,7 @@ function App() {
               <button
                 style={S.iconBtn}
                 onClick={() => setScreen("pastHistory")}
-                title="Jornadas anteriores"
+                title="Turnos anteriores"
               >
                 <IconHistory />
               </button>
@@ -1851,7 +1976,7 @@ function App() {
                 transition: "all 0.2s"
               }}
             >
-              <span style={{ fontSize: 18 }}>📝</span> Añadir nota a la jornada
+              <span style={{ fontSize: 18 }}>📝</span> Añadir nota al turno
             </button>
           </div>
         )}
@@ -1881,7 +2006,7 @@ function App() {
             >
               {current.startTime ? (
                 <div>
-                  Jornada iniciada a las {current.startTime}.<br />
+                  Turno iniciado a las {current.startTime}.<br />
                   Pulsa un botón para añadir tu primera entrada.
                 </div>
               ) : (
@@ -1910,10 +2035,10 @@ function App() {
                       cursor: "pointer",
                     }}
                   >
-                    🚀 Iniciar jornada
+                    🚀 Iniciar turno
                   </button>
                   <div style={{ marginTop: 14, fontSize: 13 }}>
-                    Pulsa para comenzar tu jornada.
+                    Pulsa para comenzar tu turno.
                   </div>
                 </div>
               )}
@@ -2044,7 +2169,7 @@ function App() {
         {active && (
           <button
             onClick={() => {
-              // Pre-rellenar la nota de jornada con todas las notas standalone
+              // Pre-rellenar la nota de turno con todas las notas standalone
               // (entradas tipo "nota") añadidas durante el turno.
               const notas = current.entries.filter(e => e.type === "nota");
               if (notas.length > 0) {
@@ -2069,7 +2194,7 @@ function App() {
               flexShrink: 0,
             }}
           >
-            Terminar jornada
+            Terminar turno
           </button>
         )}
       </div>

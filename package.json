@@ -1,7 +1,7 @@
 {
   "name": "mi-turno",
   "version": "1.0.1",
-  "description": "App para gestionar tu jornada laboral como taxista",
+  "description": "App para gestionar tu turno laboral como taxista",
   "type": "module",
   "scripts": {
     "dev": "vite",
