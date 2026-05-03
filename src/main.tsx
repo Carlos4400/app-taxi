@@ -753,14 +753,6 @@ function App() {
             {updateMsg && (
               <div style={{ marginTop: 16, fontSize: 14, color: updateMsg.includes("Nueva") ? "oklch(0.68 0.20 145)" : "rgba(255,255,255,0.6)", fontWeight: updateMsg.includes("Nueva") ? 700 : 400, background: "rgba(0,0,0,0.2)", padding: "12px", borderRadius: 12 }}>
                 {updateMsg}
-                {updateMsg.includes("Nueva") && (
-                  <button
-                    onClick={() => window.location.reload()}
-                    style={{ display: "block", width: "100%", marginTop: 10, padding: "10px 0", borderRadius: 10, border: "none", background: "oklch(0.68 0.20 145)", color: "black", fontSize: 14, fontWeight: 700, cursor: "pointer" }}
-                  >
-                    🔄 Recargar
-                  </button>
-                )}
               </div>
             )}
 
@@ -1702,11 +1694,6 @@ function App() {
                 <div style={{ fontSize: 11, color: "rgba(255,255,255,0.2)", marginTop: 2 }}>{nulos.length} entrada{nulos.length !== 1 ? "s" : ""}</div>
               </div>
             </div>
-            {current.startTime && (
-              <div style={{ fontSize: 12, color: "rgba(255,255,255,0.22)", marginTop: 10, textAlign: "center" }}>
-                Iniciada a las {current.startTime}
-              </div>
-            )}
           </div>
 
           {(() => {
@@ -2195,12 +2182,24 @@ function App() {
         {active && (
           <button
             onClick={() => {
-              // Pre-rellenar la nota de turno con todas las notas standalone
-              // (entradas tipo "nota") añadidas durante el Turno.
-              const notas = current.entries.filter(e => e.type === "nota");
-              if (notas.length > 0) {
-                const combined = notas
-                  .map(n => `[${n.time}] ${n.note}`)
+              // Pre-rellenar la nota del Turno con TODAS las notas escritas
+              // durante el turno: tanto las standalone (tipo "nota") como
+              // las que se adjuntaron a entradas concretas (Datáfono, Propina,
+              // Extra, Gasolina, Agencia, Nulo). Así el campo NOTA DEL TURNO
+              // queda como log completo.
+              const labelOf = (t: string) => ({
+                propina: "PROPINA", datafono: "DATÁFONO", agencia: "AGENCIA",
+                extra: "EXTRA", gasolina: "GASOLINA", nulo: "NULO",
+              } as Record<string, string>)[t] || t.toUpperCase();
+              const allWithNote = current.entries
+                .filter(e => e.note && e.note.trim())
+                .slice()
+                .sort((a, b) => (a.time || "").localeCompare(b.time || ""));
+              if (allWithNote.length > 0) {
+                const combined = allWithNote
+                  .map(n => n.type === "nota"
+                    ? `[${n.time}] ${n.note}`
+                    : `[${n.time}] ${labelOf(n.type)}: ${n.note}`)
                   .join("\n");
                 // Si el usuario ya tenía algo escrito, lo respeta; si no, pre-rellena.
                 setNotesJ(prev => prev.trim() ? prev : combined);
