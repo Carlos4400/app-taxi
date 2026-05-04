@@ -53,6 +53,12 @@ const NBG = "oklch(0.18 0.03 260)";
 
 const KEY_CURRENT = "taxi_current_v3";
 const KEY_HISTORY = "taxi_history_v3";
+const KEY_SETTINGS = "taxi_settings_v3";
+
+interface AppSettings {
+  "porcentaje.jefe": number;
+  "porcentaje.chofer": number;
+}
 // Inyectado por Vite en build a partir de process.env.APP_VERSION o package.json.
 declare const __APP_VERSION__: string;
 const APP_VERSION = __APP_VERSION__;
@@ -75,6 +81,14 @@ function fmtDate(iso: string): string {
     day: "numeric",
     month: "short",
   });
+}
+
+function loadSettings(): AppSettings {
+  try {
+    const d = JSON.parse(localStorage.getItem(KEY_SETTINGS)!);
+    if (d) return d;
+  } catch (e) { }
+  return { "porcentaje.jefe": 0, "porcentaje.chofer": 0 };
 }
 
 function csvEscape(value: string | number): string {
@@ -213,6 +227,14 @@ const IconCoin = ({ s = 24, c = G }: { s?: number; c?: string }) => (
     >
       €
     </text>
+  </svg>
+);
+
+const IconPercent = ({ s = 24, c = G }: { s?: number; c?: string }) => (
+  <svg width={s} height={s} viewBox="0 0 24 24" fill="none">
+    <path d="M16 8L8 16" stroke={c} strokeWidth="2.5" strokeLinecap="round" />
+    <circle cx="9" cy="9" r="2" stroke={c} strokeWidth="2.5" />
+    <circle cx="15" cy="15" r="2" stroke={c} strokeWidth="2.5" />
   </svg>
 );
 
@@ -419,6 +441,8 @@ function App() {
   const [kmJ, setKmJ] = useState("");
   const [endField, setEndField] = useState<"dinero" | "km" | null>(null);
   const [notesJ, setNotesJ] = useState("");
+  const [activeSettingsField, setActiveSettingsField] = useState<"porcentaje.jefe" | "porcentaje.chofer" | null>(null);
+  const [settingsValStr, setSettingsValStr] = useState("");
 
 
   const [editJ, setEditJ] = useState<any>(null);
@@ -428,6 +452,7 @@ function App() {
   const [editEntry, setEditEntry] = useState<Entry | null>(null);
   const [editEntryAmount, setEditEntryAmount] = useState("");
   const [editEntryNote, setEditEntryNote] = useState("");
+  const [settings, setSettings] = useState<AppSettings>(loadSettings);
 
   function openEditEntry(e: Entry) {
     setEditEntry(e);
@@ -481,6 +506,9 @@ function App() {
   useEffect(() => {
     localStorage.setItem(KEY_HISTORY, JSON.stringify(history));
   }, [history]);
+  useEffect(() => {
+    localStorage.setItem(KEY_SETTINGS, JSON.stringify(settings));
+  }, [settings]);
 
   // Detección automática de nuevas versiones vía Service Worker.
   // El SW comprueba el manifest periódicamente y nos manda un postMessage
@@ -664,10 +692,9 @@ function App() {
               style={{
                 padding: "20px 0",
                 borderRadius: 20,
-                border: "none",
+                border: `2px solid ${G}`,
                 background: GBG,
                 color: G,
-                outline: `1.5px solid ${G}55`,
                 fontSize: 18,
                 fontWeight: 800,
                 cursor: "pointer",
@@ -685,9 +712,9 @@ function App() {
               style={{
                 padding: "18px 0",
                 borderRadius: 20,
-                border: "1px solid rgba(255,255,255,0.1)",
-                background: "rgba(255,255,255,0.04)",
-                color: "rgba(255,255,255,0.6)",
+                border: `2px solid ${P}`,
+                background: PBG,
+                color: P,
                 fontSize: 16,
                 fontWeight: 700,
                 cursor: "pointer",
@@ -699,6 +726,26 @@ function App() {
             >
               <span style={{ fontSize: 20 }}>📋</span>
               Turnos Anteriores
+            </button>
+            <button
+              onClick={() => setScreen("contabilidad")}
+              style={{
+                padding: "18px 0",
+                borderRadius: 20,
+                border: `2px solid ${A}`,
+                background: ABG,
+                color: A,
+                fontSize: 16,
+                fontWeight: 700,
+                cursor: "pointer",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: 12,
+              }}
+            >
+              <span style={{ fontSize: 20 }}>📊</span>
+              Contabilidad
             </button>
           </div>
         </div>
@@ -728,13 +775,13 @@ function App() {
   if (screen === "settings") {
     return (
       <Shell burst={false}>
-        <div style={{ flex: 1, padding: "16px 20px", display: "flex", flexDirection: "column" }}>
+        <div style={{ flex: 1, padding: "16px 20px", display: "flex", flexDirection: "column", overflowY: "auto" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 32 }}>
             <button style={S.iconBtn} onClick={() => { setScreen("home"); setUpdateMsg(""); setDownloadUrl(""); }}><IconBack /></button>
             <div style={{ fontSize: 24, fontWeight: 800, color: "white" }}>Ajustes</div>
           </div>
 
-          <div style={{ background: "rgba(255,255,255,0.03)", borderRadius: 20, padding: 24, border: "1px solid rgba(255,255,255,0.07)", textAlign: "center" }}>
+          <div style={{ background: "rgba(255,255,255,0.03)", borderRadius: 20, padding: 24, border: "1px solid rgba(255,255,255,0.07)", textAlign: "center", marginBottom: 16 }}>
             <div style={{ fontSize: 48, marginBottom: 12 }}>🚕</div>
             <div style={{ fontSize: 20, fontWeight: 800, color: "white", marginBottom: 4 }}>Mi Turno</div>
             <div style={{ fontSize: 14, color: "rgba(255,255,255,0.4)", marginBottom: 24 }}>Versión {APP_VERSION}</div>
@@ -761,7 +808,144 @@ function App() {
               </button>
             )}
           </div>
+
+          <div style={{
+            background: "rgba(255,255,255,0.03)",
+            borderRadius: 22,
+            padding: "20px",
+            border: "1px solid rgba(255,255,255,0.07)"
+          }}>
+            <div style={{ fontSize: 12, fontWeight: 700, color: "rgba(255,255,255,0.4)", textTransform: "uppercase", letterSpacing: "0.8px", marginBottom: 16, display: "flex", alignItems: "center", gap: 8 }}>
+              <IconPercent s={26} c={G} /> Reparto de Porcentajes
+            </div>
+
+            <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: "rgba(0,0,0,0.2)", padding: "12px 16px", borderRadius: 16, border: "1px solid rgba(255,255,255,0.05)" }}>
+                <span style={{ color: "white", fontWeight: 600 }}>Jefe</span>
+                <div
+                  onClick={() => {
+                    setActiveSettingsField("porcentaje.jefe");
+                    setSettingsValStr(settings["porcentaje.jefe"].toString().replace(".", ","));
+                  }}
+                  style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}
+                >
+                  <div
+                    id="porcentaje.jefe"
+                    style={{ color: A, fontSize: 20, fontWeight: 800, textAlign: "right", minWidth: "40px" }}
+                  >
+                    {settings["porcentaje.jefe"]}
+                  </div>
+                  <span style={{ color: "rgba(255,255,255,0.3)", fontWeight: 700 }}>%</span>
+                </div>
+              </div>
+
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: "rgba(0,0,0,0.2)", padding: "12px 16px", borderRadius: 16, border: "1px solid rgba(255,255,255,0.05)" }}>
+                <span style={{ color: "white", fontWeight: 600 }}>Chofer</span>
+                <div
+                  onClick={() => {
+                    setActiveSettingsField("porcentaje.chofer");
+                    setSettingsValStr(settings["porcentaje.chofer"].toString().replace(".", ","));
+                  }}
+                  style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}
+                >
+                  <div
+                    id="porcentaje.chofer"
+                    style={{ color: G, fontSize: 20, fontWeight: 800, textAlign: "right", minWidth: "40px" }}
+                  >
+                    {settings["porcentaje.chofer"]}
+                  </div>
+                  <span style={{ color: "rgba(255,255,255,0.3)", fontWeight: 700 }}>%</span>
+                </div>
+              </div>
+            </div>
+            <div style={{ marginTop: 12, fontSize: 11, color: "rgba(255,255,255,0.25)", textAlign: "center" }}>
+              Estos valores se guardan automáticamente y se usarán para cálculos futuros.
+            </div>
+          </div>
         </div>
+
+        {activeSettingsField && (
+          <div
+            onClick={() => setActiveSettingsField(null)}
+            style={{
+              position: "fixed",
+              top: 0, left: 0, right: 0, bottom: 0,
+              background: "rgba(0,0,0,0.65)",
+              backdropFilter: "blur(4px)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              padding: "0 20px",
+              zIndex: 9999,
+              animation: "fadeIn 0.2s ease",
+            }}
+          >
+            <div
+              onClick={(e) => e.stopPropagation()}
+              style={{
+                width: "100%",
+                maxWidth: 400,
+                background: "#0d0d14",
+                borderRadius: 28,
+                padding: "24px",
+                border: "1px solid rgba(255,255,255,0.08)",
+                animation: "fadeUp 0.3s ease",
+              }}
+            >
+              <div style={{ marginBottom: 12 }}>
+                <span style={{ fontSize: 13, fontWeight: 700, color: activeSettingsField === "porcentaje.jefe" ? A : G, textTransform: "uppercase", letterSpacing: "0.6px" }}>
+                  Porcentaje {activeSettingsField === "porcentaje.jefe" ? "Jefe" : "Chofer"}
+                </span>
+              </div>
+              <div style={{ fontSize: 36, fontWeight: 900, color: activeSettingsField === "porcentaje.jefe" ? A : G, marginBottom: 14, textAlign: "center", letterSpacing: "-0.5px" }}>
+                {settingsValStr || "0"} %
+              </div>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8 }}>
+                {["1", "2", "3", "4", "5", "6", "7", "8", "9", ",", "0", "DEL"].map((k) => (
+                  <button key={k}
+                    onClick={() => {
+                      let next = settingsValStr;
+                      if (k === "DEL") next = next.slice(0, -1);
+                      else if (k === ",") { if (!next.includes(",")) next = next + ","; else return; }
+                      else { if (next.replace(",", "").length >= 3) return; next = next + k; }
+                      setSettingsValStr(next);
+                    }}
+                    style={{ ...S.keyBtn, padding: "20px 0", background: "rgba(255,255,255,0.05)", color: "white", fontSize: 22, fontWeight: 700 }}>
+                    {k === "DEL" ? <IconDel /> : k}
+                  </button>
+                ))}
+              </div>
+              <button
+                onClick={() => {
+                  const val = parseFloat(settingsValStr.replace(",", ".")) || 0;
+                  setConfirmDialog({
+                    text: `¿Seguro que quieres cambiar el porcentaje de ${activeSettingsField === "porcentaje.jefe" ? "Jefe" : "Chofer"} a ${val}%?`,
+                    onConfirm: () => {
+                      setSettings({ ...settings, [activeSettingsField!]: val });
+                      setActiveSettingsField(null);
+                      setConfirmDialog(null);
+                    }
+                  });
+                }}
+                style={{
+                  width: "100%",
+                  padding: "16px 0",
+                  marginTop: 12,
+                  borderRadius: 14,
+                  border: "none",
+                  background: activeSettingsField === "porcentaje.jefe" ? A : G,
+                  color: "black",
+                  fontSize: 17,
+                  fontWeight: 800,
+                  cursor: "pointer",
+                }}
+              >
+                Guardar
+              </button>
+            </div>
+          </div>
+        )}
+        {confirmDialog && <ConfirmDialog {...confirmDialog} onCancel={() => setConfirmDialog(null)} />}
       </Shell>
     );
   }
@@ -786,6 +970,22 @@ function App() {
       { key: 'gasolina', label: 'Gasolina', color: F, bg: FBG, icon: <IconFuel s={18} c={F} />, total: vF, count: viewTurno.entries.filter((e: any) => e.type === 'gasolina').length },
       { key: 'nulo', label: 'Nulos', color: N, bg: NBG, icon: <IconNulo s={18} c={N} />, total: vN, count: viewTurno.entries.filter((e: any) => e.type === 'nulo').length },
     ];
+
+    // Cálculo de duración
+    let durationStr = "0h 0m";
+    if (viewTurno.startTime && viewTurno.endTime) {
+      const [h1, m1] = viewTurno.startTime.split(':').map(Number);
+      const [h2, m2] = viewTurno.endTime.split(':').map(Number);
+      let totalMins = (h2 * 60 + m2) - (h1 * 60 + m1);
+      if (totalMins < 0) totalMins += 24 * 60;
+      const hh = Math.floor(totalMins / 60);
+      const mm = totalMins % 60;
+      durationStr = `${hh}h ${mm}m`;
+    }
+
+    // Mi Ganancia (Chofer)
+    const choferPercent = settings["porcentaje.chofer"] || 0;
+    const miGanancia = (dineroV * (choferPercent / 100)) + vP;
     return (
       <Shell burst={false}>
         <div style={{ flex: 1, overflowY: 'auto', padding: '16px 20px 32px', display: 'flex', flexDirection: 'column', gap: 14, animation: 'slideIn 0.3s ease' }}>
@@ -807,21 +1007,33 @@ function App() {
             </button>
           </div>
 
-          {/* Dinero / KM */}
+          {/* Tiempo y Ganancia */}
           <div style={{ display: 'flex', gap: 10 }}>
-            <div style={{ flex: 1, background: 'oklch(0.20 0.06 150)', borderRadius: 16, padding: '14px 16px', border: '1px solid oklch(0.60 0.16 150 / 0.35)' }}>
-              <div style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', letterSpacing: '0.6px', marginBottom: 6 }}>€ Dinero</div>
-              <div style={{ fontSize: 22, fontWeight: 900, color: 'oklch(0.78 0.18 150)', letterSpacing: '-0.5px' }}>{fmt(dineroV)}</div>
+            <div style={{ flex: 1, background: 'rgba(0, 180, 255, 0.05)', borderRadius: 16, padding: '14px 16px', border: '1px solid rgba(0, 180, 255, 0.15)' }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '0.6px', marginBottom: 6, display: 'flex', alignItems: 'center', gap: 6 }}>
+                <span style={{ fontSize: 18 }}>⏱️</span> Tiempo Trabajado
+              </div>
+              <div style={{ fontSize: 20, fontWeight: 900, color: 'oklch(0.85 0.12 210)', letterSpacing: '-0.5px' }}>{durationStr}</div>
             </div>
-            <div style={{ flex: 1, background: 'oklch(0.19 0.05 220)', borderRadius: 16, padding: '14px 16px', border: '1px solid oklch(0.65 0.14 220 / 0.35)' }}>
-              <div style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', letterSpacing: '0.6px', marginBottom: 6 }}>→ KM</div>
-              <div style={{ fontSize: 22, fontWeight: 900, color: 'oklch(0.80 0.14 220)', letterSpacing: '-0.5px' }}>{kmV.toString().replace('.', ',')} <span style={{ fontSize: 13, fontWeight: 700, opacity: 0.6 }}>km</span></div>
+            <div style={{ flex: 1, background: 'rgba(255, 180, 0, 0.06)', borderRadius: 16, padding: '14px 16px', border: '1px solid rgba(255, 180, 0, 0.2)' }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '0.6px', marginBottom: 6, display: 'flex', alignItems: 'center', gap: 6 }}>
+                <span style={{ fontSize: 18 }}>💰</span> Mi Ganancia
+              </div>
+              <div style={{ fontSize: 20, fontWeight: 900, color: 'oklch(0.85 0.18 85)', letterSpacing: '-0.5px' }}>{fmt(miGanancia)}</div>
             </div>
           </div>
 
           {/* Categorías + Notas */}
           <div style={{ background: 'rgba(255,255,255,0.03)', borderRadius: 22, padding: '16px', border: '1px solid rgba(255,255,255,0.07)' }}>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+              <div style={{ background: 'oklch(0.20 0.06 150)', borderRadius: 16, padding: '14px 16px', border: '1px solid oklch(0.60 0.16 150 / 0.35)' }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', letterSpacing: '0.6px', marginBottom: 6 }}>Total Taxímetro</div>
+                <div style={{ fontSize: 22, fontWeight: 900, color: 'oklch(0.78 0.18 150)', letterSpacing: '-0.5px' }}>{fmt(dineroV)}</div>
+              </div>
+              <div style={{ background: 'oklch(0.19 0.05 220)', borderRadius: 16, padding: '14px 16px', border: '1px solid oklch(0.65 0.14 220 / 0.35)' }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', letterSpacing: '0.6px', marginBottom: 6 }}>Total KM</div>
+                <div style={{ fontSize: 22, fontWeight: 900, color: 'oklch(0.80 0.14 220)', letterSpacing: '-0.5px' }}>{kmV.toString().replace('.', ',')} <span style={{ fontSize: 13, fontWeight: 700, opacity: 0.6 }}>KM</span></div>
+              </div>
               {cats.map(c => (
                 <div key={c.key} style={{ background: c.bg, borderRadius: 16, padding: '14px 16px', border: `1px solid ${c.color}33` }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8 }}>
@@ -836,7 +1048,13 @@ function App() {
 
             {(() => {
               const generalNotes = viewTurno.entries.filter((e: any) => e.type === 'nota');
-              if (generalNotes.length === 0 && !viewTurno.notes) return null;
+              if (generalNotes.length === 0 && !viewTurno.notes) {
+                return (
+                  <div style={{ marginTop: 16, paddingTop: 14, borderTop: '1px solid rgba(255,255,255,0.06)', textAlign: 'center' }}>
+                    <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.2)', fontStyle: 'italic' }}>Sin notas del turno</div>
+                  </div>
+                );
+              }
               return (
                 <div style={{ marginTop: 16, paddingTop: 14, borderTop: '1px solid rgba(255,255,255,0.06)' }}>
                   <div style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '0.6px', marginBottom: 8 }}>📝 Nota del Turno</div>
@@ -941,13 +1159,13 @@ function App() {
           <div style={{ display: 'flex', gap: 10, marginBottom: 14 }}>
             <div onClick={() => setEndField("dinero")}
               style={{ flex: 1, background: 'oklch(0.20 0.06 150)', borderRadius: 16, padding: '14px', border: `1.5px solid ${endField === "dinero" ? "oklch(0.78 0.18 150)" : "oklch(0.60 0.16 150 / 0.35)"}`, cursor: "pointer" }}>
-              <div style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', letterSpacing: '0.6px', marginBottom: 8 }}>€ Dinero</div>
-              <div style={{ color: 'oklch(0.78 0.18 150)', fontSize: 22, fontWeight: 900, minHeight: 28 }}>{eDinero || "0"}</div>
+              <div style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', letterSpacing: '0.6px', marginBottom: 8 }}>Total Taxímetro</div>
+              <div style={{ color: 'oklch(0.78 0.18 150)', fontSize: 22, fontWeight: 900, minHeight: 28 }}>{eDinero || "0"} €</div>
             </div>
             <div onClick={() => setEndField("km")}
               style={{ flex: 1, background: 'oklch(0.19 0.05 220)', borderRadius: 16, padding: '14px', border: `1.5px solid ${endField === "km" ? "oklch(0.80 0.14 220)" : "oklch(0.65 0.14 220 / 0.35)"}`, cursor: "pointer" }}>
-              <div style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', letterSpacing: '0.6px', marginBottom: 8 }}>→ KM</div>
-              <div style={{ color: 'oklch(0.80 0.14 220)', fontSize: 22, fontWeight: 900, minHeight: 28 }}>{eKm || "0"}</div>
+              <div style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', letterSpacing: '0.6px', marginBottom: 8 }}>Total KM</div>
+              <div style={{ color: 'oklch(0.80 0.14 220)', fontSize: 22, fontWeight: 900, minHeight: 28 }}>{eKm || "0"} KM</div>
             </div>
           </div>
 
@@ -1134,11 +1352,11 @@ function App() {
             >
               <div style={{ marginBottom: 12 }}>
                 <span style={{ fontSize: 13, fontWeight: 700, color: endField === "dinero" ? "oklch(0.78 0.18 150)" : "oklch(0.80 0.14 220)", textTransform: "uppercase", letterSpacing: "0.6px" }}>
-                  {endField === "dinero" ? "€ Dinero" : "→ KM"}
+                  {endField === "dinero" ? "Total Taxímetro" : "Total KM"}
                 </span>
               </div>
               <div style={{ fontSize: 36, fontWeight: 900, color: endField === "dinero" ? "oklch(0.78 0.18 150)" : "oklch(0.80 0.14 220)", marginBottom: 14, textAlign: "center", letterSpacing: "-0.5px" }}>
-                {(endField === "dinero" ? eDinero : eKm) || "0"}
+                {(endField === "dinero" ? eDinero : eKm) || "0"} {endField === "dinero" ? "€" : "KM"}
               </div>
               <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8 }}>
                 {["1", "2", "3", "4", "5", "6", "7", "8", "9", ",", "0", "DEL"].map((k) => (
@@ -1419,6 +1637,27 @@ function App() {
     );
   }
 
+  if (screen === "contabilidad") {
+    return (
+      <Shell burst={false}>
+        <div style={{ flex: 1, padding: "16px 20px", display: "flex", flexDirection: "column" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 32 }}>
+            <button style={S.iconBtn} onClick={() => setScreen("home")}>
+              <IconBack />
+            </button>
+            <div style={{ fontSize: 24, fontWeight: 800, color: "white" }}>Contabilidad</div>
+          </div>
+
+          <div style={{ background: "rgba(255,255,255,0.03)", borderRadius: 20, padding: 24, border: "1px solid rgba(255,255,255,0.07)", textAlign: "center" }}>
+            <div style={{ fontSize: 15, color: "rgba(255,255,255,0.4)" }}>
+              Pantalla en construcción.
+            </div>
+          </div>
+        </div>
+      </Shell>
+    );
+  }
+
   if (screen === "pastHistory") {
     return (
       <Shell burst={false}>
@@ -1618,13 +1857,13 @@ function App() {
           <div style={{ display: "flex", gap: 10, marginBottom: 12, flexShrink: 0 }}>
             <div onClick={() => setEndField("dinero")}
               style={{ flex: 1, background: "oklch(0.20 0.06 150)", borderRadius: 16, padding: "14px", border: `1.5px solid ${endField === "dinero" ? "oklch(0.78 0.18 150)" : "oklch(0.60 0.16 150 / 0.35)"}`, cursor: "pointer", transition: "border 0.15s" }}>
-              <div style={{ fontSize: 11, fontWeight: 700, color: "rgba(255,255,255,0.5)", textTransform: "uppercase", letterSpacing: "0.6px", marginBottom: 8 }}>€ Dinero</div>
-              <div style={{ color: "oklch(0.78 0.18 150)", fontSize: 22, fontWeight: 900, letterSpacing: "-0.5px", minHeight: 28 }}>{dineroJ || "0"}</div>
+              <div style={{ fontSize: 11, fontWeight: 700, color: "rgba(255,255,255,0.5)", textTransform: "uppercase", letterSpacing: "0.6px", marginBottom: 8 }}>Total Taxímetro</div>
+              <div style={{ color: "oklch(0.78 0.18 150)", fontSize: 22, fontWeight: 900, letterSpacing: "-0.5px", minHeight: 28 }}>{dineroJ || "0"} €</div>
             </div>
             <div onClick={() => setEndField("km")}
               style={{ flex: 1, background: "oklch(0.19 0.05 220)", borderRadius: 16, padding: "14px", border: `1.5px solid ${endField === "km" ? "oklch(0.80 0.14 220)" : "oklch(0.65 0.14 220 / 0.35)"}`, cursor: "pointer", transition: "border 0.15s" }}>
-              <div style={{ fontSize: 11, fontWeight: 700, color: "rgba(255,255,255,0.5)", textTransform: "uppercase", letterSpacing: "0.6px", marginBottom: 8 }}>→ KM</div>
-              <div style={{ color: "oklch(0.80 0.14 220)", fontSize: 22, fontWeight: 900, letterSpacing: "-0.5px", minHeight: 28 }}>{kmJ || "0"}</div>
+              <div style={{ fontSize: 11, fontWeight: 700, color: "rgba(255,255,255,0.5)", textTransform: "uppercase", letterSpacing: "0.6px", marginBottom: 8 }}>Total KM</div>
+              <div style={{ color: "oklch(0.80 0.14 220)", fontSize: 22, fontWeight: 900, letterSpacing: "-0.5px", minHeight: 28 }}>{kmJ || "0"} KM</div>
             </div>
           </div>
 
@@ -1702,7 +1941,11 @@ function App() {
                   </div>
                 );
               }
-              return null;
+              return (
+                <div style={{ marginTop: 16, paddingTop: 14, borderTop: "1px solid rgba(255,255,255,0.06)", textAlign: 'center' }}>
+                  <div style={{ fontSize: 12, color: "rgba(255,255,255,0.2)", fontStyle: 'italic' }}>Sin notas del turno</div>
+                </div>
+              );
             })()}
 
           </div>
@@ -1732,7 +1975,7 @@ function App() {
           <div style={{ display: "flex", flexDirection: "column", gap: 8, flexShrink: 0, marginTop: "auto" }}>
             <button onClick={handleEndTurno}
               style={{ padding: "15px 0", borderRadius: 16, border: "none", background: "rgba(255,60,60,0.12)", color: "rgba(255,110,110,0.9)", fontSize: 16, fontWeight: 800, cursor: "pointer", outline: "1.5px solid rgba(255,60,60,0.25)" }}>
-              Sí, terminar Turno
+              Terminar Turno
             </button>
             <button onClick={() => setScreen("main")}
               style={{ padding: "13px 0", borderRadius: 16, border: "none", background: "rgba(255,255,255,0.06)", color: "rgba(255,255,255,0.5)", fontSize: 15, fontWeight: 700, cursor: "pointer" }}>
@@ -1772,11 +2015,11 @@ function App() {
             >
               <div style={{ marginBottom: 12 }}>
                 <span style={{ fontSize: 13, fontWeight: 700, color: endField === "dinero" ? "oklch(0.78 0.18 150)" : "oklch(0.80 0.14 220)", textTransform: "uppercase", letterSpacing: "0.6px" }}>
-                  {endField === "dinero" ? "€ Dinero" : "→ KM"}
+                  {endField === "dinero" ? "Total Taxímetro" : "Total KM"}
                 </span>
               </div>
               <div style={{ fontSize: 36, fontWeight: 900, color: endField === "dinero" ? "oklch(0.78 0.18 150)" : "oklch(0.80 0.14 220)", marginBottom: 14, textAlign: "center", letterSpacing: "-0.5px" }}>
-                {(endField === "dinero" ? dineroJ : kmJ) || "0"}
+                {(endField === "dinero" ? dineroJ : kmJ) || "0"} {endField === "dinero" ? "€" : "KM"}
               </div>
               <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8 }}>
                 {["1", "2", "3", "4", "5", "6", "7", "8", "9", ",", "0", "DEL"].map((k) => (
@@ -2386,7 +2629,8 @@ function EditEntryDialog({
         : entry.type === "agencia" ? { col: A, lbl: "Agencia" }
           : entry.type === "extra" ? { col: E, lbl: "Extra" }
             : entry.type === "gasolina" ? { col: F, lbl: "Gasolina" }
-              : { col: N, lbl: "Nulo" };
+              : entry.type === "nota" ? { col: "white", lbl: "Nota" }
+                : { col: N, lbl: "Nulo" };
 
   function kpAmount(k: string) {
     if (k === "DEL") { onAmountChange(amount.slice(0, -1)); return; }
@@ -2427,29 +2671,31 @@ function EditEntryDialog({
           <span style={{ fontSize: 12, color: "rgba(255,255,255,0.3)", marginLeft: "auto" }}>{entry.time}</span>
         </div>
 
-        {/* Importe (display + teclado in-app) */}
-        <div style={{ marginBottom: 12, cursor: "pointer" }} onClick={() => setShowKP(true)}>
-          <div style={{ fontSize: 11, fontWeight: 700, color: "rgba(255,255,255,0.5)", marginBottom: 6, textTransform: "uppercase", letterSpacing: "0.6px", display: "flex", justifyContent: "space-between" }}>
-            <span>Importe (€)</span>
-            {!showKP && <span style={{ color: meta.col, fontSize: 10 }}>Toca para editar</span>}
+        {/* Importe (display + teclado in-app) - Oculto para Notas */}
+        {entry.type !== "nota" && (
+          <div style={{ marginBottom: 12, cursor: "pointer" }} onClick={() => setShowKP(true)}>
+            <div style={{ fontSize: 11, fontWeight: 700, color: "rgba(255,255,255,0.5)", marginBottom: 6, textTransform: "uppercase", letterSpacing: "0.6px", display: "flex", justifyContent: "space-between" }}>
+              <span>Importe (€)</span>
+              {!showKP && <span style={{ color: meta.col, fontSize: 10 }}>Toca para editar</span>}
+            </div>
+            <div style={{
+              width: "100%",
+              background: "rgba(0,0,0,0.3)",
+              border: `1px solid ${showKP ? meta.col : "rgba(255,255,255,0.1)"}`,
+              borderRadius: 12,
+              color: showKP ? meta.col : "white",
+              padding: "12px 14px",
+              fontSize: 26,
+              fontWeight: 900,
+              textAlign: "center",
+              minHeight: 32,
+              letterSpacing: "-0.5px",
+              transition: "all 0.2s"
+            }}>
+              {amount || "0"}
+            </div>
           </div>
-          <div style={{
-            width: "100%",
-            background: "rgba(0,0,0,0.3)",
-            border: `1px solid ${showKP ? meta.col : "rgba(255,255,255,0.1)"}`,
-            borderRadius: 12,
-            color: showKP ? meta.col : "white",
-            padding: "12px 14px",
-            fontSize: 26,
-            fontWeight: 900,
-            textAlign: "center",
-            minHeight: 32,
-            letterSpacing: "-0.5px",
-            transition: "all 0.2s"
-          }}>
-            {amount || "0"}
-          </div>
-        </div>
+        )}
 
         {/* Teclado in-app */}
         {showKP && (
