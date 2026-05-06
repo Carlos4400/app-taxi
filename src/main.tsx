@@ -30,12 +30,16 @@ interface Turno {
   km: number;
   notes: string;
   startDate: string | null;
+  totalPausedMinutes?: number;
 }
 
 interface CurrentState {
   entries: Entry[];
   startTime: string | null;
   startDate: string | null;
+  isPaused?: boolean;
+  pauseStartTime?: string | null;
+  totalPausedMinutes?: number;
 }
 
 const G = "oklch(0.68 0.20 145)";
@@ -89,6 +93,12 @@ interface FrozenWeek {
 interface AppSettings {
   "porcentaje.jefe": number;
   "porcentaje.chofer": number;
+  "descontar.datafono": boolean;
+  "descontar.propina": boolean;
+  "descontar.agencia_bono": boolean;
+  "descontar.extra": boolean;
+  "descontar.gasolina": boolean;
+  "descontar.nulo": boolean;
   diaLibre: number;              // 0=Domingo, 1=Lunes, 2=Martes, 3=Miércoles, 4=Jueves, 5=Viernes, 6=Sábado
   diaLibreDesde: string | null;  // Fecha ISO desde la que aplica este día libre (null si nunca se ha cambiado)
 }
@@ -105,6 +115,15 @@ function timeNow(): string {
     minute: "2-digit",
   });
 }
+
+function getDiffMins(t1: string, t2: string): number {
+  const [h1, m1] = t1.split(':').map(Number);
+  const [h2, m2] = t2.split(':').map(Number);
+  let mins = (h2 * 60 + m2) - (h1 * 60 + m1);
+  if (mins < 0) mins += 24 * 60;
+  return mins;
+}
+
 function fmt(n: number): string {
   return n.toFixed(2).replace(".", ",") + " €";
 }
@@ -123,13 +142,21 @@ function loadSettings(): AppSettings {
   const defaults: AppSettings = {
     "porcentaje.jefe": 0,
     "porcentaje.chofer": 0,
+    "descontar.datafono": true,
+    "descontar.propina": false,
+    "descontar.agencia_bono": true,
+    "descontar.extra": true,
+    "descontar.gasolina": true,
+    "descontar.nulo": true,
     diaLibre: 2,           // Martes por defecto (tu día libre actual)
     diaLibreDesde: null,
   };
   try {
     const d = JSON.parse(localStorage.getItem(KEY_SETTINGS)!);
     if (d) {
-      // Mezcla con defaults para soportar ajustes ya guardados sin diaLibre
+      if (d["descontar.agencia"] !== undefined && d["descontar.agencia_bono"] === undefined) {
+        d["descontar.agencia_bono"] = d["descontar.agencia"];
+      }
       return { ...defaults, ...d };
     }
   } catch (e) { }
@@ -246,9 +273,16 @@ async function exportHistoryCSV(turnos: Turno[]): Promise<void> {
 function loadCurrent(): CurrentState {
   try {
     const d = JSON.parse(localStorage.getItem(KEY_CURRENT)!);
-    if (d) return d;
+    if (d) {
+      return {
+        ...d,
+        isPaused: d.isPaused || false,
+        pauseStartTime: d.pauseStartTime || null,
+        totalPausedMinutes: d.totalPausedMinutes || 0,
+      };
+    }
   } catch (e) { }
-  return { entries: [], startTime: null, startDate: null };
+  return { entries: [], startTime: null, startDate: null, isPaused: false, pauseStartTime: null, totalPausedMinutes: 0 };
 }
 function loadHistory(): Turno[] {
   try {
@@ -380,9 +414,6 @@ function freezeOldWeeks(
   const grupos = groupTurnosByWeek(turnos, diaLibreAnterior);
 
   for (const [key, turnosSemana] of grupos.entries()) {
-    // Saltar turnos sueltos: no son semanas congelables
-    if (key.startsWith("__suelto__")) continue;
-
     const weekId = key;
 
     // Si la semana ya estaba congelada de antes, no la tocamos
@@ -611,37 +642,7 @@ const IconBack = () => (
     />
   </svg>
 );
-const IconHistory = () => (
-  <svg width="22" height="22" viewBox="0 0 22 22" fill="none">
-    <rect
-      x="3"
-      y="4"
-      width="16"
-      height="14"
-      rx="3"
-      stroke="rgba(255,255,255,0.55)"
-      strokeWidth="1.7"
-    />
-    <line
-      x1="7"
-      y1="9"
-      x2="15"
-      y2="9"
-      stroke="rgba(255,255,255,0.55)"
-      strokeWidth="1.5"
-      strokeLinecap="round"
-    />
-    <line
-      x1="7"
-      y1="13"
-      x2="12"
-      y2="13"
-      stroke="rgba(255,255,255,0.55)"
-      strokeWidth="1.5"
-      strokeLinecap="round"
-    />
-  </svg>
-);
+
 const IconDel = () => (
   <svg width="20" height="16" viewBox="0 0 20 16" fill="none">
     <path
@@ -710,6 +711,85 @@ const IconNulo = ({ s = 24, c = N }: { s?: number; c?: string }) => (
   <svg width={s} height={s} viewBox="0 0 24 24" fill="none">
     <circle cx="12" cy="12" r="9" stroke={c} strokeWidth="1.8" />
     <path d="M6 18L18 6" stroke={c} strokeWidth="1.8" strokeLinecap="round" />
+  </svg>
+);
+
+// Icono para Total Descontar (Ticket/Factura)
+const IconReceipt = ({ s = 24, c = "white" }: { s?: number; c?: string }) => (
+  <svg width={s} height={s} viewBox="0 0 24 24" fill="none">
+    <path d="M7 21V3C7 2.44772 7.44772 2 8 2H16C16.5523 2 17 2.44772 17 3V21L14.5 19.5L12 21L9.5 19.5L7 21Z" stroke={c} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+    <path d="M10 7H14M10 11H14M10 15H12" stroke={c} strokeWidth="1.8" strokeLinecap="round" />
+  </svg>
+);
+
+const IconGive = ({ s = 24, c = "white" }: { s?: number; c?: string }) => (
+  <svg width={s} height={s} viewBox="0 0 24 24" fill="none">
+    <path d="M8 10V8C8 6.89543 8.89543 6 10 6H14C15.1046 6 16 6.89543 16 8V10" stroke={c} strokeWidth="1.8" strokeLinecap="round" />
+    <path d="M5 10H19C20.1046 10 21 10.8954 21 12V18C21 19.6569 19.6569 21 18 21H6C4.34315 21 3 19.6569 3 18V12C3 10.8954 3.89543 10 5 10Z" stroke={c} strokeWidth="1.8" strokeLinejoin="round" />
+    <circle cx="12" cy="15.5" r="2" stroke={c} strokeWidth="1.8" />
+  </svg>
+);
+
+// Icono para Total a Dar (Mano con moneda)
+const IconHandGive = ({ s = 24, c = "oklch(0.68 0.20 145)" }: { s?: number; c?: string }) => (
+  <svg width={s} height={s} viewBox="0 0 24 24" fill="none">
+    {/* Moneda */}
+    <circle
+      cx="12"
+      cy="6"
+      r="3"
+      stroke={c}
+      strokeWidth="1.8"
+    />
+    <circle
+      cx="12"
+      cy="6"
+      r="1.5"
+      stroke={c}
+      strokeWidth="1"
+      opacity="0.5"
+    />
+    {/* Mano abierta */}
+    <path
+      d="M6 11C6 9.5 7 8.5 8.5 8.5H9.5C10.5 8.5 11 9 11 10V13"
+      stroke={c}
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+    <path
+      d="M9 11C9 9 10.5 8 12 8C13.5 8 14.5 9 14.5 10.5V13.5"
+      stroke={c}
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+    <path
+      d="M12 11.5C12 10 13 9 14.5 9C16 9 17 10 17 11.5V15"
+      stroke={c}
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+    <path
+      d="M15 12.5C15 11 16 10 17.5 10C19 10 20 11 20 12.5V14C20 16.5 18 18.5 15.5 18.5H11C8 18.5 5.5 16.5 5 13.5"
+      stroke={c}
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+  </svg>
+);
+
+// Icono para Día Libre / Vacaciones (Sombrilla de playa)
+const IconHoliday = ({ s = 24, c = "oklch(0.85 0.18 85)" }: { s?: number; c?: string }) => (
+  <svg width={s} height={s} viewBox="0 0 24 24" fill="none">
+    {/* Sombrilla */}
+    <path d="M12 4V16" stroke={c} strokeWidth="1.8" strokeLinecap="round" />
+    <path d="M12 4C14 4 18.5 5.5 19 9.5C19.5 13.5 16 16 12 16C8 16 4.5 13.5 5 9.5C5.5 5.5 10 4 12 4Z" stroke={c} strokeWidth="1.8" strokeLinejoin="round" />
+    <path d="M12 4C11.5 6 10.5 7.5 8 9M12 4C12.5 6 13.5 7.5 16 9" stroke={c} strokeWidth="1.6" strokeLinecap="round" opacity="0.6" />
+    {/* Base/Arena */}
+    <path d="M8 20C10.5 18.5 13.5 18.5 16 20" stroke={c} strokeWidth="1.8" strokeLinecap="round" />
   </svg>
 );
 
@@ -795,7 +875,14 @@ function App() {
   const [editJ, setEditJ] = useState<any>(null);
   const [showTypeMenu, setShowTypeMenu] = useState(false);
   const [showNewEntryKP, setShowNewEntryKP] = useState(false);
-  const [confirmDialog, setConfirmDialog] = useState<{ text: string; onConfirm: () => void } | null>(null);
+  const [confirmDialog, setConfirmDialog] = useState<{
+    text: string;
+    onConfirm: () => void;
+    confirmText?: string;
+    confirmBg?: string;
+    confirmColor?: string;
+    confirmBorder?: string;
+  } | null>(null);
   const [updateMsg, setUpdateMsg] = useState("");
   const [downloadUrl, setDownloadUrl] = useState("");
   const [editEntry, setEditEntry] = useState<Entry | null>(null);
@@ -807,7 +894,6 @@ function App() {
 
   // Estados Contabilidad (Fase 5)
   const [selectedWeekId, setSelectedWeekId] = useState<string | null>(null);
-  const [selectedSueltoId, setSelectedSueltoId] = useState<number | null>(null);
   const [tieResolutions, setTieResolutions] = useState<Map<string, string>>(new Map());
   const [pendingTie, setPendingTie] = useState<{
     weekId: string;
@@ -963,7 +1049,7 @@ function App() {
 
   const propinas = current.entries.filter((e) => e.type === "propina");
   const datafonos = current.entries.filter((e) => e.type === "datafono");
-  const agencias = current.entries.filter((e) => e.type === "agencia");
+  const agencias = current.entries.filter((e) => e.type === "agencia" || e.type === "agencia_bono");
   const extras = current.entries.filter((e) => e.type === "extra");
   const gasolinas = current.entries.filter((e) => e.type === "gasolina");
   const nulos = current.entries.filter((e) => e.type === "nulo");
@@ -980,6 +1066,29 @@ function App() {
       ...d,
       entries: d.entries.filter((e) => e.id !== id),
     }));
+  }
+
+  function togglePause() {
+    const now = timeNow();
+    setCurrent((prev) => {
+      if (prev.isPaused) {
+        // Reanudar turno: calcular minutos pausados y sumarlos
+        const pauseMins = prev.pauseStartTime ? getDiffMins(prev.pauseStartTime, now) : 0;
+        return {
+          ...prev,
+          isPaused: false,
+          pauseStartTime: null,
+          totalPausedMinutes: (prev.totalPausedMinutes || 0) + pauseMins,
+        };
+      } else {
+        // Pausar turno
+        return {
+          ...prev,
+          isPaused: true,
+          pauseStartTime: now,
+        };
+      }
+    });
   }
 
   function handleEndTurno() {
@@ -999,9 +1108,10 @@ function App() {
       km: parseFloat(kmJ.replace(",", ".")) || 0,
       notes: notesJ.trim(),
       startDate: current.startDate,
+      totalPausedMinutes: current.totalPausedMinutes || 0,
     };
     setHistory((h) => [turno, ...h]);
-    setCurrent({ entries: [], startTime: null, startDate: null });
+    setCurrent({ entries: [], startTime: null, startDate: null, isPaused: false, pauseStartTime: null, totalPausedMinutes: 0 });
     setDineroJ("");
     setKmJ("");
     setNotesJ("");
@@ -1110,13 +1220,15 @@ function App() {
           </div>
           <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
             <button
-              onClick={() => setScreen("main")}
+              onClick={() => {
+                setScreen("main");
+              }}
               style={{
                 padding: "20px 0",
                 borderRadius: 20,
-                border: `2px solid ${G}`,
-                background: GBG,
-                color: G,
+                border: current.isPaused ? "2px solid #3b82f6" : `2px solid ${G}`,
+                background: current.isPaused ? "rgba(59, 130, 246, 0.08)" : GBG,
+                color: current.isPaused ? "#3b82f6" : G,
                 fontSize: 18,
                 fontWeight: 800,
                 cursor: "pointer",
@@ -1126,7 +1238,7 @@ function App() {
                 gap: 12,
               }}
             >
-              <span style={{ fontSize: 22 }}>{hasActive ? "▶" : "🚀"}</span>
+              <span style={{ fontSize: 22, color: current.isPaused ? "#3b82f6" : undefined }}>{hasActive ? "▶" : "🚀"}</span>
               {hasActive ? "Continuar Turno" : "Iniciar Turno"}
             </button>
             <button
@@ -1200,127 +1312,94 @@ function App() {
         <div style={{ flex: 1, padding: "16px 20px", display: "flex", flexDirection: "column", overflowY: "auto" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 32 }}>
             <button style={S.iconBtn} onClick={() => { setScreen("home"); setUpdateMsg(""); setDownloadUrl(""); }}><IconBack /></button>
-            <div style={{ fontSize: 24, fontWeight: 800, color: "white" }}>Ajustes</div>
+            <div style={{ fontSize: 24, fontWeight: 800, color: "white" }}>Ajustes de Usuario</div>
           </div>
 
+          {/* Bloque App Info */}
           <div style={{ background: "rgba(255,255,255,0.03)", borderRadius: 20, padding: 24, border: "1px solid rgba(255,255,255,0.07)", textAlign: "center", marginBottom: 16 }}>
             <div style={{ fontSize: 48, marginBottom: 12 }}>🚕</div>
             <div style={{ fontSize: 20, fontWeight: 800, color: "white", marginBottom: 4 }}>Mi Turno</div>
             <div style={{ fontSize: 14, color: "rgba(255,255,255,0.4)", marginBottom: 24 }}>Versión {APP_VERSION}</div>
-
-            <button
-              onClick={checkUpdate}
-              style={{ width: "100%", padding: "16px 0", borderRadius: 16, border: "none", background: "rgba(255,255,255,0.1)", color: "white", fontSize: 16, fontWeight: 700, cursor: "pointer", transition: "all 0.2s" }}
-            >
-              🔄 Buscar actualizaciones
-            </button>
-
-            {updateMsg && (
-              <div style={{ marginTop: 16, fontSize: 14, color: updateMsg.includes("Nueva") ? "oklch(0.68 0.20 145)" : "rgba(255,255,255,0.6)", fontWeight: updateMsg.includes("Nueva") ? 700 : 400, background: "rgba(0,0,0,0.2)", padding: "12px", borderRadius: 12 }}>
-                {updateMsg}
-              </div>
-            )}
-
-            {downloadUrl && (
-              <button
-                onClick={() => window.open(downloadUrl, "_blank")}
-                style={{ width: "100%", padding: "14px 0", marginTop: 12, borderRadius: 16, border: "none", background: "oklch(0.68 0.20 145)", color: "black", fontSize: 16, fontWeight: 800, cursor: "pointer" }}
-              >
-                ⬇️ Descargar nueva versión
-              </button>
-            )}
+            <button onClick={checkUpdate} style={{ width: "100%", padding: "16px 0", borderRadius: 16, border: "none", background: "rgba(255,255,255,0.1)", color: "white", fontSize: 16, fontWeight: 700, cursor: "pointer" }}>🔄 Buscar actualizaciones</button>
+            {updateMsg && <div style={{ marginTop: 16, fontSize: 14, color: "rgba(255,255,255,0.6)", background: "rgba(0,0,0,0.2)", padding: "12px", borderRadius: 12 }}>{updateMsg}</div>}
           </div>
 
-          <div style={{
-            background: "rgba(255,255,255,0.03)",
-            borderRadius: 22,
-            padding: "20px",
-            border: "1px solid rgba(255,255,255,0.07)"
-          }}>
-            <div style={{ fontSize: 12, fontWeight: 700, color: "rgba(255,255,255,0.4)", textTransform: "uppercase", letterSpacing: "0.8px", marginBottom: 16, display: "flex", alignItems: "center", gap: 8 }}>
-              <IconPercent s={26} c={G} /> Reparto de Porcentajes
+          {/* Bloque Porcentajes */}
+          <div style={{ background: "rgba(255,255,255,0.03)", borderRadius: 22, padding: "20px", border: "1px solid rgba(255,255,255,0.07)", marginBottom: 16 }}>
+            <div style={{ fontSize: 12, fontWeight: 800, color: G, textTransform: "uppercase", letterSpacing: "1px", marginBottom: 14, display: "flex", alignItems: "center", gap: 8 }}>
+              <IconPercent s={22} c={G} /> Reparto de Porcentajes
             </div>
-
-            <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: "rgba(0,0,0,0.2)", padding: "12px 16px", borderRadius: 16, border: "1px solid rgba(255,255,255,0.05)" }}>
+            <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+              <div onClick={() => { setActiveSettingsField("porcentaje.jefe"); setSettingsValStr(settings["porcentaje.jefe"].toString().replace(".", ",")); }} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: "rgba(0,0,0,0.2)", padding: "12px 16px", borderRadius: 16, border: "1px solid rgba(255,255,255,0.05)", cursor: "pointer" }}>
                 <span style={{ color: "white", fontWeight: 600 }}>Jefe</span>
-                <div
-                  onClick={() => {
-                    setActiveSettingsField("porcentaje.jefe");
-                    setSettingsValStr(settings["porcentaje.jefe"].toString().replace(".", ","));
-                  }}
-                  style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}
-                >
-                  <div
-                    id="porcentaje.jefe"
-                    style={{ color: A, fontSize: 20, fontWeight: 800, textAlign: "right", minWidth: "40px" }}
-                  >
-                    {settings["porcentaje.jefe"]}
-                  </div>
-                  <span style={{ color: "rgba(255,255,255,0.3)", fontWeight: 700 }}>%</span>
-                </div>
+                <span style={{ color: A, fontSize: 20, fontWeight: 800 }}>{settings["porcentaje.jefe"]} %</span>
               </div>
-
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: "rgba(0,0,0,0.2)", padding: "12px 16px", borderRadius: 16, border: "1px solid rgba(255,255,255,0.05)" }}>
+              <div onClick={() => { setActiveSettingsField("porcentaje.chofer"); setSettingsValStr(settings["porcentaje.chofer"].toString().replace(".", ",")); }} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: "rgba(0,0,0,0.2)", padding: "12px 16px", borderRadius: 16, border: "1px solid rgba(255,255,255,0.05)", cursor: "pointer" }}>
                 <span style={{ color: "white", fontWeight: 600 }}>Chofer</span>
-                <div
-                  onClick={() => {
-                    setActiveSettingsField("porcentaje.chofer");
-                    setSettingsValStr(settings["porcentaje.chofer"].toString().replace(".", ","));
-                  }}
-                  style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}
-                >
-                  <div
-                    id="porcentaje.chofer"
-                    style={{ color: G, fontSize: 20, fontWeight: 800, textAlign: "right", minWidth: "40px" }}
-                  >
-                    {settings["porcentaje.chofer"]}
-                  </div>
-                  <span style={{ color: "rgba(255,255,255,0.3)", fontWeight: 700 }}>%</span>
-                </div>
+                <span style={{ color: G, fontSize: 20, fontWeight: 800 }}>{settings["porcentaje.chofer"]} %</span>
               </div>
-            </div>
-            <div style={{ marginTop: 12, fontSize: 11, color: "rgba(255,255,255,0.25)", textAlign: "center" }}>
-              Estos valores se guardan automáticamente y se usarán para cálculos futuros.
             </div>
           </div>
 
-          {/* Bloque Día Libre */}
-          <div style={{
-            background: "rgba(255,255,255,0.03)",
-            borderRadius: 22,
-            padding: "20px",
-            border: "1px solid rgba(255,255,255,0.07)",
-            marginTop: 16,
-          }}>
-            <div style={{
-              fontSize: 12,
-              fontWeight: 700,
-              color: "rgba(255,255,255,0.4)",
-              textTransform: "uppercase",
-              letterSpacing: "0.8px",
-              marginBottom: 16,
-              display: "flex",
-              alignItems: "center",
-              gap: 8,
-            }}>
-              <span style={{ fontSize: 22 }}>📅</span> Día Libre Semanal
+          {/* Bloque Total a Descontar (Seguridad + Neón Rojo) */}
+          <div style={{ background: "rgba(255,255,255,0.03)", borderRadius: 22, padding: "20px", border: "1px solid rgba(255,255,255,0.07)", marginTop: 16 }}>
+            <div style={{ fontSize: 13, fontWeight: 800, color: '#ff6b6b', textTransform: "uppercase", letterSpacing: "1px", marginBottom: 14, display: "flex", alignItems: "center", gap: 9 }}>
+              <IconReceipt s={18} c="#ff6b6b" /> Total a Descontar
+            </div>
+            <div style={{ fontSize: 13, color: "rgba(255,255,255,0.5)", marginBottom: 16, lineHeight: 1.4 }}>
+              Selecciona qué categorías se restan del Total a Dar al jefe.
+            </div>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
+              {([
+                { key: "descontar.datafono", label: "Datáfono", color: P, bg: PBG },
+                { key: "descontar.propina", label: "Propinas", color: G, bg: GBG },
+                { key: "descontar.agencia_bono", label: "Agencias/Bonos", color: A, bg: ABG },
+                { key: "descontar.extra", label: "Extras", color: E, bg: EBG },
+                { key: "descontar.gasolina", label: "Gasolina", color: F, bg: FBG },
+                { key: "descontar.nulo", label: "Nulos", color: N, bg: NBG },
+              ] as const).map((item) => {
+                const isActive = settings[item.key as keyof AppSettings] as boolean;
+                return (
+                  <button
+                    key={item.key}
+                    onClick={() => {
+                      setConfirmDialog({
+                        text: `¿Seguro que quieres ${isActive ? "dejar de descontar" : "empezar a descontar"} la categoría ${item.label}?`,
+                        onConfirm: () => {
+                          setSettings({ ...settings, [item.key]: !isActive });
+                        }
+                      });
+                    }}
+                    style={{
+                      padding: "10px 18px",
+                      borderRadius: 20,
+                      border: isActive ? `1.5px solid ${item.color}` : `1.5px solid rgba(255,255,255,0.1)`,
+                      background: isActive ? item.bg : 'transparent',
+                      color: isActive ? item.color : 'rgba(255,255,255,0.4)',
+                      fontSize: 14,
+                      fontWeight: isActive ? 800 : 600,
+                      cursor: "pointer",
+                      transition: "all 0.2s"
+                    }}
+                  >
+                    {item.label}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Bloque Día Libre (Cuadrícula Original + Neón Oro) */}
+          <div style={{ background: "rgba(255,255,255,0.03)", borderRadius: 22, padding: "20px", border: "1px solid rgba(255,255,255,0.07)", marginTop: 16 }}>
+            <div style={{ fontSize: 13, fontWeight: 800, color: 'oklch(0.85 0.18 85)', textTransform: "uppercase", letterSpacing: "1px", marginBottom: 14, display: "flex", alignItems: "center", gap: 9 }}>
+              <IconHoliday s={18} c="oklch(0.85 0.18 85)" /> Día libre semanal
             </div>
 
-            <div style={{
-              fontSize: 13,
-              color: "rgba(255,255,255,0.5)",
-              marginBottom: 14,
-              lineHeight: 1.4,
-            }}>
+            <div style={{ fontSize: 13, color: "rgba(255,255,255,0.5)", marginBottom: 16, lineHeight: 1.4 }}>
               Selecciona tu día libre. La semana laboral termina el día anterior y se reinicia al día siguiente.
             </div>
 
-            <div style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(7, 1fr)",
-              gap: 6,
-            }}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 6, marginBottom: 16 }}>
               {[
                 { idx: 1, lbl: "L" },
                 { idx: 2, lbl: "M" },
@@ -1335,7 +1414,7 @@ function App() {
                   <button
                     key={d.idx}
                     onClick={() => {
-                      if (settings.diaLibre === d.idx) return;
+                      if (selected) return;
                       const nombres = ["Domingo", "Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado"];
                       setConfirmDialog({
                         text: `¿Cambiar tu día libre a ${nombres[d.idx]}? Las semanas anteriores quedarán congeladas tal y como están.`,
@@ -1376,20 +1455,13 @@ function App() {
               })}
             </div>
 
-            <div style={{
-              marginTop: 14,
-              fontSize: 12,
-              color: "rgba(255,255,255,0.35)",
-              textAlign: "center",
-              lineHeight: 1.4,
-            }}>
+            <div style={{ textAlign: 'center', fontSize: 12, color: 'rgba(255,255,255,0.35)', fontWeight: 600 }}>
               {(() => {
                 const nombres = ["Domingo", "Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado"];
-                const dia = nombres[settings.diaLibre];
-                const indexLibre = settings.diaLibre;
-                const primerDia = nombres[(indexLibre + 1) % 7];
-                const ultimoDia = nombres[(indexLibre + 6) % 7];
-                return `Día libre: ${dia} · Semana laboral: ${primerDia} → ${ultimoDia}`;
+                const diaLibreTxt = nombres[settings.diaLibre];
+                const inicioSemana = nombres[(settings.diaLibre + 1) % 7];
+                const finSemana = nombres[(settings.diaLibre + 6) % 7];
+                return `Día libre: ${diaLibreTxt} · Semana laboral: ${inicioSemana} → ${finSemana}`;
               })()}
             </div>
           </div>
@@ -1485,38 +1557,46 @@ function App() {
     const vP = viewTurno.entries.filter((e: any) => e.type === 'propina').reduce((s: number, e: any) => s + e.amount, 0);
     const vD = viewTurno.entries.filter((e: any) => e.type === 'datafono').reduce((s: number, e: any) => s + e.amount, 0);
     const isToday = viewTurno.date === today();
-    const vA = viewTurno.entries.filter((e: any) => e.type === 'agencia').reduce((s: number, e: any) => s + e.amount, 0);
+    const vA = viewTurno.entries.filter((e: any) => e.type === 'agencia' || e.type === 'agencia_bono').reduce((s: number, e: any) => s + e.amount, 0);
     const vE = viewTurno.entries.filter((e: any) => e.type === 'extra').reduce((s: number, e: any) => s + e.amount, 0);
     const vF = viewTurno.entries.filter((e: any) => e.type === 'gasolina').reduce((s: number, e: any) => s + e.amount, 0);
     const vN = viewTurno.entries.filter((e: any) => e.type === 'nulo').reduce((s: number, e: any) => s + e.amount, 0);
     const dineroV = viewTurno.dinero || 0;
     const kmV = viewTurno.km || 0;
-    const totalGeneral = vP + vD + vA + vE + dineroV;
-    const eurKm = kmV > 0 ? totalGeneral / kmV : 0;
     const cats = [
-      { key: 'datafono', label: 'Datáfono', color: P, bg: PBG, icon: <IconCard s={18} c={P} />, total: vD, count: viewTurno.entries.filter((e: any) => e.type === 'datafono').length },
-      { key: 'propina', label: 'Propinas', color: G, bg: GBG, icon: <IconCoin s={18} c={G} />, total: vP, count: viewTurno.entries.filter((e: any) => e.type === 'propina').length },
-      { key: 'agencia', label: 'Agencias', color: A, bg: ABG, icon: <IconAgency s={18} c={A} />, total: vA, count: viewTurno.entries.filter((e: any) => e.type === 'agencia').length },
-      { key: 'extra', label: 'Extras', color: E, bg: EBG, icon: <IconExtra s={18} c={E} />, total: vE, count: viewTurno.entries.filter((e: any) => e.type === 'extra').length },
-      { key: 'gasolina', label: 'Gasolina', color: F, bg: FBG, icon: <IconFuel s={18} c={F} />, total: vF, count: viewTurno.entries.filter((e: any) => e.type === 'gasolina').length },
-      { key: 'nulo', label: 'Nulos', color: N, bg: NBG, icon: <IconNulo s={18} c={N} />, total: vN, count: viewTurno.entries.filter((e: any) => e.type === 'nulo').length },
+      { key: 'datafono', label: 'Datáfono', color: P, bg: PBG, icon: <IconCard s={20} c={P} />, total: vD, count: viewTurno.entries.filter((e: any) => e.type === 'datafono').length },
+      { key: 'propina', label: 'Propinas', color: G, bg: GBG, icon: <IconCoin s={20} c={G} />, total: vP, count: viewTurno.entries.filter((e: any) => e.type === 'propina').length },
+      { key: 'agencia_bono', label: 'Agencias/Bonos', color: A, bg: ABG, icon: <IconAgency s={20} c={A} />, total: vA, count: viewTurno.entries.filter((e: any) => e.type === 'agencia' || e.type === 'agencia_bono').length },
+      { key: 'extra', label: 'Extras', color: E, bg: EBG, icon: <IconExtra s={20} c={E} />, total: vE, count: viewTurno.entries.filter((e: any) => e.type === 'extra').length },
+      { key: 'gasolina', label: 'Gasolina', color: F, bg: FBG, icon: <IconFuel s={20} c={F} />, total: vF, count: viewTurno.entries.filter((e: any) => e.type === 'gasolina').length },
+      { key: 'nulo', label: 'Nulos', color: N, bg: NBG, icon: <IconNulo s={20} c={N} />, total: vN, count: viewTurno.entries.filter((e: any) => e.type === 'nulo').length },
     ];
 
     // Cálculo de duración
     let durationStr = "0h 0m";
     if (viewTurno.startTime && viewTurno.endTime) {
-      const [h1, m1] = viewTurno.startTime.split(':').map(Number);
-      const [h2, m2] = viewTurno.endTime.split(':').map(Number);
-      let totalMins = (h2 * 60 + m2) - (h1 * 60 + m1);
-      if (totalMins < 0) totalMins += 24 * 60;
+      let totalMins = getDiffMins(viewTurno.startTime, viewTurno.endTime);
+      if (viewTurno.totalPausedMinutes) {
+        totalMins = Math.max(0, totalMins - viewTurno.totalPausedMinutes);
+      }
       const hh = Math.floor(totalMins / 60);
       const mm = totalMins % 60;
       durationStr = `${hh}h ${mm}m`;
     }
 
-    // Mi Ganancia (Chofer)
-    const choferPercent = settings["porcentaje.chofer"] || 0;
-    const miGanancia = (dineroV * (choferPercent / 100)) + vP;
+    const miGanancia = (dineroV * (settings["porcentaje.chofer"] / 100)) + vP;
+
+    // Cálculos dinámicos según ajustes
+    const descD = settings["descontar.datafono"] ? vD : 0;
+    const descP = settings["descontar.propina"] ? vP : 0;
+    const descA = settings["descontar.agencia_bono"] ? vA : 0;
+    const descE = settings["descontar.extra"] ? vE : 0;
+    const descF = settings["descontar.gasolina"] ? vF : 0;
+    const descN = settings["descontar.nulo"] ? vN : 0;
+
+    const totalDescontar = descD + descP + descA + descE + descF + descN;
+    const totalADar = (dineroV * (settings["porcentaje.jefe"] / 100)) - totalDescontar;
+
     return (
       <Shell burst={false}>
         <div style={{ flex: 1, overflowY: 'auto', padding: '16px 20px 32px', display: 'flex', flexDirection: 'column', gap: 14, animation: 'slideIn 0.3s ease' }}>
@@ -1538,33 +1618,40 @@ function App() {
             </button>
           </div>
 
-          {/* Tiempo y Ganancia */}
+          {/* Contenedor Superior Agrupado (Dos columnas) */}
           <div style={{ display: 'flex', gap: 10 }}>
-            <div style={{ flex: 1, background: 'rgba(0, 180, 255, 0.05)', borderRadius: 16, padding: '14px 16px', border: '1px solid rgba(0, 180, 255, 0.15)' }}>
-              <div style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '0.6px', marginBottom: 6, display: 'flex', alignItems: 'center', gap: 6 }}>
-                <span style={{ fontSize: 18 }}>⏱️</span> Tiempo Trabajado
+            {/* Columna Izquierda: Taxímetro y KM */}
+            <div style={{ flex: 1, background: 'rgba(255,255,255,0.03)', borderRadius: 22, padding: '16px', border: '1px solid rgba(255,255,255,0.07)', display: 'flex', flexDirection: 'column', gap: 10 }}>
+              <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', textAlign: 'center', background: 'oklch(0.20 0.06 150)', borderRadius: 16, padding: '14px 16px', border: '1px solid oklch(0.60 0.16 150 / 0.35)' }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', letterSpacing: '0.6px', marginBottom: 6 }}>Total Taxímetro</div>
+                <div style={{ fontSize: 22, fontWeight: 900, color: 'oklch(0.78 0.18 150)', letterSpacing: '-0.5px' }}>{fmt(dineroV)}</div>
               </div>
-              <div style={{ fontSize: 20, fontWeight: 900, color: 'oklch(0.85 0.12 210)', letterSpacing: '-0.5px' }}>{durationStr}</div>
+              <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', textAlign: 'center', background: 'oklch(0.19 0.05 220)', borderRadius: 16, padding: '14px 16px', border: '1px solid oklch(0.65 0.14 220 / 0.35)' }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', letterSpacing: '0.6px', marginBottom: 6 }}>Total KM</div>
+                <div style={{ fontSize: 22, fontWeight: 900, color: 'oklch(0.80 0.14 220)', letterSpacing: '-0.5px' }}>{kmV.toString().replace('.', ',')} <span style={{ fontSize: 13, fontWeight: 700, opacity: 0.6 }}>KM</span></div>
+              </div>
             </div>
-            <div style={{ flex: 1, background: 'rgba(255, 180, 0, 0.06)', borderRadius: 16, padding: '14px 16px', border: '1px solid rgba(255, 180, 0, 0.2)' }}>
-              <div style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '0.6px', marginBottom: 6, display: 'flex', alignItems: 'center', gap: 6 }}>
-                <span style={{ fontSize: 18 }}>💰</span> Mi Ganancia
+
+            {/* Columna Derecha: Ganancia y Tiempo */}
+            <div style={{ flex: 1, background: 'rgba(255,255,255,0.03)', borderRadius: 22, padding: '16px', border: '1px solid rgba(255,255,255,0.07)', display: 'flex', flexDirection: 'column', gap: 10 }}>
+              <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', textAlign: 'center', background: 'rgba(255, 180, 0, 0.06)', borderRadius: 16, padding: '14px 16px', border: '1px solid rgba(255, 180, 0, 0.2)' }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '0.6px', marginBottom: 6, display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 6 }}>
+                  <span style={{ fontSize: 20 }}>💰</span> Mi Ganancia
+                </div>
+                <div style={{ fontSize: 20, fontWeight: 900, color: 'oklch(0.85 0.18 85)', letterSpacing: '-0.5px' }}>{fmt(miGanancia)}</div>
               </div>
-              <div style={{ fontSize: 20, fontWeight: 900, color: 'oklch(0.85 0.18 85)', letterSpacing: '-0.5px' }}>{fmt(miGanancia)}</div>
+              <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', textAlign: 'center', background: 'rgba(0, 180, 255, 0.05)', borderRadius: 16, padding: '14px 16px', border: '1px solid rgba(0, 180, 255, 0.15)' }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '0.6px', marginBottom: 6, display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 6 }}>
+                  <span style={{ fontSize: 20 }}>⏱️</span> Tiempo Trabajado
+                </div>
+                <div style={{ fontSize: 20, fontWeight: 900, color: 'oklch(0.85 0.12 210)', letterSpacing: '-0.5px' }}>{durationStr}</div>
+              </div>
             </div>
           </div>
 
           {/* Categorías + Notas */}
           <div style={{ background: 'rgba(255,255,255,0.03)', borderRadius: 22, padding: '16px', border: '1px solid rgba(255,255,255,0.07)' }}>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-              <div style={{ background: 'oklch(0.20 0.06 150)', borderRadius: 16, padding: '14px 16px', border: '1px solid oklch(0.60 0.16 150 / 0.35)' }}>
-                <div style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', letterSpacing: '0.6px', marginBottom: 6 }}>Total Taxímetro</div>
-                <div style={{ fontSize: 22, fontWeight: 900, color: 'oklch(0.78 0.18 150)', letterSpacing: '-0.5px' }}>{fmt(dineroV)}</div>
-              </div>
-              <div style={{ background: 'oklch(0.19 0.05 220)', borderRadius: 16, padding: '14px 16px', border: '1px solid oklch(0.65 0.14 220 / 0.35)' }}>
-                <div style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', letterSpacing: '0.6px', marginBottom: 6 }}>Total KM</div>
-                <div style={{ fontSize: 22, fontWeight: 900, color: 'oklch(0.80 0.14 220)', letterSpacing: '-0.5px' }}>{kmV.toString().replace('.', ',')} <span style={{ fontSize: 13, fontWeight: 700, opacity: 0.6 }}>KM</span></div>
-              </div>
               {cats.map(c => (
                 <div key={c.key} style={{ background: c.bg, borderRadius: 16, padding: '14px 16px', border: `1px solid ${c.color}33` }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8 }}>
@@ -1628,6 +1715,35 @@ function App() {
             );
           })()}
 
+          {/* Contenedor Inferior Agrupado: Descontar y Dar */}
+          <div style={{ background: 'rgba(255,255,255,0.03)', borderRadius: 22, padding: '16px', border: '1px solid rgba(255,255,255,0.07)', marginTop: 16 }}>
+            <div style={{ display: 'flex', gap: 10 }}>
+
+              {/* Tarjeta: Total a Descontar */}
+              <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', textAlign: 'center', background: 'oklch(0.19 0.06 25)', borderRadius: 16, padding: '14px 16px', border: '1px solid oklch(0.70 0.18 25 / 0.35)' }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', letterSpacing: '0.6px', marginBottom: 6, display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 6 }}>
+                  <IconReceipt s={20} c="oklch(0.70 0.18 25)" />
+                  Total a Descontar
+                </div>
+                <div style={{ fontSize: 20, fontWeight: 900, color: 'oklch(0.70 0.18 25)', letterSpacing: '-0.5px' }}>
+                  {fmt(totalDescontar)}
+                </div>
+              </div>
+
+              {/* Tarjeta: Total a Dar */}
+              <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', textAlign: 'center', background: 'oklch(0.18 0.07 145)', borderRadius: 16, padding: '14px 16px', border: '1px solid oklch(0.68 0.20 145 / 0.35)' }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', letterSpacing: '0.6px', marginBottom: 6, display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 6 }}>
+                  <IconGive s={20} c="oklch(0.68 0.20 145)" />
+                  Total a Dar
+                </div>
+                <div style={{ fontSize: 20, fontWeight: 900, color: 'oklch(0.68 0.20 145)', letterSpacing: '-0.5px' }}>
+                  {fmt(totalADar)}
+                </div>
+              </div>
+
+            </div>
+          </div>
+
           {isToday && (
             <button onClick={() => setScreen('home')}
               style={{ marginTop: 4, padding: '17px 0', borderRadius: 18, border: 'none', background: 'rgba(255,255,255,0.07)', color: 'rgba(255,255,255,0.7)', fontSize: 16, fontWeight: 700, cursor: 'pointer' }}>
@@ -1656,7 +1772,7 @@ function App() {
         kmStr: undefined,
         totalP: editJ.entries.filter((e: any) => e.type === 'propina').reduce((s: number, e: any) => s + e.amount, 0),
         totalD: editJ.entries.filter((e: any) => e.type === 'datafono').reduce((s: number, e: any) => s + e.amount, 0),
-        totalA: editJ.entries.filter((e: any) => e.type === 'agencia').reduce((s: number, e: any) => s + e.amount, 0),
+        totalA: editJ.entries.filter((e: any) => e.type === 'agencia' || e.type === 'agencia_bono').reduce((s: number, e: any) => s + e.amount, 0),
         totalE: editJ.entries.filter((e: any) => e.type === 'extra').reduce((s: number, e: any) => s + e.amount, 0),
         totalF: editJ.entries.filter((e: any) => e.type === 'gasolina').reduce((s: number, e: any) => s + e.amount, 0),
         totalN: editJ.entries.filter((e: any) => e.type === 'nulo').reduce((s: number, e: any) => s + e.amount, 0),
@@ -1707,7 +1823,7 @@ function App() {
               {editJ.entries.map((e: any) => {
                 const meta = e.type === 'propina' ? { col: G, lbl: 'Propina' }
                   : e.type === 'datafono' ? { col: P, lbl: 'Datáfono' }
-                    : e.type === 'agencia' ? { col: A, lbl: 'Agencia' }
+                    : (e.type === 'agencia' || e.type === 'agencia_bono') ? { col: A, lbl: 'Agencia/Bono' }
                       : e.type === 'extra' ? { col: E, lbl: 'Extra' }
                         : e.type === 'gasolina' ? { col: F, lbl: 'Gasolina' }
                           : e.type === 'nota' ? { col: 'white', lbl: 'Nota' }
@@ -1741,8 +1857,8 @@ function App() {
                       onClick={() => { setShowTypeMenu(!showTypeMenu); setShowNewEntryKP(false); }}
                       style={{ width: '100%', height: '100%', background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, padding: '8px 10px', outline: 'none', display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer' }}
                     >
-                      <span style={{ color: editJ.newType ? ({ datafono: P, propina: G, agencia: A, extra: E, gasolina: F, nota: 'white', nulo: N } as any)[editJ.newType] : 'white', fontWeight: editJ.newType ? 800 : 600, textTransform: editJ.newType ? 'capitalize' : 'none', fontSize: 13 }}>
-                        {editJ.newType || 'Selecciona'}
+                      <span style={{ color: editJ.newType ? ({ datafono: P, propina: G, agencia_bono: A, extra: E, gasolina: F, nota: 'white', nulo: N } as any)[editJ.newType] : 'white', fontWeight: editJ.newType ? 800 : 600, textTransform: editJ.newType === 'agencia_bono' ? 'none' : (editJ.newType ? 'capitalize' : 'none'), fontSize: 13 }}>
+                        {editJ.newType === 'agencia_bono' ? 'Agencia/Bono' : (editJ.newType || 'Selecciona')}
                       </span>
                       <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.5)' }}>▼</span>
                     </button>
@@ -1750,15 +1866,15 @@ function App() {
                       <>
                         <div onClick={() => setShowTypeMenu(false)} style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 99 }} />
                         <div style={{ position: 'absolute', top: '100%', left: 0, marginTop: 4, background: '#13131a', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 12, zIndex: 100, width: '100%', overflow: 'hidden', boxShadow: '0 8px 24px rgba(0,0,0,0.8)' }}>
-                          {['datafono', 'propina', 'agencia', 'extra', 'gasolina', 'nulo'].map(type => {
-                            const tColor = ({ datafono: P, propina: G, agencia: A, extra: E, gasolina: F, nulo: N } as any)[type];
+                          {['datafono', 'propina', 'agencia_bono', 'extra', 'gasolina', 'nulo'].map(type => {
+                            const tColor = ({ datafono: P, propina: G, agencia_bono: A, extra: E, gasolina: F, nulo: N } as any)[type];
                             return (
                               <div
                                 key={type}
                                 onClick={() => { setEditJ({ ...editJ, newType: type }); setShowTypeMenu(false); }}
-                                style={{ padding: '12px', fontSize: 13, color: tColor, borderBottom: '1px solid rgba(255,255,255,0.03)', cursor: 'pointer', textTransform: 'capitalize', fontWeight: 700, background: editJ.newType === type ? 'rgba(255,255,255,0.06)' : 'transparent' }}
+                                style={{ padding: '12px', fontSize: 13, color: tColor, borderBottom: '1px solid rgba(255,255,255,0.03)', cursor: 'pointer', textTransform: type === 'agencia_bono' ? 'none' : 'capitalize', fontWeight: 700, background: editJ.newType === type ? 'rgba(255,255,255,0.06)' : 'transparent' }}
                               >
-                                {type}
+                                {type === 'agencia_bono' ? 'Agencia/Bono' : type}
                               </div>
                             );
                           })}
@@ -1770,7 +1886,7 @@ function App() {
                   {/* Falso input que abre el teclado numérico */}
                   <div
                     onClick={() => { setShowNewEntryKP(!showNewEntryKP); setShowTypeMenu(false); }}
-                    style={{ flex: 1, minWidth: 60, background: 'rgba(0,0,0,0.3)', border: `1px solid ${showNewEntryKP ? (editJ.newType ? ({ datafono: P, propina: G, agencia: A, extra: E, gasolina: F, nulo: N } as any)[editJ.newType] : 'white') : 'rgba(255,255,255,0.1)'}`, borderRadius: 8, padding: '8px 10px', display: 'flex', alignItems: 'center', cursor: 'pointer', position: 'relative', zIndex: showNewEntryKP ? 100 : 'auto' }}
+                    style={{ flex: 1, minWidth: 60, background: 'rgba(0,0,0,0.3)', border: `1px solid ${showNewEntryKP ? (editJ.newType ? ({ datafono: P, propina: G, agencia_bono: A, extra: E, gasolina: F, nulo: N } as any)[editJ.newType] : 'white') : 'rgba(255,255,255,0.1)'}`, borderRadius: 8, padding: '8px 10px', display: 'flex', alignItems: 'center', cursor: 'pointer', position: 'relative', zIndex: showNewEntryKP ? 100 : 'auto' }}
                   >
                     {editJ.newAmount ? <span style={{ color: 'white', fontSize: 14, fontWeight: 700 }}>{editJ.newAmount}</span> : <span style={{ color: 'rgba(255,255,255,0.3)', fontSize: 14 }}>0,00</span>}
                   </div>
@@ -2042,7 +2158,7 @@ function App() {
 
   if (screen === "addSingle" && singleMode) {
     const cfg = {
-      agencia: { accent: A, bg: ABG, label: "Agencia", Icon: IconAgency },
+      agencia_bono: { accent: A, bg: ABG, label: "Agencia/Bono", Icon: IconAgency },
       extra: { accent: E, bg: EBG, label: "Extra", Icon: IconExtra },
       gasolina: { accent: F, bg: FBG, label: "Gasolina", Icon: IconFuel },
       nulo: { accent: N, bg: NBG, label: "Nulo", Icon: IconNulo },
@@ -2308,12 +2424,7 @@ function App() {
       turnos: Turno[];
       override: WeekOverride | null;
     };
-    type ElemSuelto = {
-      kind: "suelto";
-      turno: Turno;
-      fechaOrden: string;
-    };
-    type Elem = ElemSemana | ElemSuelto;
+    type Elem = ElemSemana;
 
     const elementos: Elem[] = [];
 
@@ -2337,30 +2448,20 @@ function App() {
     // 2. Agrupar resto del historial por semana con día libre actual
     const grupos = groupTurnosByWeek(history, diaLibre);
     for (const [key, turnosSemana] of grupos.entries()) {
-      if (key.startsWith("__suelto__")) {
-        // Turno suelto
-        const t = turnosSemana[0];
-        elementos.push({
-          kind: "suelto",
-          turno: t,
-          fechaOrden: t.startDate || t.date,
-        });
-      } else {
-        // Semana
-        const weekId = key;
-        if (frozenIds.has(weekId)) continue; // ya añadida desde frozen
-        const range = getWeekRange(weekId);
-        const isEnCurso = !isWeekClosed(weekId, hoyISO);
-        elementos.push({
-          kind: "semana",
-          weekId,
-          fechaOrden: range.fin,
-          isFrozen: false,
-          isEnCurso,
-          turnos: turnosSemana,
-          override: getWeekOverride(weekOverrides, weekId),
-        });
-      }
+      // Semana
+      const weekId = key;
+      if (frozenIds.has(weekId)) continue; // ya añadida desde frozen
+      const range = getWeekRange(weekId);
+      const isEnCurso = !isWeekClosed(weekId, hoyISO);
+      elementos.push({
+        kind: "semana",
+        weekId,
+        fechaOrden: range.fin,
+        isFrozen: false,
+        isEnCurso,
+        turnos: turnosSemana,
+        override: getWeekOverride(weekOverrides, weekId),
+      });
     }
 
     // 3. Detectar si la semana en curso ya existe; si no, crear una "vacía"
@@ -2397,24 +2498,18 @@ function App() {
     let primerEmpate: { weekId: string; candidates: { mesId: string; mesLabel: string }[] } | null = null;
 
     for (const elem of otros) {
-      if (elem.kind === "suelto") {
-        const d = new Date(elem.fechaOrden + "T12:00:00");
-        const mesId = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
-        otrosConMes.push({ elem, mesId });
+      const r = getWeekMonth(elem.weekId, elem.isFrozen ? elem.frozen!.diaLibreUsado : diaLibre);
+      if (r.type === "single") {
+        otrosConMes.push({ elem, mesId: r.mesId });
       } else {
-        const r = getWeekMonth(elem.weekId, elem.isFrozen ? elem.frozen!.diaLibreUsado : diaLibre);
-        if (r.type === "single") {
-          otrosConMes.push({ elem, mesId: r.mesId });
+        // Empate: ¿hay resolución guardada en estado?
+        const resolved = tieResolutions.get(elem.weekId);
+        if (resolved) {
+          otrosConMes.push({ elem, mesId: resolved });
         } else {
-          // Empate: ¿hay resolución guardada en estado?
-          const resolved = tieResolutions.get(elem.weekId);
-          if (resolved) {
-            otrosConMes.push({ elem, mesId: resolved });
-          } else {
-            otrosConMes.push({ elem, mesId: null });
-            if (!primerEmpate) {
-              primerEmpate = { weekId: elem.weekId, candidates: r.candidates };
-            }
+          otrosConMes.push({ elem, mesId: null });
+          if (!primerEmpate) {
+            primerEmpate = { weekId: elem.weekId, candidates: r.candidates };
           }
         }
       }
@@ -2469,7 +2564,6 @@ function App() {
               <div
                 onClick={() => {
                   setSelectedWeekId(enCurso.weekId);
-                  setSelectedSueltoId(null);
                   setScreen("detalleSemana");
                 }}
                 style={{
@@ -2579,55 +2673,6 @@ function App() {
               </div>
 
               {grupo.items.map((item) => {
-                if (item.elem.kind === "suelto") {
-                  const t = item.elem.turno;
-                  return (
-                    <div
-                      key={`suelto-${t.id}`}
-                      onClick={() => {
-                        setSelectedSueltoId(t.id);
-                        setSelectedWeekId(null);
-                        setViewTurno(t);
-                        setScreen("summary");
-                      }}
-                      style={{
-                        background: "rgba(255,200,80,0.06)",
-                        borderRadius: 16,
-                        padding: 14,
-                        cursor: "pointer",
-                        border: "1px dashed rgba(255,200,80,0.3)",
-                        display: "flex",
-                        alignItems: "center",
-                        gap: 12,
-                      }}
-                    >
-                      <span style={{ fontSize: 24 }}>🚕</span>
-                      <div style={{ flex: 1 }}>
-                        <div style={{
-                          fontSize: 12,
-                          fontWeight: 800,
-                          color: "oklch(0.85 0.15 80)",
-                          textTransform: "uppercase",
-                          letterSpacing: "0.6px",
-                          marginBottom: 2,
-                        }}>
-                          Turno suelto
-                        </div>
-                        <div style={{ fontSize: 14, color: "rgba(255,255,255,0.7)" }}>
-                          {fmtDate(t.startDate || t.date)}
-                        </div>
-                      </div>
-                      <div style={{
-                        fontSize: 16,
-                        fontWeight: 900,
-                        color: "oklch(0.85 0.15 80)",
-                      }}>
-                        {fmt(t.dinero || 0)}
-                      </div>
-                    </div>
-                  );
-                }
-
                 // Tarjeta de semana
                 const sem = item.elem;
                 const totales = sem.isFrozen
@@ -2643,7 +2688,6 @@ function App() {
                     key={`sem-${sem.weekId}`}
                     onClick={() => {
                       setSelectedWeekId(sem.weekId);
-                      setSelectedSueltoId(null);
                       setScreen("detalleSemana");
                     }}
                     style={{
@@ -2840,7 +2884,7 @@ function App() {
     const cats = [
       { key: 'datafono', label: 'Datáfono', color: P, bg: PBG, icon: <IconCard s={18} c={P} />, total: totales.totalD },
       { key: 'propina', label: 'Propinas', color: G, bg: GBG, icon: <IconCoin s={18} c={G} />, total: totales.totalP },
-      { key: 'agencia', label: 'Agencias', color: A, bg: ABG, icon: <IconAgency s={18} c={A} />, total: totales.totalA },
+      { key: 'agencia_bono', label: 'Agencias/Bonos', color: A, bg: ABG, icon: <IconAgency s={18} c={A} />, total: totales.totalA },
       { key: 'extra', label: 'Extras', color: E, bg: EBG, icon: <IconExtra s={18} c={E} />, total: totales.totalE },
       { key: 'gasolina', label: 'Gasolina', color: F, bg: FBG, icon: <IconFuel s={18} c={F} />, total: totales.totalF },
       { key: 'nulo', label: 'Nulos', color: N, bg: NBG, icon: <IconNulo s={18} c={N} />, total: totales.totalN },
@@ -3091,10 +3135,10 @@ function App() {
             history.map((j) => {
               let durationStr = "0h 0m";
               if (j.startTime && j.endTime) {
-                const [h1, m1] = j.startTime.split(':').map(Number);
-                const [h2, m2] = j.endTime.split(':').map(Number);
-                let totalMins = (h2 * 60 + m2) - (h1 * 60 + m1);
-                if (totalMins < 0) totalMins += 24 * 60;
+                let totalMins = getDiffMins(j.startTime, j.endTime);
+                if (j.totalPausedMinutes) {
+                  totalMins = Math.max(0, totalMins - j.totalPausedMinutes);
+                }
                 const hh = Math.floor(totalMins / 60);
                 const mm = totalMins % 60;
                 durationStr = `${hh}h ${mm}m`;
@@ -3181,8 +3225,8 @@ function App() {
                   ? { col: G, ic: <IconCoin s={17} c={G} />, lbl: "Propina" }
                   : e.type === "datafono"
                     ? { col: P, ic: <IconCard s={17} c={P} />, lbl: "Datáfono" }
-                    : e.type === "agencia"
-                      ? { col: A, ic: <IconAgency s={17} c={A} />, lbl: "Agencia" }
+                    : (e.type === "agencia" || e.type === "agencia_bono")
+                      ? { col: A, ic: <IconAgency s={17} c={A} />, lbl: "Agencia/Bono" }
                       : e.type === "extra"
                         ? { col: E, ic: <IconExtra s={17} c={E} />, lbl: "Extra" }
                         : e.type === "nulo"
@@ -3392,11 +3436,11 @@ function App() {
               <div style={{ marginBottom: 12, display: "flex", flexDirection: "column", gap: 6, flexShrink: 0 }}>
                 <div style={{ fontSize: 11, fontWeight: 700, color: "rgba(255,255,255,0.4)", textTransform: "uppercase", letterSpacing: "0.6px", marginBottom: 2 }}>📌 Notas detalladas</div>
                 {entriesWithNotes.map(e => {
-                  const col = e.type === 'propina' ? G : e.type === 'datafono' ? P : e.type === 'agencia' ? A : e.type === 'extra' ? E : e.type === 'gasolina' ? F : N;
+                  const col = e.type === 'propina' ? G : e.type === 'datafono' ? P : (e.type === 'agencia' || e.type === 'agencia_bono') ? A : e.type === 'extra' ? E : e.type === 'gasolina' ? F : N;
                   return (
                     <div key={e.id} style={{ fontSize: 13, background: "rgba(255,255,255,0.03)", padding: "10px 12px", borderRadius: 12, border: "1px solid rgba(255,255,255,0.05)", display: "flex", alignItems: "baseline", gap: 8 }}>
                       <span style={{ fontSize: 11, color: "rgba(255,255,255,0.25)", fontWeight: 600 }}>{e.time}</span>
-                      <span style={{ fontWeight: 900, color: col, fontSize: 10, textTransform: "uppercase", minWidth: 60 }}>{e.type}</span>
+                      <span style={{ fontWeight: 900, color: col, fontSize: 10, textTransform: "uppercase", minWidth: 60 }}>{e.type === 'agencia_bono' ? 'agencia/bono' : e.type}</span>
                       <span style={{ color: "rgba(255,255,255,0.8)", lineHeight: 1.4 }}>{e.note}</span>
                       <span style={{ marginLeft: "auto", fontSize: 11, color: "rgba(255,255,255,0.2)", fontWeight: 600 }}>{fmt(e.amount)}</span>
                     </div>
@@ -3498,6 +3542,7 @@ function App() {
           padding: "12px 20px 24px",
           overflowY: "hidden",
           minHeight: 0,
+          position: "relative",
         }}
       >
         <div
@@ -3551,13 +3596,26 @@ function App() {
             >
               <span style={{ fontSize: 18 }}>🏠</span>
             </button>
-            {history.length > 0 && (
+            {active && current.startTime && (
               <button
-                style={S.iconBtn}
-                onClick={() => setScreen("PantallaTurnos")}
-                title="Turnos"
+                style={{ ...S.iconBtn, background: current.isPaused ? "rgba(255,180,0,0.15)" : S.iconBtn.background }}
+                onClick={() => {
+                  if (!current.isPaused) {
+                    setConfirmDialog({
+                      text: "¿Seguro que quieres pausar el Turno actual?",
+                      onConfirm: togglePause,
+                      confirmText: "Pausar",
+                      confirmBg: "rgba(0, 180, 255, 0.12)",
+                      confirmColor: "rgba(0, 180, 255, 0.9)",
+                      confirmBorder: "1.5px solid rgba(0, 180, 255, 0.25)"
+                    });
+                  } else {
+                    togglePause();
+                  }
+                }}
+                title={current.isPaused ? "Reanudar Turno" : "Pausar Turno"}
               >
-                <IconHistory />
+                <span style={{ fontSize: 18 }}>{current.isPaused ? "▶️" : "⏸️"}</span>
               </button>
             )}
           </div>
@@ -3592,14 +3650,14 @@ function App() {
         </div>
         <div style={{ display: "flex", gap: 10, marginBottom: 6 }}>
           <SmallCard
-            label="Agencias"
+            label="Agencias/Bonos"
             color={A}
             bg={ABG}
             total={totalA}
             icon={<IconAgency s={18} c={A} />}
             disabled={!current.startTime}
             onClick={() => {
-              setSingleMode("agencia");
+              setSingleMode("agencia_bono");
               setScreen("addSingle");
             }}
           />
@@ -3748,11 +3806,11 @@ function App() {
                           ic: <IconCard s={17} c={P} />,
                           lbl: "Datáfono",
                         }
-                        : e.type === "agencia"
+                        : (e.type === "agencia" || e.type === "agencia_bono")
                           ? {
                             col: A,
                             ic: <IconAgency s={17} c={A} />,
-                            lbl: "Agencia",
+                            lbl: "Agencia/Bono",
                           }
                           : e.type === "extra"
                             ? {
@@ -3875,6 +3933,68 @@ function App() {
           >
             Terminar Turno
           </button>
+        )}
+
+        {current.isPaused && (
+          <div
+            style={{
+              position: "absolute",
+              top: 85,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              background: "rgba(10, 12, 18, 0.2)",
+              backdropFilter: "grayscale(0.85) brightness(0.6)",
+              WebkitBackdropFilter: "grayscale(0.85) brightness(0.6)",
+              display: "flex",
+              flexDirection: "column",
+              justifyContent: "center",
+              alignItems: "center",
+              zIndex: 1000,
+              padding: "20px",
+              margin: "0 -20px -24px",
+            }}
+          >
+            <div style={{
+              width: 72,
+              height: 72,
+              background: "linear-gradient(135deg, #7eb6ff, #3b82f6)",
+              borderRadius: 18,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: 8,
+              marginBottom: 24,
+              boxShadow: "0 8px 24px rgba(59, 130, 246, 0.25)"
+            }}>
+              <div style={{ width: 10, height: 32, background: "white", borderRadius: 4 }}></div>
+              <div style={{ width: 10, height: 32, background: "white", borderRadius: 4 }}></div>
+            </div>
+            <div style={{ fontSize: 24, fontWeight: 800, color: "white", marginBottom: 40, letterSpacing: "-0.5px" }}>
+              Turno Pausado
+            </div>
+            <button
+              onClick={togglePause}
+              style={{
+                width: "100%",
+                padding: "20px 0",
+                borderRadius: 20,
+                border: "2px solid #3b82f6",
+                background: "rgba(59, 130, 246, 0.08)",
+                color: "#3b82f6",
+                fontSize: 18,
+                fontWeight: 800,
+                cursor: "pointer",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: 12,
+              }}
+            >
+              <span style={{ fontSize: 22 }}>▶</span>
+              Continuar Turno
+            </button>
+          </div>
         )}
       </div>
       {confirmDialog && <ConfirmDialog {...confirmDialog} onCancel={() => setConfirmDialog(null)} />}
@@ -4061,7 +4181,7 @@ function EditEntryDialog({
   const meta: { col: string; lbl: string } =
     entry.type === "propina" ? { col: G, lbl: "Propina" }
       : entry.type === "datafono" ? { col: P, lbl: "Datáfono" }
-        : entry.type === "agencia" ? { col: A, lbl: "Agencia" }
+        : (entry.type === "agencia" || entry.type === "agencia_bono") ? { col: A, lbl: "Agencia/Bono" }
           : entry.type === "extra" ? { col: E, lbl: "Extra" }
             : entry.type === "gasolina" ? { col: F, lbl: "Gasolina" }
               : entry.type === "nota" ? { col: "white", lbl: "Nota" }
@@ -4230,7 +4350,7 @@ function EditEntryDialog({
   );
 }
 
-function ConfirmDialog({ text, onConfirm, onCancel }: any) {
+function ConfirmDialog({ text, onConfirm, onCancel, confirmText, confirmBg, confirmColor, confirmBorder }: any) {
   return (
     <div
       style={{
@@ -4291,14 +4411,14 @@ function ConfirmDialog({ text, onConfirm, onCancel }: any) {
               flex: 1,
               padding: "14px",
               borderRadius: 12,
-              border: "none",
-              background: "rgba(255,60,60,0.2)",
-              color: "#ff6b6b",
+              border: confirmBorder || "none",
+              background: confirmBg || "rgba(255,60,60,0.2)",
+              color: confirmColor || "#ff6b6b",
               fontWeight: 700,
               cursor: "pointer",
             }}
           >
-            Confirmar
+            {confirmText || "Confirmar"}
           </button>
         </div>
       </div>
