@@ -279,24 +279,46 @@ function getWeekId(dateStr: string, diaLibre: number): string {
 function getWeekRange(weekId: string): { inicio: string; fin: string } {
   const d = new Date(weekId + "T12:00:00");
   const inicio = weekId;
-  d.setDate(d.getDate() + 6);
+  d.setDate(d.getDate() + 5);
   const fin = d.toISOString().slice(0, 10);
   return { inicio, fin };
 }
 
-function getTurnoFechaEfectiva(turno: Turno): string {
-  return turno.startDate || turno.date;
+/**
+ * Devuelve la fecha "efectiva" de un turno para asignarlo a una semana.
+ *
+ * Regla:
+ *   - Si startDate cae en día laboral → usar startDate
+ *   - Si startDate cae en el día libre Y date (fin) cae en un día laboral
+ *     distinto → usar date (el turno cuenta para la semana del día de fin)
+ *   - En cualquier otro caso → startDate || date
+ */
+function getTurnoFechaEfectiva(turno: Turno, diaLibre: number): string {
+  const fechaInicio = turno.startDate || turno.date;
+  if (!fechaInicio) return turno.date;
+
+  const diaInicio = new Date(fechaInicio + "T12:00:00").getDay();
+
+  // Si empezó en día libre y terminó en otro día (laboral) → usar fecha de fin
+  if (diaInicio === diaLibre && turno.date && turno.date !== fechaInicio) {
+    const diaFin = new Date(turno.date + "T12:00:00").getDay();
+    if (diaFin !== diaLibre) {
+      return turno.date;
+    }
+  }
+
+  return fechaInicio;
 }
 
 function groupTurnosByWeek(turnos: Turno[], diaLibre: number): Map<string, Turno[]> {
   const map = new Map<string, Turno[]>();
   const sorted = [...turnos].sort((a, b) => {
-    const dateA = getTurnoFechaEfectiva(a);
-    const dateB = getTurnoFechaEfectiva(b);
+    const dateA = getTurnoFechaEfectiva(a, diaLibre);
+    const dateB = getTurnoFechaEfectiva(b, diaLibre);
     return dateA.localeCompare(dateB);
   });
   for (const t of sorted) {
-    const f = getTurnoFechaEfectiva(t);
+    const f = getTurnoFechaEfectiva(t, diaLibre);
     const weekId = getWeekId(f, diaLibre);
     if (!map.has(weekId)) {
       map.set(weekId, []);
@@ -2961,7 +2983,7 @@ function App() {
               </div>
             ) : (
               <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                {[...turnosSemana].sort((a, b) => (getTurnoFechaEfectiva(a) < getTurnoFechaEfectiva(b) ? 1 : -1)).map((t) => (
+                {[...turnosSemana].sort((a, b) => (getTurnoFechaEfectiva(a, settings.diaLibre) < getTurnoFechaEfectiva(b, settings.diaLibre) ? 1 : -1)).map((t) => (
                   <div
                     key={t.id}
                     onClick={() => { setViewTurno(t); setScreen("summary"); }}
