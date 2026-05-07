@@ -94,11 +94,9 @@ interface AppSettings {
   "porcentaje.jefe": number;
   "porcentaje.chofer": number;
   "descontar.datafono": boolean;
-  "descontar.propina": boolean;
   "descontar.agencia_bono": boolean;
   "descontar.extra": boolean;
   "descontar.gasolina": boolean;
-  "descontar.nulo": boolean;
   diaLibre: number;              // 0=Domingo, 1=Lunes, 2=Martes, 3=Miércoles, 4=Jueves, 5=Viernes, 6=Sábado
   diaLibreDesde: string | null;  // Fecha ISO desde la que aplica este día libre (null si nunca se ha cambiado)
 }
@@ -143,11 +141,9 @@ function loadSettings(): AppSettings {
     "porcentaje.jefe": 0,
     "porcentaje.chofer": 0,
     "descontar.datafono": true,
-    "descontar.propina": false,
     "descontar.agencia_bono": true,
     "descontar.extra": true,
     "descontar.gasolina": true,
-    "descontar.nulo": true,
     diaLibre: 2,           // Martes por defecto (tu día libre actual)
     diaLibreDesde: null,
   };
@@ -1352,11 +1348,9 @@ function App() {
             <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
               {([
                 { key: "descontar.datafono", label: "Datáfono", color: P, bg: PBG },
-                { key: "descontar.propina", label: "Propinas", color: G, bg: GBG },
                 { key: "descontar.agencia_bono", label: "Agencias/Bonos", color: A, bg: ABG },
                 { key: "descontar.extra", label: "Extras", color: E, bg: EBG },
                 { key: "descontar.gasolina", label: "Gasolina", color: F, bg: FBG },
-                { key: "descontar.nulo", label: "Nulos", color: N, bg: NBG },
               ] as const).map((item) => {
                 const isActive = settings[item.key as keyof AppSettings] as boolean;
                 return (
@@ -1561,7 +1555,10 @@ function App() {
     const vE = viewTurno.entries.filter((e: any) => e.type === 'extra').reduce((s: number, e: any) => s + e.amount, 0);
     const vF = viewTurno.entries.filter((e: any) => e.type === 'gasolina').reduce((s: number, e: any) => s + e.amount, 0);
     const vN = viewTurno.entries.filter((e: any) => e.type === 'nulo').reduce((s: number, e: any) => s + e.amount, 0);
-    const dineroV = viewTurno.dinero || 0;
+    
+    // El taxímetro efectivo ya no incluye los Nulos
+    const dineroV = (viewTurno.dinero || 0) - vN;
+    
     const kmV = viewTurno.km || 0;
     const cats = [
       { key: 'datafono', label: 'Datáfono', color: P, bg: PBG, icon: <IconCard s={20} c={P} />, total: vD, count: viewTurno.entries.filter((e: any) => e.type === 'datafono').length },
@@ -1588,13 +1585,12 @@ function App() {
 
     // Cálculos dinámicos según ajustes
     const descD = settings["descontar.datafono"] ? vD : 0;
-    const descP = settings["descontar.propina"] ? vP : 0;
     const descA = settings["descontar.agencia_bono"] ? vA : 0;
     const descE = settings["descontar.extra"] ? vE : 0;
     const descF = settings["descontar.gasolina"] ? vF : 0;
-    const descN = settings["descontar.nulo"] ? vN : 0;
 
-    const totalDescontar = descD + descP + descA + descE + descF + descN;
+    // Se elimina descP porque las propinas ya no forman parte de la configuración de descuentos al jefe
+    const totalDescontar = descD + descA + descE + descF;
     const totalADar = (dineroV * (settings["porcentaje.jefe"] / 100)) - totalDescontar;
 
     return (
