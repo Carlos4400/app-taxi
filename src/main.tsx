@@ -1317,7 +1317,38 @@ function App() {
             <div style={{ fontSize: 20, fontWeight: 800, color: "white", marginBottom: 4 }}>Mi Turno</div>
             <div style={{ fontSize: 14, color: "rgba(255,255,255,0.4)", marginBottom: 24 }}>Versión {APP_VERSION}</div>
             <button onClick={checkUpdate} style={{ width: "100%", padding: "16px 0", borderRadius: 16, border: "none", background: "rgba(255,255,255,0.1)", color: "white", fontSize: 16, fontWeight: 700, cursor: "pointer" }}>🔄 Buscar actualizaciones</button>
-            {updateMsg && <div style={{ marginTop: 16, fontSize: 14, color: "rgba(255,255,255,0.6)", background: "rgba(0,0,0,0.2)", padding: "12px", borderRadius: 12 }}>{updateMsg}</div>}
+            
+            {/* Mensajes de estado sin enlace (Buscando..., Última versión, etc.) */}
+            {updateMsg && !downloadUrl && (
+              <div style={{ marginTop: 16, fontSize: 14, color: "rgba(255,255,255,0.6)", background: "rgba(0,0,0,0.2)", padding: "12px", borderRadius: 12 }}>
+                {updateMsg}
+              </div>
+            )}
+
+            {/* El mensaje se convierte en botón de descarga si hay actualización */}
+            {updateMsg && downloadUrl && (
+              <a
+                href={downloadUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{
+                  display: "block",
+                  width: "100%",
+                  marginTop: 16,
+                  padding: "14px",
+                  borderRadius: 14,
+                  background: G,
+                  color: "black",
+                  fontSize: 15,
+                  fontWeight: 800,
+                  textDecoration: "none",
+                  cursor: "pointer",
+                  textAlign: "center"
+                }}
+              >
+                ⬇️ {updateMsg}
+              </a>
+            )}
           </div>
 
           {/* Bloque Porcentajes */}
