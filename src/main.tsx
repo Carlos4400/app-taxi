@@ -33,6 +33,16 @@ interface Turno {
   totalPausedMinutes?: number;
 }
 
+interface EditTurnoState extends Turno {
+  dineroStr?: string;
+  kmStr?: string;
+  newType?: string | null;
+  newAmount?: string;
+  newNote?: string;
+  isAddingNote?: boolean;
+  tempNote?: string;
+}
+
 interface CurrentState {
   entries: Entry[];
   startTime: string | null;
@@ -148,11 +158,8 @@ function loadSettings(): AppSettings {
     diaLibreDesde: null,
   };
   try {
-    const d = JSON.parse(localStorage.getItem(KEY_SETTINGS)!);
+    const d = JSON.parse(localStorage.getItem(KEY_SETTINGS) || "null");
     if (d) {
-      if (d["descontar.agencia"] !== undefined && d["descontar.agencia_bono"] === undefined) {
-        d["descontar.agencia_bono"] = d["descontar.agencia"];
-      }
       return { ...defaults, ...d };
     }
   } catch (e) { }
@@ -268,7 +275,7 @@ async function exportHistoryCSV(turnos: Turno[]): Promise<void> {
 
 function loadCurrent(): CurrentState {
   try {
-    const d = JSON.parse(localStorage.getItem(KEY_CURRENT)!);
+    const d = JSON.parse(localStorage.getItem(KEY_CURRENT) || "null");
     if (d) {
       return {
         ...d,
@@ -282,7 +289,7 @@ function loadCurrent(): CurrentState {
 }
 function loadHistory(): Turno[] {
   try {
-    const d = JSON.parse(localStorage.getItem(KEY_HISTORY)!);
+    const d = JSON.parse(localStorage.getItem(KEY_HISTORY) || "null");
     if (Array.isArray(d)) return d;
   } catch (e) { }
   return [];
@@ -455,7 +462,7 @@ function freezeOldWeeks(
 
 function loadWeekOverrides(): WeekOverride[] {
   try {
-    const d = JSON.parse(localStorage.getItem(KEY_WEEK_OVERRIDES)!);
+    const d = JSON.parse(localStorage.getItem(KEY_WEEK_OVERRIDES) || "null");
     if (Array.isArray(d)) return d;
   } catch (e) { }
   return [];
@@ -463,7 +470,7 @@ function loadWeekOverrides(): WeekOverride[] {
 
 function loadFrozenWeeks(): FrozenWeek[] {
   try {
-    const d = JSON.parse(localStorage.getItem(KEY_WEEKS_FROZEN)!);
+    const d = JSON.parse(localStorage.getItem(KEY_WEEKS_FROZEN) || "null");
     if (Array.isArray(d)) return d;
   } catch (e) { }
   return [];
@@ -488,6 +495,7 @@ function getWeekOverride(overrides: WeekOverride[], weekId: string): WeekOverrid
   return overrides.find((o) => o.weekId === weekId) || null;
 }
 
+const DIAS_LABORABLES_SEMANA = 6;
 /**
  * Decide a qué mes pertenece una semana laboral.
  *
@@ -513,7 +521,7 @@ function getWeekMonth(weekId: string, diaLibre: number): {
 
   // Contar 6 días laborales (la semana completa, todos los días son laborales por construcción)
   const conteo = new Map<string, number>(); // "YYYY-MM" → nº días
-  for (let i = 0; i < 6; i++) {
+  for (let i = 0; i < DIAS_LABORABLES_SEMANA; i++) {
     const d = new Date(start);
     d.setDate(start.getDate() + i);
     const mesId = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
@@ -710,6 +718,26 @@ const IconNulo = ({ s = 24, c = N }: { s?: number; c?: string }) => (
   </svg>
 );
 
+const IconRefresh = ({ s = 20, c = "currentColor" }: { s?: number; c?: string }) => (
+  <svg width={s} height={s} viewBox="0 0 24 24" fill="none">
+    <path d="M4 4V9H9" stroke={c} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+    <path d="M20 20V15H15" stroke={c} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+    <path d="M20 9C18.8289 5.50429 15.6836 3 12 3C7.02944 3 3 7.02944 3 12" stroke={c} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+    <path d="M4 15C5.17112 18.4957 8.31641 21 12 21C16.9706 21 21 16.9706 21 12" stroke={c} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+  </svg>
+);
+
+const IconDownload = ({ s = 20, c = "currentColor" }: { s?: number; c?: string }) => (
+  <svg width={s} height={s} viewBox="0 0 24 24" fill="none">
+    <path d="M12 4V16" stroke={c} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+    <path d="M7 11L12 16L17 11" stroke={c} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+    <path d="M20 20H4" stroke={c} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+  </svg>
+);
+
+
+
+
 // Icono para Total Descontar (Ticket/Factura)
 const IconReceipt = ({ s = 24, c = "white" }: { s?: number; c?: string }) => (
   <svg width={s} height={s} viewBox="0 0 24 24" fill="none">
@@ -726,57 +754,6 @@ const IconGive = ({ s = 24, c = "white" }: { s?: number; c?: string }) => (
   </svg>
 );
 
-// Icono para Total a Dar (Mano con moneda)
-const IconHandGive = ({ s = 24, c = "oklch(0.68 0.20 145)" }: { s?: number; c?: string }) => (
-  <svg width={s} height={s} viewBox="0 0 24 24" fill="none">
-    {/* Moneda */}
-    <circle
-      cx="12"
-      cy="6"
-      r="3"
-      stroke={c}
-      strokeWidth="1.8"
-    />
-    <circle
-      cx="12"
-      cy="6"
-      r="1.5"
-      stroke={c}
-      strokeWidth="1"
-      opacity="0.5"
-    />
-    {/* Mano abierta */}
-    <path
-      d="M6 11C6 9.5 7 8.5 8.5 8.5H9.5C10.5 8.5 11 9 11 10V13"
-      stroke={c}
-      strokeWidth="1.8"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    />
-    <path
-      d="M9 11C9 9 10.5 8 12 8C13.5 8 14.5 9 14.5 10.5V13.5"
-      stroke={c}
-      strokeWidth="1.8"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    />
-    <path
-      d="M12 11.5C12 10 13 9 14.5 9C16 9 17 10 17 11.5V15"
-      stroke={c}
-      strokeWidth="1.8"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    />
-    <path
-      d="M15 12.5C15 11 16 10 17.5 10C19 10 20 11 20 12.5V14C20 16.5 18 18.5 15.5 18.5H11C8 18.5 5.5 16.5 5 13.5"
-      stroke={c}
-      strokeWidth="1.8"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    />
-  </svg>
-);
-
 // Icono para Día Libre / Vacaciones (Sombrilla de playa)
 const IconHoliday = ({ s = 24, c = "oklch(0.85 0.18 85)" }: { s?: number; c?: string }) => (
   <svg width={s} height={s} viewBox="0 0 24 24" fill="none">
@@ -786,6 +763,96 @@ const IconHoliday = ({ s = 24, c = "oklch(0.85 0.18 85)" }: { s?: number; c?: st
     <path d="M12 4C11.5 6 10.5 7.5 8 9M12 4C12.5 6 13.5 7.5 16 9" stroke={c} strokeWidth="1.6" strokeLinecap="round" opacity="0.6" />
     {/* Base/Arena */}
     <path d="M8 20C10.5 18.5 13.5 18.5 16 20" stroke={c} strokeWidth="1.8" strokeLinecap="round" />
+  </svg>
+);
+
+const IconTimer = ({ s = 24, c = "white" }: { s?: number; c?: string }) => (
+  <svg width={s} height={s} viewBox="0 0 24 24" fill="none" style={{ display: "inline-block", verticalAlign: "middle" }}>
+    <path
+      d="M12 5C16.4183 5 20 8.58172 20 13C20 17.4183 16.4183 21 12 21C7.58172 21 4 17.4183 4 13C4 9.61051 6.10892 6.71424 9.06 5.5"
+      stroke={c}
+      strokeWidth="1.8"
+      strokeLinecap="round"
+    />
+    <path d="M12 2V5M10 2H14" stroke={c} strokeWidth="1.8" strokeLinecap="round" />
+    <path
+      d="M12 13L15.5 8.5"
+      stroke={c}
+      strokeWidth="1.8"
+      strokeLinecap="round"
+    />
+    <circle cx="12" cy="13" r="1.2" fill={c} />
+    <circle cx="17.5" cy="8.5" r="1" fill={c} opacity="0.6" />
+  </svg>
+);
+
+const IconTaxiSign = ({ s = 24, c = "white" }: { s?: number; c?: string }) => (
+  <svg width={s} height={s} viewBox="0 0 24 24" fill="none" style={{ display: "inline-block", verticalAlign: "middle" }}>
+    <path d="M4 16H20C21 16 22 15 21 12L19 7C18.5 5.5 17 4.5 15.5 4.5H8.5C7 4.5 5.5 5.5 5 7L3 12C2 15 3 16 4 16Z" stroke={c} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+    <path d="M8 9V11.5M16 9V11.5M12 9V11.5" stroke={c} strokeWidth="1.8" strokeLinecap="round" />
+  </svg>
+);
+
+const IconRoad = ({ s = 24, c = "white" }: { s?: number; c?: string }) => (
+  <svg width={s} height={s} viewBox="0 0 24 24" fill="none" style={{ display: "inline-block", verticalAlign: "middle" }}>
+    <path d="M3 22L9 2M21 22L15 2" stroke={c} strokeWidth="1.8" strokeLinecap="round" />
+    <path d="M12 22V18M12 14V10M12 6V2" stroke={c} strokeWidth="1.8" strokeLinecap="round" opacity="0.6" />
+  </svg>
+);
+
+const IconMoneyBag = ({ s = 24, c = "white" }: { s?: number; c?: string }) => (
+  <svg width={s} height={s} viewBox="0 0 24 24" fill="none" style={{ display: "inline-block", verticalAlign: "middle" }}>
+    <circle cx="3.5" cy="10.5" r="1" fill={c} />
+    <circle cx="2" cy="13.5" r="0.8" fill={c} />
+    <circle cx="20.5" cy="10.5" r="1" fill={c} />
+    <circle cx="22" cy="13.5" r="0.8" fill={c} />
+    <path d="M8 8 L6.5 4 Q9 6 12 3 Q15 6 17.5 4 L16 8" stroke={c} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+    <rect x="8" y="8" width="8" height="2.5" rx="1" stroke={c} strokeWidth="1.8" />
+    <path d="M8.5 10.5C4 12 2.5 17.5 6 20.5C8 22.5 16 22.5 18 20.5C21.5 17.5 20 12 15.5 10.5" stroke={c} strokeWidth="1.8" strokeLinecap="round" />
+    <path d="M12 12V20" stroke={c} strokeWidth="1.8" strokeLinecap="round" />
+    <path d="M14 13.5C14 12 10 12 10 14C10 16 14 16 14 18C14 20 10 20 10 18.5" stroke={c} strokeWidth="1.8" strokeLinecap="round" />
+  </svg>
+);
+
+const IconClipboard = ({ s = 24, c = "white" }: { s?: number; c?: string }) => (
+  <svg width={s} height={s} viewBox="0 0 24 24" fill="none" style={{ display: "inline-block", verticalAlign: "middle" }}>
+    <path d="M9 4H7C5.89543 4 5 4.89543 5 6V20C5 21.1046 5.89543 22 7 22H17C18.1046 22 19 21.1046 19 20V6C19 4.89543 18.1046 4 17 4H15" stroke={c} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+    <path d="M10 2C9.44772 2 9 2.44772 9 3V5C9 5.55228 9.44772 6 10 6H14C14.5523 6 15 5.55228 15 5V3C15 2.44772 14.5523 2 14 2H10Z" stroke={c} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+    <path d="M9 12H15M9 16H13" stroke={c} strokeWidth="1.8" strokeLinecap="round" opacity="0.6" />
+  </svg>
+);
+
+const IconChart = ({ s = 24, c = "white" }: { s?: number; c?: string }) => (
+  <svg width={s} height={s} viewBox="0 0 24 24" fill="none" style={{ display: "inline-block", verticalAlign: "middle" }}>
+    <rect x="4" y="14" width="4" height="6" rx="1" stroke={c} strokeWidth="1.8" strokeLinejoin="round" opacity="0.7" />
+    <rect x="10" y="8" width="4" height="12" rx="1" stroke={c} strokeWidth="1.8" strokeLinejoin="round" />
+    <rect x="16" y="4" width="4" height="16" rx="1" stroke={c} strokeWidth="1.8" strokeLinejoin="round" />
+    <path d="M2 22H22" stroke={c} strokeWidth="1.8" strokeLinecap="round" />
+  </svg>
+);
+
+
+const IconRocket = ({ s = 24, c = "white" }: { s?: number; c?: string }) => (
+  <svg width={s} height={s} viewBox="0 0 24 24" fill="none" style={{ display: "inline-block", verticalAlign: "middle" }}>
+    <g transform="rotate(45 12 12)">
+      <path d="M12 2 C16 3 17 9 16 14 L8 14 C7 9 8 3 12 2 Z" stroke={c} strokeWidth="1.8" strokeLinejoin="round" />
+      <path d="M9.5 5 Q12 6 14.5 5" stroke={c} strokeWidth="1.8" strokeLinecap="round" />
+      <circle cx="12" cy="8" r="1.5" stroke={c} strokeWidth="1.8" />
+      <path d="M8 11 C5 11 4 14 4 16 C6 16 8 14 8 14" stroke={c} strokeWidth="1.8" strokeLinejoin="round" />
+      <path d="M16 11 C19 11 20 14 20 16 C18 16 16 14 16 14" stroke={c} strokeWidth="1.8" strokeLinejoin="round" />
+      <path d="M10 14 L9 16 C11 16.5 13 16.5 15 16 L14 14" stroke={c} strokeWidth="1.8" strokeLinejoin="round" />
+      <path d="M10 16 C10 19 12 21 12 21 C12 21 14 19 14 16" stroke={c} strokeWidth="1.8" strokeLinejoin="round" />
+      <path d="M12 23 L12 26" stroke={c} strokeWidth="1.8" strokeLinecap="round" />
+      <path d="M8 22 L8 25" stroke={c} strokeWidth="1.8" strokeLinecap="round" />
+      <path d="M16 22 L16 25" stroke={c} strokeWidth="1.8" strokeLinecap="round" />
+    </g>
+  </svg>
+);
+
+const IconSettings = ({ s = 24, c = "white" }: { s?: number; c?: string }) => (
+  <svg width={s} height={s} viewBox="0 0 24 24" fill="none" style={{ display: "inline-block", verticalAlign: "middle" }}>
+    <path d="M12 15C13.6569 15 15 13.6569 15 12C15 10.3431 13.6569 9 12 9C10.3431 9 9 10.3431 9 12C9 13.6569 10.3431 15 12 15Z" stroke={c} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+    <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1Z" stroke={c} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
   </svg>
 );
 
@@ -868,7 +935,7 @@ function App() {
   const [settingsValStr, setSettingsValStr] = useState("");
 
 
-  const [editJ, setEditJ] = useState<any>(null);
+  const [editJ, setEditJ] = useState<EditTurnoState | null>(null);
   const [showTypeMenu, setShowTypeMenu] = useState(false);
   const [showNewEntryKP, setShowNewEntryKP] = useState(false);
   const [confirmDialog, setConfirmDialog] = useState<{
@@ -997,22 +1064,7 @@ function App() {
     localStorage.setItem(KEY_WEEKS_FROZEN, JSON.stringify(frozenWeeks));
   }, [frozenWeeks]);
 
-  // [DEBUG FASE 2-3] Exponer funciones y estado de semanas en window para inspección.
-  useEffect(() => {
-    (window as any).__taxiDebug = {
-      getWeekStartDate,
-      getWeekId,
-      getWeekRange,
-      getTurnoFechaEfectiva,
-      groupTurnosByWeek,
-      isWeekClosed,
-      calcularTotalesTurnos,
-      history,
-      settings,
-      weekOverrides,
-      frozenWeeks,
-    };
-  }, [history, settings, weekOverrides, frozenWeeks]);
+
 
   // Detección automática de nuevas versiones vía Service Worker.
   // El SW comprueba el manifest periódicamente y nos manda un postMessage
@@ -1045,7 +1097,7 @@ function App() {
 
   const propinas = current.entries.filter((e) => e.type === "propina");
   const datafonos = current.entries.filter((e) => e.type === "datafono");
-  const agencias = current.entries.filter((e) => e.type === "agencia" || e.type === "agencia_bono");
+  const agencias = current.entries.filter((e) => e.type === "agencia_bono");
   const extras = current.entries.filter((e) => e.type === "extra");
   const gasolinas = current.entries.filter((e) => e.type === "gasolina");
   const nulos = current.entries.filter((e) => e.type === "nulo");
@@ -1234,7 +1286,7 @@ function App() {
                 gap: 12,
               }}
             >
-              <span style={{ fontSize: 22, color: current.isPaused ? "#3b82f6" : undefined }}>{hasActive ? "▶" : "🚀"}</span>
+              {hasActive ? <span style={{ fontSize: 22, color: "#3b82f6" }}>▶</span> : <IconRocket s={26} c={G} />}
               {hasActive ? "Continuar Turno" : "Iniciar Turno"}
             </button>
             <button
@@ -1254,7 +1306,7 @@ function App() {
                 gap: 12,
               }}
             >
-              <span style={{ fontSize: 22 }}>📋</span>
+              <IconClipboard s={24} c={P} />
               Turnos
             </button>
             <button
@@ -1274,7 +1326,7 @@ function App() {
                 gap: 12,
               }}
             >
-              <span style={{ fontSize: 22 }}>📊</span>
+              <IconChart s={24} c={A} />
               Contabilidad
             </button>
           </div>
@@ -1296,7 +1348,7 @@ function App() {
             fontSize: 22
           }}
         >
-          ⚙️
+          <IconSettings s={24} c="white" />
         </button>
       </Shell>
     );
@@ -1316,23 +1368,26 @@ function App() {
             <div style={{ fontSize: 48, marginBottom: 12 }}>🚕</div>
             <div style={{ fontSize: 20, fontWeight: 800, color: "white", marginBottom: 4 }}>Mi Turno</div>
             <div style={{ fontSize: 14, color: "rgba(255,255,255,0.4)", marginBottom: 24 }}>Versión {APP_VERSION}</div>
-            <button onClick={checkUpdate} style={{ width: "100%", padding: "16px 0", borderRadius: 16, border: "none", background: "rgba(255,255,255,0.1)", color: "white", fontSize: 16, fontWeight: 700, cursor: "pointer" }}>🔄 Buscar actualizaciones</button>
-            
-            {/* Mensajes de estado sin enlace (Buscando..., Última versión, etc.) */}
+            <button onClick={checkUpdate} style={{ width: "100%", padding: "16px 0", borderRadius: 16, border: "none", background: "rgba(255,255,255,0.1)", color: "white", fontSize: 16, fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 10 }}>
+              <IconRefresh s={20} c={G} /> Buscar actualizaciones
+            </button>
+
             {updateMsg && !downloadUrl && (
               <div style={{ marginTop: 16, fontSize: 14, color: "rgba(255,255,255,0.6)", background: "rgba(0,0,0,0.2)", padding: "12px", borderRadius: 12 }}>
                 {updateMsg}
               </div>
             )}
 
-            {/* El mensaje se convierte en botón de descarga si hay actualización */}
             {updateMsg && downloadUrl && (
               <a
                 href={downloadUrl}
                 target="_blank"
                 rel="noopener noreferrer"
                 style={{
-                  display: "block",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: 10,
                   width: "100%",
                   marginTop: 16,
                   padding: "14px",
@@ -1346,7 +1401,7 @@ function App() {
                   textAlign: "center"
                 }}
               >
-                ⬇️ {updateMsg}
+                <IconDownload s={20} c="#3b82f6" /> {updateMsg}
               </a>
             )}
           </div>
@@ -1371,7 +1426,7 @@ function App() {
           {/* Bloque Total a Descontar (Seguridad + Neón Rojo) */}
           <div style={{ background: "rgba(255,255,255,0.03)", borderRadius: 22, padding: "20px", border: "1px solid rgba(255,255,255,0.07)", marginTop: 16 }}>
             <div style={{ fontSize: 13, fontWeight: 800, color: '#ff6b6b', textTransform: "uppercase", letterSpacing: "1px", marginBottom: 14, display: "flex", alignItems: "center", gap: 9 }}>
-              <IconReceipt s={18} c="#ff6b6b" /> Total a Descontar
+              <IconReceipt s={22} c="#ff6b6b" /> Total a Descontar
             </div>
             <div style={{ fontSize: 13, color: "rgba(255,255,255,0.5)", marginBottom: 16, lineHeight: 1.4 }}>
               Selecciona qué categorías se restan del Total a Dar al jefe.
@@ -1417,7 +1472,7 @@ function App() {
           {/* Bloque Día Libre (Cuadrícula Original + Neón Oro) */}
           <div style={{ background: "rgba(255,255,255,0.03)", borderRadius: 22, padding: "20px", border: "1px solid rgba(255,255,255,0.07)", marginTop: 16 }}>
             <div style={{ fontSize: 13, fontWeight: 800, color: 'oklch(0.85 0.18 85)', textTransform: "uppercase", letterSpacing: "1px", marginBottom: 14, display: "flex", alignItems: "center", gap: 9 }}>
-              <IconHoliday s={18} c="oklch(0.85 0.18 85)" /> Día libre semanal
+              <IconHoliday s={22} c="oklch(0.85 0.18 85)" /> Día libre semanal
             </div>
 
             <div style={{ fontSize: 13, color: "rgba(255,255,255,0.5)", marginBottom: 16, lineHeight: 1.4 }}>
@@ -1582,19 +1637,19 @@ function App() {
     const vP = viewTurno.entries.filter((e: any) => e.type === 'propina').reduce((s: number, e: any) => s + e.amount, 0);
     const vD = viewTurno.entries.filter((e: any) => e.type === 'datafono').reduce((s: number, e: any) => s + e.amount, 0);
     const isToday = viewTurno.date === today();
-    const vA = viewTurno.entries.filter((e: any) => e.type === 'agencia' || e.type === 'agencia_bono').reduce((s: number, e: any) => s + e.amount, 0);
+    const vA = viewTurno.entries.filter((e: any) => e.type === 'agencia_bono').reduce((s: number, e: any) => s + e.amount, 0);
     const vE = viewTurno.entries.filter((e: any) => e.type === 'extra').reduce((s: number, e: any) => s + e.amount, 0);
     const vF = viewTurno.entries.filter((e: any) => e.type === 'gasolina').reduce((s: number, e: any) => s + e.amount, 0);
     const vN = viewTurno.entries.filter((e: any) => e.type === 'nulo').reduce((s: number, e: any) => s + e.amount, 0);
-    
+
     // El taxímetro efectivo ya no incluye los Nulos
     const dineroV = (viewTurno.dinero || 0) - vN;
-    
+
     const kmV = viewTurno.km || 0;
     const cats = [
       { key: 'datafono', label: 'Datáfono', color: P, bg: PBG, icon: <IconCard s={20} c={P} />, total: vD, count: viewTurno.entries.filter((e: any) => e.type === 'datafono').length },
       { key: 'propina', label: 'Propinas', color: G, bg: GBG, icon: <IconCoin s={20} c={G} />, total: vP, count: viewTurno.entries.filter((e: any) => e.type === 'propina').length },
-      { key: 'agencia_bono', label: 'Agencias/Bonos', color: A, bg: ABG, icon: <IconAgency s={20} c={A} />, total: vA, count: viewTurno.entries.filter((e: any) => e.type === 'agencia' || e.type === 'agencia_bono').length },
+      { key: 'agencia_bono', label: 'Agencias/Bonos', color: A, bg: ABG, icon: <IconAgency s={20} c={A} />, total: vA, count: viewTurno.entries.filter((e: any) => e.type === 'agencia_bono').length },
       { key: 'extra', label: 'Extras', color: E, bg: EBG, icon: <IconExtra s={20} c={E} />, total: vE, count: viewTurno.entries.filter((e: any) => e.type === 'extra').length },
       { key: 'gasolina', label: 'Gasolina', color: F, bg: FBG, icon: <IconFuel s={20} c={F} />, total: vF, count: viewTurno.entries.filter((e: any) => e.type === 'gasolina').length },
       { key: 'nulo', label: 'Nulos', color: N, bg: NBG, icon: <IconNulo s={20} c={N} />, total: vN, count: viewTurno.entries.filter((e: any) => e.type === 'nulo').length },
@@ -1650,11 +1705,15 @@ function App() {
             {/* Columna Izquierda: Taxímetro y KM */}
             <div style={{ flex: 1, background: 'rgba(255,255,255,0.03)', borderRadius: 22, padding: '16px', border: '1px solid rgba(255,255,255,0.07)', display: 'flex', flexDirection: 'column', gap: 10 }}>
               <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', textAlign: 'center', background: 'oklch(0.20 0.06 150)', borderRadius: 16, padding: '14px 16px', border: '1px solid oklch(0.60 0.16 150 / 0.35)' }}>
-                <div style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', letterSpacing: '0.6px', marginBottom: 6 }}>Total Taxímetro</div>
+                <div style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', letterSpacing: '0.6px', marginBottom: 6, display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 6 }}>
+                  <IconTaxiSign s={24} c="oklch(0.78 0.18 150)" /> Total Taxímetro
+                </div>
                 <div style={{ fontSize: 22, fontWeight: 900, color: 'oklch(0.78 0.18 150)', letterSpacing: '-0.5px' }}>{fmt(dineroV)}</div>
               </div>
               <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', textAlign: 'center', background: 'oklch(0.19 0.05 220)', borderRadius: 16, padding: '14px 16px', border: '1px solid oklch(0.65 0.14 220 / 0.35)' }}>
-                <div style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', letterSpacing: '0.6px', marginBottom: 6 }}>Total KM</div>
+                <div style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', letterSpacing: '0.6px', marginBottom: 6, display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 6 }}>
+                  <IconRoad s={24} c="oklch(0.80 0.14 220)" /> Total KM
+                </div>
                 <div style={{ fontSize: 22, fontWeight: 900, color: 'oklch(0.80 0.14 220)', letterSpacing: '-0.5px' }}>{kmV.toString().replace('.', ',')} <span style={{ fontSize: 13, fontWeight: 700, opacity: 0.6 }}>KM</span></div>
               </div>
             </div>
@@ -1663,13 +1722,13 @@ function App() {
             <div style={{ flex: 1, background: 'rgba(255,255,255,0.03)', borderRadius: 22, padding: '16px', border: '1px solid rgba(255,255,255,0.07)', display: 'flex', flexDirection: 'column', gap: 10 }}>
               <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', textAlign: 'center', background: 'rgba(255, 180, 0, 0.06)', borderRadius: 16, padding: '14px 16px', border: '1px solid rgba(255, 180, 0, 0.2)' }}>
                 <div style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '0.6px', marginBottom: 6, display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 6 }}>
-                  <span style={{ fontSize: 20 }}>💰</span> Mi Ganancia
+                  <IconMoneyBag s={24} c="oklch(0.85 0.18 85)" /> Mi Ganancia
                 </div>
                 <div style={{ fontSize: 20, fontWeight: 900, color: 'oklch(0.85 0.18 85)', letterSpacing: '-0.5px' }}>{fmt(miGanancia)}</div>
               </div>
               <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', textAlign: 'center', background: 'rgba(0, 180, 255, 0.05)', borderRadius: 16, padding: '14px 16px', border: '1px solid rgba(0, 180, 255, 0.15)' }}>
                 <div style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '0.6px', marginBottom: 6, display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 6 }}>
-                  <span style={{ fontSize: 20 }}>⏱️</span> Tiempo Trabajado
+                  <IconTimer s={24} c="oklch(0.85 0.12 210)" /> Tiempo Trabajado
                 </div>
                 <div style={{ fontSize: 20, fontWeight: 900, color: 'oklch(0.85 0.12 210)', letterSpacing: '-0.5px' }}>{durationStr}</div>
               </div>
@@ -1727,7 +1786,7 @@ function App() {
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                   {entriesWithNotes.map((e: any) => {
-                    const col = e.type === 'propina' ? G : e.type === 'datafono' ? P : e.type === 'agencia' ? A : e.type === 'extra' ? E : e.type === 'gasolina' ? F : N;
+                    const col = e.type === 'propina' ? G : e.type === 'datafono' ? P : e.type === 'agencia_bono' ? A : e.type === 'extra' ? E : e.type === 'gasolina' ? F : N;
                     return (
                       <div key={e.id} style={{ fontSize: 13, background: 'rgba(255,255,255,0.02)', padding: '10px 12px', borderRadius: 12, border: '1px solid rgba(255,255,255,0.04)', display: 'flex', alignItems: 'baseline', gap: 8 }}>
                         <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.25)', fontWeight: 600 }}>{e.time}</span>
@@ -1785,6 +1844,7 @@ function App() {
   // ── EDIT TURNO SCREEN ───────────────────────────────────────
   if (screen === 'editTurno' && editJ) {
     function saveEdit() {
+      if (!editJ) return;
       const finalDinero = editJ.dineroStr !== undefined
         ? parseFloat(editJ.dineroStr.replace(',', '.')) || 0
         : (editJ.dinero || 0);
@@ -1797,29 +1857,29 @@ function App() {
         km: finalKm,
         dineroStr: undefined,
         kmStr: undefined,
-        totalP: editJ.entries.filter((e: any) => e.type === 'propina').reduce((s: number, e: any) => s + e.amount, 0),
-        totalD: editJ.entries.filter((e: any) => e.type === 'datafono').reduce((s: number, e: any) => s + e.amount, 0),
-        totalA: editJ.entries.filter((e: any) => e.type === 'agencia' || e.type === 'agencia_bono').reduce((s: number, e: any) => s + e.amount, 0),
-        totalE: editJ.entries.filter((e: any) => e.type === 'extra').reduce((s: number, e: any) => s + e.amount, 0),
-        totalF: editJ.entries.filter((e: any) => e.type === 'gasolina').reduce((s: number, e: any) => s + e.amount, 0),
-        totalN: editJ.entries.filter((e: any) => e.type === 'nulo').reduce((s: number, e: any) => s + e.amount, 0),
+        totalP: editJ.entries.filter((e: Entry) => e.type === 'propina').reduce((s: number, e: Entry) => s + e.amount, 0),
+        totalD: editJ.entries.filter((e: Entry) => e.type === 'datafono').reduce((s: number, e: Entry) => s + e.amount, 0),
+        totalA: editJ.entries.filter((e: Entry) => e.type === 'agencia_bono').reduce((s: number, e: Entry) => s + e.amount, 0),
+        totalE: editJ.entries.filter((e: Entry) => e.type === 'extra').reduce((s: number, e: Entry) => s + e.amount, 0),
+        totalF: editJ.entries.filter((e: Entry) => e.type === 'gasolina').reduce((s: number, e: Entry) => s + e.amount, 0),
+        totalN: editJ.entries.filter((e: Entry) => e.type === 'nulo').reduce((s: number, e: Entry) => s + e.amount, 0),
       };
-      setHistory((h: any[]) => h.map((j: any) => j.id === updated.id ? updated : j));
-      setViewTurno(updated);
+      setHistory((h: Turno[]) => h.map((j: Turno) => j.id === updated.id ? (updated as Turno) : j));
+      setViewTurno(updated as Turno);
       setEditJ(null);
       setScreen('summary');
     }
     const eDinero = editJ.dineroStr !== undefined ? editJ.dineroStr : (editJ.dinero || 0).toString().replace('.', ',');
     const eKm = editJ.kmStr !== undefined ? editJ.kmStr : (editJ.km || 0).toString().replace('.', ',');
     function kpEdit(v: string) {
-      if (!endField) return;
+      if (!editJ || !endField) return;
       const cur = endField === "dinero" ? eDinero : eKm;
       const key = endField === "dinero" ? "dineroStr" : "kmStr";
       let next = cur;
       if (v === "DEL") next = cur.slice(0, -1);
       else if (v === ",") { if (!cur.includes(",")) next = cur + ","; else return; }
       else { if (cur.replace(",", "").length >= 7) return; next = cur + v; }
-      setEditJ({ ...editJ, [key]: next });
+      setEditJ({ ...editJ, [key]: next } as EditTurnoState);
     }
     return (
       <Shell burst={false}>
@@ -1833,12 +1893,16 @@ function App() {
           <div style={{ display: 'flex', gap: 10, marginBottom: 14 }}>
             <div onClick={() => setEndField("dinero")}
               style={{ flex: 1, background: 'oklch(0.20 0.06 150)', borderRadius: 16, padding: '14px', border: `1.5px solid ${endField === "dinero" ? "oklch(0.78 0.18 150)" : "oklch(0.60 0.16 150 / 0.35)"}`, cursor: "pointer" }}>
-              <div style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', letterSpacing: '0.6px', marginBottom: 8 }}>Total Taxímetro</div>
+              <div style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', letterSpacing: '0.6px', marginBottom: 8, display: "flex", alignItems: "center", gap: 6 }}>
+                <IconTaxiSign s={24} c="oklch(0.78 0.18 150)" /> Total Taxímetro
+              </div>
               <div style={{ color: 'oklch(0.78 0.18 150)', fontSize: 22, fontWeight: 900, minHeight: 28 }}>{eDinero || "0"} €</div>
             </div>
             <div onClick={() => setEndField("km")}
               style={{ flex: 1, background: 'oklch(0.19 0.05 220)', borderRadius: 16, padding: '14px', border: `1.5px solid ${endField === "km" ? "oklch(0.80 0.14 220)" : "oklch(0.65 0.14 220 / 0.35)"}`, cursor: "pointer" }}>
-              <div style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', letterSpacing: '0.6px', marginBottom: 8 }}>Total KM</div>
+              <div style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', letterSpacing: '0.6px', marginBottom: 8, display: "flex", alignItems: "center", gap: 6 }}>
+                <IconRoad s={24} c="oklch(0.80 0.14 220)" /> Total KM
+              </div>
               <div style={{ color: 'oklch(0.80 0.14 220)', fontSize: 22, fontWeight: 900, minHeight: 28 }}>{eKm || "0"} KM</div>
             </div>
           </div>
@@ -1847,10 +1911,10 @@ function App() {
           <div style={{ background: 'rgba(255,255,255,0.03)', borderRadius: 18, padding: '14px', border: '1px solid rgba(255,255,255,0.07)', marginBottom: 14 }}>
             <div style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '0.6px', marginBottom: 10 }}>Entradas</div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-              {editJ.entries.map((e: any) => {
+              {editJ.entries.map((e: Entry) => {
                 const meta = e.type === 'propina' ? { col: G, lbl: 'Propina' }
                   : e.type === 'datafono' ? { col: P, lbl: 'Datáfono' }
-                    : (e.type === 'agencia' || e.type === 'agencia_bono') ? { col: A, lbl: 'Agencia/Bono' }
+                    : (e.type === 'agencia_bono') ? { col: A, lbl: 'Agencia/Bono' }
                       : e.type === 'extra' ? { col: E, lbl: 'Extra' }
                         : e.type === 'gasolina' ? { col: F, lbl: 'Gasolina' }
                           : e.type === 'nota' ? { col: 'white', lbl: 'Nota' }
@@ -1978,16 +2042,16 @@ function App() {
           <div style={{ background: 'rgba(255,255,255,0.04)', borderRadius: 16, padding: '14px 16px', border: '1px solid rgba(255,255,255,0.08)', marginBottom: 14 }}>
             <div style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', letterSpacing: '0.6px', marginBottom: 12 }}>📝 Notas del Turno</div>
 
-            {editJ.entries.filter((e: any) => e.type === 'nota').length === 0 && (
+            {editJ.entries.filter((e: Entry) => e.type === 'nota').length === 0 && (
               <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.3)', fontStyle: 'italic', marginBottom: 12 }}>Sin notas del turno</div>
             )}
 
-            {editJ.entries.filter((e: any) => e.type === 'nota').map((e: any) => (
+            {editJ.entries.filter((e: Entry) => e.type === 'nota').map((e: Entry) => (
               <div key={e.id} style={{ position: 'relative', marginBottom: 12 }}>
                 <span style={{ position: 'absolute', top: 10, left: 10, color: 'rgba(255,255,255,0.3)', fontSize: 11, fontWeight: 600 }}>{e.time}</span>
                 <button
                   onClick={() => {
-                    const newEntries = editJ.entries.filter((ent: any) => ent.id !== e.id);
+                    const newEntries = editJ.entries.filter((ent: Entry) => ent.id !== e.id);
                     setEditJ({ ...editJ, entries: newEntries });
                   }}
                   style={{ position: 'absolute', top: 6, right: 6, background: 'rgba(255,60,60,0.15)', color: '#ff7b7b', border: 'none', borderRadius: 6, width: 24, height: 24, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', zIndex: 10 }}
@@ -1998,7 +2062,7 @@ function App() {
                   rows={1}
                   value={e.note}
                   onChange={(ev) => {
-                    const newEntries = editJ.entries.map((ent: any) =>
+                    const newEntries = editJ.entries.map((ent: Entry) =>
                       ent.id === e.id ? { ...ent, note: ev.target.value } : ent
                     );
                     setEditJ({ ...editJ, entries: newEntries });
@@ -2917,6 +2981,29 @@ function App() {
       { key: 'nulo', label: 'Nulos', color: N, bg: NBG, icon: <IconNulo s={18} c={N} />, total: totales.totalN },
     ];
 
+    // Cálculos agregados de la semana
+    let totalMins = 0;
+    for (const t of turnosSemana) {
+      if (t.startTime && t.endTime) {
+        let mins = getDiffMins(t.startTime, t.endTime);
+        if (t.totalPausedMinutes) mins = Math.max(0, mins - t.totalPausedMinutes);
+        totalMins += mins;
+      }
+    }
+    const hh = Math.floor(totalMins / 60);
+    const mm = totalMins % 60;
+    const durationStr = `${hh}h ${mm}m`;
+
+    const dineroV = (totales.dinero || 0) - (totales.totalN || 0);
+    const miGanancia = (dineroV * (settings["porcentaje.chofer"] / 100)) + (totales.totalP || 0);
+
+    const descD = settings["descontar.datafono"] ? totales.totalD : 0;
+    const descA = settings["descontar.agencia_bono"] ? totales.totalA : 0;
+    const descE = settings["descontar.extra"] ? totales.totalE : 0;
+    const descF = settings["descontar.gasolina"] ? totales.totalF : 0;
+    const totalDescontar = descD + descA + descE + descF;
+    const totalADar = (dineroV * (settings["porcentaje.jefe"] / 100)) - totalDescontar;
+
     return (
       <Shell burst={false}>
         <div style={{ flex: 1, padding: "16px 20px 32px", display: "flex", flexDirection: "column", gap: 14, overflowY: "auto" }}>
@@ -2944,7 +3031,7 @@ function App() {
               padding: "5px 10px", borderRadius: 8,
               letterSpacing: "0.5px", textTransform: "uppercase",
             }}>
-              {entregada ? `✓ Entregada${fechaEntrega ? " · " + fechaEntrega.split("-").reverse().join("/") : ""}` : "Pendiente"}
+              {entregada ? `✓ Entregada${fechaEntrega ? " · " + new Date(fechaEntrega + "T12:00:00").toLocaleDateString("es-ES") : ""}` : "Pendiente"}
             </div>
             {isFrozen && (
               <div style={{
@@ -2959,20 +3046,44 @@ function App() {
             )}
           </div>
 
-          {/* Resumen totales */}
-          <div style={{ background: 'rgba(255,255,255,0.03)', borderRadius: 22, padding: '16px', border: '1px solid rgba(255,255,255,0.07)' }}>
-            <div style={{ fontSize: 11, fontWeight: 700, color: "rgba(255,255,255,0.4)", textTransform: "uppercase", letterSpacing: "0.6px", marginBottom: 12 }}>
-              Resumen de la semana
-            </div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-              <div style={{ background: 'oklch(0.20 0.06 150)', borderRadius: 16, padding: '14px 16px', border: '1px solid oklch(0.60 0.16 150 / 0.35)' }}>
-                <div style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', letterSpacing: '0.6px', marginBottom: 6 }}>Total Taxímetro</div>
+          {/* Contenedor Superior Agrupado (Dos columnas) */}
+          <div style={{ display: 'flex', gap: 10 }}>
+            {/* Columna Izquierda: Taxímetro y KM */}
+            <div style={{ flex: 1, background: 'rgba(255,255,255,0.03)', borderRadius: 22, padding: '16px', border: '1px solid rgba(255,255,255,0.07)', display: 'flex', flexDirection: 'column', gap: 10 }}>
+              <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', textAlign: 'center', background: 'oklch(0.20 0.06 150)', borderRadius: 16, padding: '14px 16px', border: '1px solid oklch(0.60 0.16 150 / 0.35)' }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', letterSpacing: '0.6px', marginBottom: 6, display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 6 }}>
+                  <IconTaxiSign s={24} c="oklch(0.78 0.18 150)" /> Total Taxímetro
+                </div>
                 <div style={{ fontSize: 22, fontWeight: 900, color: 'oklch(0.78 0.18 150)', letterSpacing: '-0.5px' }}>{fmt(totales.dinero)}</div>
               </div>
-              <div style={{ background: 'oklch(0.19 0.05 220)', borderRadius: 16, padding: '14px 16px', border: '1px solid oklch(0.65 0.14 220 / 0.35)' }}>
-                <div style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', letterSpacing: '0.6px', marginBottom: 6 }}>Total KM</div>
+              <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', textAlign: 'center', background: 'oklch(0.19 0.05 220)', borderRadius: 16, padding: '14px 16px', border: '1px solid oklch(0.65 0.14 220 / 0.35)' }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', letterSpacing: '0.6px', marginBottom: 6, display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 6 }}>
+                  <IconRoad s={24} c="oklch(0.80 0.14 220)" /> Total KM
+                </div>
                 <div style={{ fontSize: 22, fontWeight: 900, color: 'oklch(0.80 0.14 220)', letterSpacing: '-0.5px' }}>{(totales.km || 0).toString().replace('.', ',')} <span style={{ fontSize: 13, fontWeight: 700, opacity: 0.6 }}>KM</span></div>
               </div>
+            </div>
+
+            {/* Columna Derecha: Ganancia y Tiempo */}
+            <div style={{ flex: 1, background: 'rgba(255,255,255,0.03)', borderRadius: 22, padding: '16px', border: '1px solid rgba(255,255,255,0.07)', display: 'flex', flexDirection: 'column', gap: 10 }}>
+              <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', textAlign: 'center', background: 'rgba(255, 180, 0, 0.06)', borderRadius: 16, padding: '14px 16px', border: '1px solid rgba(255, 180, 0, 0.2)' }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '0.6px', marginBottom: 6, display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 6 }}>
+                  <IconMoneyBag s={24} c="oklch(0.85 0.18 85)" /> Mi Ganancia
+                </div>
+                <div style={{ fontSize: 20, fontWeight: 900, color: 'oklch(0.85 0.18 85)', letterSpacing: '-0.5px' }}>{fmt(miGanancia)}</div>
+              </div>
+              <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', textAlign: 'center', background: 'rgba(0, 180, 255, 0.05)', borderRadius: 16, padding: '14px 16px', border: '1px solid rgba(0, 180, 255, 0.15)' }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '0.6px', marginBottom: 6, display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 6 }}>
+                  <IconTimer s={24} c="oklch(0.85 0.12 210)" /> Tiempo Trabajado
+                </div>
+                <div style={{ fontSize: 20, fontWeight: 900, color: 'oklch(0.85 0.12 210)', letterSpacing: '-0.5px' }}>{durationStr}</div>
+              </div>
+            </div>
+          </div>
+
+          {/* Categorías */}
+          <div style={{ background: 'rgba(255,255,255,0.03)', borderRadius: 22, padding: '16px', border: '1px solid rgba(255,255,255,0.07)' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
               {cats.map(c => (
                 <div key={c.key} style={{ background: c.bg, borderRadius: 16, padding: '14px 16px', border: `1px solid ${c.color}33` }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8 }}>
@@ -2982,6 +3093,33 @@ function App() {
                   <div style={{ fontSize: 20, fontWeight: 900, color: c.color, letterSpacing: '-0.5px' }}>{fmt(c.total)}</div>
                 </div>
               ))}
+            </div>
+          </div>
+
+          {/* Contenedor Inferior Agrupado: Descontar y Dar */}
+          <div style={{ background: 'rgba(255,255,255,0.03)', borderRadius: 22, padding: '16px', border: '1px solid rgba(255,255,255,0.07)' }}>
+            <div style={{ display: 'flex', gap: 10 }}>
+              {/* Tarjeta: Total a Descontar */}
+              <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', textAlign: 'center', background: 'oklch(0.19 0.06 25)', borderRadius: 16, padding: '14px 16px', border: '1px solid oklch(0.70 0.18 25 / 0.35)' }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', letterSpacing: '0.6px', marginBottom: 6, display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 6 }}>
+                  <IconReceipt s={20} c="oklch(0.70 0.18 25)" />
+                  Total a Descontar
+                </div>
+                <div style={{ fontSize: 20, fontWeight: 900, color: 'oklch(0.70 0.18 25)', letterSpacing: '-0.5px' }}>
+                  {fmt(totalDescontar)}
+                </div>
+              </div>
+
+              {/* Tarjeta: Total a Dar */}
+              <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', textAlign: 'center', background: 'oklch(0.18 0.07 145)', borderRadius: 16, padding: '14px 16px', border: '1px solid oklch(0.68 0.20 145 / 0.35)' }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', letterSpacing: '0.6px', marginBottom: 6, display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 6 }}>
+                  <IconGive s={20} c="oklch(0.68 0.20 145)" />
+                  Total a Dar
+                </div>
+                <div style={{ fontSize: 20, fontWeight: 900, color: 'oklch(0.68 0.20 145)', letterSpacing: '-0.5px' }}>
+                  {fmt(totalADar)}
+                </div>
+              </div>
             </div>
           </div>
 
@@ -3196,8 +3334,8 @@ function App() {
                     <div style={{ fontSize: 13, color: "rgba(255,255,255,0.4)" }}>
                       {j.startDate && j.startDate !== j.date
                         ? (() => {
-                          const startStr = j.startDate.split('-').map(Number).reverse().join('/');
-                          const endStr = j.date.split('-').map(Number).reverse().join('/');
+                          const startStr = new Date(j.startDate + "T12:00:00").toLocaleDateString("es-ES");
+                          const endStr = new Date(j.date + "T12:00:00").toLocaleDateString("es-ES");
                           return `${startStr} ${j.startTime} - ${endStr} ${j.endTime}`;
                         })()
                         : `${j.startTime} - ${j.endTime}`}
@@ -3208,19 +3346,19 @@ function App() {
                   </div>
                   <div style={{ display: "flex", gap: 16, textAlign: "right" }}>
                     <div style={{ display: "flex", flexDirection: "column", gap: 8, justifyContent: "center" }}>
-                      <div style={{ fontSize: 17, fontWeight: 900, color: "oklch(0.78 0.18 150)" }}>
-                        {fmt(j.dinero || 0)}
+                      <div style={{ fontSize: 17, fontWeight: 900, color: "oklch(0.78 0.18 150)", display: "flex", alignItems: "center", gap: 6 }}>
+                        <IconTaxiSign s={18} c="oklch(0.78 0.18 150)" /> {fmt(j.dinero || 0)}
                       </div>
-                      <div style={{ fontSize: 17, fontWeight: 900, color: "oklch(0.80 0.14 220)" }}>
-                        {j.km || 0} KM
+                      <div style={{ fontSize: 17, fontWeight: 900, color: "oklch(0.80 0.14 220)", display: "flex", alignItems: "center", gap: 6 }}>
+                        <IconRoad s={18} c="oklch(0.80 0.14 220)" /> {j.km || 0} KM
                       </div>
                     </div>
                     <div style={{ display: "flex", flexDirection: "column", gap: 8, alignItems: "flex-end", justifyContent: "center" }}>
-                      <div style={{ fontSize: 17, fontWeight: 900, color: "oklch(0.85 0.18 85)" }}>
-                        💰 {fmt(miGanancia)}
+                      <div style={{ fontSize: 17, fontWeight: 900, color: "oklch(0.85 0.18 85)", display: "flex", alignItems: "center", gap: 6 }}>
+                        <IconMoneyBag s={18} c="oklch(0.85 0.18 85)" /> {fmt(miGanancia)}
                       </div>
-                      <div style={{ fontSize: 17, fontWeight: 900, color: "oklch(0.85 0.12 210)" }}>
-                        ⏱️ {durationStr}
+                      <div style={{ fontSize: 17, fontWeight: 900, color: "oklch(0.85 0.12 210)", display: "flex", alignItems: "center", gap: 6 }}>
+                        <IconTimer s={18} c="oklch(0.85 0.12 210)" /> {durationStr}
                       </div>
                     </div>
                   </div>
@@ -3252,7 +3390,7 @@ function App() {
                   ? { col: G, ic: <IconCoin s={17} c={G} />, lbl: "Propina" }
                   : e.type === "datafono"
                     ? { col: P, ic: <IconCard s={17} c={P} />, lbl: "Datáfono" }
-                    : (e.type === "agencia" || e.type === "agencia_bono")
+                    : (e.type === "agencia_bono")
                       ? { col: A, ic: <IconAgency s={17} c={A} />, lbl: "Agencia/Bono" }
                       : e.type === "extra"
                         ? { col: E, ic: <IconExtra s={17} c={E} />, lbl: "Extra" }
@@ -3363,12 +3501,16 @@ function App() {
           <div style={{ display: "flex", gap: 10, marginBottom: 12, flexShrink: 0 }}>
             <div onClick={() => setEndField("dinero")}
               style={{ flex: 1, background: "oklch(0.20 0.06 150)", borderRadius: 16, padding: "14px", border: `1.5px solid ${endField === "dinero" ? "oklch(0.78 0.18 150)" : "oklch(0.60 0.16 150 / 0.35)"}`, cursor: "pointer", transition: "border 0.15s" }}>
-              <div style={{ fontSize: 11, fontWeight: 700, color: "rgba(255,255,255,0.5)", textTransform: "uppercase", letterSpacing: "0.6px", marginBottom: 8 }}>Total Taxímetro</div>
+              <div style={{ fontSize: 11, fontWeight: 700, color: "rgba(255,255,255,0.5)", textTransform: "uppercase", letterSpacing: "0.6px", marginBottom: 8, display: "flex", alignItems: "center", gap: 6 }}>
+                <IconTaxiSign s={24} c="oklch(0.78 0.18 150)" /> Total Taxímetro
+              </div>
               <div style={{ color: "oklch(0.78 0.18 150)", fontSize: 22, fontWeight: 900, letterSpacing: "-0.5px", minHeight: 28 }}>{dineroJ || "0"} €</div>
             </div>
             <div onClick={() => setEndField("km")}
               style={{ flex: 1, background: "oklch(0.19 0.05 220)", borderRadius: 16, padding: "14px", border: `1.5px solid ${endField === "km" ? "oklch(0.80 0.14 220)" : "oklch(0.65 0.14 220 / 0.35)"}`, cursor: "pointer", transition: "border 0.15s" }}>
-              <div style={{ fontSize: 11, fontWeight: 700, color: "rgba(255,255,255,0.5)", textTransform: "uppercase", letterSpacing: "0.6px", marginBottom: 8 }}>Total KM</div>
+              <div style={{ fontSize: 11, fontWeight: 700, color: "rgba(255,255,255,0.5)", textTransform: "uppercase", letterSpacing: "0.6px", marginBottom: 8, display: "flex", alignItems: "center", gap: 6 }}>
+                <IconRoad s={24} c="oklch(0.80 0.14 220)" /> Total KM
+              </div>
               <div style={{ color: "oklch(0.80 0.14 220)", fontSize: 22, fontWeight: 900, letterSpacing: "-0.5px", minHeight: 28 }}>{kmJ || "0"} KM</div>
             </div>
           </div>
@@ -3463,7 +3605,7 @@ function App() {
               <div style={{ marginBottom: 12, display: "flex", flexDirection: "column", gap: 6, flexShrink: 0 }}>
                 <div style={{ fontSize: 11, fontWeight: 700, color: "rgba(255,255,255,0.4)", textTransform: "uppercase", letterSpacing: "0.6px", marginBottom: 2 }}>📌 Notas detalladas</div>
                 {entriesWithNotes.map(e => {
-                  const col = e.type === 'propina' ? G : e.type === 'datafono' ? P : (e.type === 'agencia' || e.type === 'agencia_bono') ? A : e.type === 'extra' ? E : e.type === 'gasolina' ? F : N;
+                  const col = e.type === 'propina' ? G : e.type === 'datafono' ? P : (e.type === 'agencia_bono') ? A : e.type === 'extra' ? E : e.type === 'gasolina' ? F : N;
                   return (
                     <div key={e.id} style={{ fontSize: 13, background: "rgba(255,255,255,0.03)", padding: "10px 12px", borderRadius: 12, border: "1px solid rgba(255,255,255,0.05)", display: "flex", alignItems: "baseline", gap: 8 }}>
                       <span style={{ fontSize: 11, color: "rgba(255,255,255,0.25)", fontWeight: 600 }}>{e.time}</span>
@@ -3833,7 +3975,7 @@ function App() {
                           ic: <IconCard s={17} c={P} />,
                           lbl: "Datáfono",
                         }
-                        : (e.type === "agencia" || e.type === "agencia_bono")
+                        : (e.type === "agencia_bono")
                           ? {
                             col: A,
                             ic: <IconAgency s={17} c={A} />,
@@ -4208,7 +4350,7 @@ function EditEntryDialog({
   const meta: { col: string; lbl: string } =
     entry.type === "propina" ? { col: G, lbl: "Propina" }
       : entry.type === "datafono" ? { col: P, lbl: "Datáfono" }
-        : (entry.type === "agencia" || entry.type === "agencia_bono") ? { col: A, lbl: "Agencia/Bono" }
+        : (entry.type === "agencia_bono") ? { col: A, lbl: "Agencia/Bono" }
           : entry.type === "extra" ? { col: E, lbl: "Extra" }
             : entry.type === "gasolina" ? { col: F, lbl: "Gasolina" }
               : entry.type === "nota" ? { col: "white", lbl: "Nota" }
@@ -4377,7 +4519,17 @@ function EditEntryDialog({
   );
 }
 
-function ConfirmDialog({ text, onConfirm, onCancel, confirmText, confirmBg, confirmColor, confirmBorder }: any) {
+interface ConfirmDialogProps {
+  text: string;
+  onConfirm: () => void;
+  onCancel: () => void;
+  confirmText?: string;
+  confirmBg?: string;
+  confirmColor?: string;
+  confirmBorder?: string;
+}
+
+function ConfirmDialog({ text, onConfirm, onCancel, confirmText, confirmBg, confirmColor, confirmBorder }: ConfirmDialogProps) {
   return (
     <div
       style={{
