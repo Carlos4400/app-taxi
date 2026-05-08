@@ -273,6 +273,88 @@ async function exportHistoryCSV(turnos: Turno[]): Promise<void> {
   URL.revokeObjectURL(url);
 }
 
+function parseCSVLine(text: string): string[] {
+  const result: string[] = [];
+  let current = "";
+  let inQuotes = false;
+  for (let i = 0; i < text.length; i++) {
+    const char = text[i];
+    if (char === '"') {
+      if (inQuotes && text[i + 1] === '"') {
+        current += '"';
+        i++;
+      } else {
+        inQuotes = !inQuotes;
+      }
+    } else if (char === ';' && !inQuotes) {
+      result.push(current);
+      current = "";
+    } else {
+      current += char;
+    }
+  }
+  result.push(current);
+  return result;
+}
+
+function parseCSVToHistory(csvText: string): Turno[] {
+  const lines = csvText.split(/\r?\n/).filter(l => l.trim() !== "");
+  if (lines.length < 2) return [];
+
+  const newTurnosMap = new Map<string, Turno>();
+  let timeBase = Date.now();
+
+  for (let i = 1; i < lines.length; i++) {
+    const cols = parseCSVLine(lines[i]);
+    if (cols.length < 10) continue;
+
+    const [date, startTime, endTime, type, amountStr, note, time, dineroStr, kmStr, notesTurno] = cols;
+
+    const key = `${date}|${startTime}|${endTime}`;
+    if (!newTurnosMap.has(key)) {
+      newTurnosMap.set(key, {
+        id: timeBase++,
+        date,
+        startTime: startTime || null,
+        endTime,
+        entries: [],
+        totalP: 0, totalD: 0, totalA: 0, totalE: 0, totalF: 0, totalN: 0,
+        dinero: parseFloat(dineroStr.replace(",", ".")) || 0,
+        km: parseFloat(kmStr.replace(",", ".")) || 0,
+        notes: notesTurno || "",
+        startDate: date,
+        totalPausedMinutes: 0
+      });
+    }
+
+    const turno = newTurnosMap.get(key)!;
+
+    if (type) {
+      const amount = parseFloat(amountStr.replace(",", ".")) || 0;
+      turno.entries.push({
+        id: timeBase++,
+        type,
+        amount,
+        note: note || "",
+        time
+      });
+
+      if (type === 'propina') turno.totalP += amount;
+      if (type === 'datafono') turno.totalD += amount;
+      if (type === 'agencia_bono') turno.totalA += amount;
+      if (type === 'extra') turno.totalE += amount;
+      if (type === 'gasolina') turno.totalF += amount;
+      if (type === 'nulo') turno.totalN += amount;
+    }
+  }
+
+  return Array.from(newTurnosMap.values()).sort((a, b) => {
+    const dateA = a.startDate || a.date;
+    const dateB = b.startDate || b.date;
+    return dateA < dateB ? 1 : -1;
+  });
+}
+
 function loadCurrent(): CurrentState {
   try {
     const d = JSON.parse(localStorage.getItem(KEY_CURRENT) || "null");
@@ -732,6 +814,14 @@ const IconDownload = ({ s = 20, c = "currentColor" }: { s?: number; c?: string }
     <path d="M12 4V16" stroke={c} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
     <path d="M7 11L12 16L17 11" stroke={c} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
     <path d="M20 20H4" stroke={c} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+  </svg>
+);
+
+const IconUpload = ({ s = 20, c = "currentColor" }: { s?: number; c?: string }) => (
+  <svg width={s} height={s} viewBox="0 0 24 24" fill="none">
+    <path d="M12 20V8" stroke={c} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+    <path d="M7 13L12 8L17 13" stroke={c} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+    <path d="M20 4H4" stroke={c} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
   </svg>
 );
 
@@ -1543,6 +1633,92 @@ function App() {
                 const finSemana = nombres[(settings.diaLibre + 6) % 7];
                 return `Día libre: ${diaLibreTxt} · Semana laboral: ${inicioSemana} → ${finSemana}`;
               })()}
+            </div>
+          </div>
+
+          {/* Bloque Gestión de Datos */}
+          <div style={{ background: "rgba(255,255,255,0.03)", borderRadius: 22, padding: "20px", border: "1px solid rgba(255,255,255,0.07)", marginTop: 16 }}>
+            <div style={{ fontSize: 13, fontWeight: 800, color: 'oklch(0.75 0.16 70)', textTransform: "uppercase", letterSpacing: "1px", marginBottom: 14, display: "flex", alignItems: "center", gap: 9 }}>
+              <IconUpload s={22} c="oklch(0.75 0.16 70)" /> Gestión de Datos
+            </div>
+            
+            <div style={{ fontSize: 13, color: "rgba(255,255,255,0.5)", marginBottom: 16, lineHeight: 1.4 }}>
+              Exporta tu historial actual o importa un archivo CSV para restaurarlo. Atención: la importación reemplazará los datos actuales.
+            </div>
+
+            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+              {history.length > 0 && (
+                <button
+                  onClick={() => exportHistoryCSV(history)}
+                  style={{
+                    width: "100%",
+                    padding: "16px 0",
+                    borderRadius: 16,
+                    border: "1px solid rgba(255,255,255,0.1)",
+                    background: "rgba(255,255,255,0.05)",
+                    color: "white",
+                    fontSize: 15,
+                    fontWeight: 700,
+                    cursor: "pointer",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    gap: 10
+                  }}
+                >
+                  <IconDownload s={20} c="white" /> Exportar Historial (CSV)
+                </button>
+              )}
+
+              <button
+                onClick={() => {
+                  const input = document.createElement('input');
+                  input.type = 'file';
+                  input.accept = '.csv';
+                  input.onchange = (e: any) => {
+                    const file = e.target.files?.[0];
+                    if (!file) return;
+                    const reader = new FileReader();
+                    reader.onload = (evt) => {
+                      const text = evt.target?.result as string;
+                      const parsedTurnos = parseCSVToHistory(text);
+                      if (parsedTurnos.length > 0) {
+                        setConfirmDialog({
+                          text: `¿Seguro que quieres importar ${parsedTurnos.length} turnos? Esto REEMPLAZARÁ tu historial actual de forma irreversible.`,
+                          onConfirm: () => {
+                            setHistory(parsedTurnos);
+                          },
+                          confirmText: "Importar CSV",
+                          confirmBg: "rgba(80,220,140,0.15)",
+                          confirmColor: "#50dc8c",
+                          confirmBorder: "1px solid rgba(80,220,140,0.3)"
+                        });
+                      } else {
+                        alert("No se detectaron turnos válidos en el archivo CSV.");
+                      }
+                    };
+                    reader.readAsText(file, "UTF-8");
+                  };
+                  input.click();
+                }}
+                style={{
+                  width: "100%",
+                  padding: "16px 0",
+                  borderRadius: 16,
+                  border: "none",
+                  background: "rgba(255,255,255,0.1)",
+                  color: "white",
+                  fontSize: 15,
+                  fontWeight: 700,
+                  cursor: "pointer",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: 10
+                }}
+              >
+                <IconUpload s={20} c="white" /> Importar Historial (CSV)
+              </button>
             </div>
           </div>
         </div>
@@ -3269,28 +3445,6 @@ function App() {
             <div style={{ flex: 1, fontSize: 24, fontWeight: 800, color: "white", textAlign: "center" }}>
               Turnos
             </div>
-            {history.length > 0 && (
-              <button
-                onClick={() => exportHistoryCSV(history)}
-                title="Exportar historial a CSV"
-                style={{
-                  background: "rgba(255,255,255,0.07)",
-                  border: "1px solid rgba(255,255,255,0.1)",
-                  borderRadius: 12,
-                  color: "rgba(255,255,255,0.75)",
-                  padding: "8px 14px",
-                  fontSize: 13,
-                  fontWeight: 700,
-                  cursor: "pointer",
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 6,
-                }}
-              >
-                <span style={{ fontSize: 14 }}>⬇</span>
-                CSV
-              </button>
-            )}
           </div>
           {history.length === 0 ? (
             <div style={{ textAlign: "center", color: "rgba(255,255,255,0.3)", marginTop: 40, fontSize: 15 }}>
