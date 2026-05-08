@@ -6,7 +6,7 @@ import { Share } from "@capacitor/share";
 
 const { useState, useEffect } = React;
 
-interface Entry {
+export interface Entry {
   id: number;
   type: string;
   amount: number;
@@ -14,7 +14,7 @@ interface Entry {
   time: string;
 }
 
-interface Turno {
+export interface Turno {
   id: number;
   date: string;
   startTime: string | null;
@@ -98,6 +98,14 @@ interface FrozenWeek {
   entregada: boolean;
   fechaEntrega: string | null;
   numTurnos: number;
+  configCongelada?: {
+    porcentajeJefe: number;
+    porcentajeChofer: number;
+    descDatafono: boolean;
+    descAgencia: boolean;
+    descExtra: boolean;
+    descGasolina: boolean;
+  };
 }
 
 interface AppSettings {
@@ -174,106 +182,7 @@ function csvEscape(value: string | number): string {
   return s;
 }
 
-function buildHistoryCSV(turnos: Turno[]): string {
-  const header = [
-    "fecha",
-    "inicio",
-    "fin",
-    "tipo",
-    "importe",
-    "nota",
-    "hora_entrada",
-    "dinero_total_turno",
-    "km_turno",
-    "notas_turno",
-  ];
-  const rows: string[] = [header.join(";")];
-
-  for (const j of turnos) {
-    if (j.entries.length === 0) {
-      rows.push(
-        [
-          j.date,
-          j.startTime ?? "",
-          j.endTime ?? "",
-          "",
-          "",
-          "",
-          "",
-          (j.dinero ?? 0).toFixed(2).replace(".", ","),
-          (j.km ?? 0).toString().replace(".", ","),
-          j.notes ?? "",
-        ].map(csvEscape).join(";")
-      );
-      continue;
-    }
-    for (const e of j.entries) {
-      rows.push(
-        [
-          j.date,
-          j.startTime ?? "",
-          j.endTime ?? "",
-          e.type,
-          e.amount.toFixed(2).replace(".", ","),
-          e.note ?? "",
-          e.time ?? "",
-          (j.dinero ?? 0).toFixed(2).replace(".", ","),
-          (j.km ?? 0).toString().replace(".", ","),
-          j.notes ?? "",
-        ].map(csvEscape).join(";")
-      );
-    }
-  }
-  // BOM UTF-8 para que Excel reconozca los acentos.
-  return "﻿" + rows.join("\r\n");
-}
-
-async function exportHistoryCSV(turnos: Turno[]): Promise<void> {
-  const csv = buildHistoryCSV(turnos);
-  const filename = `mi-turno-${today()}.csv`;
-
-  // En Capacitor (APK Android) usamos Filesystem + Share porque
-  // el truco <a download> no funciona dentro del WebView nativo.
-  if (Capacitor.isNativePlatform()) {
-    try {
-      const result = await Filesystem.writeFile({
-        path: filename,
-        data: csv,
-        directory: Directory.Documents,
-        encoding: Encoding.UTF8,
-        recursive: true,
-      });
-      try {
-        await Share.share({
-          title: "Historial Mi Turno",
-          text: "Exportación CSV de Turnos",
-          url: result.uri,
-          dialogTitle: "Compartir CSV",
-        });
-      } catch (shareErr) {
-        // Si el usuario cancela o no hay app de compartir, al menos el
-        // archivo ya está guardado en Documents.
-        alert("CSV guardado en Documentos del dispositivo:\n" + filename);
-      }
-    } catch (e) {
-      alert("No se pudo exportar el CSV: " + (e as Error).message);
-    }
-    return;
-  }
-
-  // Navegador (PWA): descarga clásica con <a download>.
-  const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = filename;
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  URL.revokeObjectURL(url);
-}
-
-function parseCSVLine(text: string): string[] {
+export function parseCSVLine(text: string): string[] {
   const result: string[] = [];
   let current = "";
   let inQuotes = false;
@@ -297,7 +206,7 @@ function parseCSVLine(text: string): string[] {
   return result;
 }
 
-function parseCSVToHistory(csvText: string): Turno[] {
+export function parseCSVToHistory(csvText: string): Turno[] {
   const lines = csvText.split(/\r?\n/).filter(l => l.trim() !== "");
   if (lines.length < 2) return [];
 
@@ -355,6 +264,36 @@ function parseCSVToHistory(csvText: string): Turno[] {
   });
 }
 
+function exportBackupJSON() {
+  const backup = {
+    history: localStorage.getItem(KEY_HISTORY),
+    settings: localStorage.getItem(KEY_SETTINGS),
+    current: localStorage.getItem(KEY_CURRENT),
+    weekOverrides: localStorage.getItem(KEY_WEEK_OVERRIDES),
+    weeksFrozen: localStorage.getItem(KEY_WEEKS_FROZEN)
+  };
+  const blob = new Blob([JSON.stringify(backup, null, 2)], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `taxi_backup_${new Date().toISOString().split("T")[0]}.json`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+// Esta función mezcla los turnos seleccionados con los actuales sin duplicar
+export function mergeTurnos(actuales: Turno[], nuevos: Turno[]) {
+  const map = new Map();
+  // Primero metemos los que ya tienes
+  actuales.forEach(t => map.set(`${t.date}|${t.startTime}`, t));
+  // Luego añadimos los nuevos (si coinciden fecha e inicio, el map no se duplica)
+  nuevos.forEach(t => map.set(`${t.date}|${t.startTime}`, t));
+
+  return Array.from(map.values()).sort((a: any, b: any) =>
+    (b.startDate || b.date).localeCompare(a.startDate || a.date)
+  );
+}
+
 function loadCurrent(): CurrentState {
   try {
     const d = JSON.parse(localStorage.getItem(KEY_CURRENT) || "null");
@@ -381,7 +320,7 @@ function loadHistory(): Turno[] {
 // SEMANAS — Funciones lógicas (Fase 2)
 // ============================================================================
 
-function getWeekStartDate(dateStr: string, diaLibre: number): string {
+export function getWeekStartDate(dateStr: string, diaLibre: number): string {
   const d = new Date(dateStr + "T12:00:00");
   const currentDayOfWeek = d.getDay();
   const startDayOfWeek = (diaLibre + 1) % 7;
@@ -391,11 +330,11 @@ function getWeekStartDate(dateStr: string, diaLibre: number): string {
   return d.toISOString().slice(0, 10);
 }
 
-function getWeekId(dateStr: string, diaLibre: number): string {
+export function getWeekId(dateStr: string, diaLibre: number): string {
   return getWeekStartDate(dateStr, diaLibre);
 }
 
-function getWeekRange(weekId: string): { inicio: string; fin: string } {
+export function getWeekRange(weekId: string): { inicio: string; fin: string } {
   const d = new Date(weekId + "T12:00:00");
   const inicio = weekId;
   d.setDate(d.getDate() + 5);
@@ -412,7 +351,7 @@ function getWeekRange(weekId: string): { inicio: string; fin: string } {
  *     distinto → usar date (el turno cuenta para la semana del día de fin)
  *   - En cualquier otro caso → startDate || date
  */
-function getTurnoFechaEfectiva(turno: Turno, diaLibre: number): string {
+export function getTurnoFechaEfectiva(turno: Turno, diaLibre: number): string {
   const fechaInicio = turno.startDate || turno.date;
   if (!fechaInicio) return turno.date;
 
@@ -429,7 +368,7 @@ function getTurnoFechaEfectiva(turno: Turno, diaLibre: number): string {
   return fechaInicio;
 }
 
-function groupTurnosByWeek(turnos: Turno[], diaLibre: number): Map<string, Turno[]> {
+export function groupTurnosByWeek(turnos: Turno[], diaLibre: number): Map<string, Turno[]> {
   const map = new Map<string, Turno[]>();
   const sorted = [...turnos].sort((a, b) => {
     const dateA = getTurnoFechaEfectiva(a, diaLibre);
@@ -452,7 +391,7 @@ function isWeekClosed(weekId: string, hoyISO: string): boolean {
   return hoyISO > fin;
 }
 
-function calcularTotalesTurnos(turnos: Turno[]) {
+export function calcularTotalesTurnos(turnos: Turno[]) {
   let totalP = 0;
   let totalD = 0;
   let totalA = 0;
@@ -831,16 +770,29 @@ const IconUpload = ({ s = 20, c = "currentColor" }: { s?: number; c?: string }) 
 // Icono para Total Descontar (Ticket/Factura)
 const IconReceipt = ({ s = 24, c = "white" }: { s?: number; c?: string }) => (
   <svg width={s} height={s} viewBox="0 0 24 24" fill="none">
-    <path d="M7 21V3C7 2.44772 7.44772 2 8 2H16C16.5523 2 17 2.44772 17 3V21L14.5 19.5L12 21L9.5 19.5L7 21Z" stroke={c} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-    <path d="M10 7H14M10 11H14M10 15H12" stroke={c} strokeWidth="1.8" strokeLinecap="round" />
+    <path d="M4.5 21V3C4.5 2.44772 4.94772 2 5.5 2H18.5C19.0523 2 19.5 2.44772 19.5 3V21L15.75 19.5L12 21L8.25 19.5L4.5 21Z" stroke={c} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+    <path d="M8 7H16M8 11H16M8 15H13" stroke={c} strokeWidth="1.8" strokeLinecap="round" />
   </svg>
 );
 
-const IconGive = ({ s = 24, c = "white" }: { s?: number; c?: string }) => (
+const IconGive = ({ s = 26, c = "white" }: { s?: number; c?: string }) => (
   <svg width={s} height={s} viewBox="0 0 24 24" fill="none">
-    <path d="M8 10V8C8 6.89543 8.89543 6 10 6H14C15.1046 6 16 6.89543 16 8V10" stroke={c} strokeWidth="1.8" strokeLinecap="round" />
-    <path d="M5 10H19C20.1046 10 21 10.8954 21 12V18C21 19.6569 19.6569 21 18 21H6C4.34315 21 3 19.6569 3 18V12C3 10.8954 3.89543 10 5 10Z" stroke={c} strokeWidth="1.8" strokeLinejoin="round" />
-    <circle cx="12" cy="15.5" r="2" stroke={c} strokeWidth="1.8" />
+    {/* Asa del maletín (subida de y=6 a y=4 para ganar altura) */}
+    <path d="M8 8V5.5C8 4.67 8.67 4 9.5 4H14.5C15.33 4 16 4.67 16 5.5V8" stroke={c} strokeWidth="1.8" strokeLinecap="round" />
+    {/* Cuerpo del maletín (ampliado 2px más ancho y alto, empezando en y=8 en lugar de 10) */}
+    <path d="M4.5 8H19.5C20.6 8 21.5 8.9 21.5 10V18.5C21.5 19.9 20.4 21 19 21H5C3.6 21 2.5 19.9 2.5 18.5V10C2.5 8.9 3.4 8 4.5 8Z" stroke={c} strokeWidth="1.8" strokeLinejoin="round" />
+    {/* Símbolo del euro con Outfit font, de tamaño 11, perfectamente centrado */}
+    <text
+      x="12"
+      y="18.2"
+      textAnchor="middle"
+      fill={c}
+      fontSize="11"
+      fontWeight="700"
+      fontFamily="Outfit, sans-serif"
+    >
+      €
+    </text>
   </svg>
 );
 
@@ -1006,6 +958,10 @@ function Burst() {
 function App() {
   const [current, setCurrent] = useState<CurrentState>(loadCurrent);
   const [history, setHistory] = useState<Turno[]>(loadHistory);
+  const [showBackupMenu, setShowBackupMenu] = useState(false);
+  const [pendingImport, setPendingImport] = useState<Turno[]>([]); // Para la selección de turnos
+  const [isSelectingTurnos, setIsSelectingTurnos] = useState(false);
+  const [selectedTurnosIds, setSelectedTurnosIds] = useState<number[]>([]);
   const [screen, setScreen] = useState("home");
   const [burst, setBurst] = useState(false);
   const [viewTurno, setViewTurno] = useState<Turno | null>(null);
@@ -1136,6 +1092,33 @@ function App() {
       }));
     }
     setEditEntry(null);
+  }
+
+  function exportSelectedTurnosJSON() {
+    if (selectedTurnosIds.length === 0) {
+      alert("No has seleccionado ningún turno.");
+      return;
+    }
+
+    // Filtramos el historial para quedarnos solo con los seleccionados
+    const turnosAExportar = history.filter(t => selectedTurnosIds.includes(t.id));
+
+    // Creamos un paquete JSON solo con esos turnos (sin ajustes, para no sobreescribir configuraciones en otro móvil)
+    const backup = {
+      history: JSON.stringify(turnosAExportar)
+    };
+
+    const blob = new Blob([JSON.stringify(backup, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `taxi_turnos_seleccionados_${new Date().toISOString().split("T")[0]}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+
+    // Salimos del modo selección tras exportar
+    setIsSelectingTurnos(false);
+    setSelectedTurnosIds([]);
   }
 
   useEffect(() => {
@@ -1310,6 +1293,21 @@ function App() {
       cursor: "pointer",
       marginTop: 10,
     },
+    backupSubBtn: {
+      width: "100%",
+      padding: "14px 18px",
+      borderRadius: 16,
+      border: "1px solid rgba(255,255,255,0.05)",
+      background: "rgba(255,255,255,0.05)",
+      color: "rgba(255,255,255,0.8)",
+      fontSize: 14,
+      fontWeight: 600,
+      cursor: "pointer",
+      display: "flex",
+      alignItems: "center",
+      gap: 12,
+      textAlign: "left" as const
+    },
   };
 
   if (screen === "home") {
@@ -1343,7 +1341,7 @@ function App() {
             <div
               style={{
                 fontSize: 15,
-                color: "rgba(255,255,255,0.35)",
+                color: "rgba(255,255,255,0.5)",
                 marginTop: 10,
                 textTransform: "none",
               }}
@@ -1447,14 +1445,14 @@ function App() {
   if (screen === "settings") {
     return (
       <Shell burst={false}>
-        <div style={{ flex: 1, padding: "16px 20px", display: "flex", flexDirection: "column", overflowY: "auto" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 32 }}>
+        <div style={{ flex: 1, padding: "16px 20px", display: "flex", flexDirection: "column", gap: 16, overflowY: "auto" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 16 }}>
             <button style={S.iconBtn} onClick={() => { setScreen("home"); setUpdateMsg(""); setDownloadUrl(""); }}><IconBack /></button>
             <div style={{ fontSize: 24, fontWeight: 800, color: "white" }}>Ajustes de Usuario</div>
           </div>
 
           {/* Bloque App Info */}
-          <div style={{ background: "rgba(255,255,255,0.03)", borderRadius: 20, padding: 24, border: "1px solid rgba(255,255,255,0.07)", textAlign: "center", marginBottom: 16 }}>
+          <div style={{ background: "rgba(255,255,255,0.03)", borderRadius: 20, padding: 24, border: "1px solid rgba(255,255,255,0.07)", textAlign: "center" }}>
             <div style={{ fontSize: 48, marginBottom: 12 }}>🚕</div>
             <div style={{ fontSize: 20, fontWeight: 800, color: "white", marginBottom: 4 }}>Mi Turno</div>
             <div style={{ fontSize: 14, color: "rgba(255,255,255,0.4)", marginBottom: 24 }}>Versión {APP_VERSION}</div>
@@ -1497,7 +1495,7 @@ function App() {
           </div>
 
           {/* Bloque Porcentajes */}
-          <div style={{ background: "rgba(255,255,255,0.03)", borderRadius: 22, padding: "20px", border: "1px solid rgba(255,255,255,0.07)", marginBottom: 16 }}>
+          <div style={{ background: "rgba(255,255,255,0.03)", borderRadius: 22, padding: "20px", border: "1px solid rgba(255,255,255,0.07)" }}>
             <div style={{ fontSize: 12, fontWeight: 800, color: G, textTransform: "uppercase", letterSpacing: "1px", marginBottom: 14, display: "flex", alignItems: "center", gap: 8 }}>
               <IconPercent s={22} c={G} /> Reparto de Porcentajes
             </div>
@@ -1514,7 +1512,7 @@ function App() {
           </div>
 
           {/* Bloque Total a Descontar (Seguridad + Neón Rojo) */}
-          <div style={{ background: "rgba(255,255,255,0.03)", borderRadius: 22, padding: "20px", border: "1px solid rgba(255,255,255,0.07)", marginTop: 16 }}>
+          <div style={{ background: "rgba(255,255,255,0.03)", borderRadius: 22, padding: "20px", border: "1px solid rgba(255,255,255,0.07)" }}>
             <div style={{ fontSize: 13, fontWeight: 800, color: '#ff6b6b', textTransform: "uppercase", letterSpacing: "1px", marginBottom: 14, display: "flex", alignItems: "center", gap: 9 }}>
               <IconReceipt s={22} c="#ff6b6b" /> Total a Descontar
             </div>
@@ -1560,7 +1558,7 @@ function App() {
           </div>
 
           {/* Bloque Día Libre (Cuadrícula Original + Neón Oro) */}
-          <div style={{ background: "rgba(255,255,255,0.03)", borderRadius: 22, padding: "20px", border: "1px solid rgba(255,255,255,0.07)", marginTop: 16 }}>
+          <div style={{ background: "rgba(255,255,255,0.03)", borderRadius: 22, padding: "20px", border: "1px solid rgba(255,255,255,0.07)" }}>
             <div style={{ fontSize: 13, fontWeight: 800, color: 'oklch(0.85 0.18 85)', textTransform: "uppercase", letterSpacing: "1px", marginBottom: 14, display: "flex", alignItems: "center", gap: 9 }}>
               <IconHoliday s={22} c="oklch(0.85 0.18 85)" /> Día libre semanal
             </div>
@@ -1587,21 +1585,12 @@ function App() {
                       if (selected) return;
                       const nombres = ["Domingo", "Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado"];
                       setConfirmDialog({
-                        text: `¿Cambiar tu día libre a ${nombres[d.idx]}? Las semanas anteriores quedarán congeladas tal y como están.`,
+                        text: `¿Cambiar tu día libre a ${nombres[d.idx]}?`,
                         onConfirm: () => {
-                          const fechaCambio = today();
-                          const nuevosFrozen = freezeOldWeeks(
-                            history,
-                            settings.diaLibre,
-                            fechaCambio,
-                            frozenWeeks,
-                            weekOverrides
-                          );
-                          setFrozenWeeks(nuevosFrozen);
                           setSettings({
                             ...settings,
                             diaLibre: d.idx,
-                            diaLibreDesde: fechaCambio,
+                            diaLibreDesde: today(),
                           });
                           setConfirmDialog(null);
                         },
@@ -1625,7 +1614,7 @@ function App() {
               })}
             </div>
 
-            <div style={{ textAlign: 'center', fontSize: 12, color: 'rgba(255,255,255,0.35)', fontWeight: 600 }}>
+            <div style={{ textAlign: 'center', fontSize: 12, color: "rgba(255,255,255,0.5)", fontWeight: 600 }}>
               {(() => {
                 const nombres = ["Domingo", "Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado"];
                 const diaLibreTxt = nombres[settings.diaLibre];
@@ -1636,95 +1625,148 @@ function App() {
             </div>
           </div>
 
-          {/* Bloque Gestión de Datos */}
-          <div style={{ background: "rgba(255,255,255,0.03)", borderRadius: 22, padding: "20px", border: "1px solid rgba(255,255,255,0.07)", marginTop: 16 }}>
-            <div style={{ fontSize: 13, fontWeight: 800, color: 'oklch(0.75 0.16 70)', textTransform: "uppercase", letterSpacing: "1px", marginBottom: 14, display: "flex", alignItems: "center", gap: 9 }}>
-              <IconUpload s={22} c="oklch(0.75 0.16 70)" /> Gestión de Datos
-            </div>
-            
-            <div style={{ fontSize: 13, color: "rgba(255,255,255,0.5)", marginBottom: 16, lineHeight: 1.4 }}>
-              Exporta tu historial actual o importa un archivo CSV para restaurarlo. Atención: la importación reemplazará los datos actuales.
+          {/* Botón Independiente: Añadir Turno (Importar) */}
+          <button
+            id="btn_import_turno_fusion"
+            onClick={() => {
+              const input = document.createElement('input');
+              input.type = 'file';
+              input.accept = '.json, .csv';
+              input.onchange = (e: any) => {
+                const file = e.target.files?.[0];
+                if (!file) return;
+                const reader = new FileReader();
+                reader.onload = (evt) => {
+                  let nuevosTurnos: Turno[] = [];
+                  const text = evt.target?.result as string;
+                  try {
+                    if (file.name.endsWith('.json')) {
+                      const backup = JSON.parse(text);
+                      nuevosTurnos = JSON.parse(backup.history || "[]");
+                    } else {
+                      nuevosTurnos = parseCSVToHistory(text);
+                    }
+                    if (nuevosTurnos.length > 0) {
+                      setConfirmDialog({
+                        text: `Se han detectado ${nuevosTurnos.length} turnos en el archivo. ¿Quieres añadirlos a tu historial actual?`,
+                        onConfirm: () => {
+                          const merged = mergeTurnos(history, nuevosTurnos);
+                          setHistory(merged);
+                          localStorage.setItem(KEY_HISTORY, JSON.stringify(merged));
+                          alert("Turnos añadidos correctamente");
+                        },
+                        confirmText: "Añadir todos",
+                        confirmBg: "rgba(80,220,140,0.15)",
+                        confirmColor: "#50dc8c",
+                        confirmBorder: "1px solid rgba(80,220,140,0.3)"
+                      });
+                    }
+                  } catch (e) {
+                    alert("Error al procesar el archivo.");
+                  }
+                };
+                reader.readAsText(file);
+              };
+              input.click();
+            }}
+            style={{
+              width: "100%",
+              background: "rgba(255,255,255,0.03)",
+              borderRadius: 22,
+              padding: "16px 20px",
+              border: "1px solid rgba(255,255,255,0.07)",
+              display: "flex",
+              alignItems: "center",
+              gap: 12,
+              cursor: "pointer",
+              color: "white",
+              textAlign: "left",
+              outline: "none"
+            }}
+          >
+            <IconUpload s={22} c="#50dc8c" />
+            <span style={{ fontSize: 16, fontWeight: 700 }}>Añadir Turno</span>
+          </button>
+
+          {/* Menú Desplegable: Gestión de Backup */}
+          <div>
+            <div
+              onClick={() => setShowBackupMenu(!showBackupMenu)}
+              style={{
+                background: "rgba(255,255,255,0.03)",
+                borderRadius: 22,
+                padding: "16px 20px",
+                border: "1px solid rgba(255,255,255,0.07)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                cursor: "pointer"
+              }}
+            >
+              <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                <IconDownload s={22} c="oklch(0.75 0.16 70)" />
+                <span style={{ fontSize: 16, fontWeight: 700, color: "white" }}>Copia de Seguridad</span>
+              </div>
+              <span style={{
+                color: "rgba(255,255,255,0.5)",
+                transform: showBackupMenu ? "rotate(180deg)" : "rotate(0deg)",
+                transition: "transform 0.2s"
+              }}>▼</span>
             </div>
 
-            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-              {history.length > 0 && (
-                <button
-                  onClick={() => exportHistoryCSV(history)}
-                  style={{
-                    width: "100%",
-                    padding: "16px 0",
-                    borderRadius: 16,
-                    border: "1px solid rgba(255,255,255,0.1)",
-                    background: "rgba(255,255,255,0.05)",
-                    color: "white",
-                    fontSize: 15,
-                    fontWeight: 700,
-                    cursor: "pointer",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    gap: 10
-                  }}
-                >
-                  <IconDownload s={20} c="white" /> Exportar Historial (CSV)
+            {showBackupMenu && (
+              <div style={{
+                marginTop: 8,
+                padding: "0 4px",
+                display: "flex",
+                flexDirection: "column",
+                gap: 8
+              }}>
+                <button onClick={exportBackupJSON} style={S.backupSubBtn}>
+                  <IconDownload s={18} c="white" /> Exportar todo a JSON
                 </button>
-              )}
 
-              <button
-                onClick={() => {
-                  const input = document.createElement('input');
-                  input.type = 'file';
-                  input.accept = '.csv, text/csv, application/vnd.ms-excel, text/plain, */*';
-                  input.onchange = (e: any) => {
-                    const file = e.target.files?.[0];
-                    if (!file) return;
-                    const reader = new FileReader();
-                    reader.onload = (evt) => {
-                      const text = evt.target?.result as string;
-                      const parsedTurnos = parseCSVToHistory(text);
-                      if (parsedTurnos.length > 0) {
+                <button
+                  onClick={() => {
+                    const input = document.createElement('input');
+                    input.type = 'file';
+                    input.accept = '.json';
+                    input.onchange = (e: any) => {
+                      const file = e.target.files?.[0];
+                      if (!file) return;
+                      const reader = new FileReader();
+                      reader.onload = (evt) => {
+                        const backup = JSON.parse(evt.target?.result as string);
                         setConfirmDialog({
-                          text: `¿Seguro que quieres importar ${parsedTurnos.length} turnos? Esto REEMPLAZARÁ tu historial actual de forma irreversible.`,
+                          text: "RESTAURAR TOTAL: Esto borrará tus datos actuales y pondrá los del archivo. ¿Continuar?",
                           onConfirm: () => {
-                            setHistory(parsedTurnos);
-                          },
-                          confirmText: "Importar CSV",
-                          confirmBg: "rgba(80,220,140,0.15)",
-                          confirmColor: "#50dc8c",
-                          confirmBorder: "1px solid rgba(80,220,140,0.3)"
+                            if (backup.history) localStorage.setItem(KEY_HISTORY, backup.history);
+                            if (backup.settings) localStorage.setItem(KEY_SETTINGS, backup.settings);
+                            if (backup.current) localStorage.setItem(KEY_CURRENT, backup.current);
+                            if (backup.weekOverrides) localStorage.setItem(KEY_WEEK_OVERRIDES, backup.weekOverrides);
+                            if (backup.weeksFrozen) localStorage.setItem(KEY_WEEKS_FROZEN, backup.weeksFrozen);
+                            window.location.reload();
+                          }
                         });
-                      } else {
-                        alert("No se detectaron turnos válidos en el archivo CSV.");
-                      }
+                      };
+                      reader.readAsText(file);
                     };
-                    reader.readAsText(file, "UTF-8");
-                  };
-                  input.click();
-                }}
-                style={{
-                  width: "100%",
-                  padding: "16px 0",
-                  borderRadius: 16,
-                  border: "none",
-                  background: "rgba(255,255,255,0.1)",
-                  color: "white",
-                  fontSize: 15,
-                  fontWeight: 700,
-                  cursor: "pointer",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  gap: 10
-                }}
-              >
-                <IconUpload s={20} c="white" /> Importar Historial (CSV)
-              </button>
-            </div>
+                    input.click();
+                  }}
+                  style={S.backupSubBtn}
+                >
+                  <span style={{ fontSize: 16 }}>⚠️</span> Restaurar copia completa
+                </button>
+              </div>
+            )}
           </div>
         </div>
 
         {activeSettingsField && (
           <div
+            role="dialog"
+            aria-modal="true"
+            aria-label="Configuración"
             onClick={() => setActiveSettingsField(null)}
             style={{
               position: "fixed",
@@ -1761,7 +1803,7 @@ function App() {
               </div>
               <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8 }}>
                 {["1", "2", "3", "4", "5", "6", "7", "8", "9", "DEL", "0", ","].map((k) => (
-                  <button key={k}
+                  <button key={k} aria-label={k === "DEL" ? "Borrar" : k === "," ? "Coma decimal" : k}
                     onClick={() => {
                       let next = settingsValStr;
                       if (k === "DEL") next = next.slice(0, -1);
@@ -1827,7 +1869,7 @@ function App() {
       { key: 'propina', label: 'Propinas', color: G, bg: GBG, icon: <IconCoin s={20} c={G} />, total: vP, count: viewTurno.entries.filter((e: any) => e.type === 'propina').length },
       { key: 'agencia_bono', label: 'Agencias/Bonos', color: A, bg: ABG, icon: <IconAgency s={20} c={A} />, total: vA, count: viewTurno.entries.filter((e: any) => e.type === 'agencia_bono').length },
       { key: 'extra', label: 'Extras', color: E, bg: EBG, icon: <IconExtra s={20} c={E} />, total: vE, count: viewTurno.entries.filter((e: any) => e.type === 'extra').length },
-      { key: 'gasolina', label: 'Gasolina', color: F, bg: FBG, icon: <IconFuel s={20} c={F} />, total: vF, count: viewTurno.entries.filter((e: any) => e.type === 'gasolina').length },
+      { key: 'gasolina', label: 'Gasolina', color: F, bg: FBG, icon: <IconFuel s={22} c={F} />, total: vF, count: viewTurno.entries.filter((e: any) => e.type === 'gasolina').length },
       { key: 'nulo', label: 'Nulos', color: N, bg: NBG, icon: <IconNulo s={20} c={N} />, total: vN, count: viewTurno.entries.filter((e: any) => e.type === 'nulo').length },
     ];
 
@@ -1862,7 +1904,7 @@ function App() {
             <button style={S.iconBtn} onClick={() => { setScreen(isToday ? 'home' : 'PantallaTurnos'); setViewTurno(null); }}><IconBack /></button>
             <div style={{ flex: 1 }}>
               <div style={{ fontSize: 20, fontWeight: 800, color: 'white' }}>Resumen del Turno</div>
-              <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.3)', textTransform: 'none', marginTop: 1 }}>
+              <div style={{ fontSize: 13, color: "rgba(255,255,255,0.5)", textTransform: 'none', marginTop: 1 }}>
                 {viewTurno.startDate && viewTurno.startDate !== viewTurno.date
                   ? <>{fmtDate(viewTurno.startDate)} {viewTurno.startTime} – {fmtDate(viewTurno.date)} {viewTurno.endTime}</>
                   : <>{fmtDate(viewTurno.date)} · {viewTurno.startTime} – {viewTurno.endTime}</>}
@@ -1880,31 +1922,31 @@ function App() {
           <div style={{ display: 'flex', gap: 10 }}>
             {/* Columna Izquierda: Taxímetro y KM */}
             <div style={{ flex: 1, background: 'rgba(255,255,255,0.03)', borderRadius: 22, padding: '16px', border: '1px solid rgba(255,255,255,0.07)', display: 'flex', flexDirection: 'column', gap: 10 }}>
-              <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', textAlign: 'center', background: 'oklch(0.20 0.06 150)', borderRadius: 16, padding: '14px 16px', border: '1px solid oklch(0.60 0.16 150 / 0.35)' }}>
-                <div style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', letterSpacing: '0.6px', marginBottom: 6, display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 6 }}>
-                  <IconTaxiSign s={24} c="oklch(0.78 0.18 150)" /> Total Taxímetro
+              <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', textAlign: 'center', background: 'rgba(255, 180, 0, 0.06)', borderRadius: 16, padding: '14px 8px', border: '1px solid rgba(255, 180, 0, 0.2)' }}>
+                <div style={{ fontSize: 10, fontWeight: 700, color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', letterSpacing: '0.3px', marginBottom: 6, display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 4, whiteSpace: 'nowrap' }}>
+                  <IconTaxiSign s={28} c="oklch(0.85 0.18 85)" /> Total Taxímetro
                 </div>
-                <div style={{ fontSize: 22, fontWeight: 900, color: 'oklch(0.78 0.18 150)', letterSpacing: '-0.5px' }}>{fmt(dineroV)}</div>
+                <div style={{ fontSize: 20, fontWeight: 900, color: 'oklch(0.85 0.18 85)', letterSpacing: '-0.5px' }}>{fmt(dineroV)}</div>
               </div>
-              <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', textAlign: 'center', background: 'oklch(0.19 0.05 220)', borderRadius: 16, padding: '14px 16px', border: '1px solid oklch(0.65 0.14 220 / 0.35)' }}>
-                <div style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', letterSpacing: '0.6px', marginBottom: 6, display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 6 }}>
+              <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', textAlign: 'center', background: 'oklch(0.19 0.05 220)', borderRadius: 16, padding: '14px 8px', border: '1px solid oklch(0.65 0.14 220 / 0.35)' }}>
+                <div style={{ fontSize: 10, fontWeight: 700, color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', letterSpacing: '0.3px', marginBottom: 6, display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 4, whiteSpace: 'nowrap' }}>
                   <IconRoad s={24} c="oklch(0.80 0.14 220)" /> Total KM
                 </div>
-                <div style={{ fontSize: 22, fontWeight: 900, color: 'oklch(0.80 0.14 220)', letterSpacing: '-0.5px' }}>{kmV.toString().replace('.', ',')} <span style={{ fontSize: 13, fontWeight: 700, opacity: 0.6 }}>KM</span></div>
+                <div style={{ fontSize: 20, fontWeight: 900, color: 'oklch(0.80 0.14 220)', letterSpacing: '-0.5px' }}>{kmV.toString().replace('.', ',')} <span style={{ fontSize: 13, fontWeight: 700, opacity: 0.6 }}>KM</span></div>
               </div>
             </div>
 
             {/* Columna Derecha: Ganancia y Tiempo */}
             <div style={{ flex: 1, background: 'rgba(255,255,255,0.03)', borderRadius: 22, padding: '16px', border: '1px solid rgba(255,255,255,0.07)', display: 'flex', flexDirection: 'column', gap: 10 }}>
-              <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', textAlign: 'center', background: 'rgba(255, 180, 0, 0.06)', borderRadius: 16, padding: '14px 16px', border: '1px solid rgba(255, 180, 0, 0.2)' }}>
-                <div style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '0.6px', marginBottom: 6, display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 6 }}>
-                  <IconMoneyBag s={24} c="oklch(0.85 0.18 85)" /> Mi Ganancia
+              <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', textAlign: 'center', background: 'oklch(0.20 0.06 150)', borderRadius: 16, padding: '14px 8px', border: '1px solid oklch(0.60 0.16 150 / 0.35)' }}>
+                <div style={{ fontSize: 10, fontWeight: 700, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '0.3px', marginBottom: 6, display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 4, whiteSpace: 'nowrap' }}>
+                  <IconMoneyBag s={26} c="oklch(0.78 0.18 150)" /> Mi Ganancia
                 </div>
-                <div style={{ fontSize: 20, fontWeight: 900, color: 'oklch(0.85 0.18 85)', letterSpacing: '-0.5px' }}>{fmt(miGanancia)}</div>
+                <div style={{ fontSize: 20, fontWeight: 900, color: 'oklch(0.78 0.18 150)', letterSpacing: '-0.5px' }}>{fmt(miGanancia)}</div>
               </div>
-              <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', textAlign: 'center', background: 'rgba(0, 180, 255, 0.05)', borderRadius: 16, padding: '14px 16px', border: '1px solid rgba(0, 180, 255, 0.15)' }}>
-                <div style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '0.6px', marginBottom: 6, display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 6 }}>
-                  <IconTimer s={24} c="oklch(0.85 0.12 210)" /> Tiempo Trabajado
+              <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', textAlign: 'center', background: 'rgba(0, 180, 255, 0.05)', borderRadius: 16, padding: '14px 8px', border: '1px solid rgba(0, 180, 255, 0.15)' }}>
+                <div style={{ fontSize: 10, fontWeight: 700, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '0.3px', marginBottom: 6, display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 4, whiteSpace: 'nowrap' }}>
+                  <IconTimer s={26} c="oklch(0.85 0.12 210)" /> Tiempo Trabajado
                 </div>
                 <div style={{ fontSize: 20, fontWeight: 900, color: 'oklch(0.85 0.12 210)', letterSpacing: '-0.5px' }}>{durationStr}</div>
               </div>
@@ -1921,7 +1963,7 @@ function App() {
                     <span style={{ fontSize: 12, fontWeight: 700, color: 'rgba(255,255,255,0.5)' }}>{c.label}</span>
                   </div>
                   <div style={{ fontSize: 20, fontWeight: 900, color: c.color, letterSpacing: '-0.5px' }}>{fmt(c.total)}</div>
-                  <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.25)', marginTop: 3 }}>{c.count} {c.count === 1 ? 'entrada' : 'entradas'}</div>
+                  <div style={{ fontSize: 11, color: "rgba(255,255,255,0.5)", marginTop: 3 }}>{c.count} {c.count === 1 ? 'entrada' : 'entradas'}</div>
                 </div>
               ))}
             </div>
@@ -1931,7 +1973,7 @@ function App() {
               if (generalNotes.length === 0 && !viewTurno.notes) {
                 return (
                   <div style={{ marginTop: 16, paddingTop: 14, borderTop: '1px solid rgba(255,255,255,0.06)', textAlign: 'center' }}>
-                    <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.2)', fontStyle: 'italic' }}>Sin notas del turno</div>
+                    <div style={{ fontSize: 12, color: "rgba(255,255,255,0.5)", fontStyle: 'italic' }}>Sin notas del turno</div>
                   </div>
                 );
               }
@@ -1941,7 +1983,7 @@ function App() {
                   <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                     {generalNotes.map((e: any) => (
                       <div key={e.id} style={{ color: "rgba(255,255,255,0.9)", fontSize: 13, lineHeight: 1.4, background: "rgba(255,255,255,0.02)", padding: "8px 10px", borderRadius: 8, overflowWrap: "anywhere" }}>
-                        <span style={{ color: "rgba(255,255,255,0.3)", fontSize: 11, marginRight: 6, fontWeight: 600 }}>{e.time}</span>
+                        <span style={{ color: "rgba(255,255,255,0.5)", fontSize: 11, marginRight: 6, fontWeight: 600 }}>{e.time}</span>
                         {e.note}
                       </div>
                     ))}
@@ -1965,10 +2007,10 @@ function App() {
                     const col = e.type === 'propina' ? G : e.type === 'datafono' ? P : e.type === 'agencia_bono' ? A : e.type === 'extra' ? E : e.type === 'gasolina' ? F : N;
                     return (
                       <div key={e.id} style={{ fontSize: 13, background: 'rgba(255,255,255,0.02)', padding: '10px 12px', borderRadius: 12, border: '1px solid rgba(255,255,255,0.04)', display: 'flex', alignItems: 'baseline', gap: 8 }}>
-                        <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.25)', fontWeight: 600 }}>{e.time}</span>
+                        <span style={{ fontSize: 11, color: "rgba(255,255,255,0.5)", fontWeight: 600 }}>{e.time}</span>
                         <span style={{ fontWeight: 900, color: col, fontSize: 10, textTransform: 'uppercase', minWidth: 60 }}>{e.type}</span>
                         <span style={{ color: 'rgba(255,255,255,0.85)', lineHeight: 1.4 }}>{e.note}</span>
-                        <span style={{ marginLeft: 'auto', fontSize: 11, color: 'rgba(255,255,255,0.2)', fontWeight: 600 }}>{fmt(e.amount)}</span>
+                        <span style={{ marginLeft: 'auto', fontSize: 11, color: "rgba(255,255,255,0.5)", fontWeight: 600 }}>{fmt(e.amount)}</span>
                       </div>
                     );
                   })}
@@ -1984,7 +2026,7 @@ function App() {
               {/* Tarjeta: Total a Descontar */}
               <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', textAlign: 'center', background: 'oklch(0.19 0.06 25)', borderRadius: 16, padding: '14px 16px', border: '1px solid oklch(0.70 0.18 25 / 0.35)' }}>
                 <div style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', letterSpacing: '0.6px', marginBottom: 6, display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 6 }}>
-                  <IconReceipt s={20} c="oklch(0.70 0.18 25)" />
+                  <IconReceipt s={24} c="oklch(0.70 0.18 25)" />
                   Total a Descontar
                 </div>
                 <div style={{ fontSize: 20, fontWeight: 900, color: 'oklch(0.70 0.18 25)', letterSpacing: '-0.5px' }}>
@@ -1995,7 +2037,7 @@ function App() {
               {/* Tarjeta: Total a Dar */}
               <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', textAlign: 'center', background: 'oklch(0.18 0.07 145)', borderRadius: 16, padding: '14px 16px', border: '1px solid oklch(0.68 0.20 145 / 0.35)' }}>
                 <div style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', letterSpacing: '0.6px', marginBottom: 6, display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 6 }}>
-                  <IconGive s={20} c="oklch(0.68 0.20 145)" />
+                  <IconGive s={26} c="oklch(0.68 0.20 145)" />
                   Total a Dar
                 </div>
                 <div style={{ fontSize: 20, fontWeight: 900, color: 'oklch(0.68 0.20 145)', letterSpacing: '-0.5px' }}>
@@ -2045,16 +2087,21 @@ function App() {
       setEditJ(null);
       setScreen('summary');
     }
-    const eDinero = editJ.dineroStr !== undefined ? editJ.dineroStr : (editJ.dinero || 0).toString().replace('.', ',');
-    const eKm = editJ.kmStr !== undefined ? editJ.kmStr : (editJ.km || 0).toString().replace('.', ',');
+    const eDinero = editJ.dineroStr !== undefined ? editJ.dineroStr : (editJ.dinero ? editJ.dinero.toString().replace('.', ',') : "");
+    const eKm = editJ.kmStr !== undefined ? editJ.kmStr : (editJ.km ? editJ.km.toString().replace('.', ',') : "");
     function kpEdit(v: string) {
       if (!editJ || !endField) return;
       const cur = endField === "dinero" ? eDinero : eKm;
       const key = endField === "dinero" ? "dineroStr" : "kmStr";
       let next = cur;
-      if (v === "DEL") next = cur.slice(0, -1);
-      else if (v === ",") { if (!cur.includes(",")) next = cur + ","; else return; }
-      else { if (cur.replace(",", "").length >= 7) return; next = cur + v; }
+      if (v === "DEL") {
+        next = cur.slice(0, -1);
+      } else if (v === ",") {
+        if (!cur.includes(",")) next = cur + ","; else return;
+      } else {
+        if (cur.replace(",", "").length >= 7) return;
+        next = cur + v;
+      }
       setEditJ({ ...editJ, [key]: next } as EditTurnoState);
     }
     return (
@@ -2065,21 +2112,49 @@ function App() {
             <span style={{ fontSize: 20, fontWeight: 700, color: 'white' }}>Editar Turno</span>
           </div>
 
-          {/* Dinero / KM (clickables) */}
+          {/* Dinero / KM (clickables - centrados y sin ceros) */}
           <div style={{ display: 'flex', gap: 10, marginBottom: 14 }}>
             <div onClick={() => setEndField("dinero")}
-              style={{ flex: 1, background: 'oklch(0.20 0.06 150)', borderRadius: 16, padding: '14px', border: `1.5px solid ${endField === "dinero" ? "oklch(0.78 0.18 150)" : "oklch(0.60 0.16 150 / 0.35)"}`, cursor: "pointer" }}>
-              <div style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', letterSpacing: '0.6px', marginBottom: 8, display: "flex", alignItems: "center", gap: 6 }}>
-                <IconTaxiSign s={24} c="oklch(0.78 0.18 150)" /> Total Taxímetro
+              style={{
+                flex: 1,
+                background: 'rgba(255, 180, 0, 0.06)', // Fondo Oro suave
+                borderRadius: 16,
+                padding: "14px",
+                border: `1.5px solid ${endField === "dinero" ? "oklch(0.85 0.18 85)" : "rgba(255, 180, 0, 0.2)"}`,
+                cursor: "pointer",
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+                justifyContent: "center",
+                textAlign: "center"
+              }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', letterSpacing: '0.6px', marginBottom: 8, display: "flex", alignItems: "center", gap: 6, justifyContent: "center" }}>
+                <IconTaxiSign s={28} c="oklch(0.85 0.18 85)" /> Total Taxímetro
               </div>
-              <div style={{ color: 'oklch(0.78 0.18 150)', fontSize: 22, fontWeight: 900, minHeight: 28 }}>{eDinero || "0"} €</div>
+              <div style={{ color: 'oklch(0.85 0.18 85)', fontSize: 20, fontWeight: 900, minHeight: 28 }}>
+                {eDinero ? `${eDinero} €` : "€"}
+              </div>
             </div>
             <div onClick={() => setEndField("km")}
-              style={{ flex: 1, background: 'oklch(0.19 0.05 220)', borderRadius: 16, padding: '14px', border: `1.5px solid ${endField === "km" ? "oklch(0.80 0.14 220)" : "oklch(0.65 0.14 220 / 0.35)"}`, cursor: "pointer" }}>
-              <div style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', letterSpacing: '0.6px', marginBottom: 8, display: "flex", alignItems: "center", gap: 6 }}>
+              style={{
+                flex: 1,
+                background: 'oklch(0.19 0.05 220)',
+                borderRadius: 16,
+                padding: "14px",
+                border: `1.5px solid ${endField === "km" ? "oklch(0.80 0.14 220)" : "oklch(0.65 0.14 220 / 0.35)"}`,
+                cursor: "pointer",
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+                justifyContent: "center",
+                textAlign: "center"
+              }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', letterSpacing: '0.6px', marginBottom: 8, display: "flex", alignItems: "center", gap: 6, justifyContent: "center" }}>
                 <IconRoad s={24} c="oklch(0.80 0.14 220)" /> Total KM
               </div>
-              <div style={{ color: 'oklch(0.80 0.14 220)', fontSize: 22, fontWeight: 900, minHeight: 28 }}>{eKm || "0"} KM</div>
+              <div style={{ color: 'oklch(0.80 0.14 220)', fontSize: 20, fontWeight: 900, minHeight: 28 }}>
+                {eKm ? `${eKm} KM` : "KM"}
+              </div>
             </div>
           </div>
 
@@ -2099,7 +2174,7 @@ function App() {
                   <div key={e.id} style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'rgba(0,0,0,0.2)', borderRadius: 10, padding: '8px 12px' }}>
                     <span style={{ fontSize: 13, fontWeight: 600, color: meta.col, minWidth: 60 }}>{meta.lbl}</span>
                     <span style={{ fontSize: 15, fontWeight: 700, color: 'white' }}>{e.type === 'nota' ? '' : fmt(e.amount)}</span>
-                    <div style={{ flex: 1, textAlign: 'right', fontSize: 12, color: 'rgba(255,255,255,0.3)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', paddingRight: 8 }}>
+                    <div style={{ flex: 1, textAlign: 'right', fontSize: 12, color: "rgba(255,255,255,0.5)", whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', paddingRight: 8 }}>
                       {e.note}
                     </div>
                     <button onClick={() => openEditEntry(e)}
@@ -2109,12 +2184,12 @@ function App() {
                   </div>
                 );
               })}
-              {editJ.entries.length === 0 && <div style={{ textAlign: 'center', color: 'rgba(255,255,255,0.2)', fontSize: 13, padding: '10px 0' }}>Sin entradas</div>}
+              {editJ.entries.length === 0 && <div style={{ textAlign: 'center', color: "rgba(255,255,255,0.5)", fontSize: 13, padding: '10px 0' }}>Sin entradas</div>}
             </div>
 
             {/* Formulario para añadir nueva entrada */}
             <div style={{ marginTop: 14, paddingTop: 14, borderTop: '1px solid rgba(255,255,255,0.06)' }}>
-              <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.3)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 8 }}>+ Añadir entrada olvidada</div>
+              <div style={{ fontSize: 10, color: "rgba(255,255,255,0.5)", textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 8 }}>+ Añadir entrada olvidada</div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                 <div style={{ display: 'flex', gap: 6 }}>
 
@@ -2155,7 +2230,7 @@ function App() {
                     onClick={() => { setShowNewEntryKP(!showNewEntryKP); setShowTypeMenu(false); }}
                     style={{ flex: 1, minWidth: 60, background: 'rgba(0,0,0,0.3)', border: `1px solid ${showNewEntryKP ? (editJ.newType ? ({ datafono: P, propina: G, agencia_bono: A, extra: E, gasolina: F, nulo: N } as any)[editJ.newType] : 'white') : 'rgba(255,255,255,0.1)'}`, borderRadius: 8, padding: '8px 10px', display: 'flex', alignItems: 'center', cursor: 'pointer', position: 'relative', zIndex: showNewEntryKP ? 100 : 'auto' }}
                   >
-                    {editJ.newAmount ? <span style={{ color: 'white', fontSize: 14, fontWeight: 700 }}>{editJ.newAmount}</span> : <span style={{ color: 'rgba(255,255,255,0.3)', fontSize: 14 }}>0,00</span>}
+                    {editJ.newAmount ? <span style={{ color: 'white', fontSize: 14, fontWeight: 700 }}>{editJ.newAmount}</span> : <span style={{ color: "rgba(255,255,255,0.5)", fontSize: 14 }}>0,00</span>}
                   </div>
 
                   <button
@@ -2189,7 +2264,7 @@ function App() {
                     <div onClick={() => setShowNewEntryKP(false)} style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 98 }} />
                     <div style={{ position: 'relative', zIndex: 99, display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 6, marginTop: 4, marginBottom: 4, animation: 'fadeUp 0.2s ease' }}>
                       {["1", "2", "3", "4", "5", "6", "7", "8", "9", "DEL", "0", ","].map((k) => (
-                        <button key={k} onClick={(e) => {
+                        <button key={k} aria-label={k === "DEL" ? "Borrar" : k === "," ? "Coma decimal" : k} onClick={(e) => {
                           e.preventDefault();
                           let cur = editJ.newAmount || '';
                           if (k === "DEL") { setEditJ({ ...editJ, newAmount: cur.slice(0, -1) }); return; }
@@ -2219,12 +2294,12 @@ function App() {
             <div style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', letterSpacing: '0.6px', marginBottom: 12 }}>📝 Notas del Turno</div>
 
             {editJ.entries.filter((e: Entry) => e.type === 'nota').length === 0 && (
-              <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.3)', fontStyle: 'italic', marginBottom: 12 }}>Sin notas del turno</div>
+              <div style={{ fontSize: 13, color: "rgba(255,255,255,0.5)", fontStyle: 'italic', marginBottom: 12 }}>Sin notas del turno</div>
             )}
 
             {editJ.entries.filter((e: Entry) => e.type === 'nota').map((e: Entry) => (
               <div key={e.id} style={{ position: 'relative', marginBottom: 12 }}>
-                <span style={{ position: 'absolute', top: 10, left: 10, color: 'rgba(255,255,255,0.3)', fontSize: 11, fontWeight: 600 }}>{e.time}</span>
+                <span style={{ position: 'absolute', top: 10, left: 10, color: "rgba(255,255,255,0.5)", fontSize: 11, fontWeight: 600 }}>{e.time}</span>
                 <button
                   onClick={() => {
                     const newEntries = editJ.entries.filter((ent: Entry) => ent.id !== e.id);
@@ -2357,6 +2432,9 @@ function App() {
         {/* Teclado in-app para Dinero / KM en Editar Turno */}
         {endField && (
           <div
+            role="dialog"
+            aria-modal="true"
+            aria-label="Teclado numérico"
             onClick={() => setEndField(null)}
             style={{
               position: "fixed",
@@ -2393,7 +2471,7 @@ function App() {
               </div>
               <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8 }}>
                 {["1", "2", "3", "4", "5", "6", "7", "8", "9", "DEL", "0", ","].map((k) => (
-                  <button key={k} onClick={() => kpEdit(k)}
+                  <button key={k} aria-label={k === "DEL" ? "Borrar" : k === "," ? "Coma decimal" : k} onClick={() => kpEdit(k)}
                     style={{ ...S.keyBtn, padding: "20px 0", background: "rgba(255,255,255,0.05)", color: "white", fontSize: 22, fontWeight: 700 }}>
                     {k === "DEL" ? <IconDel /> : k}
                   </button>
@@ -2491,7 +2569,7 @@ function App() {
           />
           <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8, flexShrink: 0 }}>
             {["1", "2", "3", "4", "5", "6", "7", "8", "9", "DEL", "0", ","].map((k) => (
-              <button key={k} onClick={() => kpS(k)} style={{ ...S.keyBtn, padding: "20px 0", background: "rgba(255,255,255,0.05)", color: "white", fontSize: 22, fontWeight: 700 }}>
+              <button key={k} aria-label={k === "DEL" ? "Borrar" : k === "," ? "Coma decimal" : k} onClick={() => kpS(k)} style={{ ...S.keyBtn, padding: "20px 0", background: "rgba(255,255,255,0.05)", color: "white", fontSize: 22, fontWeight: 700 }}>
                 {k === "DEL" ? <IconDel /> : k}
               </button>
             ))}
@@ -2656,7 +2734,7 @@ function App() {
 
           <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8, flexShrink: 0 }}>
             {["1", "2", "3", "4", "5", "6", "7", "8", "9", "DEL", "0", ","].map((k) => (
-              <button key={k} onClick={() => kpAdd(k)} style={{ ...S.keyBtn, padding: "20px 0", background: "rgba(255,255,255,0.05)", fontSize: 22, fontWeight: 700, color: "white" }}>
+              <button key={k} aria-label={k === "DEL" ? "Borrar" : k === "," ? "Coma decimal" : k} onClick={() => kpAdd(k)} style={{ ...S.keyBtn, padding: "20px 0", background: "rgba(255,255,255,0.05)", fontSize: 22, fontWeight: 700, color: "white" }}>
                 {k === "DEL" ? <IconDel /> : k}
               </button>
             ))}
@@ -2837,7 +2915,7 @@ function App() {
                   background: `linear-gradient(135deg, ${ABG} 0%, oklch(0.20 0.05 200) 100%)`,
                   borderRadius: 22,
                   padding: 20,
-                  border: `2px solid ${A}`,
+                  border: `2px solid ${G}`,
                   cursor: "pointer",
                   boxShadow: "0 8px 24px rgba(0,0,0,0.3)",
                 }}
@@ -2897,17 +2975,16 @@ function App() {
                     letterSpacing: "0.6px",
                     fontWeight: 700,
                   }}>
-                    Acumulado parcial
+                    ACUMULADO TOTAL
                   </span>
                 </div>
-                <div style={{
-                  fontSize: 32,
-                  fontWeight: 900,
-                  color: A,
-                  letterSpacing: "-1px",
-                  marginTop: 4,
-                }}>
-                  {fmt(totales.dinero)}
+                <div style={{ display: "flex", gap: 16, marginTop: 4 }}>
+                  <div style={{ fontSize: 32, fontWeight: 900, color: "oklch(0.85 0.18 85)", letterSpacing: "-1px" }}>
+                    {fmt(totales.dinero)}
+                  </div>
+                  <div style={{ fontSize: 32, fontWeight: 900, color: "oklch(0.80 0.14 220)", letterSpacing: "-1px" }}>
+                    {(totales.km || 0).toString().replace('.', ',')} <span style={{ fontSize: 16, fontWeight: 700, opacity: 0.6 }}>KM</span>
+                  </div>
                 </div>
               </div>
             );
@@ -2917,7 +2994,7 @@ function App() {
           {grupos2.length === 0 && !enCurso && (
             <div style={{
               textAlign: "center",
-              color: "rgba(255,255,255,0.3)",
+              color: "rgba(255,255,255,0.5)",
               marginTop: 40,
               fontSize: 15,
             }}>
@@ -2962,7 +3039,9 @@ function App() {
                       borderRadius: 16,
                       padding: 16,
                       cursor: "pointer",
-                      border: "1px solid rgba(255,255,255,0.08)",
+                      border: (entregada || sem.isFrozen)
+                        ? "1px solid rgba(59, 130, 246, 0.5)"
+                        : "1px solid rgba(255,255,255,0.08)",
                       display: "flex",
                       justifyContent: "space-between",
                       alignItems: "center",
@@ -3032,6 +3111,9 @@ function App() {
         {/* Diálogo de empate 3-3 */}
         {pendingTie && (
           <div
+            role="dialog"
+            aria-modal="true"
+            aria-label="Confirmación de empate 3-3"
             style={{
               position: "fixed",
               top: 0, left: 0, right: 0, bottom: 0,
@@ -3153,7 +3235,7 @@ function App() {
       { key: 'propina', label: 'Propinas', color: G, bg: GBG, icon: <IconCoin s={18} c={G} />, total: totales.totalP },
       { key: 'agencia_bono', label: 'Agencias/Bonos', color: A, bg: ABG, icon: <IconAgency s={18} c={A} />, total: totales.totalA },
       { key: 'extra', label: 'Extras', color: E, bg: EBG, icon: <IconExtra s={18} c={E} />, total: totales.totalE },
-      { key: 'gasolina', label: 'Gasolina', color: F, bg: FBG, icon: <IconFuel s={18} c={F} />, total: totales.totalF },
+      { key: 'gasolina', label: 'Gasolina', color: F, bg: FBG, icon: <IconFuel s={22} c={F} />, total: totales.totalF },
       { key: 'nulo', label: 'Nulos', color: N, bg: NBG, icon: <IconNulo s={18} c={N} />, total: totales.totalN },
     ];
 
@@ -3171,14 +3253,27 @@ function App() {
     const durationStr = `${hh}h ${mm}m`;
 
     const dineroV = (totales.dinero || 0) - (totales.totalN || 0);
-    const miGanancia = (dineroV * (settings["porcentaje.chofer"] / 100)) + (totales.totalP || 0);
 
-    const descD = settings["descontar.datafono"] ? totales.totalD : 0;
-    const descA = settings["descontar.agencia_bono"] ? totales.totalA : 0;
-    const descE = settings["descontar.extra"] ? totales.totalE : 0;
-    const descF = settings["descontar.gasolina"] ? totales.totalF : 0;
+    // Determinar qué configuración usar
+    const config = isFrozen && frozen?.configCongelada
+      ? frozen.configCongelada
+      : {
+        porcentajeJefe: settings["porcentaje.jefe"],
+        porcentajeChofer: settings["porcentaje.chofer"],
+        descDatafono: settings["descontar.datafono"],
+        descAgencia: settings["descontar.agencia_bono"],
+        descExtra: settings["descontar.extra"],
+        descGasolina: settings["descontar.gasolina"],
+      };
+
+    const miGanancia = (dineroV * (config.porcentajeChofer / 100)) + (totales.totalP || 0);
+
+    const descD = config.descDatafono ? totales.totalD : 0;
+    const descA = config.descAgencia ? totales.totalA : 0;
+    const descE = config.descExtra ? totales.totalE : 0;
+    const descF = config.descGasolina ? totales.totalF : 0;
     const totalDescontar = descD + descA + descE + descF;
-    const totalADar = (dineroV * (settings["porcentaje.jefe"] / 100)) - totalDescontar;
+    const totalADar = (dineroV * (config.porcentajeJefe / 100)) - totalDescontar;
 
     return (
       <Shell burst={false}>
@@ -3226,31 +3321,31 @@ function App() {
           <div style={{ display: 'flex', gap: 10 }}>
             {/* Columna Izquierda: Taxímetro y KM */}
             <div style={{ flex: 1, background: 'rgba(255,255,255,0.03)', borderRadius: 22, padding: '16px', border: '1px solid rgba(255,255,255,0.07)', display: 'flex', flexDirection: 'column', gap: 10 }}>
-              <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', textAlign: 'center', background: 'oklch(0.20 0.06 150)', borderRadius: 16, padding: '14px 16px', border: '1px solid oklch(0.60 0.16 150 / 0.35)' }}>
-                <div style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', letterSpacing: '0.6px', marginBottom: 6, display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 6 }}>
-                  <IconTaxiSign s={24} c="oklch(0.78 0.18 150)" /> Total Taxímetro
+              <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', textAlign: 'center', background: 'rgba(255, 180, 0, 0.06)', borderRadius: 16, padding: '14px 8px', border: '1px solid rgba(255, 180, 0, 0.2)' }}>
+                <div style={{ fontSize: 10, fontWeight: 700, color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', letterSpacing: '0.3px', marginBottom: 6, display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 4, whiteSpace: 'nowrap' }}>
+                  <IconTaxiSign s={28} c="oklch(0.85 0.18 85)" /> Total Taxímetro
                 </div>
-                <div style={{ fontSize: 22, fontWeight: 900, color: 'oklch(0.78 0.18 150)', letterSpacing: '-0.5px' }}>{fmt(totales.dinero)}</div>
+                <div style={{ fontSize: 20, fontWeight: 900, color: 'oklch(0.85 0.18 85)', letterSpacing: '-0.5px' }}>{fmt(totales.dinero)}</div>
               </div>
-              <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', textAlign: 'center', background: 'oklch(0.19 0.05 220)', borderRadius: 16, padding: '14px 16px', border: '1px solid oklch(0.65 0.14 220 / 0.35)' }}>
-                <div style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', letterSpacing: '0.6px', marginBottom: 6, display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 6 }}>
+              <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', textAlign: 'center', background: 'oklch(0.19 0.05 220)', borderRadius: 16, padding: '14px 8px', border: '1px solid oklch(0.65 0.14 220 / 0.35)' }}>
+                <div style={{ fontSize: 10, fontWeight: 700, color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', letterSpacing: '0.3px', marginBottom: 6, display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 4, whiteSpace: 'nowrap' }}>
                   <IconRoad s={24} c="oklch(0.80 0.14 220)" /> Total KM
                 </div>
-                <div style={{ fontSize: 22, fontWeight: 900, color: 'oklch(0.80 0.14 220)', letterSpacing: '-0.5px' }}>{(totales.km || 0).toString().replace('.', ',')} <span style={{ fontSize: 13, fontWeight: 700, opacity: 0.6 }}>KM</span></div>
+                <div style={{ fontSize: 20, fontWeight: 900, color: 'oklch(0.80 0.14 220)', letterSpacing: '-0.5px' }}>{(totales.km || 0).toString().replace('.', ',')} <span style={{ fontSize: 13, fontWeight: 700, opacity: 0.6 }}>KM</span></div>
               </div>
             </div>
 
             {/* Columna Derecha: Ganancia y Tiempo */}
             <div style={{ flex: 1, background: 'rgba(255,255,255,0.03)', borderRadius: 22, padding: '16px', border: '1px solid rgba(255,255,255,0.07)', display: 'flex', flexDirection: 'column', gap: 10 }}>
-              <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', textAlign: 'center', background: 'rgba(255, 180, 0, 0.06)', borderRadius: 16, padding: '14px 16px', border: '1px solid rgba(255, 180, 0, 0.2)' }}>
-                <div style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '0.6px', marginBottom: 6, display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 6 }}>
-                  <IconMoneyBag s={24} c="oklch(0.85 0.18 85)" /> Mi Ganancia
+              <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', textAlign: 'center', background: 'oklch(0.20 0.06 150)', borderRadius: 16, padding: '14px 8px', border: '1px solid oklch(0.60 0.16 150 / 0.35)' }}>
+                <div style={{ fontSize: 10, fontWeight: 700, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '0.3px', marginBottom: 6, display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 4, whiteSpace: 'nowrap' }}>
+                  <IconMoneyBag s={26} c="oklch(0.78 0.18 150)" /> Mi Ganancia
                 </div>
-                <div style={{ fontSize: 20, fontWeight: 900, color: 'oklch(0.85 0.18 85)', letterSpacing: '-0.5px' }}>{fmt(miGanancia)}</div>
+                <div style={{ fontSize: 20, fontWeight: 900, color: 'oklch(0.78 0.18 150)', letterSpacing: '-0.5px' }}>{fmt(miGanancia)}</div>
               </div>
-              <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', textAlign: 'center', background: 'rgba(0, 180, 255, 0.05)', borderRadius: 16, padding: '14px 16px', border: '1px solid rgba(0, 180, 255, 0.15)' }}>
-                <div style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '0.6px', marginBottom: 6, display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 6 }}>
-                  <IconTimer s={24} c="oklch(0.85 0.12 210)" /> Tiempo Trabajado
+              <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', textAlign: 'center', background: 'rgba(0, 180, 255, 0.05)', borderRadius: 16, padding: '14px 8px', border: '1px solid rgba(0, 180, 255, 0.15)' }}>
+                <div style={{ fontSize: 10, fontWeight: 700, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '0.3px', marginBottom: 6, display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 4, whiteSpace: 'nowrap' }}>
+                  <IconTimer s={26} c="oklch(0.85 0.12 210)" /> Tiempo Trabajado
                 </div>
                 <div style={{ fontSize: 20, fontWeight: 900, color: 'oklch(0.85 0.12 210)', letterSpacing: '-0.5px' }}>{durationStr}</div>
               </div>
@@ -3278,7 +3373,7 @@ function App() {
               {/* Tarjeta: Total a Descontar */}
               <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', textAlign: 'center', background: 'oklch(0.19 0.06 25)', borderRadius: 16, padding: '14px 16px', border: '1px solid oklch(0.70 0.18 25 / 0.35)' }}>
                 <div style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', letterSpacing: '0.6px', marginBottom: 6, display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 6 }}>
-                  <IconReceipt s={20} c="oklch(0.70 0.18 25)" />
+                  <IconReceipt s={24} c="oklch(0.70 0.18 25)" />
                   Total a Descontar
                 </div>
                 <div style={{ fontSize: 20, fontWeight: 900, color: 'oklch(0.70 0.18 25)', letterSpacing: '-0.5px' }}>
@@ -3289,7 +3384,7 @@ function App() {
               {/* Tarjeta: Total a Dar */}
               <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', textAlign: 'center', background: 'oklch(0.18 0.07 145)', borderRadius: 16, padding: '14px 16px', border: '1px solid oklch(0.68 0.20 145 / 0.35)' }}>
                 <div style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', letterSpacing: '0.6px', marginBottom: 6, display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 6 }}>
-                  <IconGive s={20} c="oklch(0.68 0.20 145)" />
+                  <IconGive s={26} c="oklch(0.68 0.20 145)" />
                   Total a Dar
                 </div>
                 <div style={{ fontSize: 20, fontWeight: 900, color: 'oklch(0.68 0.20 145)', letterSpacing: '-0.5px' }}>
@@ -3363,37 +3458,76 @@ function App() {
               Turnos de la semana ({turnosSemana.length})
             </div>
             {turnosSemana.length === 0 ? (
-              <div style={{ textAlign: "center", color: "rgba(255,255,255,0.3)", fontSize: 13, fontStyle: "italic", padding: "20px 0" }}>
+              <div style={{ textAlign: "center", color: "rgba(255,255,255,0.5)", fontSize: 13, fontStyle: "italic", padding: "20px 0" }}>
                 Sin turnos en esta semana todavía
               </div>
             ) : (
               <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                {[...turnosSemana].sort((a, b) => (getTurnoFechaEfectiva(a, settings.diaLibre) < getTurnoFechaEfectiva(b, settings.diaLibre) ? 1 : -1)).map((t) => (
-                  <div
-                    key={t.id}
-                    onClick={() => { setViewTurno(t); setScreen("summary"); }}
-                    style={{
-                      background: "rgba(255,255,255,0.04)",
-                      borderRadius: 12,
-                      padding: "12px 14px",
-                      cursor: "pointer",
-                      border: "1px solid rgba(255,255,255,0.05)",
-                      display: "flex",
-                      justifyContent: "space-between",
-                      alignItems: "center",
-                    }}
-                  >
-                    <div>
-                      <div style={{ fontSize: 14, fontWeight: 700, color: "white" }}>{fmtDate(t.date)}</div>
-                      <div style={{ fontSize: 11, color: "rgba(255,255,255,0.4)", marginTop: 2 }}>
-                        {t.startTime} - {t.endTime} · {t.entries.length} {t.entries.length === 1 ? "entrada" : "entradas"}
+                {[...turnosSemana].sort((a, b) => (getTurnoFechaEfectiva(a, settings.diaLibre) < getTurnoFechaEfectiva(b, settings.diaLibre) ? 1 : -1)).map((t) => {
+                  let durationStr = "0h 0m";
+                  if (t.startTime && t.endTime) {
+                    let totalMins = getDiffMins(t.startTime, t.endTime);
+                    if (t.totalPausedMinutes) {
+                      totalMins = Math.max(0, totalMins - t.totalPausedMinutes);
+                    }
+                    const hh = Math.floor(totalMins / 60);
+                    const mm = totalMins % 60;
+                    durationStr = `${hh}h ${mm}m`;
+                  }
+                  const choferPercent = config.porcentajeChofer || 0;
+                  const miGanancia = ((t.dinero || 0) * (choferPercent / 100)) + (t.totalP || 0);
+
+                  return (
+                    <div
+                      key={t.id}
+                      onClick={() => { setViewTurno(t); setScreen("summary"); }}
+                      style={{
+                        background: "rgba(255,255,255,0.04)",
+                        borderRadius: 12,
+                        padding: "12px 14px",
+                        cursor: "pointer",
+                        border: "1px solid rgba(255,255,255,0.05)",
+                        display: "flex",
+                        justifyContent: "space-between",
+                        alignItems: "center",
+                      }}
+                    >
+                      <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                        <div style={{ fontWeight: 700, color: "white", fontSize: 16 }}>{fmtDate(t.date)}</div>
+                        <div style={{ fontSize: 13, color: "rgba(255,255,255,0.4)" }}>
+                          {t.startDate && t.startDate !== t.date
+                            ? (() => {
+                              const startStr = new Date(t.startDate + "T12:00:00").toLocaleDateString("es-ES");
+                              const endStr = new Date(t.date + "T12:00:00").toLocaleDateString("es-ES");
+                              return `${startStr} ${t.startTime} - ${endStr} ${t.endTime}`;
+                            })()
+                            : `${t.startTime} - ${t.endTime}`}
+                        </div>
+                        <div style={{ fontSize: 13, color: "rgba(255,255,255,0.4)" }}>
+                          {t.entries.length} {t.entries.length === 1 ? "entrada" : "entradas"}
+                        </div>
+                      </div>
+                      <div style={{ display: "flex", gap: 16, textAlign: "right" }}>
+                        <div style={{ display: "flex", flexDirection: "column", gap: 8, justifyContent: "center" }}>
+                          <div style={{ fontSize: 17, fontWeight: 900, color: "oklch(0.78 0.18 150)", display: "flex", alignItems: "center", gap: 6 }}>
+                            <IconTaxiSign s={20} c="oklch(0.85 0.18 85)" /> {fmt(t.dinero || 0)}
+                          </div>
+                          <div style={{ fontSize: 17, fontWeight: 900, color: "oklch(0.80 0.14 220)", display: "flex", alignItems: "center", gap: 6 }}>
+                            <IconRoad s={18} c="oklch(0.80 0.14 220)" /> {t.km || 0} KM
+                          </div>
+                        </div>
+                        <div style={{ display: "flex", flexDirection: "column", gap: 8, alignItems: "flex-end", justifyContent: "center" }}>
+                          <div style={{ fontSize: 17, fontWeight: 900, color: "oklch(0.78 0.18 150)", display: "flex", alignItems: "center", gap: 6 }}>
+                            <IconMoneyBag s={20} c="oklch(0.78 0.18 150)" /> {fmt(miGanancia)}
+                          </div>
+                          <div style={{ fontSize: 17, fontWeight: 900, color: "oklch(0.85 0.12 210)", display: "flex", alignItems: "center", gap: 6 }}>
+                            <IconTimer s={18} c="oklch(0.85 0.12 210)" /> {durationStr}
+                          </div>
+                        </div>
                       </div>
                     </div>
-                    <div style={{ fontSize: 16, fontWeight: 900, color: "oklch(0.78 0.18 150)" }}>
-                      {fmt(t.dinero || 0)}
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>
@@ -3401,16 +3535,26 @@ function App() {
           {/* Botón Marcar como entregada */}
           <button
             onClick={() => {
-              if (entregada) {
+              if (isFrozen) {
+                if (entregada) {
+                  setConfirmDialog({
+                    text: "¿Marcar esta semana como NO entregada?",
+                    onConfirm: () => {
+                      updateFrozenWeek(weekId, { entregada: false, fechaEntrega: null });
+                      setConfirmDialog(null);
+                    },
+                  });
+                } else {
+                  updateFrozenWeek(weekId, { entregada: true, fechaEntrega: today() });
+                }
+              } else {
                 setConfirmDialog({
-                  text: "¿Marcar esta semana como NO entregada?",
+                  text: "Al marcar como entregada, la semana se congelará con los totales y porcentajes actuales. ¿Continuar?",
                   onConfirm: () => {
-                    applyChange({ entregada: false, fechaEntrega: null });
+                    freezeOneWeek(weekId);
                     setConfirmDialog(null);
                   },
                 });
-              } else {
-                applyChange({ entregada: true, fechaEntrega: today() });
               }
             }}
             style={{
@@ -3438,16 +3582,60 @@ function App() {
     return (
       <Shell burst={false}>
         <div style={{ flex: 1, padding: "16px 20px", display: "flex", flexDirection: "column", gap: 14, overflowY: "auto" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 10 }}>
-            <button style={S.iconBtn} onClick={() => setScreen("home")}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
+            <button style={S.iconBtn} onClick={() => {
+              setIsSelectingTurnos(false);
+              setSelectedTurnosIds([]);
+              setScreen("home");
+            }}>
               <IconBack />
             </button>
-            <div style={{ flex: 1, fontSize: 24, fontWeight: 800, color: "white", textAlign: "center" }}>
+            <div style={{ fontSize: 24, fontWeight: 800, color: "white", textAlign: "center" }}>
               Turnos
             </div>
+
+            {/* Controles de Selección */}
+            {history.length > 0 && (
+              <button
+                onClick={() => {
+                  if (isSelectingTurnos) {
+                    exportSelectedTurnosJSON();
+                  } else {
+                    setIsSelectingTurnos(true);
+                  }
+                }}
+                style={{
+                  background: isSelectingTurnos ? "rgba(80,220,140,0.15)" : "rgba(255,255,255,0.07)",
+                  border: isSelectingTurnos ? "1px solid rgba(80,220,140,0.3)" : "1px solid rgba(255,255,255,0.1)",
+                  borderRadius: 12,
+                  color: isSelectingTurnos ? "#50dc8c" : "rgba(255,255,255,0.75)",
+                  padding: "8px 14px",
+                  fontSize: 13,
+                  fontWeight: 700,
+                  cursor: "pointer",
+                }}
+              >
+                {isSelectingTurnos ? `Exportar (${selectedTurnosIds.length})` : "Seleccionar"}
+              </button>
+            )}
           </div>
+
+          {/* Botón cancelar si estamos en modo selección */}
+          {isSelectingTurnos && (
+            <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 10 }}>
+              <button
+                onClick={() => {
+                  setIsSelectingTurnos(false);
+                  setSelectedTurnosIds([]);
+                }}
+                style={{ background: "none", border: "none", color: "rgba(255,255,255,0.5)", fontSize: 13, textDecoration: "underline", cursor: "pointer" }}
+              >
+                Cancelar selección
+              </button>
+            </div>
+          )}
           {history.length === 0 ? (
-            <div style={{ textAlign: "center", color: "rgba(255,255,255,0.3)", marginTop: 40, fontSize: 15 }}>
+            <div style={{ textAlign: "center", color: "rgba(255,255,255,0.5)", marginTop: 40, fontSize: 15 }}>
               No hay Turnos Anteriores.
             </div>
           ) : (
@@ -3466,53 +3654,80 @@ function App() {
               const miGanancia = ((j.dinero || 0) * (choferPercent / 100)) + (j.totalP || 0);
 
               return (
-                <div
-                  key={j.id}
-                  onClick={() => {
-                    setViewTurno(j);
-                    setScreen("summary");
-                  }}
-                  style={{
-                    background: "rgba(255,255,255,0.05)",
-                    borderRadius: 16,
-                    padding: 16,
-                    cursor: "pointer",
-                    border: "1px solid rgba(255,255,255,0.1)",
-                    display: "flex",
-                    justifyContent: "space-between",
-                    alignItems: "center"
-                  }}
-                >
-                  <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-                    <div style={{ fontWeight: 700, color: "white", fontSize: 16 }}>{fmtDate(j.date)}</div>
-                    <div style={{ fontSize: 13, color: "rgba(255,255,255,0.4)" }}>
-                      {j.startDate && j.startDate !== j.date
-                        ? (() => {
-                          const startStr = new Date(j.startDate + "T12:00:00").toLocaleDateString("es-ES");
-                          const endStr = new Date(j.date + "T12:00:00").toLocaleDateString("es-ES");
-                          return `${startStr} ${j.startTime} - ${endStr} ${j.endTime}`;
-                        })()
-                        : `${j.startTime} - ${j.endTime}`}
-                    </div>
-                    <div style={{ fontSize: 13, color: "rgba(255,255,255,0.4)" }}>
-                      {j.entries.length} entradas
-                    </div>
-                  </div>
-                  <div style={{ display: "flex", gap: 16, textAlign: "right" }}>
-                    <div style={{ display: "flex", flexDirection: "column", gap: 8, justifyContent: "center" }}>
-                      <div style={{ fontSize: 17, fontWeight: 900, color: "oklch(0.78 0.18 150)", display: "flex", alignItems: "center", gap: 6 }}>
-                        <IconTaxiSign s={18} c="oklch(0.78 0.18 150)" /> {fmt(j.dinero || 0)}
+                <div key={j.id} style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
+
+                  {/* Checkbox condicional */}
+                  {isSelectingTurnos && (
+                    <input
+                      type="checkbox"
+                      checked={selectedTurnosIds.includes(j.id)}
+                      onChange={(e) => {
+                        if (e.target.checked) {
+                          setSelectedTurnosIds([...selectedTurnosIds, j.id]);
+                        } else {
+                          setSelectedTurnosIds(selectedTurnosIds.filter(id => id !== j.id));
+                        }
+                      }}
+                      style={{ width: 20, height: 20, accentColor: "#50dc8c", cursor: "pointer" }}
+                    />
+                  )}
+
+                  <div
+                    onClick={() => {
+                      if (isSelectingTurnos) {
+                        if (selectedTurnosIds.includes(j.id)) {
+                          setSelectedTurnosIds(selectedTurnosIds.filter(id => id !== j.id));
+                        } else {
+                          setSelectedTurnosIds([...selectedTurnosIds, j.id]);
+                        }
+                      } else {
+                        setViewTurno(j);
+                        setScreen("summary");
+                      }
+                    }}
+                    style={{
+                      flex: 1,
+                      background: "rgba(255,255,255,0.05)",
+                      borderRadius: 16,
+                      padding: 16,
+                      cursor: "pointer",
+                      border: "1px solid rgba(255,255,255,0.1)",
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center"
+                    }}
+                  >
+                    <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                      <div style={{ fontWeight: 700, color: "white", fontSize: 16 }}>{fmtDate(j.date)}</div>
+                      <div style={{ fontSize: 13, color: "rgba(255,255,255,0.4)" }}>
+                        {j.startDate && j.startDate !== j.date
+                          ? (() => {
+                            const startStr = new Date(j.startDate + "T12:00:00").toLocaleDateString("es-ES");
+                            const endStr = new Date(j.date + "T12:00:00").toLocaleDateString("es-ES");
+                            return `${startStr} ${j.startTime} - ${endStr} ${j.endTime}`;
+                          })()
+                          : `${j.startTime} - ${j.endTime}`}
                       </div>
-                      <div style={{ fontSize: 17, fontWeight: 900, color: "oklch(0.80 0.14 220)", display: "flex", alignItems: "center", gap: 6 }}>
-                        <IconRoad s={18} c="oklch(0.80 0.14 220)" /> {j.km || 0} KM
+                      <div style={{ fontSize: 13, color: "rgba(255,255,255,0.4)" }}>
+                        {j.entries.length} entradas
                       </div>
                     </div>
-                    <div style={{ display: "flex", flexDirection: "column", gap: 8, alignItems: "flex-end", justifyContent: "center" }}>
-                      <div style={{ fontSize: 17, fontWeight: 900, color: "oklch(0.85 0.18 85)", display: "flex", alignItems: "center", gap: 6 }}>
-                        <IconMoneyBag s={18} c="oklch(0.85 0.18 85)" /> {fmt(miGanancia)}
+                    <div style={{ display: "flex", gap: 16, textAlign: "right" }}>
+                      <div style={{ display: "flex", flexDirection: "column", gap: 8, justifyContent: "center" }}>
+                        <div style={{ fontSize: 17, fontWeight: 900, color: "oklch(0.78 0.18 150)", display: "flex", alignItems: "center", gap: 6 }}>
+                          <IconTaxiSign s={20} c="oklch(0.85 0.18 85)" /> {fmt(j.dinero || 0)}
+                        </div>
+                        <div style={{ fontSize: 17, fontWeight: 900, color: "oklch(0.80 0.14 220)", display: "flex", alignItems: "center", gap: 6 }}>
+                          <IconRoad s={18} c="oklch(0.80 0.14 220)" /> {j.km || 0} KM
+                        </div>
                       </div>
-                      <div style={{ fontSize: 17, fontWeight: 900, color: "oklch(0.85 0.12 210)", display: "flex", alignItems: "center", gap: 6 }}>
-                        <IconTimer s={18} c="oklch(0.85 0.12 210)" /> {durationStr}
+                      <div style={{ display: "flex", flexDirection: "column", gap: 8, alignItems: "flex-end", justifyContent: "center" }}>
+                        <div style={{ fontSize: 17, fontWeight: 900, color: "oklch(0.78 0.18 150)", display: "flex", alignItems: "center", gap: 6 }}>
+                          <IconMoneyBag s={20} c="oklch(0.78 0.18 150)" /> {fmt(miGanancia)}
+                        </div>
+                        <div style={{ fontSize: 17, fontWeight: 900, color: "oklch(0.85 0.12 210)", display: "flex", alignItems: "center", gap: 6 }}>
+                          <IconTimer s={18} c="oklch(0.85 0.12 210)" /> {durationStr}
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -3566,13 +3781,14 @@ function App() {
                   {meta.ic}
                   <div style={{ flex: 1, fontSize: 15, fontWeight: 600, color: "rgba(255,255,255,0.8)" }}>
                     {meta.lbl}
-                    {e.note && <span style={{ color: "rgba(255,255,255,0.3)", fontSize: 13 }}> · {e.note}</span>}
+                    {e.note && <span style={{ color: "rgba(255,255,255,0.5)", fontSize: 13 }}> · {e.note}</span>}
                   </div>
-                  <span style={{ fontSize: 13, color: "rgba(255,255,255,0.3)", marginRight: 8 }}>{e.time}</span>
+                  <span style={{ fontSize: 13, color: "rgba(255,255,255,0.5)", marginRight: 8 }}>{e.time}</span>
                   <span style={{ fontSize: 16, fontWeight: 800, color: meta.col }}>+{fmt(e.amount)}</span>
                   <button
                     onClick={() => openEditEntry(e)}
                     title="Editar entrada"
+                    aria-label="Editar entrada"
                     style={{
                       background: "rgba(255,255,255,0.08)",
                       border: "none",
@@ -3654,24 +3870,54 @@ function App() {
           {/* Dinero / KM cards (clickables — abren el teclado in-app) */}
           <div style={{ display: "flex", gap: 10, marginBottom: 12, flexShrink: 0 }}>
             <div onClick={() => setEndField("dinero")}
-              style={{ flex: 1, background: "oklch(0.20 0.06 150)", borderRadius: 16, padding: "14px", border: `1.5px solid ${endField === "dinero" ? "oklch(0.78 0.18 150)" : "oklch(0.60 0.16 150 / 0.35)"}`, cursor: "pointer", transition: "border 0.15s" }}>
-              <div style={{ fontSize: 11, fontWeight: 700, color: "rgba(255,255,255,0.5)", textTransform: "uppercase", letterSpacing: "0.6px", marginBottom: 8, display: "flex", alignItems: "center", gap: 6 }}>
-                <IconTaxiSign s={24} c="oklch(0.78 0.18 150)" /> Total Taxímetro
+              style={{
+                flex: 1,
+                background: 'rgba(255, 180, 0, 0.06)', // Fondo Oro suave
+                borderRadius: 16,
+                padding: "14px",
+                border: `1.5px solid ${endField === "dinero" ? "oklch(0.85 0.18 85)" : "rgba(255, 180, 0, 0.2)"}`,
+                cursor: "pointer",
+                transition: "border 0.15s",
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+                justifyContent: "center",
+                textAlign: "center"
+              }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: "rgba(255,255,255,0.5)", textTransform: "uppercase", letterSpacing: "0.6px", marginBottom: 8, display: "flex", alignItems: "center", gap: 6, justifyContent: "center" }}>
+                <IconTaxiSign s={28} c="oklch(0.85 0.18 85)" /> Total Taxímetro
               </div>
-              <div style={{ color: "oklch(0.78 0.18 150)", fontSize: 22, fontWeight: 900, letterSpacing: "-0.5px", minHeight: 28 }}>{dineroJ || "0"} €</div>
+              <div style={{ color: "oklch(0.85 0.18 85)", fontSize: 20, fontWeight: 900, letterSpacing: "-0.5px", minHeight: 28 }}>
+                {dineroJ ? `${dineroJ} €` : "€"}
+              </div>
             </div>
             <div onClick={() => setEndField("km")}
-              style={{ flex: 1, background: "oklch(0.19 0.05 220)", borderRadius: 16, padding: "14px", border: `1.5px solid ${endField === "km" ? "oklch(0.80 0.14 220)" : "oklch(0.65 0.14 220 / 0.35)"}`, cursor: "pointer", transition: "border 0.15s" }}>
-              <div style={{ fontSize: 11, fontWeight: 700, color: "rgba(255,255,255,0.5)", textTransform: "uppercase", letterSpacing: "0.6px", marginBottom: 8, display: "flex", alignItems: "center", gap: 6 }}>
+              style={{
+                flex: 1,
+                background: "oklch(0.19 0.05 220)",
+                borderRadius: 16,
+                padding: "14px",
+                border: `1.5px solid ${endField === "km" ? "oklch(0.80 0.14 220)" : "oklch(0.65 0.14 220 / 0.35)"}`,
+                cursor: "pointer",
+                transition: "border 0.15s",
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+                justifyContent: "center",
+                textAlign: "center"
+              }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: "rgba(255,255,255,0.5)", textTransform: "uppercase", letterSpacing: "0.6px", marginBottom: 8, display: "flex", alignItems: "center", gap: 6, justifyContent: "center" }}>
                 <IconRoad s={24} c="oklch(0.80 0.14 220)" /> Total KM
               </div>
-              <div style={{ color: "oklch(0.80 0.14 220)", fontSize: 22, fontWeight: 900, letterSpacing: "-0.5px", minHeight: 28 }}>{kmJ || "0"} KM</div>
+              <div style={{ color: "oklch(0.80 0.14 220)", fontSize: 20, fontWeight: 900, letterSpacing: "-0.5px", minHeight: 28 }}>
+                {kmJ ? `${kmJ} KM` : "KM"}
+              </div>
             </div>
           </div>
 
           {/* Resumen previo */}
           <div style={{ background: "rgba(255,255,255,0.04)", borderRadius: 22, padding: "16px", border: "1px solid rgba(255,255,255,0.07)", marginBottom: 12, flexShrink: 0 }}>
-            <div style={{ fontSize: 12, fontWeight: 600, color: "rgba(255,255,255,0.3)", textTransform: "uppercase", letterSpacing: "0.8px", marginBottom: 12 }}>
+            <div style={{ fontSize: 12, fontWeight: 600, color: "rgba(255,255,255,0.5)", textTransform: "uppercase", letterSpacing: "0.8px", marginBottom: 12 }}>
               Resumen de hoy
             </div>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
@@ -3681,7 +3927,7 @@ function App() {
                   <span style={{ fontSize: 12, fontWeight: 600, color: "rgba(255,255,255,0.4)" }}>Datáfono</span>
                 </div>
                 <div style={{ fontSize: 20, fontWeight: 900, color: P, letterSpacing: "-0.5px" }}>{fmt(totalD)}</div>
-                <div style={{ fontSize: 11, color: "rgba(255,255,255,0.2)", marginTop: 2 }}>{datafonos.length} entrada{datafonos.length !== 1 ? "s" : ""}</div>
+                <div style={{ fontSize: 11, color: "rgba(255,255,255,0.5)", marginTop: 2 }}>{datafonos.length} entrada{datafonos.length !== 1 ? "s" : ""}</div>
               </div>
               <div style={{ background: GBG, borderRadius: 14, padding: "12px", border: `1px solid ${G}33` }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 6 }}>
@@ -3689,7 +3935,7 @@ function App() {
                   <span style={{ fontSize: 12, fontWeight: 600, color: "rgba(255,255,255,0.4)" }}>Propinas</span>
                 </div>
                 <div style={{ fontSize: 20, fontWeight: 900, color: G, letterSpacing: "-0.5px" }}>{fmt(totalP)}</div>
-                <div style={{ fontSize: 11, color: "rgba(255,255,255,0.2)", marginTop: 2 }}>{propinas.length} entrada{propinas.length !== 1 ? "s" : ""}</div>
+                <div style={{ fontSize: 11, color: "rgba(255,255,255,0.5)", marginTop: 2 }}>{propinas.length} entrada{propinas.length !== 1 ? "s" : ""}</div>
               </div>
               <div style={{ background: ABG, borderRadius: 14, padding: "12px", border: `1px solid ${A}33` }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 6 }}>
@@ -3697,7 +3943,7 @@ function App() {
                   <span style={{ fontSize: 12, fontWeight: 600, color: "rgba(255,255,255,0.4)" }}>Agencias</span>
                 </div>
                 <div style={{ fontSize: 20, fontWeight: 900, color: A, letterSpacing: "-0.5px" }}>{fmt(totalA)}</div>
-                <div style={{ fontSize: 11, color: "rgba(255,255,255,0.2)", marginTop: 2 }}>{agencias.length} entrada{agencias.length !== 1 ? "s" : ""}</div>
+                <div style={{ fontSize: 11, color: "rgba(255,255,255,0.5)", marginTop: 2 }}>{agencias.length} entrada{agencias.length !== 1 ? "s" : ""}</div>
               </div>
               <div style={{ background: EBG, borderRadius: 14, padding: "12px", border: `1px solid ${E}33` }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 6 }}>
@@ -3705,7 +3951,7 @@ function App() {
                   <span style={{ fontSize: 12, fontWeight: 600, color: "rgba(255,255,255,0.4)" }}>Extras</span>
                 </div>
                 <div style={{ fontSize: 20, fontWeight: 900, color: E, letterSpacing: "-0.5px" }}>{fmt(totalE)}</div>
-                <div style={{ fontSize: 11, color: "rgba(255,255,255,0.2)", marginTop: 2 }}>{extras.length} entrada{extras.length !== 1 ? "s" : ""}</div>
+                <div style={{ fontSize: 11, color: "rgba(255,255,255,0.5)", marginTop: 2 }}>{extras.length} entrada{extras.length !== 1 ? "s" : ""}</div>
               </div>
               <div style={{ background: FBG, borderRadius: 14, padding: "12px", border: `1px solid ${F}33` }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 6 }}>
@@ -3713,7 +3959,7 @@ function App() {
                   <span style={{ fontSize: 12, fontWeight: 600, color: "rgba(255,255,255,0.4)" }}>Gasolina</span>
                 </div>
                 <div style={{ fontSize: 20, fontWeight: 900, color: F, letterSpacing: "-0.5px" }}>{fmt(totalF)}</div>
-                <div style={{ fontSize: 11, color: "rgba(255,255,255,0.2)", marginTop: 2 }}>{gasolinas.length} entrada{gasolinas.length !== 1 ? "s" : ""}</div>
+                <div style={{ fontSize: 11, color: "rgba(255,255,255,0.5)", marginTop: 2 }}>{gasolinas.length} entrada{gasolinas.length !== 1 ? "s" : ""}</div>
               </div>
               <div style={{ background: NBG, borderRadius: 14, padding: "12px", border: `1px solid ${N}33` }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 6 }}>
@@ -3721,7 +3967,7 @@ function App() {
                   <span style={{ fontSize: 12, fontWeight: 600, color: "rgba(255,255,255,0.4)" }}>Nulos</span>
                 </div>
                 <div style={{ fontSize: 20, fontWeight: 900, color: N, letterSpacing: "-0.5px" }}>{fmt(totalN)}</div>
-                <div style={{ fontSize: 11, color: "rgba(255,255,255,0.2)", marginTop: 2 }}>{nulos.length} entrada{nulos.length !== 1 ? "s" : ""}</div>
+                <div style={{ fontSize: 11, color: "rgba(255,255,255,0.5)", marginTop: 2 }}>{nulos.length} entrada{nulos.length !== 1 ? "s" : ""}</div>
               </div>
             </div>
 
@@ -3735,7 +3981,7 @@ function App() {
                     <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                       {gNotes.map(e => (
                         <div key={e.id} style={{ color: "rgba(255,255,255,0.8)", fontSize: 13, lineHeight: 1.4, background: "rgba(255,255,255,0.02)", padding: "8px 10px", borderRadius: 8 }}>
-                          <span style={{ color: "rgba(255,255,255,0.25)", fontSize: 11, marginRight: 6, fontWeight: 600 }}>{e.time}</span>
+                          <span style={{ color: "rgba(255,255,255,0.5)", fontSize: 11, marginRight: 6, fontWeight: 600 }}>{e.time}</span>
                           {e.note}
                         </div>
                       ))}
@@ -3745,7 +3991,7 @@ function App() {
               }
               return (
                 <div style={{ marginTop: 16, paddingTop: 14, borderTop: "1px solid rgba(255,255,255,0.06)", textAlign: 'center' }}>
-                  <div style={{ fontSize: 12, color: "rgba(255,255,255,0.2)", fontStyle: 'italic' }}>Sin notas del turno</div>
+                  <div style={{ fontSize: 12, color: "rgba(255,255,255,0.5)", fontStyle: 'italic' }}>Sin notas del turno</div>
                 </div>
               );
             })()}
@@ -3762,10 +4008,10 @@ function App() {
                   const col = e.type === 'propina' ? G : e.type === 'datafono' ? P : (e.type === 'agencia_bono') ? A : e.type === 'extra' ? E : e.type === 'gasolina' ? F : N;
                   return (
                     <div key={e.id} style={{ fontSize: 13, background: "rgba(255,255,255,0.03)", padding: "10px 12px", borderRadius: 12, border: "1px solid rgba(255,255,255,0.05)", display: "flex", alignItems: "baseline", gap: 8 }}>
-                      <span style={{ fontSize: 11, color: "rgba(255,255,255,0.25)", fontWeight: 600 }}>{e.time}</span>
+                      <span style={{ fontSize: 11, color: "rgba(255,255,255,0.5)", fontWeight: 600 }}>{e.time}</span>
                       <span style={{ fontWeight: 900, color: col, fontSize: 10, textTransform: "uppercase", minWidth: 60 }}>{e.type === 'agencia_bono' ? 'agencia/bono' : e.type}</span>
                       <span style={{ color: "rgba(255,255,255,0.8)", lineHeight: 1.4 }}>{e.note}</span>
-                      <span style={{ marginLeft: "auto", fontSize: 11, color: "rgba(255,255,255,0.2)", fontWeight: 600 }}>{fmt(e.amount)}</span>
+                      <span style={{ marginLeft: "auto", fontSize: 11, color: "rgba(255,255,255,0.5)", fontWeight: 600 }}>{fmt(e.amount)}</span>
                     </div>
                   );
                 })}
@@ -3789,6 +4035,9 @@ function App() {
         {/* Teclado in-app para Dinero / KM */}
         {endField && (
           <div
+            role="dialog"
+            aria-modal="true"
+            aria-label="Teclado numérico"
             onClick={() => setEndField(null)}
             style={{
               position: "fixed",
@@ -3825,7 +4074,7 @@ function App() {
               </div>
               <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8 }}>
                 {["1", "2", "3", "4", "5", "6", "7", "8", "9", "DEL", "0", ","].map((k) => (
-                  <button key={k} onClick={() => kpEnd(k)}
+                  <button key={k} aria-label={k === "DEL" ? "Borrar" : k === "," ? "Coma decimal" : k} onClick={() => kpEnd(k)}
                     style={{ ...S.keyBtn, padding: "20px 0", background: "rgba(255,255,255,0.05)", color: "white", fontSize: 22, fontWeight: 700 }}>
                     {k === "DEL" ? <IconDel /> : k}
                   </button>
@@ -3854,6 +4103,58 @@ function App() {
       </Shell>
     );
   }
+  function freezeOneWeek(weekId: string): void {
+    if (!isWeekClosed(weekId, today())) {
+      alert("No puedes congelar una semana que aún está en curso. Espera a que termine.");
+      return;
+    }
+
+    const grupos = groupTurnosByWeek(history, settings.diaLibre);
+    const turnosSemana = grupos.get(weekId) || [];
+    if (turnosSemana.length === 0) return;
+
+    const totales = calcularTotalesTurnos(turnosSemana);
+    const range = getWeekRange(weekId);
+    const override = getWeekOverride(weekOverrides, weekId);
+
+    const nuevaFrozen: FrozenWeek = {
+      weekId,
+      fechaInicio: range.inicio,
+      fechaFin: range.fin,
+      diaLibreUsado: settings.diaLibre,
+      totales: {
+        totalP: totales.totalP,
+        totalD: totales.totalD,
+        totalA: totales.totalA,
+        totalE: totales.totalE,
+        totalF: totales.totalF,
+        totalN: totales.totalN,
+        dinero: totales.dinero,
+        km: totales.km,
+      },
+      turnoIds: turnosSemana.map((t) => t.id),
+      notes: override?.notes || "",
+      entregada: true,
+      fechaEntrega: today(),
+      numTurnos: turnosSemana.length,
+      configCongelada: {
+        porcentajeJefe: settings["porcentaje.jefe"],
+        porcentajeChofer: settings["porcentaje.chofer"],
+        descDatafono: settings["descontar.datafono"],
+        descAgencia: settings["descontar.agencia_bono"],
+        descExtra: settings["descontar.extra"],
+        descGasolina: settings["descontar.gasolina"],
+      },
+    };
+
+    setFrozenWeeks((prev) => {
+      const filtrado = prev.filter((fw) => fw.weekId !== weekId);
+      return [...filtrado, nuevaFrozen];
+    });
+
+    setWeekOverrides((prev) => prev.filter((o) => o.weekId !== weekId));
+  }
+
 
   return (
     <Shell burst={burst}>
@@ -3899,7 +4200,7 @@ function App() {
               <div
                 style={{
                   fontSize: 13,
-                  color: "rgba(255,255,255,0.35)",
+                  color: "rgba(255,255,255,0.5)",
                   marginTop: 4,
                 }}
               >
@@ -3916,6 +4217,7 @@ function App() {
               style={S.iconBtn}
               onClick={() => setScreen("home")}
               title="Inicio"
+              aria-label="Volver al inicio"
             >
               <span style={{ fontSize: 18 }}>🏠</span>
             </button>
@@ -3937,6 +4239,7 @@ function App() {
                   }
                 }}
                 title={current.isPaused ? "Reanudar Turno" : "Pausar Turno"}
+                aria-label={current.isPaused ? "Reanudar turno" : "Pausar turno"}
               >
                 <span style={{ fontSize: 18 }}>{current.isPaused ? "▶️" : "⏸️"}</span>
               </button>
@@ -4003,7 +4306,7 @@ function App() {
             color={F}
             bg={FBG}
             total={totalF}
-            icon={<IconFuel s={18} c={F} />}
+            icon={<IconFuel s={22} c={F} />}
             disabled={!current.startTime}
             onClick={() => {
               setSingleMode("gasolina");
@@ -4058,7 +4361,7 @@ function App() {
             style={{
               fontSize: 12,
               fontWeight: 600,
-              color: "rgba(255,255,255,0.3)",
+              color: "rgba(255,255,255,0.5)",
               textTransform: "uppercase",
               letterSpacing: "0.8px",
               marginBottom: 10,
@@ -4102,14 +4405,23 @@ function App() {
                       background: "rgba(60,255,100,0.1)",
                       color: "rgba(60,255,100,0.9)",
                       border: "1px solid rgba(60,255,100,0.2)",
-                      fontSize: 15,
+                      fontSize: 16,
                       fontWeight: 700,
                       cursor: "pointer",
+                      display: "inline-flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      gap: 12
                     }}
                   >
-                    🚀 Iniciar Turno
+                    <IconRocket s={32} c="rgba(60,255,100,0.9)" /> Iniciar Turno
                   </button>
-                  <div style={{ marginTop: 14, fontSize: 13 }}>
+                  <div style={{
+                    marginTop: 14,
+                    fontSize: 14,
+                    color: "rgba(255,255,255,0.8)",
+                    fontWeight: 500
+                  }}>
                     Pulsa para comenzar tu Turno.
                   </div>
                 </div>
@@ -4172,7 +4484,7 @@ function App() {
                         {e.note && (
                           <span
                             style={{
-                              color: "rgba(255,255,255,0.28)",
+                              color: "rgba(255,255,255,0.5)",
                               fontSize: 12,
                             }}
                           >
@@ -4184,7 +4496,7 @@ function App() {
                       <span
                         style={{
                           fontSize: 12,
-                          color: "rgba(255,255,255,0.22)",
+                          color: "rgba(255,255,255,0.5)",
                           marginRight: 6,
                         }}
                       >
@@ -4198,6 +4510,7 @@ function App() {
                       <button
                         onClick={() => openEditEntry(e)}
                         title="Editar entrada"
+                        aria-label="Editar entrada"
                         style={{
                           background: "rgba(255,255,255,0.08)",
                           border: "none",
@@ -4224,7 +4537,7 @@ function App() {
                   style={{
                     background: "none",
                     border: "none",
-                    color: "rgba(255,255,255,0.22)",
+                    color: "rgba(255,255,255,0.5)",
                     fontSize: 13,
                     cursor: "pointer",
                     padding: "4px 0",
@@ -4260,6 +4573,9 @@ function App() {
 
         {current.isPaused && (
           <div
+            role="alertdialog"
+            aria-modal="true"
+            aria-label="Turno Pausado"
             style={{
               position: "absolute",
               top: 85,
@@ -4350,6 +4666,7 @@ function SmallCard({
   icon,
   onClick,
   disabled,
+  ariaLabel,
 }: {
   label: string;
   color: string;
@@ -4358,10 +4675,13 @@ function SmallCard({
   icon: React.ReactNode;
   onClick?: () => void;
   disabled?: boolean;
+  ariaLabel?: string;
 }) {
   return (
     <div
       onClick={!disabled ? onClick : undefined}
+      {...(onClick && !disabled ? { role: "button", tabIndex: 0 } : {})}
+      aria-label={ariaLabel || label}
       style={{
         flex: 1,
         background: bg,
@@ -4416,6 +4736,7 @@ function MainCard({
   icon,
   onClick,
   disabled,
+  ariaLabel,
 }: {
   label: string;
   color: string;
@@ -4425,10 +4746,13 @@ function MainCard({
   icon: React.ReactNode;
   onClick?: () => void;
   disabled?: boolean;
+  ariaLabel?: string;
 }) {
   return (
     <div
       onClick={!disabled ? onClick : undefined}
+      {...(onClick && !disabled ? { role: "button", tabIndex: 0 } : {})}
+      aria-label={ariaLabel || label}
       style={{
         flex: 1,
         background: bg,
@@ -4473,7 +4797,7 @@ function MainCard({
         {fmt(total)}
       </div>
       <div
-        style={{ fontSize: 12, color: "rgba(255,255,255,0.22)", marginTop: 8 }}
+        style={{ fontSize: 12, color: "rgba(255,255,255,0.5)", marginTop: 8 }}
       >
         {count} entrada{count !== 1 ? "s" : ""}
       </div>
@@ -4519,6 +4843,9 @@ function EditEntryDialog({
 
   return (
     <div
+      role="dialog"
+      aria-modal="true"
+      aria-label="Editar entrada"
       style={{
         position: "fixed",
         top: 0, left: 0, right: 0, bottom: 0,
@@ -4546,7 +4873,7 @@ function EditEntryDialog({
           <span style={{ fontSize: 13, fontWeight: 700, color: meta.col, textTransform: "uppercase", letterSpacing: "0.5px" }}>
             Editar {meta.lbl}
           </span>
-          <span style={{ fontSize: 12, color: "rgba(255,255,255,0.3)", marginLeft: "auto" }}>{entry.time}</span>
+          <span style={{ fontSize: 12, color: "rgba(255,255,255,0.5)", marginLeft: "auto" }}>{entry.time}</span>
         </div>
 
         {/* Importe (display + teclado in-app) - Oculto para Notas */}
@@ -4579,7 +4906,7 @@ function EditEntryDialog({
         {showKP && (
           <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 6, marginBottom: 14, animation: "fadeUp 0.2s ease" }}>
             {["1", "2", "3", "4", "5", "6", "7", "8", "9", "DEL", "0", ","].map((k) => (
-              <button key={k} onClick={(e) => { e.stopPropagation(); kpAmount(k); }}
+              <button key={k} aria-label={k === "DEL" ? "Borrar" : k === "," ? "Coma decimal" : k} onClick={(e) => { e.stopPropagation(); kpAmount(k); }}
                 style={{
                   border: "none",
                   borderRadius: 10,
@@ -4686,6 +5013,9 @@ interface ConfirmDialogProps {
 function ConfirmDialog({ text, onConfirm, onCancel, confirmText, confirmBg, confirmColor, confirmBorder }: ConfirmDialogProps) {
   return (
     <div
+      role="dialog"
+      aria-modal="true"
+      aria-label={text}
       style={{
         position: "fixed",
         top: 0,
@@ -4759,7 +5089,10 @@ function ConfirmDialog({ text, onConfirm, onCancel, confirmText, confirmBg, conf
   );
 }
 
-ReactDOM.createRoot(document.getElementById("root")!).render(<App />);
+const rootElement = document.getElementById("root");
+if (rootElement) {
+  ReactDOM.createRoot(rootElement).render(<App />);
+}
 
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => {
