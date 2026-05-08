@@ -1674,7 +1674,7 @@ function App() {
                 onClick={() => {
                   const input = document.createElement('input');
                   input.type = 'file';
-                  input.accept = '.csv';
+                  input.accept = '.csv, text/csv, application/vnd.ms-excel, text/plain, */*';
                   input.onchange = (e: any) => {
                     const file = e.target.files?.[0];
                     if (!file) return;
