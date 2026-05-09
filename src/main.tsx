@@ -264,7 +264,7 @@ export function parseCSVToHistory(csvText: string): Turno[] {
   });
 }
 
-function exportBackupJSON() {
+async function exportBackupJSON() {
   const backup = {
     history: localStorage.getItem(KEY_HISTORY),
     settings: localStorage.getItem(KEY_SETTINGS),
@@ -272,42 +272,26 @@ function exportBackupJSON() {
     weekOverrides: localStorage.getItem(KEY_WEEK_OVERRIDES),
     weeksFrozen: localStorage.getItem(KEY_WEEKS_FROZEN)
   };
-  const text = JSON.stringify(backup, null, 2);
-  const filename = `taxi_backup_${new Date().toISOString().split("T")[0]}.json`;
-  saveAndShareFile(filename, text);
-}
+  const json = JSON.stringify(backup, null, 2);
+  const fileName = `taxi_backup_${new Date().toISOString().split("T")[0]}.json`;
 
-async function saveAndShareFile(filename: string, textContent: string) {
-  if (Capacitor.isNativePlatform()) {
-    try {
-      // 1. Escribimos el archivo en el directorio de Cache del dispositivo móvil
-      const result = await Filesystem.writeFile({
-        path: filename,
-        data: textContent,
-        directory: Directory.Cache,
-        encoding: Encoding.UTF8,
-      });
-      
-      // 2. Activamos el panel para compartir nativo de Android/iOS con el archivo creado
-      await Share.share({
-        title: filename,
-        text: "Aquí tienes tus turnos exportados.",
-        url: result.uri,
-        dialogTitle: "Compartir/Guardar Exportación"
-      });
-    } catch (e) {
-      console.error("Error al exportar archivo vía Capacitor:", e);
-      alert("Error al exportar: " + (e as Error).message);
-    }
-  } else {
-    // Fallback para Navegadores Web tradicionales
-    const blob = new Blob([textContent], { type: "application/json" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = filename;
-    a.click();
-    URL.revokeObjectURL(url);
+  try {
+    const result = await Filesystem.writeFile({
+      path: fileName,
+      data: json,
+      directory: Directory.Cache,
+      encoding: Encoding.UTF8,
+    });
+
+    await Share.share({
+      title: "Copia de seguridad",
+      text: "Copia de seguridad de Mi Turno",
+      url: result.uri,
+      dialogTitle: "Compartir / Guardar copia de seguridad",
+    });
+  } catch (e) {
+    console.error("exportBackupJSON error:", e);
+    alert("No se pudo exportar la copia de seguridad.");
   }
 }
 
@@ -1126,7 +1110,7 @@ function App() {
     setEditEntry(null);
   }
 
-  function exportSelectedTurnosJSON() {
+  async function exportSelectedTurnosJSON() {
     if (selectedTurnosIds.length === 0) {
       alert("No has seleccionado ningún turno.");
       return;
@@ -1140,13 +1124,31 @@ function App() {
       history: JSON.stringify(turnosAExportar)
     };
 
-    const text = JSON.stringify(backup, null, 2);
-    const filename = `taxi_turnos_seleccionados_${new Date().toISOString().split("T")[0]}.json`;
-    saveAndShareFile(filename, text);
+    const json = JSON.stringify(backup, null, 2);
+    const fileName = `taxi_turnos_seleccionados_${new Date().toISOString().split("T")[0]}.json`;
 
-    // Salimos del modo selección tras exportar
-    setIsSelectingTurnos(false);
-    setSelectedTurnosIds([]);
+    try {
+      const result = await Filesystem.writeFile({
+        path: fileName,
+        data: json,
+        directory: Directory.Cache,
+        encoding: Encoding.UTF8,
+      });
+
+      await Share.share({
+        title: "Exportar turnos",
+        text: "Turnos seleccionados",
+        url: result.uri,
+        dialogTitle: "Compartir / Guardar JSON",
+      });
+
+      // Salimos del modo selección tras exportar
+      setIsSelectingTurnos(false);
+      setSelectedTurnosIds([]);
+    } catch (e) {
+      console.error("exportSelectedTurnosJSON error:", e);
+      alert("No se pudo exportar el archivo.");
+    }
   }
 
   useEffect(() => {
