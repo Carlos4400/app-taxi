@@ -1928,13 +1928,13 @@ function App() {
                 <div style={{ fontSize: 10, fontWeight: 700, color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', letterSpacing: '0.3px', marginBottom: 6, display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 4, whiteSpace: 'nowrap' }}>
                   <IconTaxiSign s={28} c="oklch(0.85 0.18 85)" /> Total Taxímetro
                 </div>
-                <div style={{ fontSize: 20, fontWeight: 900, color: 'oklch(0.85 0.18 85)', letterSpacing: '-0.5px' }}>{fmt(dineroV)}</div>
+                <div style={{ fontSize: 22, fontWeight: 900, color: 'oklch(0.85 0.18 85)', letterSpacing: '-0.5px' }}>{fmt(dineroV)}</div>
               </div>
               <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', textAlign: 'center', background: 'oklch(0.19 0.05 220)', borderRadius: 16, padding: '14px 8px', border: '1px solid oklch(0.65 0.14 220 / 0.35)' }}>
                 <div style={{ fontSize: 10, fontWeight: 700, color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', letterSpacing: '0.3px', marginBottom: 6, display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 4, whiteSpace: 'nowrap' }}>
                   <IconRoad s={24} c="oklch(0.80 0.14 220)" /> Total KM
                 </div>
-                <div style={{ fontSize: 20, fontWeight: 900, color: 'oklch(0.80 0.14 220)', letterSpacing: '-0.5px' }}>{kmV.toString().replace('.', ',')} <span style={{ fontSize: 13, fontWeight: 700, opacity: 0.6 }}>KM</span></div>
+                <div style={{ fontSize: 22, fontWeight: 900, color: 'oklch(0.80 0.14 220)', letterSpacing: '-0.5px' }}>{kmV.toString().replace('.', ',')} <span style={{ fontSize: 13, fontWeight: 700, opacity: 0.6 }}>KM</span></div>
               </div>
             </div>
 
@@ -1944,13 +1944,13 @@ function App() {
                 <div style={{ fontSize: 10, fontWeight: 700, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '0.3px', marginBottom: 6, display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 4, whiteSpace: 'nowrap' }}>
                   <IconMoneyBag s={26} c="oklch(0.78 0.18 150)" /> Mi Ganancia
                 </div>
-                <div style={{ fontSize: 20, fontWeight: 900, color: 'oklch(0.78 0.18 150)', letterSpacing: '-0.5px' }}>{fmt(miGanancia)}</div>
+                <div style={{ fontSize: 22, fontWeight: 900, color: 'oklch(0.78 0.18 150)', letterSpacing: '-0.5px' }}>{fmt(miGanancia)}</div>
               </div>
               <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', textAlign: 'center', background: 'rgba(0, 180, 255, 0.05)', borderRadius: 16, padding: '14px 8px', border: '1px solid rgba(0, 180, 255, 0.15)' }}>
                 <div style={{ fontSize: 10, fontWeight: 700, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '0.3px', marginBottom: 6, display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 4, whiteSpace: 'nowrap' }}>
                   <IconTimer s={26} c="oklch(0.85 0.12 210)" /> Tiempo Trabajado
                 </div>
-                <div style={{ fontSize: 20, fontWeight: 900, color: 'oklch(0.85 0.12 210)', letterSpacing: '-0.5px' }}>{durationStr}</div>
+                <div style={{ fontSize: 22, fontWeight: 900, color: 'oklch(0.85 0.12 210)', letterSpacing: '-0.5px' }}>{durationStr}</div>
               </div>
             </div>
           </div>
@@ -2133,7 +2133,7 @@ function App() {
               <div style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', letterSpacing: '0.6px', marginBottom: 8, display: "flex", alignItems: "center", gap: 6, justifyContent: "center" }}>
                 <IconTaxiSign s={28} c="oklch(0.85 0.18 85)" /> Total Taxímetro
               </div>
-              <div style={{ color: 'oklch(0.85 0.18 85)', fontSize: 20, fontWeight: 900, minHeight: 28 }}>
+              <div style={{ color: 'oklch(0.85 0.18 85)', fontSize: 22, fontWeight: 900, minHeight: 28 }}>
                 {eDinero ? `${eDinero} €` : "€"}
               </div>
             </div>
@@ -2154,7 +2154,7 @@ function App() {
               <div style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', letterSpacing: '0.6px', marginBottom: 8, display: "flex", alignItems: "center", gap: 6, justifyContent: "center" }}>
                 <IconRoad s={24} c="oklch(0.80 0.14 220)" /> Total KM
               </div>
-              <div style={{ color: 'oklch(0.80 0.14 220)', fontSize: 20, fontWeight: 900, minHeight: 28 }}>
+              <div style={{ color: 'oklch(0.80 0.14 220)', fontSize: 22, fontWeight: 900, minHeight: 28 }}>
                 {eKm ? `${eKm} KM` : "KM"}
               </div>
             </div>
@@ -3327,13 +3327,13 @@ function App() {
                 <div style={{ fontSize: 10, fontWeight: 700, color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', letterSpacing: '0.3px', marginBottom: 6, display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 4, whiteSpace: 'nowrap' }}>
                   <IconTaxiSign s={28} c="oklch(0.85 0.18 85)" /> Total Taxímetro
                 </div>
-                <div style={{ fontSize: 20, fontWeight: 900, color: 'oklch(0.85 0.18 85)', letterSpacing: '-0.5px' }}>{fmt(totales.dinero)}</div>
+                <div style={{ fontSize: 22, fontWeight: 900, color: 'oklch(0.85 0.18 85)', letterSpacing: '-0.5px' }}>{fmt(totales.dinero)}</div>
               </div>
               <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', textAlign: 'center', background: 'oklch(0.19 0.05 220)', borderRadius: 16, padding: '14px 8px', border: '1px solid oklch(0.65 0.14 220 / 0.35)' }}>
                 <div style={{ fontSize: 10, fontWeight: 700, color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', letterSpacing: '0.3px', marginBottom: 6, display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 4, whiteSpace: 'nowrap' }}>
                   <IconRoad s={24} c="oklch(0.80 0.14 220)" /> Total KM
                 </div>
-                <div style={{ fontSize: 20, fontWeight: 900, color: 'oklch(0.80 0.14 220)', letterSpacing: '-0.5px' }}>{(totales.km || 0).toString().replace('.', ',')} <span style={{ fontSize: 13, fontWeight: 700, opacity: 0.6 }}>KM</span></div>
+                <div style={{ fontSize: 22, fontWeight: 900, color: 'oklch(0.80 0.14 220)', letterSpacing: '-0.5px' }}>{(totales.km || 0).toString().replace('.', ',')} <span style={{ fontSize: 13, fontWeight: 700, opacity: 0.6 }}>KM</span></div>
               </div>
             </div>
 
@@ -3343,13 +3343,13 @@ function App() {
                 <div style={{ fontSize: 10, fontWeight: 700, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '0.3px', marginBottom: 6, display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 4, whiteSpace: 'nowrap' }}>
                   <IconMoneyBag s={26} c="oklch(0.78 0.18 150)" /> Mi Ganancia
                 </div>
-                <div style={{ fontSize: 20, fontWeight: 900, color: 'oklch(0.78 0.18 150)', letterSpacing: '-0.5px' }}>{fmt(miGanancia)}</div>
+                <div style={{ fontSize: 22, fontWeight: 900, color: 'oklch(0.78 0.18 150)', letterSpacing: '-0.5px' }}>{fmt(miGanancia)}</div>
               </div>
               <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', textAlign: 'center', background: 'rgba(0, 180, 255, 0.05)', borderRadius: 16, padding: '14px 8px', border: '1px solid rgba(0, 180, 255, 0.15)' }}>
                 <div style={{ fontSize: 10, fontWeight: 700, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '0.3px', marginBottom: 6, display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 4, whiteSpace: 'nowrap' }}>
                   <IconTimer s={26} c="oklch(0.85 0.12 210)" /> Tiempo Trabajado
                 </div>
-                <div style={{ fontSize: 20, fontWeight: 900, color: 'oklch(0.85 0.12 210)', letterSpacing: '-0.5px' }}>{durationStr}</div>
+                <div style={{ fontSize: 22, fontWeight: 900, color: 'oklch(0.85 0.12 210)', letterSpacing: '-0.5px' }}>{durationStr}</div>
               </div>
             </div>
           </div>
@@ -3889,7 +3889,7 @@ function App() {
               <div style={{ fontSize: 11, fontWeight: 700, color: "rgba(255,255,255,0.5)", textTransform: "uppercase", letterSpacing: "0.6px", marginBottom: 8, display: "flex", alignItems: "center", gap: 6, justifyContent: "center" }}>
                 <IconTaxiSign s={28} c="oklch(0.85 0.18 85)" /> Total Taxímetro
               </div>
-              <div style={{ color: "oklch(0.85 0.18 85)", fontSize: 20, fontWeight: 900, letterSpacing: "-0.5px", minHeight: 28 }}>
+              <div style={{ color: "oklch(0.85 0.18 85)", fontSize: 22, fontWeight: 900, letterSpacing: "-0.5px", minHeight: 28 }}>
                 {dineroJ ? `${dineroJ} €` : "€"}
               </div>
             </div>
@@ -3911,7 +3911,7 @@ function App() {
               <div style={{ fontSize: 11, fontWeight: 700, color: "rgba(255,255,255,0.5)", textTransform: "uppercase", letterSpacing: "0.6px", marginBottom: 8, display: "flex", alignItems: "center", gap: 6, justifyContent: "center" }}>
                 <IconRoad s={24} c="oklch(0.80 0.14 220)" /> Total KM
               </div>
-              <div style={{ color: "oklch(0.80 0.14 220)", fontSize: 20, fontWeight: 900, letterSpacing: "-0.5px", minHeight: 28 }}>
+              <div style={{ color: "oklch(0.80 0.14 220)", fontSize: 22, fontWeight: 900, letterSpacing: "-0.5px", minHeight: 28 }}>
                 {kmJ ? `${kmJ} KM` : "KM"}
               </div>
             </div>
