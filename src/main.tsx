@@ -64,12 +64,34 @@ const F = "oklch(0.70 0.18 25)";
 const FBG = "oklch(0.19 0.06 25)";
 const N = "oklch(0.62 0.06 260)";
 const NBG = "oklch(0.18 0.03 260)";
+const C = "oklch(0.75 0.15 290)";
+const CBG = "oklch(0.18 0.05 290 / 0.12)";
 
 const KEY_CURRENT = "taxi_current_v3";
 const KEY_HISTORY = "taxi_history_v3";
 const KEY_SETTINGS = "taxi_settings_v3";
 const KEY_WEEK_OVERRIDES = "taxi_week_overrides_v1";
 const KEY_WEEKS_FROZEN = "taxi_weeks_frozen_v1";
+const KEY_RESERVATIONS = "taxi_reservations_v1";
+const KEY_NOTES = "taxi_notes_v1";
+
+export interface Reserva {
+  id: string;          
+  date: string;        // "YYYY-MM-DD"
+  time: string;        // "HH:mm"
+  origen: string;
+  destino: string;
+  cliente: string;     
+  telefono: string;    // permite llamada directa
+  notas: string;
+}
+
+export interface NotaCalendario {
+  id: string;
+  date: string;        // "YYYY-MM-DD"
+  tipo: 'ITV' | 'Seguro' | 'Autónomos' | 'Libre' | 'Día libre';
+  texto: string;
+}
 
 interface WeekOverride {
   weekId: string;
@@ -328,6 +350,29 @@ function loadHistory(): Turno[] {
     if (Array.isArray(d)) return d;
   } catch (e) { }
   return [];
+}
+function loadReservations(): Reserva[] {
+  try {
+    const d = JSON.parse(localStorage.getItem(KEY_RESERVATIONS) || "null");
+    if (Array.isArray(d)) return d;
+  } catch (e) { }
+  return [];
+}
+function loadNotes(): NotaCalendario[] {
+  try {
+    const d = JSON.parse(localStorage.getItem(KEY_NOTES) || "null");
+    if (Array.isArray(d)) return d;
+  } catch (e) { }
+  return [];
+}
+function getDaysInMonth(year: number, month: number): number {
+  return new Date(year, month + 1, 0).getDate();
+}
+function getStartOffset(year: number, month: number): number {
+  const firstDay = new Date(year, month, 1);
+  let offset = firstDay.getDay() - 1;
+  if (offset < 0) offset = 6;
+  return offset;
 }
 
 // ============================================================================
@@ -905,6 +950,29 @@ const IconRocket = ({ s = 24, c = "white" }: { s?: number; c?: string }) => (
   </svg>
 );
 
+const IconPlay = ({ s = 24, c = "white" }: { s?: number; c?: string }) => (
+  <svg width={s} height={s} viewBox="0 0 24 24" fill="none" style={{ display: "inline-block", verticalAlign: "middle" }}>
+    <path
+      d="M8 5.5L18.5 12L8 18.5V5.5Z"
+      fill={c}
+    />
+  </svg>
+);
+
+const IconCalendar = ({ s = 24, c = "white" }: { s?: number; c?: string }) => (
+  <svg width={s} height={s} viewBox="0 0 24 24" fill="none" style={{ display: "inline-block", verticalAlign: "middle" }}>
+    <rect x="3" y="4" width="18" height="16" rx="3" stroke={c} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+    <path d="M16 2V6M8 2V6" stroke={c} strokeWidth="1.8" strokeLinecap="round" />
+    <path d="M3 9H21" stroke={c} strokeWidth="1.8" strokeLinecap="round" />
+    <circle cx="7.5" cy="13.5" r="1" fill={c} />
+    <circle cx="12" cy="13.5" r="1" fill={c} />
+    <circle cx="16.5" cy="13.5" r="1" fill={c} />
+    <circle cx="7.5" cy="17.5" r="1" fill={c} opacity="0.6" />
+    <circle cx="12" cy="17.5" r="1" fill={c} opacity="0.6" />
+    <circle cx="16.5" cy="17.5" r="1" fill={c} opacity="0.6" />
+  </svg>
+);
+
 const IconSettings = ({ s = 24, c = "white" }: { s?: number; c?: string }) => (
   <svg width={s} height={s} viewBox="0 0 24 24" fill="none" style={{ display: "inline-block", verticalAlign: "middle" }}>
     <path d="M12 15C13.6569 15 15 13.6569 15 12C15 10.3431 13.6569 9 12 9C10.3431 9 9 10.3431 9 12C9 13.6569 10.3431 15 12 15Z" stroke={c} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
@@ -974,6 +1042,28 @@ function Burst() {
 function App() {
   const [current, setCurrent] = useState<CurrentState>(loadCurrent);
   const [history, setHistory] = useState<Turno[]>(loadHistory);
+  const [reservations, setReservations] = useState<Reserva[]>(loadReservations);
+  const [notes, setNotes] = useState<NotaCalendario[]>(loadNotes);
+  const [calendarView, setCalendarView] = useState<'month' | 'agenda'>('month');
+  const [calendarMonth, setCalendarMonth] = useState<Date>(new Date());
+  const [selectedDate, setSelectedDate] = useState<string>(today());
+  const [showReservaDialog, setShowReservaDialog] = useState(false);
+  const [showNotaDialog, setShowNotaDialog] = useState(false);
+  const [editingReserva, setEditingReserva] = useState<Reserva | null>(null);
+  const [editingNota, setEditingNota] = useState<NotaCalendario | null>(null);
+
+  // Campos formulario Reserva
+  const [reservaTime, setReservaTime] = useState("");
+  const [reservaOrigen, setReservaOrigen] = useState("");
+  const [reservaDestino, setReservaDestino] = useState("");
+  const [reservaCliente, setReservaCliente] = useState("");
+  const [reservaTelefono, setReservaTelefono] = useState("");
+  const [reservaNotas, setReservaNotas] = useState("");
+
+  // Campos formulario Nota
+  const [notaTipo, setNotaTipo] = useState<'ITV' | 'Seguro' | 'Autónomos' | 'Libre' | 'Día libre'>('Libre');
+  const [notaTexto, setNotaTexto] = useState("");
+
   const [showBackupMenu, setShowBackupMenu] = useState(false);
   const [pendingImport, setPendingImport] = useState<Turno[]>([]); // Para la selección de turnos
   const [isSelectingTurnos, setIsSelectingTurnos] = useState(false);
@@ -1166,6 +1256,12 @@ function App() {
   useEffect(() => {
     localStorage.setItem(KEY_WEEKS_FROZEN, JSON.stringify(frozenWeeks));
   }, [frozenWeeks]);
+  useEffect(() => {
+    localStorage.setItem(KEY_RESERVATIONS, JSON.stringify(reservations));
+  }, [reservations]);
+  useEffect(() => {
+    localStorage.setItem(KEY_NOTES, JSON.stringify(notes));
+  }, [notes]);
 
 
 
@@ -1390,7 +1486,9 @@ function App() {
                 setScreen("main");
               }}
               style={{
-                padding: "20px 0",
+                height: 68,
+                padding: 0,
+                whiteSpace: "nowrap",
                 borderRadius: 20,
                 border: current.isPaused ? "2px solid #3b82f6" : `2px solid ${G}`,
                 background: current.isPaused ? "rgba(59, 130, 246, 0.08)" : GBG,
@@ -1404,13 +1502,22 @@ function App() {
                 gap: 12,
               }}
             >
-              {hasActive ? <span style={{ fontSize: 22, color: "#3b82f6" }}>▶</span> : <IconRocket s={26} c={G} />}
+              {hasActive ? (
+                <>
+                  <IconRocket s={30} c={G} />
+                  <IconPlay s={40} c="#3b82f6" />
+                </>
+              ) : (
+                <IconRocket s={30} c={G} />
+              )}
               {hasActive ? "Continuar Turno" : "Iniciar Turno"}
             </button>
             <button
               onClick={() => setScreen("PantallaTurnos")}
               style={{
-                padding: "20px 0",
+                height: 68,
+                padding: 0,
+                whiteSpace: "nowrap",
                 borderRadius: 20,
                 border: `2px solid ${P}`,
                 background: PBG,
@@ -1424,13 +1531,15 @@ function App() {
                 gap: 12,
               }}
             >
-              <IconClipboard s={24} c={P} />
+              <IconClipboard s={30} c={P} />
               Turnos
             </button>
             <button
               onClick={() => setScreen("contabilidad")}
               style={{
-                padding: "20px 0",
+                height: 68,
+                padding: 0,
+                whiteSpace: "nowrap",
                 borderRadius: 20,
                 border: `2px solid ${A}`,
                 background: ABG,
@@ -1444,19 +1553,41 @@ function App() {
                 gap: 12,
               }}
             >
-              <IconChart s={24} c={A} />
+              <IconChart s={30} c={A} />
               Contabilidad
+            </button>
+            <button
+              onClick={() => setScreen("calendar")}
+              style={{
+                height: 68,
+                padding: 0,
+                whiteSpace: "nowrap",
+                borderRadius: 20,
+                border: `2px solid ${C}`,
+                background: CBG,
+                color: C,
+                fontSize: 18,
+                fontWeight: 800,
+                cursor: "pointer",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: 12,
+              }}
+            >
+              <IconCalendar s={30} c={C} />
+              Calendario
             </button>
           </div>
         </div>
         <button
-          onClick={() => setScreen("settings")}
+          onClick={() => setScreen("calendar")}
           style={{
             position: "absolute",
-            bottom: 32,
+            top: 24,
             right: 28,
-            background: "rgba(255,255,255,0.06)",
-            border: "1px solid rgba(255,255,255,0.1)",
+            background: "rgba(180, 120, 255, 0.08)",
+            border: "1px solid rgba(180, 120, 255, 0.28)",
             borderRadius: 16,
             padding: 14,
             cursor: "pointer",
@@ -1466,8 +1597,889 @@ function App() {
             fontSize: 22
           }}
         >
-          <IconSettings s={24} c="white" />
+          <IconCalendar s={24} c="oklch(0.75 0.15 290)" />
         </button>
+        <button
+          onClick={() => setScreen("settings")}
+          style={{
+            position: "absolute",
+            bottom: 32,
+            right: 28,
+            background: "rgba(0, 220, 180, 0.08)",
+            border: "1px solid rgba(0, 220, 180, 0.28)",
+            borderRadius: 16,
+            padding: 14,
+            cursor: "pointer",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            fontSize: 22
+          }}
+        >
+          <IconSettings s={24} c="oklch(0.72 0.01 250)" />
+        </button>
+      </Shell>
+    );
+  }
+
+  if (screen === "calendar") {
+    const year = calendarMonth.getFullYear();
+    const month = calendarMonth.getMonth();
+    const startOffset = getStartOffset(year, month);
+    const daysInMonth = getDaysInMonth(year, month);
+
+    const prevMonth = () => {
+      setCalendarMonth(new Date(year, month - 1, 1));
+    };
+    const nextMonth = () => {
+      setCalendarMonth(new Date(year, month + 1, 1));
+    };
+
+    const openNewReserva = (date?: string) => {
+      setEditingReserva(null);
+      setSelectedDate(date || today());
+      setReservaTime(timeNow());
+      setReservaOrigen("");
+      setReservaDestino("");
+      setReservaCliente("");
+      setReservaTelefono("");
+      setReservaNotas("");
+      setShowReservaDialog(true);
+    };
+
+    const openNewNota = (date?: string) => {
+      setEditingNota(null);
+      setSelectedDate(date || today());
+      setNotaTipo("Libre");
+      setNotaTexto("");
+      setShowNotaDialog(true);
+    };
+
+    const openEditReserva = (r: Reserva) => {
+      setEditingReserva(r);
+      setSelectedDate(r.date);
+      setReservaTime(r.time);
+      setReservaOrigen(r.origen);
+      setReservaDestino(r.destino);
+      setReservaCliente(r.cliente);
+      setReservaTelefono(r.telefono);
+      setReservaNotas(r.notas);
+      setShowReservaDialog(true);
+    };
+
+    const openEditNota = (n: NotaCalendario) => {
+      setEditingNota(n);
+      setSelectedDate(n.date);
+      setNotaTipo(n.tipo);
+      setNotaTexto(n.texto);
+      setShowNotaDialog(true);
+    };
+
+    const saveReserva = () => {
+      if (!reservaTime || !reservaOrigen || !reservaDestino || !reservaCliente || !reservaTelefono) {
+        alert("Por favor rellena todos los campos obligatorios.");
+        return;
+      }
+      if (editingReserva) {
+        setReservations(prev => prev.map(r => r.id === editingReserva.id ? {
+          ...r,
+          date: selectedDate,
+          time: reservaTime,
+          origen: reservaOrigen,
+          destino: reservaDestino,
+          cliente: reservaCliente,
+          telefono: reservaTelefono,
+          notas: reservaNotas
+        } : r));
+      } else {
+        const newRes: Reserva = {
+          id: Date.now().toString() + Math.random().toString(36).substring(2, 7),
+          date: selectedDate,
+          time: reservaTime,
+          origen: reservaOrigen,
+          destino: reservaDestino,
+          cliente: reservaCliente,
+          telefono: reservaTelefono,
+          notas: reservaNotas
+        };
+        setReservations(prev => [...prev, newRes]);
+      }
+      setShowReservaDialog(false);
+    };
+
+    const saveNota = () => {
+      if (!notaTexto.trim()) {
+        alert("Por favor escribe el texto de la nota.");
+        return;
+      }
+      if (editingNota) {
+        setNotes(prev => prev.map(n => n.id === editingNota.id ? {
+          ...n,
+          date: selectedDate,
+          tipo: notaTipo,
+          texto: notaTexto
+        } : n));
+      } else {
+        const newNote: NotaCalendario = {
+          id: Date.now().toString() + Math.random().toString(36).substring(2, 7),
+          date: selectedDate,
+          tipo: notaTipo,
+          texto: notaTexto
+        };
+        setNotes(prev => [...prev, newNote]);
+      }
+      setShowNotaDialog(false);
+    };
+
+    const deleteReserva = (id: string) => {
+      setConfirmDialog({
+        text: "¿Seguro que quieres eliminar esta reserva?",
+        onConfirm: () => {
+          setReservations(prev => prev.filter(r => r.id !== id));
+        }
+      });
+    };
+
+    const deleteNota = (id: string) => {
+      setConfirmDialog({
+        text: "¿Seguro que quieres eliminar esta nota?",
+        onConfirm: () => {
+          setNotes(prev => prev.filter(n => n.id !== id));
+        }
+      });
+    };
+
+    // Eventos del día seleccionado
+    const dayReservations = reservations.filter(r => r.date === selectedDate).sort((a,b) => a.time.localeCompare(b.time));
+    const dayNotes = notes.filter(n => n.date === selectedDate);
+    const dayTurnos = history.filter(t => (t.startDate || t.date) === selectedDate);
+
+    // Agenda 14 días
+    const agendaDays = Array.from({ length: 14 }).map((_, i) => {
+      const d = new Date();
+      d.setDate(d.getDate() + i);
+      return d.toISOString().slice(0, 10);
+    });
+
+    const daysWithEvents = agendaDays.filter(dayStr => {
+      const dayRes = reservations.some(r => r.date === dayStr);
+      const dayN = notes.some(n => n.date === dayStr);
+      const dayT = history.some(t => (t.startDate || t.date) === dayStr);
+      return dayRes || dayN || dayT;
+    });
+
+    const MONTHS_ES = [
+      "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
+      "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"
+    ];
+
+    const getNotaTipoColor = (t: 'ITV' | 'Seguro' | 'Autónomos' | 'Libre' | 'Día libre') => {
+      switch (t) {
+        case 'ITV': return 'oklch(0.70 0.18 25)';
+        case 'Seguro': return 'oklch(0.72 0.14 200)';
+        case 'Autónomos': return 'oklch(0.75 0.16 70)';
+        case 'Libre': return 'oklch(0.68 0.20 145)';
+        case 'Día libre': return 'oklch(0.65 0.20 280)';
+        default: return 'white';
+      }
+    };
+
+    const formatAgendaDate = (dStr: string) => {
+      if (dStr === today()) return "Hoy";
+      const tomorrow = new Date();
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      if (dStr === tomorrow.toISOString().slice(0, 10)) return "Mañana";
+      const d = new Date(dStr + "T12:00:00");
+      return d.toLocaleDateString("es-ES", { weekday: "long", day: "numeric", month: "short" }).replace(/^\w/, c => c.toUpperCase());
+    };
+
+    return (
+      <Shell burst={false}>
+        <div style={{ flex: 1, padding: "16px 20px", display: "flex", flexDirection: "column", gap: 16, overflowY: "auto", position: "relative" }}>
+          
+          {/* Cabecera superior */}
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10, flexShrink: 0 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+              <button style={S.iconBtn} onClick={() => setScreen("home")}><IconBack /></button>
+              <div style={{ fontSize: 24, fontWeight: 800, color: "white" }}>Calendario</div>
+            </div>
+
+            {/* Selector de Vista (Mes / Agenda) */}
+            <div style={{ display: "flex", background: "rgba(0, 0, 0, 0.35)", borderRadius: 12, padding: 3, border: "1px solid rgba(255, 255, 255, 0.05)" }}>
+              <button
+                onClick={() => setCalendarView('month')}
+                style={{
+                  border: "none",
+                  borderRadius: 9,
+                  padding: "6px 12px",
+                  background: calendarView === 'month' ? "rgba(255, 255, 255, 0.1)" : "transparent",
+                  color: calendarView === 'month' ? "white" : "rgba(255, 255, 255, 0.5)",
+                  fontSize: 13,
+                  fontWeight: 700,
+                  cursor: "pointer",
+                  transition: "all 0.15s"
+                }}
+              >
+                Mes
+              </button>
+              <button
+                onClick={() => setCalendarView('agenda')}
+                style={{
+                  border: "none",
+                  borderRadius: 9,
+                  padding: "6px 12px",
+                  background: calendarView === 'agenda' ? "rgba(255, 255, 255, 0.1)" : "transparent",
+                  color: calendarView === 'agenda' ? "white" : "rgba(255, 255, 255, 0.5)",
+                  fontSize: 13,
+                  fontWeight: 700,
+                  cursor: "pointer",
+                  transition: "all 0.15s"
+                }}
+              >
+                Agenda
+              </button>
+            </div>
+
+            {/* Botones rápidos para añadir */}
+            <div style={{ display: "flex", gap: 6 }}>
+              <button
+                onClick={() => openNewReserva()}
+                style={{
+                  height: 34,
+                  borderRadius: 10,
+                  border: "none",
+                  background: C,
+                  color: "black",
+                  fontSize: 12,
+                  fontWeight: 800,
+                  cursor: "pointer",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  padding: "0 10px",
+                  gap: 4
+                }}
+              >
+                + 📅
+              </button>
+              <button
+                onClick={() => openNewNota()}
+                style={{
+                  height: 34,
+                  borderRadius: 10,
+                  border: "1px solid rgba(255,255,255,0.12)",
+                  background: "rgba(255,255,255,0.06)",
+                  color: "rgba(255,255,255,0.8)",
+                  fontSize: 12,
+                  fontWeight: 800,
+                  cursor: "pointer",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  padding: "0 10px",
+                  gap: 4
+                }}
+              >
+                + 📝
+              </button>
+            </div>
+          </div>
+
+          {/* Vistas condicionales */}
+          {calendarView === 'month' ? (
+            <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+              {/* Selector de Mes */}
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: "rgba(255,255,255,0.03)", borderRadius: 16, padding: "8px 12px", border: "1px solid rgba(255,255,255,0.05)" }}>
+                <button onClick={prevMonth} style={{ background: "none", border: "none", color: C, fontSize: 18, cursor: "pointer", padding: "8px 12px" }}>◀</button>
+                <div style={{ fontSize: 16, fontWeight: 800, color: "white" }}>
+                  {MONTHS_ES[month]} {year}
+                </div>
+                <button onClick={nextMonth} style={{ background: "none", border: "none", color: C, fontSize: 18, cursor: "pointer", padding: "8px 12px" }}>▶</button>
+              </div>
+
+              {/* Cabecera L-M-X-J-V-S-D */}
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 4, textAlign: "center" }}>
+                {["L", "M", "X", "J", "V", "S", "D"].map((day, idx) => (
+                  <div key={idx} style={{ fontSize: 11, fontWeight: 700, color: "rgba(255,255,255,0.4)", textTransform: "uppercase" }}>
+                    {day}
+                  </div>
+                ))}
+              </div>
+
+              {/* Cuadrícula de días */}
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 6, marginBottom: 8 }}>
+                {Array.from({ length: startOffset }).map((_, idx) => (
+                  <div key={`offset-${idx}`} style={{ aspectRatio: "1" }} />
+                ))}
+
+                {Array.from({ length: daysInMonth }).map((_, idx) => {
+                  const dayNum = idx + 1;
+                  const dayStr = `${year}-${String(month + 1).padStart(2, "0")}-${String(dayNum).padStart(2, "0")}`;
+                  const isSelected = selectedDate === dayStr;
+                  const isToday = dayStr === today();
+
+                  const hasTurno = history.some(t => (t.startDate || t.date) === dayStr);
+                  const dayResList = reservations.filter(r => r.date === dayStr);
+                  const dayNoteList = notes.filter(n => n.date === dayStr);
+
+                  return (
+                    <div
+                      key={dayNum}
+                      onClick={() => {
+                        const clickedDate = `${year}-${String(month + 1).padStart(2, "0")}-${String(dayNum).padStart(2, "0")}`;
+                        setSelectedDate(clickedDate);
+                      }}
+                      style={{
+                        aspectRatio: "1",
+                        background: isSelected ? "rgba(180, 120, 255, 0.12)" : isToday ? "rgba(0, 220, 180, 0.08)" : "rgba(255,255,255,0.02)",
+                        border: isSelected 
+                          ? `1.5px solid ${C}` 
+                          : isToday 
+                            ? `1.5px solid ${G}` 
+                            : "1px solid rgba(255,255,255,0.05)",
+                        borderRadius: 12,
+                        display: "flex",
+                        flexDirection: "column",
+                        justifyContent: "space-between",
+                        alignItems: "center",
+                        padding: "6px 2px",
+                        cursor: "pointer",
+                        position: "relative",
+                        transition: "all 0.15s"
+                      }}
+                    >
+                      <span style={{ 
+                        fontSize: 14, 
+                        fontWeight: isSelected || isToday ? 800 : 500, 
+                        color: isSelected ? C : isToday ? G : "white" 
+                      }}>
+                        {dayNum}
+                      </span>
+
+                      <div style={{ display: "flex", gap: 2, justifyContent: "center", flexWrap: "wrap", width: "100%" }}>
+                        {hasTurno && <span style={{ fontSize: 8 }}>🚖</span>}
+                        {dayResList.length > 0 && (
+                          <span style={{ fontSize: 8, background: C, color: "black", borderRadius: 4, padding: "0 2px", fontWeight: "bold" }}>
+                            {dayResList.length}
+                          </span>
+                        )}
+                        {dayNoteList.length > 0 && <span style={{ fontSize: 8 }}>📝</span>}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Detalle del Día Seleccionado (Panel inferior con fadeUp) */}
+              <div
+                key={selectedDate}
+                style={{
+                  background: "rgba(255,255,255,0.03)",
+                  borderRadius: 20,
+                  padding: 16,
+                  border: "1px solid rgba(255,255,255,0.07)",
+                  animation: "fadeUp 0.25s ease"
+                }}
+              >
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
+                  <div style={{ fontSize: 15, fontWeight: 800, color: "white" }}>
+                    {new Date(selectedDate + "T12:00:00").toLocaleDateString("es-ES", { weekday: "long", day: "numeric", month: "long" }).replace(/^\w/, c => c.toUpperCase())}
+                  </div>
+                  <div style={{ display: "flex", gap: 6 }}>
+                    <button onClick={() => openNewReserva(selectedDate)} style={{ border: "none", background: "rgba(180, 120, 255, 0.1)", color: C, borderRadius: 8, padding: "6px 10px", fontSize: 11, fontWeight: 700, cursor: "pointer" }}>+ Reserva</button>
+                    <button onClick={() => openNewNota(selectedDate)} style={{ border: "none", background: "rgba(255,255,255,0.06)", color: "rgba(255,255,255,0.7)", borderRadius: 8, padding: "6px 10px", fontSize: 11, fontWeight: 700, cursor: "pointer" }}>+ Nota</button>
+                  </div>
+                </div>
+
+                {/* Lista de Eventos */}
+                <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                  {dayTurnos.length === 0 && dayReservations.length === 0 && dayNotes.length === 0 && (
+                    <div style={{ textAlign: "center", color: "rgba(255,255,255,0.3)", padding: "16px 0", fontSize: 13, fontStyle: "italic" }}>
+                      Sin eventos para este día
+                    </div>
+                  )}
+
+                  {/* Turno Cerrado */}
+                  {dayTurnos.map(turno => (
+                    <div 
+                      key={turno.id}
+                      onClick={() => { setViewTurno(turno); setScreen("summary"); }}
+                      style={{
+                        background: "rgba(255,255,255,0.02)",
+                        border: "1px solid rgba(255,255,255,0.05)",
+                        borderRadius: 14,
+                        padding: 12,
+                        display: "flex",
+                        justifyContent: "space-between",
+                        alignItems: "center",
+                        cursor: "pointer"
+                      }}
+                    >
+                      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                        <span style={{ fontSize: 18 }}>🚖</span>
+                        <div>
+                          <div style={{ fontSize: 10, fontWeight: 700, color: "rgba(255,255,255,0.4)", textTransform: "uppercase" }}>Turno del Historial</div>
+                          <div style={{ fontSize: 14, fontWeight: 800, color: G }}>
+                            Taxímetro: {fmt(turno.dinero || 0)} • {turno.km} KM
+                          </div>
+                        </div>
+                      </div>
+                      <span style={{ fontSize: 16, color: "rgba(255,255,255,0.3)" }}>➔</span>
+                    </div>
+                  ))}
+
+                  {/* Reservas */}
+                  {dayReservations.map(res => (
+                    <div key={res.id} style={{ background: "rgba(180, 120, 255, 0.04)", border: "1px solid rgba(180, 120, 255, 0.15)", borderRadius: 14, padding: 12, display: "flex", flexDirection: "column", gap: 6 }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                          <span style={{ fontSize: 11, fontWeight: 800, color: "black", background: C, padding: "3px 6px", borderRadius: 6 }}>{res.time}</span>
+                          <span style={{ fontSize: 14, fontWeight: 800, color: "white" }}>{res.cliente}</span>
+                        </div>
+                        <div style={{ display: "flex", gap: 6 }}>
+                          <button onClick={() => openEditReserva(res)} style={{ background: "none", border: "none", color: "rgba(255,255,255,0.5)", cursor: "pointer", fontSize: 13 }}>✏️</button>
+                          <button onClick={() => deleteReserva(res.id)} style={{ background: "none", border: "none", color: "rgba(255,255,255,0.5)", cursor: "pointer", fontSize: 13 }}>🗑️</button>
+                        </div>
+                      </div>
+                      <div style={{ fontSize: 13, color: "rgba(255,255,255,0.8)" }}>
+                        <span style={{ fontWeight: 600 }}>Origen:</span> {res.origen} <br/>
+                        <span style={{ fontWeight: 600 }}>Destino:</span> {res.destino}
+                      </div>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 4 }}>
+                        <a 
+                          href={`tel:${res.telefono}`}
+                          style={{
+                            color: C,
+                            fontSize: 13,
+                            fontWeight: 700,
+                            textDecoration: "underline",
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 4
+                          }}
+                        >
+                          📞 {res.telefono}
+                        </a>
+                        {res.notas && (
+                          <span style={{ fontSize: 11, color: "rgba(255,255,255,0.45)", fontStyle: "italic" }}>
+                            {res.notas}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+
+                  {/* Notas */}
+                  {dayNotes.map(note => {
+                    const col = getNotaTipoColor(note.tipo);
+                    return (
+                      <div key={note.id} style={{ background: "rgba(255,255,255,0.02)", border: `1px solid rgba(255,255,255,0.06)`, borderLeft: `4px solid ${col}`, borderRadius: 12, padding: "10px 12px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                        <div>
+                          <div style={{ fontSize: 10, fontWeight: 700, color: col, textTransform: "uppercase", marginBottom: 3 }}>{note.tipo}</div>
+                          <div style={{ fontSize: 14, color: "white", lineHeight: 1.3 }}>{note.texto}</div>
+                        </div>
+                        <div style={{ display: "flex", gap: 6 }}>
+                          <button onClick={() => openEditNota(note)} style={{ background: "none", border: "none", color: "rgba(255,255,255,0.4)", cursor: "pointer", fontSize: 13 }}>✏️</button>
+                          <button onClick={() => deleteNota(note.id)} style={{ background: "none", border: "none", color: "rgba(255,255,255,0.4)", cursor: "pointer", fontSize: 13 }}>🗑️</button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+          ) : (
+            /* Vista Agenda (Próximos 14 días con eventos) */
+            <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+              {daysWithEvents.length === 0 ? (
+                <div style={{ textAlign: "center", padding: "40px 20px", background: "rgba(255,255,255,0.02)", borderRadius: 20, border: "1px solid rgba(255,255,255,0.05)" }}>
+                  <div style={{ fontSize: 32, marginBottom: 12 }}>📅</div>
+                  <div style={{ fontSize: 15, fontWeight: 700, color: "white", marginBottom: 4 }}>Sin eventos próximos</div>
+                  <div style={{ fontSize: 13, color: "rgba(255,255,255,0.45)" }}>No hay reservas ni notas planificadas para los próximos 14 días.</div>
+                </div>
+              ) : (
+                daysWithEvents.map(dayStr => {
+                  const dayRes = reservations.filter(r => r.date === dayStr).sort((a,b) => a.time.localeCompare(b.time));
+                  const dayN = notes.filter(n => n.date === dayStr);
+                  const dayT = history.filter(t => (t.startDate || t.date) === dayStr);
+
+                  return (
+                    <div key={dayStr} style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.05)", borderRadius: 18, padding: 14 }}>
+                      <div style={{ fontSize: 14, fontWeight: 800, color: C, borderBottom: "1px solid rgba(255,255,255,0.06)", paddingBottom: 6, marginBottom: 10 }}>
+                        {formatAgendaDate(dayStr)}
+                      </div>
+
+                      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                        {/* Turno */}
+                        {dayT.map(t => (
+                          <div key={t.id} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: "rgba(255,255,255,0.7)" }}>
+                            <span>🚖</span>
+                            <span>Turno Cerrado: <strong style={{ color: "white" }}>{fmt(t.dinero || 0)}</strong></span>
+                          </div>
+                        ))}
+
+                        {/* Reservas */}
+                        {dayRes.map(res => (
+                          <div key={res.id} style={{ display: "flex", flexDirection: "column", gap: 4, background: "rgba(180, 120, 255, 0.04)", padding: 10, borderRadius: 10 }}>
+                            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13 }}>
+                              <div>
+                                <span style={{ fontWeight: 800, color: C, marginRight: 6 }}>{res.time}</span>
+                                <strong style={{ color: "white" }}>{res.cliente}</strong>
+                              </div>
+                              <a href={`tel:${res.telefono}`} style={{ color: C, textDecoration: "underline", fontWeight: "bold" }}>📞 {res.telefono}</a>
+                            </div>
+                            <div style={{ fontSize: 12, color: "rgba(255,255,255,0.6)" }}>
+                              {res.origen} ➔ {res.destino}
+                            </div>
+                          </div>
+                        ))}
+
+                        {/* Notas */}
+                        {dayN.map(n => {
+                          const col = getNotaTipoColor(n.tipo);
+                          return (
+                            <div key={n.id} style={{ display: "flex", alignItems: "baseline", gap: 8, fontSize: 13 }}>
+                              <span style={{ fontSize: 9, fontWeight: 700, color: col, textTransform: "uppercase" }}>[{n.tipo}]</span>
+                              <span style={{ color: "white" }}>{n.texto}</span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          )}
+
+          {/* Dialogo Añadir/Editar Reserva */}
+          {showReservaDialog && (
+            <div
+              role="dialog"
+              aria-modal="true"
+              aria-label="Formulario Reserva"
+              style={{
+                position: "fixed",
+                top: 0, left: 0, right: 0, bottom: 0,
+                background: "rgba(0,0,0,0.65)",
+                backdropFilter: "blur(4px)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                zIndex: 10000,
+                animation: "fadeUp 0.2s ease"
+              }}
+            >
+              <div
+                style={{
+                  background: "oklch(0.18 0.03 260)",
+                  borderRadius: 20,
+                  padding: 24,
+                  width: "90%",
+                  maxWidth: 380,
+                  border: "1px solid rgba(255,255,255,0.1)",
+                  boxShadow: "0 20px 40px rgba(0,0,0,0.5)",
+                  maxHeight: "90vh",
+                  overflowY: "auto",
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: 12
+                }}
+              >
+                <div style={{ fontSize: 16, fontWeight: 800, color: C, textTransform: "uppercase", marginBottom: 4 }}>
+                  {editingReserva ? "Editar Reserva" : "Nueva Reserva"}
+                </div>
+
+                <div>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: "rgba(255,255,255,0.4)", textTransform: "uppercase", marginBottom: 4 }}>Hora *</div>
+                  <input
+                    type="time"
+                    value={reservaTime}
+                    onChange={e => setReservaTime(e.target.value)}
+                    style={{
+                      width: "100%",
+                      background: "rgba(0,0,0,0.3)",
+                      border: "1px solid rgba(255,255,255,0.1)",
+                      borderRadius: 12,
+                      color: "white",
+                      padding: "10px 14px",
+                      fontSize: 14,
+                      outline: "none",
+                      boxSizing: "border-box"
+                    }}
+                  />
+                </div>
+
+                <div>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: "rgba(255,255,255,0.4)", textTransform: "uppercase", marginBottom: 4 }}>Cliente *</div>
+                  <input
+                    type="text"
+                    placeholder="Nombre del cliente"
+                    value={reservaCliente}
+                    onChange={e => setReservaCliente(e.target.value)}
+                    style={{
+                      width: "100%",
+                      background: "rgba(0,0,0,0.3)",
+                      border: "1px solid rgba(255,255,255,0.1)",
+                      borderRadius: 12,
+                      color: "white",
+                      padding: "10px 14px",
+                      fontSize: 14,
+                      outline: "none",
+                      boxSizing: "border-box"
+                    }}
+                  />
+                </div>
+
+                <div>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: "rgba(255,255,255,0.4)", textTransform: "uppercase", marginBottom: 4 }}>Teléfono *</div>
+                  <input
+                    type="tel"
+                    placeholder="Número de teléfono"
+                    value={reservaTelefono}
+                    onChange={e => setReservaTelefono(e.target.value)}
+                    style={{
+                      width: "100%",
+                      background: "rgba(0,0,0,0.3)",
+                      border: "1px solid rgba(255,255,255,0.1)",
+                      borderRadius: 12,
+                      color: "white",
+                      padding: "10px 14px",
+                      fontSize: 14,
+                      outline: "none",
+                      boxSizing: "border-box"
+                    }}
+                  />
+                </div>
+
+                <div>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: "rgba(255,255,255,0.4)", textTransform: "uppercase", marginBottom: 4 }}>Origen *</div>
+                  <input
+                    type="text"
+                    placeholder="Lugar de recogida"
+                    value={reservaOrigen}
+                    onChange={e => setReservaOrigen(e.target.value)}
+                    style={{
+                      width: "100%",
+                      background: "rgba(0,0,0,0.3)",
+                      border: "1px solid rgba(255,255,255,0.1)",
+                      borderRadius: 12,
+                      color: "white",
+                      padding: "10px 14px",
+                      fontSize: 14,
+                      outline: "none",
+                      boxSizing: "border-box"
+                    }}
+                  />
+                </div>
+
+                <div>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: "rgba(255,255,255,0.4)", textTransform: "uppercase", marginBottom: 4 }}>Destino *</div>
+                  <input
+                    type="text"
+                    placeholder="Destino"
+                    value={reservaDestino}
+                    onChange={e => setReservaDestino(e.target.value)}
+                    style={{
+                      width: "100%",
+                      background: "rgba(0,0,0,0.3)",
+                      border: "1px solid rgba(255,255,255,0.1)",
+                      borderRadius: 12,
+                      color: "white",
+                      padding: "10px 14px",
+                      fontSize: 14,
+                      outline: "none",
+                      boxSizing: "border-box"
+                    }}
+                  />
+                </div>
+
+                <div>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: "rgba(255,255,255,0.4)", textTransform: "uppercase", marginBottom: 4 }}>Notas opcionales</div>
+                  <input
+                    type="text"
+                    placeholder="Indicaciones para el viaje"
+                    value={reservaNotas}
+                    onChange={e => setReservaNotas(e.target.value)}
+                    style={{
+                      width: "100%",
+                      background: "rgba(0,0,0,0.3)",
+                      border: "1px solid rgba(255,255,255,0.1)",
+                      borderRadius: 12,
+                      color: "white",
+                      padding: "10px 14px",
+                      fontSize: 14,
+                      outline: "none",
+                      boxSizing: "border-box"
+                    }}
+                  />
+                </div>
+
+                <div style={{ display: "flex", gap: 10, marginTop: 8 }}>
+                  <button
+                    onClick={() => setShowReservaDialog(false)}
+                    style={{
+                      flex: 1,
+                      padding: "12px 0",
+                      borderRadius: 12,
+                      border: "none",
+                      background: "rgba(255,255,255,0.08)",
+                      color: "rgba(255,255,255,0.7)",
+                      fontSize: 14,
+                      fontWeight: 700,
+                      cursor: "pointer"
+                    }}
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    onClick={saveReserva}
+                    style={{
+                      flex: 1.2,
+                      padding: "12px 0",
+                      borderRadius: 12,
+                      border: "none",
+                      background: C,
+                      color: "black",
+                      fontSize: 14,
+                      fontWeight: 800,
+                      cursor: "pointer"
+                    }}
+                  >
+                    Guardar
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Dialogo Añadir/Editar Nota */}
+          {showNotaDialog && (
+            <div
+              role="dialog"
+              aria-modal="true"
+              aria-label="Formulario Nota"
+              style={{
+                position: "fixed",
+                top: 0, left: 0, right: 0, bottom: 0,
+                background: "rgba(0,0,0,0.65)",
+                backdropFilter: "blur(4px)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                zIndex: 10000,
+                animation: "fadeUp 0.2s ease"
+              }}
+            >
+              <div
+                style={{
+                  background: "oklch(0.18 0.03 260)",
+                  borderRadius: 20,
+                  padding: 24,
+                  width: "90%",
+                  maxWidth: 340,
+                  border: "1px solid rgba(255,255,255,0.1)",
+                  boxShadow: "0 20px 40px rgba(0,0,0,0.5)",
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: 12
+                }}
+              >
+                <div style={{ fontSize: 16, fontWeight: 800, color: "white", textTransform: "uppercase", marginBottom: 4 }}>
+                  {editingNota ? "Editar Nota" : "Nueva Nota"}
+                </div>
+
+                <div>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: "rgba(255,255,255,0.4)", textTransform: "uppercase", marginBottom: 6 }}>Categoría</div>
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                    {(['ITV', 'Seguro', 'Autónomos', 'Libre', 'Día libre'] as const).map(t => {
+                      const isSelected = notaTipo === t;
+                      const col = getNotaTipoColor(t);
+                      return (
+                        <button
+                          key={t}
+                          onClick={() => setNotaTipo(t)}
+                          style={{
+                            border: isSelected ? `2.5px solid ${col}` : "1px solid rgba(255,255,255,0.1)",
+                            borderRadius: 10,
+                            padding: "6px 10px",
+                            background: isSelected ? "rgba(255,255,255,0.08)" : "rgba(255,255,255,0.02)",
+                            color: isSelected ? col : "rgba(255,255,255,0.6)",
+                            fontSize: 12,
+                            fontWeight: isSelected ? 800 : 600,
+                            cursor: "pointer",
+                            transition: "all 0.1s"
+                          }}
+                        >
+                          {t}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                <div>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: "rgba(255,255,255,0.4)", textTransform: "uppercase", marginBottom: 4 }}>Descripción</div>
+                  <input
+                    type="text"
+                    placeholder="Escribe el detalle aquí..."
+                    value={notaTexto}
+                    onChange={e => setNotaTexto(e.target.value)}
+                    style={{
+                      width: "100%",
+                      background: "rgba(0,0,0,0.3)",
+                      border: "1px solid rgba(255,255,255,0.1)",
+                      borderRadius: 12,
+                      color: "white",
+                      padding: "10px 14px",
+                      fontSize: 14,
+                      outline: "none",
+                      boxSizing: "border-box"
+                    }}
+                  />
+                </div>
+
+                <div style={{ display: "flex", gap: 10, marginTop: 8 }}>
+                  <button
+                    onClick={() => setShowNotaDialog(false)}
+                    style={{
+                      flex: 1,
+                      padding: "12px 0",
+                      borderRadius: 12,
+                      border: "none",
+                      background: "rgba(255,255,255,0.08)",
+                      color: "rgba(255,255,255,0.7)",
+                      fontSize: 14,
+                      fontWeight: 700,
+                      cursor: "pointer"
+                    }}
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    onClick={saveNota}
+                    style={{
+                      flex: 1.2,
+                      padding: "12px 0",
+                      borderRadius: 12,
+                      border: "none",
+                      background: C,
+                      color: "black",
+                      fontSize: 14,
+                      fontWeight: 800,
+                      cursor: "pointer"
+                    }}
+                  >
+                    Guardar
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {confirmDialog && <ConfirmDialog {...confirmDialog} onCancel={() => setConfirmDialog(null)} />}
+
+        </div>
       </Shell>
     );
   }
@@ -1956,13 +2968,13 @@ function App() {
                 <div style={{ fontSize: 10, fontWeight: 700, color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', letterSpacing: '0.3px', marginBottom: 6, display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 4, whiteSpace: 'nowrap' }}>
                   <IconTaxiSign s={28} c="oklch(0.85 0.18 85)" /> Total Taxímetro
                 </div>
-                <div style={{ fontSize: 22, fontWeight: 900, color: 'oklch(0.85 0.18 85)', letterSpacing: '-0.5px' }}>{fmt(dineroV)}</div>
+                <div style={{ fontSize: "clamp(16px, 4.5vw, 22px)", fontWeight: 900, color: 'oklch(0.85 0.18 85)', letterSpacing: '-0.5px' }}>{fmt(dineroV)}</div>
               </div>
               <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', textAlign: 'center', background: 'oklch(0.19 0.05 220)', borderRadius: 16, padding: '14px 8px', border: '1px solid oklch(0.65 0.14 220 / 0.35)' }}>
                 <div style={{ fontSize: 10, fontWeight: 700, color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', letterSpacing: '0.3px', marginBottom: 6, display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 4, whiteSpace: 'nowrap' }}>
                   <IconRoad s={24} c="oklch(0.80 0.14 220)" /> Total KM
                 </div>
-                <div style={{ fontSize: 22, fontWeight: 900, color: 'oklch(0.80 0.14 220)', letterSpacing: '-0.5px' }}>{kmV.toString().replace('.', ',')} <span style={{ fontSize: 13, fontWeight: 700, opacity: 0.6 }}>KM</span></div>
+                <div style={{ fontSize: "clamp(16px, 4.5vw, 22px)", fontWeight: 900, color: 'oklch(0.80 0.14 220)', letterSpacing: '-0.5px' }}>{kmV.toString().replace('.', ',')} <span style={{ fontSize: 13, fontWeight: 700, opacity: 0.6 }}>KM</span></div>
               </div>
             </div>
 
@@ -1972,13 +2984,13 @@ function App() {
                 <div style={{ fontSize: 10, fontWeight: 700, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '0.3px', marginBottom: 6, display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 4, whiteSpace: 'nowrap' }}>
                   <IconMoneyBag s={26} c="oklch(0.78 0.18 150)" /> Mi Ganancia
                 </div>
-                <div style={{ fontSize: 22, fontWeight: 900, color: 'oklch(0.78 0.18 150)', letterSpacing: '-0.5px' }}>{fmt(miGanancia)}</div>
+                <div style={{ fontSize: "clamp(16px, 4.5vw, 22px)", fontWeight: 900, color: 'oklch(0.78 0.18 150)', letterSpacing: '-0.5px' }}>{fmt(miGanancia)}</div>
               </div>
               <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', textAlign: 'center', background: 'rgba(0, 180, 255, 0.05)', borderRadius: 16, padding: '14px 8px', border: '1px solid rgba(0, 180, 255, 0.15)' }}>
                 <div style={{ fontSize: 10, fontWeight: 700, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '0.3px', marginBottom: 6, display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 4, whiteSpace: 'nowrap' }}>
                   <IconTimer s={26} c="oklch(0.85 0.12 210)" /> Tiempo Trabajado
                 </div>
-                <div style={{ fontSize: 22, fontWeight: 900, color: 'oklch(0.85 0.12 210)', letterSpacing: '-0.5px' }}>{durationStr}</div>
+                <div style={{ fontSize: "clamp(16px, 4.5vw, 22px)", fontWeight: 900, color: 'oklch(0.85 0.12 210)', letterSpacing: '-0.5px' }}>{durationStr}</div>
               </div>
             </div>
           </div>
@@ -1992,7 +3004,7 @@ function App() {
                     {c.icon}
                     <span style={{ fontSize: 12, fontWeight: 700, color: 'rgba(255,255,255,0.5)' }}>{c.label}</span>
                   </div>
-                  <div style={{ fontSize: 20, fontWeight: 900, color: c.color, letterSpacing: '-0.5px' }}>{fmt(c.total)}</div>
+                  <div style={{ fontSize: "clamp(15px, 4.5vw, 20px)", fontWeight: 900, color: c.color, letterSpacing: '-0.5px' }}>{fmt(c.total)}</div>
                   <div style={{ fontSize: 11, color: "rgba(255,255,255,0.5)", marginTop: 3 }}>{c.count} {c.count === 1 ? 'entrada' : 'entradas'}</div>
                 </div>
               ))}
@@ -3009,10 +4021,10 @@ function App() {
                   </span>
                 </div>
                 <div style={{ display: "flex", gap: 16, marginTop: 4 }}>
-                  <div style={{ fontSize: 32, fontWeight: 900, color: "oklch(0.85 0.18 85)", letterSpacing: "-1px" }}>
+                  <div style={{ fontSize: "clamp(22px, 6vw, 32px)", fontWeight: 900, color: "oklch(0.85 0.18 85)", letterSpacing: "-1px" }}>
                     {fmt(totales.dinero)}
                   </div>
-                  <div style={{ fontSize: 32, fontWeight: 900, color: "oklch(0.80 0.14 220)", letterSpacing: "-1px" }}>
+                  <div style={{ fontSize: "clamp(22px, 6vw, 32px)", fontWeight: 900, color: "oklch(0.80 0.14 220)", letterSpacing: "-1px" }}>
                     {(totales.km || 0).toString().replace('.', ',')} <span style={{ fontSize: 16, fontWeight: 700, opacity: 0.6 }}>KM</span>
                   </div>
                 </div>
@@ -3355,13 +4367,13 @@ function App() {
                 <div style={{ fontSize: 10, fontWeight: 700, color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', letterSpacing: '0.3px', marginBottom: 6, display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 4, whiteSpace: 'nowrap' }}>
                   <IconTaxiSign s={28} c="oklch(0.85 0.18 85)" /> Total Taxímetro
                 </div>
-                <div style={{ fontSize: 22, fontWeight: 900, color: 'oklch(0.85 0.18 85)', letterSpacing: '-0.5px' }}>{fmt(totales.dinero)}</div>
+                <div style={{ fontSize: "clamp(16px, 4.5vw, 22px)", fontWeight: 900, color: 'oklch(0.85 0.18 85)', letterSpacing: '-0.5px' }}>{fmt(totales.dinero)}</div>
               </div>
               <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', textAlign: 'center', background: 'oklch(0.19 0.05 220)', borderRadius: 16, padding: '14px 8px', border: '1px solid oklch(0.65 0.14 220 / 0.35)' }}>
                 <div style={{ fontSize: 10, fontWeight: 700, color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', letterSpacing: '0.3px', marginBottom: 6, display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 4, whiteSpace: 'nowrap' }}>
                   <IconRoad s={24} c="oklch(0.80 0.14 220)" /> Total KM
                 </div>
-                <div style={{ fontSize: 22, fontWeight: 900, color: 'oklch(0.80 0.14 220)', letterSpacing: '-0.5px' }}>{(totales.km || 0).toString().replace('.', ',')} <span style={{ fontSize: 13, fontWeight: 700, opacity: 0.6 }}>KM</span></div>
+                <div style={{ fontSize: "clamp(16px, 4.5vw, 22px)", fontWeight: 900, color: 'oklch(0.80 0.14 220)', letterSpacing: '-0.5px' }}>{(totales.km || 0).toString().replace('.', ',')} <span style={{ fontSize: 13, fontWeight: 700, opacity: 0.6 }}>KM</span></div>
               </div>
             </div>
 
@@ -3371,13 +4383,13 @@ function App() {
                 <div style={{ fontSize: 10, fontWeight: 700, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '0.3px', marginBottom: 6, display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 4, whiteSpace: 'nowrap' }}>
                   <IconMoneyBag s={26} c="oklch(0.78 0.18 150)" /> Mi Ganancia
                 </div>
-                <div style={{ fontSize: 22, fontWeight: 900, color: 'oklch(0.78 0.18 150)', letterSpacing: '-0.5px' }}>{fmt(miGanancia)}</div>
+                <div style={{ fontSize: "clamp(16px, 4.5vw, 22px)", fontWeight: 900, color: 'oklch(0.78 0.18 150)', letterSpacing: '-0.5px' }}>{fmt(miGanancia)}</div>
               </div>
               <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', textAlign: 'center', background: 'rgba(0, 180, 255, 0.05)', borderRadius: 16, padding: '14px 8px', border: '1px solid rgba(0, 180, 255, 0.15)' }}>
                 <div style={{ fontSize: 10, fontWeight: 700, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '0.3px', marginBottom: 6, display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 4, whiteSpace: 'nowrap' }}>
                   <IconTimer s={26} c="oklch(0.85 0.12 210)" /> Tiempo Trabajado
                 </div>
-                <div style={{ fontSize: 22, fontWeight: 900, color: 'oklch(0.85 0.12 210)', letterSpacing: '-0.5px' }}>{durationStr}</div>
+                <div style={{ fontSize: "clamp(16px, 4.5vw, 22px)", fontWeight: 900, color: 'oklch(0.85 0.12 210)', letterSpacing: '-0.5px' }}>{durationStr}</div>
               </div>
             </div>
           </div>
@@ -3391,7 +4403,7 @@ function App() {
                     {c.icon}
                     <span style={{ fontSize: 12, fontWeight: 700, color: 'rgba(255,255,255,0.5)' }}>{c.label}</span>
                   </div>
-                  <div style={{ fontSize: 20, fontWeight: 900, color: c.color, letterSpacing: '-0.5px' }}>{fmt(c.total)}</div>
+                  <div style={{ fontSize: "clamp(15px, 4.5vw, 20px)", fontWeight: 900, color: c.color, letterSpacing: '-0.5px' }}>{fmt(c.total)}</div>
                 </div>
               ))}
             </div>
@@ -3406,7 +4418,7 @@ function App() {
                   <IconReceipt s={24} c="oklch(0.70 0.18 25)" />
                   Total a Descontar
                 </div>
-                <div style={{ fontSize: 20, fontWeight: 900, color: 'oklch(0.70 0.18 25)', letterSpacing: '-0.5px' }}>
+                <div style={{ fontSize: "clamp(15px, 4.5vw, 20px)", fontWeight: 900, color: 'oklch(0.70 0.18 25)', letterSpacing: '-0.5px' }}>
                   {fmt(totalDescontar)}
                 </div>
               </div>
@@ -3417,7 +4429,7 @@ function App() {
                   <IconGive s={26} c="oklch(0.68 0.20 145)" />
                   Total a Dar
                 </div>
-                <div style={{ fontSize: 20, fontWeight: 900, color: 'oklch(0.68 0.20 145)', letterSpacing: '-0.5px' }}>
+                <div style={{ fontSize: "clamp(15px, 4.5vw, 20px)", fontWeight: 900, color: 'oklch(0.68 0.20 145)', letterSpacing: '-0.5px' }}>
                   {fmt(totalADar)}
                 </div>
               </div>
@@ -3537,20 +4549,20 @@ function App() {
                           {t.entries.length} {t.entries.length === 1 ? "entrada" : "entradas"}
                         </div>
                       </div>
-                      <div style={{ display: "flex", gap: 16, textAlign: "right" }}>
+                      <div style={{ display: "flex", gap: 10, textAlign: "right" }}>
                         <div style={{ display: "flex", flexDirection: "column", gap: 8, justifyContent: "center" }}>
-                          <div style={{ fontSize: 17, fontWeight: 900, color: "oklch(0.78 0.18 150)", display: "flex", alignItems: "center", gap: 6 }}>
+                          <div style={{ fontSize: 17, fontWeight: 900, color: "oklch(0.78 0.18 150)", display: "flex", alignItems: "center", gap: 6, whiteSpace: "nowrap" }}>
                             <IconTaxiSign s={20} c="oklch(0.85 0.18 85)" /> {fmt(t.dinero || 0)}
                           </div>
-                          <div style={{ fontSize: 17, fontWeight: 900, color: "oklch(0.80 0.14 220)", display: "flex", alignItems: "center", gap: 6 }}>
+                          <div style={{ fontSize: 17, fontWeight: 900, color: "oklch(0.80 0.14 220)", display: "flex", alignItems: "center", gap: 6, whiteSpace: "nowrap" }}>
                             <IconRoad s={18} c="oklch(0.80 0.14 220)" /> {t.km || 0} KM
                           </div>
                         </div>
                         <div style={{ display: "flex", flexDirection: "column", gap: 8, alignItems: "flex-end", justifyContent: "center" }}>
-                          <div style={{ fontSize: 17, fontWeight: 900, color: "oklch(0.78 0.18 150)", display: "flex", alignItems: "center", gap: 6 }}>
+                          <div style={{ fontSize: 17, fontWeight: 900, color: "oklch(0.78 0.18 150)", display: "flex", alignItems: "center", gap: 6, whiteSpace: "nowrap" }}>
                             <IconMoneyBag s={20} c="oklch(0.78 0.18 150)" /> {fmt(miGanancia)}
                           </div>
-                          <div style={{ fontSize: 17, fontWeight: 900, color: "oklch(0.85 0.12 210)", display: "flex", alignItems: "center", gap: 6 }}>
+                          <div style={{ fontSize: 17, fontWeight: 900, color: "oklch(0.85 0.12 210)", display: "flex", alignItems: "center", gap: 6, whiteSpace: "nowrap" }}>
                             <IconTimer s={18} c="oklch(0.85 0.12 210)" /> {durationStr}
                           </div>
                         </div>
@@ -3742,20 +4754,20 @@ function App() {
                         {j.entries.length} entradas
                       </div>
                     </div>
-                    <div style={{ display: "flex", gap: 16, textAlign: "right" }}>
+                    <div style={{ display: "flex", gap: 10, textAlign: "right" }}>
                       <div style={{ display: "flex", flexDirection: "column", gap: 8, justifyContent: "center" }}>
-                        <div style={{ fontSize: 17, fontWeight: 900, color: "oklch(0.78 0.18 150)", display: "flex", alignItems: "center", gap: 6 }}>
+                        <div style={{ fontSize: 17, fontWeight: 900, color: "oklch(0.78 0.18 150)", display: "flex", alignItems: "center", gap: 6, whiteSpace: "nowrap" }}>
                           <IconTaxiSign s={20} c="oklch(0.85 0.18 85)" /> {fmt(j.dinero || 0)}
                         </div>
-                        <div style={{ fontSize: 17, fontWeight: 900, color: "oklch(0.80 0.14 220)", display: "flex", alignItems: "center", gap: 6 }}>
+                        <div style={{ fontSize: 17, fontWeight: 900, color: "oklch(0.80 0.14 220)", display: "flex", alignItems: "center", gap: 6, whiteSpace: "nowrap" }}>
                           <IconRoad s={18} c="oklch(0.80 0.14 220)" /> {j.km || 0} KM
                         </div>
                       </div>
                       <div style={{ display: "flex", flexDirection: "column", gap: 8, alignItems: "flex-end", justifyContent: "center" }}>
-                        <div style={{ fontSize: 17, fontWeight: 900, color: "oklch(0.78 0.18 150)", display: "flex", alignItems: "center", gap: 6 }}>
+                        <div style={{ fontSize: 17, fontWeight: 900, color: "oklch(0.78 0.18 150)", display: "flex", alignItems: "center", gap: 6, whiteSpace: "nowrap" }}>
                           <IconMoneyBag s={20} c="oklch(0.78 0.18 150)" /> {fmt(miGanancia)}
                         </div>
-                        <div style={{ fontSize: 17, fontWeight: 900, color: "oklch(0.85 0.12 210)", display: "flex", alignItems: "center", gap: 6 }}>
+                        <div style={{ fontSize: 17, fontWeight: 900, color: "oklch(0.85 0.12 210)", display: "flex", alignItems: "center", gap: 6, whiteSpace: "nowrap" }}>
                           <IconTimer s={18} c="oklch(0.85 0.12 210)" /> {durationStr}
                         </div>
                       </div>
@@ -4817,7 +5829,7 @@ function MainCard({
       </div>
       <div
         style={{
-          fontSize: 34,
+          fontSize: "clamp(24px, 7vw, 34px)",
           fontWeight: 900,
           color,
           letterSpacing: "-1px",
