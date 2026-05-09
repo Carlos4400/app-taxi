@@ -272,13 +272,43 @@ function exportBackupJSON() {
     weekOverrides: localStorage.getItem(KEY_WEEK_OVERRIDES),
     weeksFrozen: localStorage.getItem(KEY_WEEKS_FROZEN)
   };
-  const blob = new Blob([JSON.stringify(backup, null, 2)], { type: "application/json" });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = `taxi_backup_${new Date().toISOString().split("T")[0]}.json`;
-  a.click();
-  URL.revokeObjectURL(url);
+  const text = JSON.stringify(backup, null, 2);
+  const filename = `taxi_backup_${new Date().toISOString().split("T")[0]}.json`;
+  saveAndShareFile(filename, text);
+}
+
+async function saveAndShareFile(filename: string, textContent: string) {
+  if (Capacitor.isNativePlatform()) {
+    try {
+      // 1. Escribimos el archivo en el directorio de Cache del dispositivo móvil
+      const result = await Filesystem.writeFile({
+        path: filename,
+        data: textContent,
+        directory: Directory.Cache,
+        encoding: Encoding.UTF8,
+      });
+      
+      // 2. Activamos el panel para compartir nativo de Android/iOS con el archivo creado
+      await Share.share({
+        title: filename,
+        text: "Aquí tienes tus turnos exportados.",
+        url: result.uri,
+        dialogTitle: "Compartir/Guardar Exportación"
+      });
+    } catch (e) {
+      console.error("Error al exportar archivo vía Capacitor:", e);
+      alert("Error al exportar: " + (e as Error).message);
+    }
+  } else {
+    // Fallback para Navegadores Web tradicionales
+    const blob = new Blob([textContent], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
 }
 
 // Esta función mezcla los turnos seleccionados con los actuales sin duplicar
@@ -1110,13 +1140,9 @@ function App() {
       history: JSON.stringify(turnosAExportar)
     };
 
-    const blob = new Blob([JSON.stringify(backup, null, 2)], { type: "application/json" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `taxi_turnos_seleccionados_${new Date().toISOString().split("T")[0]}.json`;
-    a.click();
-    URL.revokeObjectURL(url);
+    const text = JSON.stringify(backup, null, 2);
+    const filename = `taxi_turnos_seleccionados_${new Date().toISOString().split("T")[0]}.json`;
+    saveAndShareFile(filename, text);
 
     // Salimos del modo selección tras exportar
     setIsSelectingTurnos(false);
