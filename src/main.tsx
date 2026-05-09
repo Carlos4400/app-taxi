@@ -910,12 +910,14 @@ function Shell({
       style={{
         width: "100%",
         maxWidth: 460,
-        height: "100vh",
+        height: "100dvh",
         display: "flex",
         flexDirection: "column",
         background: "#0d0d14",
         overflow: "hidden",
         position: "relative",
+        paddingTop: "env(safe-area-inset-top)",
+        paddingBottom: "env(safe-area-inset-bottom)",
       }}
     >
       {burst && <Burst />}
