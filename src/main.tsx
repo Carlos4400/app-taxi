@@ -1061,6 +1061,41 @@ const IconPlay = ({ s = 24, c = "white" }: { s?: number; c?: string }) => (
   </svg>
 );
 
+const IconPause = ({ s = 24, c = "white" }: { s?: number; c?: string }) => (
+  <svg width={s} height={s} viewBox="0 0 24 24" fill="none" style={{ display: "inline-block", verticalAlign: "middle" }}>
+    <rect x="6.5" y="5" width="4.2" height="14" rx="1.7" fill={c} />
+    <rect x="13.3" y="5" width="4.2" height="14" rx="1.7" fill={c} />
+  </svg>
+);
+
+const IconHomeNeon = ({ s = 24 }: { s?: number }) => (
+  <svg width={s} height={s} viewBox="0 0 24 24" fill="none" style={{ display: "inline-block", verticalAlign: "middle" }}>
+    <path
+      d="M4.2 11.2L12 5.2L19.8 11.2"
+      stroke="#ffb347"
+      strokeWidth="2.15"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      style={{
+        filter:
+          "drop-shadow(0 0 1.2px rgba(255,190,77,0.75)) drop-shadow(0 0 4px rgba(255,139,61,0.28))",
+      }}
+    />
+    <path
+      d="M6.7 10.3V19H17.3V10.3"
+      stroke="#ffb347"
+      strokeWidth="2"
+      strokeLinejoin="round"
+      style={{
+        filter:
+          "drop-shadow(0 0 1.2px rgba(255,190,77,0.75)) drop-shadow(0 0 4px rgba(255,139,61,0.28))",
+      }}
+    />
+    <path d="M10 19V14.2H14V19" stroke="#ffe071" strokeWidth="1.8" strokeLinejoin="round" />
+    <path d="M9 11.7H15" stroke="#ffd56a" strokeWidth="1.5" strokeLinecap="round" opacity="0.75" />
+  </svg>
+);
+
 const IconCalendar = ({ s = 24, c = "white" }: { s?: number; c?: string }) => (
   <svg width={s} height={s} viewBox="0 0 24 24" fill="none" style={{ display: "inline-block", verticalAlign: "middle" }}>
     <rect x="3" y="4" width="18" height="16" rx="3" stroke={c} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
@@ -1543,8 +1578,8 @@ function App() {
   // --- Handlers globales del modal de Reserva (accesibles desde cualquier pantalla) ---
   const openNewReserva = (date?: string) => {
     setEditingReserva(null);
-    setSelectedDate(date || today());
-    setReservaTime(timeNow());
+    setSelectedDate("");
+    setReservaTime("");
     setReservaOrigen("");
     setReservaDestino("");
     setReservaCliente("");
@@ -1554,7 +1589,7 @@ function App() {
   };
 
   const saveReserva = () => {
-    if (!reservaTime || !reservaOrigen || !reservaDestino || !reservaCliente || !reservaTelefono) {
+    if (!selectedDate || !reservaTime || !reservaOrigen || !reservaDestino || !reservaCliente || !reservaTelefono) {
       alert("Por favor rellena todos los campos obligatorios.");
       return;
     }
@@ -1585,6 +1620,95 @@ function App() {
     setShowReservaDialog(false);
   };
 
+  const reservaInputStyle = {
+    width: "100%",
+    background: "rgba(0,0,0,0.28)",
+    border: "1px solid rgba(255,255,255,0.11)",
+    borderRadius: 14,
+    color: "white",
+    padding: "13px 14px",
+    fontSize: 15,
+    outline: "none",
+    boxSizing: "border-box" as const,
+  };
+
+  const renderReservaLabel = (primary: string, secondary: string, required = false) => (
+    <div style={{ marginBottom: 6 }}>
+      <div style={{ fontSize: 14, fontWeight: 800, color: "rgba(255,255,255,0.72)", textTransform: "uppercase", letterSpacing: "0.4px" }}>
+        {primary}{required ? " *" : ""}
+      </div>
+      {secondary && (
+        <div style={{ fontSize: 13, color: "rgba(255,255,255,0.36)", marginTop: 1 }}>
+          {secondary}
+        </div>
+      )}
+    </div>
+  );
+
+  const renderReservaHelp = (text: string) => (
+    <div style={{ fontSize: 13, color: "rgba(255,255,255,0.32)", marginTop: 5, lineHeight: 1.25 }}>
+      {text}
+    </div>
+  );
+
+  const renderReservaSection = (title: string, subtitle: string) => (
+    <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginTop: 4, marginBottom: 2 }}>
+      <div style={{ fontSize: 16, fontWeight: 900, color: C, textTransform: "uppercase", letterSpacing: "0.8px" }}>
+        {title}
+      </div>
+      <div style={{ fontSize: 13, color: "rgba(255,255,255,0.34)", fontWeight: 700 }}>
+        {subtitle}
+      </div>
+    </div>
+  );
+
+  const reservaFieldGroupStyle = {
+    marginLeft: 10,
+    paddingLeft: 12,
+    borderLeft: `1px solid ${C}55`,
+  };
+
+  const renderReservaCardField = (
+    label: string,
+    value: React.ReactNode,
+    options: { href?: string; full?: boolean; muted?: boolean; compact?: boolean; center?: boolean } = {}
+  ) => {
+    const valueStyle = {
+      color: options.muted ? "rgba(255,255,255,0.68)" : "rgba(255,255,255,0.86)",
+      fontSize: options.center ? (options.compact ? 17 : 18) : (options.compact ? 14 : 15),
+      fontWeight: options.muted ? 600 : 750,
+      lineHeight: 1.28,
+      wordBreak: "break-word" as const,
+      textDecoration: "none",
+      textAlign: options.center ? "center" as const : "left" as const,
+    };
+
+    return (
+      <div
+        style={{
+          gridColumn: options.full ? "1 / -1" : undefined,
+          background: "rgba(0,0,0,0.22)",
+          border: "1px solid rgba(255,255,255,0.075)",
+          borderRadius: 11,
+          padding: options.compact ? "7px 9px" : "8px 10px",
+          minWidth: 0,
+          textAlign: options.center ? "center" as const : "left" as const,
+        }}
+      >
+        <div style={{ fontSize: options.compact ? 11 : 12, fontWeight: 900, color: options.muted ? "rgba(255,255,255,0.42)" : C, textTransform: "uppercase", marginBottom: 4, textAlign: options.center ? "center" : "left" }}>
+          {label}
+        </div>
+        {options.href ? (
+          <a href={options.href} style={valueStyle}>
+            {value}
+          </a>
+        ) : (
+          <div style={valueStyle}>{value}</div>
+        )}
+      </div>
+    );
+  };
+
   // Renderiza el modal de Nueva/Editar Reserva. Se invoca desde cada pantalla que lo necesita.
   const renderReservaDialog = () => showReservaDialog && (
     <div
@@ -1606,99 +1730,117 @@ function App() {
       <div
         style={{
           background: "oklch(0.18 0.03 260)",
-          borderRadius: 20,
-          padding: 24,
-          width: "90%",
-          maxWidth: 380,
+          borderRadius: 22,
+          padding: 22,
+          width: "92%",
+          maxWidth: 420,
           border: "1px solid rgba(255,255,255,0.1)",
           boxShadow: "0 20px 40px rgba(0,0,0,0.5)",
           maxHeight: "90vh",
           overflowY: "auto",
           display: "flex",
           flexDirection: "column",
-          gap: 12
+          gap: 13
         }}
       >
-        <div style={{ fontSize: 16, fontWeight: 800, color: C, textTransform: "uppercase", marginBottom: 4 }}>
-          {editingReserva ? "Editar Reserva" : "Nueva Reserva"}
+        <div style={{ marginBottom: 2 }}>
+          <div style={{ fontSize: 22, fontWeight: 900, color: C, letterSpacing: "-0.3px", textAlign: "center", textTransform: "uppercase" }}>
+            {editingReserva ? "Edit booking" : "Taxi booking"}
+          </div>
+          <div style={{ fontSize: 15, color: "rgba(255,255,255,0.45)", marginTop: 4, lineHeight: 1.35, textAlign: "center" }}>
+            Please fill in your booking details.
+          </div>
         </div>
 
-        <div>
-          <div style={{ fontSize: 11, fontWeight: 700, color: "rgba(255,255,255,0.4)", textTransform: "uppercase", marginBottom: 4 }}>Fecha *</div>
-          <input
-            type="date"
-            value={selectedDate}
-            onChange={e => setSelectedDate(e.target.value)}
-            style={{ width: "100%", background: "rgba(0,0,0,0.3)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 12, color: "white", padding: "10px 14px", fontSize: 14, outline: "none", boxSizing: "border-box" }}
-          />
+        {renderReservaSection("When", "")}
+        <div style={{ ...reservaFieldGroupStyle, display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+          <div>
+            {renderReservaLabel("Date", "", true)}
+            <input
+              type="date"
+              value={selectedDate}
+              onClick={e => e.currentTarget.showPicker?.()}
+              onChange={e => setSelectedDate(e.target.value)}
+              style={reservaInputStyle}
+            />
+          </div>
+
+          <div>
+            {renderReservaLabel("Time", "", true)}
+            <input
+              type="time"
+              value={reservaTime}
+              onClick={e => e.currentTarget.showPicker?.()}
+              onChange={e => setReservaTime(e.target.value)}
+              style={reservaInputStyle}
+            />
+          </div>
         </div>
 
-        <div>
-          <div style={{ fontSize: 11, fontWeight: 700, color: "rgba(255,255,255,0.4)", textTransform: "uppercase", marginBottom: 4 }}>Hora *</div>
-          <input
-            type="time"
-            value={reservaTime}
-            onChange={e => setReservaTime(e.target.value)}
-            style={{ width: "100%", background: "rgba(0,0,0,0.3)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 12, color: "white", padding: "10px 14px", fontSize: 14, outline: "none", boxSizing: "border-box" }}
-          />
-        </div>
-
-        <div>
-          <div style={{ fontSize: 11, fontWeight: 700, color: "rgba(255,255,255,0.4)", textTransform: "uppercase", marginBottom: 4 }}>Cliente *</div>
+        {renderReservaSection("Client", "")}
+        <div style={reservaFieldGroupStyle}>
+          {renderReservaLabel("Your name", "", true)}
           <input
             type="text"
-            placeholder="Nombre del cliente"
+            placeholder=""
             value={reservaCliente}
             onChange={e => setReservaCliente(e.target.value)}
-            style={{ width: "100%", background: "rgba(0,0,0,0.3)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 12, color: "white", padding: "10px 14px", fontSize: 14, outline: "none", boxSizing: "border-box" }}
+            style={reservaInputStyle}
           />
         </div>
 
-        <div>
-          <div style={{ fontSize: 11, fontWeight: 700, color: "rgba(255,255,255,0.4)", textTransform: "uppercase", marginBottom: 4 }}>Teléfono *</div>
+        <div style={reservaFieldGroupStyle}>
+          {renderReservaLabel("Phone number", "", true)}
           <input
             type="tel"
-            placeholder="Número de teléfono"
+            placeholder=""
             value={reservaTelefono}
             onChange={e => setReservaTelefono(e.target.value)}
-            style={{ width: "100%", background: "rgba(0,0,0,0.3)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 12, color: "white", padding: "10px 14px", fontSize: 14, outline: "none", boxSizing: "border-box" }}
+            style={reservaInputStyle}
           />
         </div>
 
-        <div>
-          <div style={{ fontSize: 11, fontWeight: 700, color: "rgba(255,255,255,0.4)", textTransform: "uppercase", marginBottom: 4 }}>Origen *</div>
+        {renderReservaSection("Pickup", "")}
+        <div style={reservaFieldGroupStyle}>
+          {renderReservaLabel("Pickup location", "Hotel, Apartments, Address or Meeting point", true)}
           <input
             type="text"
-            placeholder="Lugar de recogida"
+            placeholder=""
             value={reservaOrigen}
             onChange={e => setReservaOrigen(e.target.value)}
-            style={{ width: "100%", background: "rgba(0,0,0,0.3)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 12, color: "white", padding: "10px 14px", fontSize: 14, outline: "none", boxSizing: "border-box" }}
+            style={reservaInputStyle}
           />
         </div>
 
-        <div>
-          <div style={{ fontSize: 11, fontWeight: 700, color: "rgba(255,255,255,0.4)", textTransform: "uppercase", marginBottom: 4 }}>Destino *</div>
+        <div style={reservaFieldGroupStyle}>
+          {renderReservaLabel("Destination", "", true)}
           <input
             type="text"
-            placeholder="Destino"
+            placeholder=""
             value={reservaDestino}
             onChange={e => setReservaDestino(e.target.value)}
-            style={{ width: "100%", background: "rgba(0,0,0,0.3)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 12, color: "white", padding: "10px 14px", fontSize: 14, outline: "none", boxSizing: "border-box" }}
+            style={reservaInputStyle}
           />
         </div>
 
-        <div>
-          <div style={{ fontSize: 11, fontWeight: 700, color: "rgba(255,255,255,0.4)", textTransform: "uppercase", marginBottom: 4 }}>Notas opcionales</div>
-          <input
-            type="text"
-            placeholder="Indicaciones para el viaje"
-            value={reservaNotas}
-            onChange={e => setReservaNotas(e.target.value)}
-            style={{ width: "100%", background: "rgba(0,0,0,0.3)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 12, color: "white", padding: "10px 14px", fontSize: 14, outline: "none", boxSizing: "border-box" }}
-          />
+        <div style={{ marginTop: 4 }}>
+          <div style={{ marginBottom: 6 }}>
+            <div style={{ fontSize: 16, fontWeight: 900, color: C, textTransform: "uppercase", letterSpacing: "0.5px" }}>
+              Optional notes
+            </div>
+          </div>
+          <div style={reservaFieldGroupStyle}>
+            <input
+              type="text"
+              placeholder=""
+              value={reservaNotas}
+              onChange={e => setReservaNotas(e.target.value)}
+              style={reservaInputStyle}
+            />
+          </div>
         </div>
 
-        <div style={{ display: "flex", gap: 10, marginTop: 8 }}>
+        <div style={{ display: "flex", gap: 10, marginTop: 10 }}>
           {editingReserva && (
             <button
               onClick={() => {
@@ -1719,15 +1861,15 @@ function App() {
           )}
           <button
             onClick={() => setShowReservaDialog(false)}
-            style={{ flex: 1, padding: "12px 0", borderRadius: 12, border: "none", background: "rgba(255,255,255,0.08)", color: "rgba(255,255,255,0.7)", fontSize: 14, fontWeight: 700, cursor: "pointer" }}
+            style={{ flex: 1, padding: "14px 0", borderRadius: 14, border: "none", background: "rgba(255,255,255,0.08)", color: "rgba(255,255,255,0.7)", fontSize: 16, fontWeight: 800, cursor: "pointer" }}
           >
             Cancelar
           </button>
           <button
             onClick={saveReserva}
-            style={{ flex: 1.2, padding: "12px 0", borderRadius: 12, border: "none", background: C, color: "black", fontSize: 14, fontWeight: 800, cursor: "pointer" }}
+            style={{ flex: 1.45, padding: "12px 0", borderRadius: 14, border: "none", background: C, color: "black", fontSize: 16, fontWeight: 900, cursor: "pointer", display: "flex", flexDirection: "column", alignItems: "center", lineHeight: 1.15 }}
           >
-            Guardar
+            <span>Confirm Booking</span>
           </button>
         </div>
       </div>
@@ -1884,7 +2026,7 @@ function App() {
           style={{
             position: "absolute",
             top: 24,
-            right: 92,
+            left: 28,
             background: "rgba(0, 200, 220, 0.08)",
             border: "1px solid rgba(0, 200, 220, 0.28)",
             borderRadius: 16,
@@ -2110,9 +2252,9 @@ function App() {
                 flex: 1,
                 height: 44,
                 borderRadius: 12,
-                border: "none",
+                border: "2px solid rgba(255,255,255,0.16)",
                 background: C,
-                color: "black",
+                color: "white",
                 fontSize: 14,
                 fontWeight: 800,
                 cursor: "pointer",
@@ -2131,9 +2273,9 @@ function App() {
                 flex: 1,
                 height: 44,
                 borderRadius: 12,
-                border: "1px solid rgba(255,255,255,0.12)",
-                background: "rgba(255,255,255,0.06)",
-                color: "rgba(255,255,255,0.85)",
+                border: "2px solid rgba(255,255,255,0.16)",
+                background: C,
+                color: "white",
                 fontSize: 14,
                 fontWeight: 800,
                 cursor: "pointer",
@@ -2370,40 +2512,40 @@ function App() {
 
                   {/* Reservas */}
                   {dayReservations.map(res => (
-                    <div key={res.id} style={{ background: "rgba(180, 120, 255, 0.04)", border: "1px solid rgba(180, 120, 255, 0.15)", borderRadius: 14, padding: 12, display: "flex", flexDirection: "column", gap: 6 }}>
-                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                          <span style={{ fontSize: 11, fontWeight: 800, color: "black", background: C, padding: "3px 6px", borderRadius: 6 }}>{res.time}</span>
-                          <span style={{ fontSize: 14, fontWeight: 800, color: "white" }}>{res.cliente}</span>
+                    <div key={res.id} style={{ background: "rgba(180, 120, 255, 0.07)", border: "1px solid rgba(180, 120, 255, 0.26)", borderRadius: 16, padding: 12, display: "flex", flexDirection: "column", gap: 10 }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10 }}>
+                        <div style={{ fontSize: 12, fontWeight: 900, color: C, textTransform: "uppercase", letterSpacing: "0.4px" }}>
+                          Reserva
                         </div>
-                        <div style={{ display: "flex", gap: 6 }}>
-                          <button onClick={() => openEditReserva(res)} style={{ background: "none", border: "none", color: "rgba(255,255,255,0.5)", cursor: "pointer", fontSize: 13 }}>✏️</button>
-                        </div>
-                      </div>
-                      <div style={{ fontSize: 13, color: "rgba(255,255,255,0.8)" }}>
-                        <span style={{ fontWeight: 600 }}>Origen:</span> {res.origen} <br />
-                        <span style={{ fontWeight: 600 }}>Destino:</span> {res.destino}
-                      </div>
-                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 4 }}>
-                        <a
-                          href={`tel:${res.telefono}`}
+                        <button
+                          onClick={() => openEditReserva(res)}
                           style={{
-                            color: C,
-                            fontSize: 13,
-                            fontWeight: 700,
-                            textDecoration: "underline",
+                            width: 34,
+                            height: 34,
+                            flex: "0 0 34px",
+                            background: "rgba(255,255,255,0.06)",
+                            border: "1px solid rgba(255,255,255,0.08)",
+                            borderRadius: 10,
                             display: "flex",
                             alignItems: "center",
-                            gap: 4
+                            justifyContent: "center",
+                            cursor: "pointer",
+                            padding: 0
                           }}
+                          title="Editar reserva"
+                          aria-label="Editar reserva"
                         >
-                          📞 {res.telefono}
-                        </a>
-                        {res.notas && (
-                          <span style={{ fontSize: 11, color: "rgba(255,255,255,0.45)", fontStyle: "italic" }}>
-                            {res.notas}
-                          </span>
-                        )}
+                          <IconPencilNeon s={24} />
+                        </button>
+                      </div>
+
+                      <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 8 }}>
+                        {renderReservaCardField("Time", res.time, { full: true, center: true })}
+                        {renderReservaCardField("Client", res.cliente)}
+                        {renderReservaCardField("Phone", res.telefono, { href: `tel:${res.telefono}` })}
+                        {renderReservaCardField("Pickup", res.origen, { full: true })}
+                        {renderReservaCardField("Destination", res.destino, { full: true })}
+                        {res.notas && renderReservaCardField("Notes", res.notas, { full: true, muted: true })}
                       </div>
                     </div>
                   ))}
@@ -2449,25 +2591,72 @@ function App() {
 
                       <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                         {/* Turno */}
-                        {dayT.map(t => (
-                          <div key={t.id} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: "rgba(255,255,255,0.7)" }}>
-                            <span>🚖</span>
-                            <span>Turno Cerrado: <strong style={{ color: "white" }}>{fmt(t.dinero || 0)}</strong></span>
-                          </div>
-                        ))}
+                        {dayT.map(t => {
+                          const propinasTurno = t.entries.filter((e: any) => e.type === 'propina').reduce((s: number, e: any) => s + e.amount, 0);
+                          const nulosTurno = t.entries.filter((e: any) => e.type === 'nulo').reduce((s: number, e: any) => s + e.amount, 0);
+                          const dineroEfectivo = (t.dinero || 0) - nulosTurno;
+                          const gananciaTurno = (dineroEfectivo * (settings["porcentaje.chofer"] / 100)) + propinasTurno;
+
+                          let tiempoTurno = "0h 0m";
+                          if (t.startTime && t.endTime) {
+                            let totalMins = getDiffMins(t.startTime, t.endTime);
+                            if (t.totalPausedMinutes) totalMins = Math.max(0, totalMins - t.totalPausedMinutes);
+                            const hh = Math.floor(totalMins / 60);
+                            const mm = totalMins % 60;
+                            tiempoTurno = `${hh}h ${mm}m`;
+                          }
+
+                          return (
+                            <div key={t.id} style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 13, color: "rgba(255,255,255,0.72)", flexWrap: "wrap" }}>
+                              <span>🚖</span>
+                              <span style={{ fontWeight: 800, color: "rgba(255,255,255,0.8)" }}>Turno cerrado</span>
+                              <span style={{ display: "flex", alignItems: "center", gap: 4, fontWeight: 900, color: "oklch(0.78 0.18 150)" }}>
+                                <IconMoneyBag s={16} c="oklch(0.78 0.18 150)" />
+                                {fmt(gananciaTurno)}
+                              </span>
+                              <span style={{ display: "flex", alignItems: "center", gap: 4, fontWeight: 900, color: "oklch(0.85 0.12 210)" }}>
+                                <IconTimer s={16} c="oklch(0.85 0.12 210)" />
+                                {tiempoTurno}
+                              </span>
+                            </div>
+                          );
+                        })}
 
                         {/* Reservas */}
                         {dayRes.map(res => (
-                          <div key={res.id} style={{ display: "flex", flexDirection: "column", gap: 4, background: "rgba(180, 120, 255, 0.04)", padding: 10, borderRadius: 10 }}>
-                            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13 }}>
-                              <div>
-                                <span style={{ fontWeight: 800, color: C, marginRight: 6 }}>{res.time}</span>
-                                <strong style={{ color: "white" }}>{res.cliente}</strong>
+                          <div key={res.id} style={{ display: "flex", flexDirection: "column", gap: 8, background: "rgba(180, 120, 255, 0.07)", border: "1px solid rgba(180, 120, 255, 0.22)", padding: 10, borderRadius: 12 }}>
+                            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
+                              <div style={{ fontSize: 11, fontWeight: 900, color: C, textTransform: "uppercase", letterSpacing: "0.35px" }}>
+                                Reserva
                               </div>
-                              <a href={`tel:${res.telefono}`} style={{ color: C, textDecoration: "underline", fontWeight: "bold" }}>📞 {res.telefono}</a>
+                              <button
+                                onClick={() => openEditReserva(res)}
+                                style={{
+                                  width: 32,
+                                  height: 32,
+                                  flex: "0 0 32px",
+                                  background: "rgba(255,255,255,0.06)",
+                                  border: "1px solid rgba(255,255,255,0.08)",
+                                  borderRadius: 9,
+                                  display: "flex",
+                                  alignItems: "center",
+                                  justifyContent: "center",
+                                  cursor: "pointer",
+                                  padding: 0
+                                }}
+                                title="Editar reserva"
+                                aria-label="Editar reserva"
+                              >
+                                <IconPencilNeon s={22} />
+                              </button>
                             </div>
-                            <div style={{ fontSize: 12, color: "rgba(255,255,255,0.6)" }}>
-                              {res.origen} ➔ {res.destino}
+                            <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 6 }}>
+                              {renderReservaCardField("Time", res.time, { full: true, center: true, compact: true })}
+                              {renderReservaCardField("Client", res.cliente, { compact: true })}
+                              {renderReservaCardField("Phone", res.telefono, { href: `tel:${res.telefono}`, compact: true })}
+                              {renderReservaCardField("Pickup", res.origen, { full: true, compact: true })}
+                              {renderReservaCardField("Destination", res.destino, { full: true, compact: true })}
+                              {res.notas && renderReservaCardField("Notes", res.notas, { full: true, muted: true, compact: true })}
                             </div>
                           </div>
                         ))}
@@ -5426,16 +5615,33 @@ function App() {
           </div>
           <div style={{ display: "flex", gap: 8 }}>
             <button
-              style={S.iconBtn}
+              style={{
+                ...S.iconBtn,
+                width: 48,
+                height: 48,
+                padding: 0,
+                justifyContent: "center",
+                border: "2px solid rgba(255, 180, 0, 0.24)",
+                boxShadow: "0 8px 22px rgba(255, 180, 0, 0.10)",
+              }}
               onClick={() => setScreen("home")}
               title="Inicio"
               aria-label="Volver al inicio"
             >
-              <span style={{ fontSize: 18 }}>🏠</span>
+              <IconHomeNeon s={32} />
             </button>
             {active && current.startTime && (
               <button
-                style={{ ...S.iconBtn, background: current.isPaused ? "rgba(255,180,0,0.15)" : S.iconBtn.background }}
+                style={{
+                  ...S.iconBtn,
+                  width: 48,
+                  height: 48,
+                  padding: 0,
+                  justifyContent: "center",
+                  background: "rgba(59, 130, 246, 0.16)",
+                  border: "2px solid rgba(59, 130, 246, 0.22)",
+                  boxShadow: "0 8px 22px rgba(59, 130, 246, 0.12)",
+                }}
                 onClick={() => {
                   if (!current.isPaused) {
                     setConfirmDialog({
@@ -5453,7 +5659,7 @@ function App() {
                 title={current.isPaused ? "Reanudar Turno" : "Pausar Turno"}
                 aria-label={current.isPaused ? "Reanudar turno" : "Pausar turno"}
               >
-                <span style={{ fontSize: 18 }}>{current.isPaused ? "▶️" : "⏸️"}</span>
+                {current.isPaused ? <IconPlay s={38} c="#7eb6ff" /> : <IconPause s={38} c="#7eb6ff" />}
               </button>
             )}
           </div>
@@ -5807,19 +6013,18 @@ function App() {
             }}
           >
             <div style={{
-              width: 72,
-              height: 72,
-              background: "linear-gradient(135deg, #7eb6ff, #3b82f6)",
-              borderRadius: 18,
+              width: 152,
+              height: 152,
+              background: "#101827",
+              borderRadius: 38,
+              border: "3px solid #3b82f6",
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
-              gap: 8,
-              marginBottom: 24,
-              boxShadow: "0 8px 24px rgba(59, 130, 246, 0.25)"
+              marginBottom: 40,
+              boxShadow: "0 0 4px rgba(126,182,255,0.68), 0 0 28px rgba(59,130,246,0.30), 0 14px 34px rgba(59,130,246,0.18)"
             }}>
-              <div style={{ width: 10, height: 32, background: "white", borderRadius: 4 }}></div>
-              <div style={{ width: 10, height: 32, background: "white", borderRadius: 4 }}></div>
+              <IconPause s={84} c="#7eb6ff" />
             </div>
             <div style={{ fontSize: 24, fontWeight: 800, color: "white", marginBottom: 40, letterSpacing: "-0.5px" }}>
               Turno Pausado
