@@ -9,6 +9,7 @@ import {
   groupTurnosByWeek,
   calcularTotalesTurnos,
   mergeTurnos,
+  buildBackupPayload,
   Turno
 } from '../main';
 
@@ -112,5 +113,22 @@ describe('Merge Turnos Logic', () => {
     expect(merged).toHaveLength(3);
     expect(merged.find(t => t.date === '2026-05-08')?.id).toBe(3); // Expecting the overwritten id
     expect(merged.find(t => t.date === '2026-05-10')).toBeDefined();
+  });
+});
+
+describe('Backup Logic', () => {
+  it('should include reservations and calendar notes in the full backup payload', () => {
+    const backup = buildBackupPayload({
+      history: '[]',
+      settings: '{"diaLibre":2}',
+      current: '{"entries":[]}',
+      weekOverrides: '[]',
+      weeksFrozen: '[]',
+      reservations: '[{"id":"r1"}]',
+      notes: '[{"id":"n1"}]'
+    });
+
+    expect(backup.reservations).toBe('[{"id":"r1"}]');
+    expect(backup.notes).toBe('[{"id":"n1"}]');
   });
 });

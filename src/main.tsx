@@ -76,20 +76,22 @@ const KEY_RESERVATIONS = "taxi_reservations_v1";
 const KEY_NOTES = "taxi_notes_v1";
 
 export interface Reserva {
-  id: string;          
+  id: string;
   date: string;        // "YYYY-MM-DD"
   time: string;        // "HH:mm"
   origen: string;
   destino: string;
-  cliente: string;     
+  cliente: string;
   telefono: string;    // permite llamada directa
   notas: string;
 }
 
+export type NotaTipo = 'ITV' | 'Seguro' | 'Normal' | 'Día libre';
+
 export interface NotaCalendario {
   id: string;
   date: string;        // "YYYY-MM-DD"
-  tipo: 'ITV' | 'Seguro' | 'Autónomos' | 'Libre' | 'Día libre';
+  tipo: NotaTipo;
   texto: string;
 }
 
@@ -286,14 +288,36 @@ export function parseCSVToHistory(csvText: string): Turno[] {
   });
 }
 
+export function buildBackupPayload(values: {
+  history: string | null;
+  settings: string | null;
+  current: string | null;
+  weekOverrides: string | null;
+  weeksFrozen: string | null;
+  reservations: string | null;
+  notes: string | null;
+}) {
+  return {
+    history: values.history,
+    settings: values.settings,
+    current: values.current,
+    weekOverrides: values.weekOverrides,
+    weeksFrozen: values.weeksFrozen,
+    reservations: values.reservations,
+    notes: values.notes,
+  };
+}
+
 async function exportBackupJSON() {
-  const backup = {
+  const backup = buildBackupPayload({
     history: localStorage.getItem(KEY_HISTORY),
     settings: localStorage.getItem(KEY_SETTINGS),
     current: localStorage.getItem(KEY_CURRENT),
     weekOverrides: localStorage.getItem(KEY_WEEK_OVERRIDES),
-    weeksFrozen: localStorage.getItem(KEY_WEEKS_FROZEN)
-  };
+    weeksFrozen: localStorage.getItem(KEY_WEEKS_FROZEN),
+    reservations: localStorage.getItem(KEY_RESERVATIONS),
+    notes: localStorage.getItem(KEY_NOTES),
+  });
   const json = JSON.stringify(backup, null, 2);
   const fileName = `taxi_backup_${new Date().toISOString().split("T")[0]}.json`;
 
@@ -743,6 +767,72 @@ const IconDel = () => (
     />
   </svg>
 );
+
+const IconPencilNeon = ({ s = 28 }: { s?: number }) => (
+  <svg
+    width={s}
+    height={s}
+    viewBox="0 0 24 24"
+    fill="none"
+    style={{ display: "inline-block", verticalAlign: "middle" }}
+  >
+    <g>
+      <path
+        d="M4.1 19.9L6.15 14.85L9.15 17.85L4.1 19.9Z"
+        fill="#c7cede"
+        stroke="#e0e5f2"
+        strokeWidth="0.75"
+        strokeLinejoin="round"
+        style={{
+          filter:
+            "drop-shadow(0 0 1px rgba(199,206,222,0.55)) drop-shadow(0 0 2px rgba(127,137,166,0.22))",
+        }}
+      />
+      <path
+        d="M4.1 19.9L4.85 18.05L5.95 19.15L4.1 19.9Z"
+        fill="#6f778d"
+      />
+      <path
+        d="M6.15 14.85L15.45 5.55L18.45 8.55L9.15 17.85L6.15 14.85Z"
+        fill="#ffd84d"
+        stroke="#ffe45c"
+        strokeWidth="0.85"
+        strokeLinejoin="round"
+        style={{
+          filter:
+            "drop-shadow(0 0 1.15px rgba(255,228,92,0.72)) drop-shadow(0 0 2.6px rgba(255,189,46,0.28))",
+        }}
+      />
+      <path
+        d="M15.45 5.55L16.95 4.05L19.95 7.05L18.45 8.55L15.45 5.55Z"
+        fill="#ff9cda"
+        stroke="#ffc1e9"
+        strokeWidth="0.75"
+        strokeLinejoin="round"
+        opacity="0.78"
+        style={{
+          filter:
+            "drop-shadow(0 0 0.8px rgba(255,120,207,0.42)) drop-shadow(0 0 1.8px rgba(255,120,207,0.14))",
+        }}
+      />
+      <path
+        d="M8.1 14.35L15.7 6.75"
+        stroke="#fff3a6"
+        strokeWidth="0.9"
+        strokeLinecap="round"
+        opacity="0.92"
+      />
+      <path
+        d="M9.25 15.55L16.85 7.95"
+        stroke="#ffba2e"
+        strokeWidth="0.75"
+        strokeLinecap="round"
+        opacity="0.65"
+      />
+    </g>
+  </svg>
+);
+
 const IconAgency = ({ s = 24, c = A }: { s?: number; c?: string }) => (
   <svg width={s} height={s} viewBox="0 0 24 24" fill="none">
     <path
@@ -915,6 +1005,18 @@ const IconMoneyBag = ({ s = 24, c = "white" }: { s?: number; c?: string }) => (
   </svg>
 );
 
+const IconAgenda = ({ s = 24, c = "white" }: { s?: number; c?: string }) => (
+  <svg width={s} height={s} viewBox="0 0 24 24" fill="none" style={{ display: "inline-block", verticalAlign: "middle" }}>
+    <rect x="3" y="4" width="18" height="17" rx="3" stroke={c} strokeWidth="1.8" strokeLinejoin="round" />
+    <circle cx="7" cy="9" r="1" fill={c} />
+    <circle cx="7" cy="13" r="1" fill={c} />
+    <circle cx="7" cy="17" r="1" fill={c} opacity="0.6" />
+    <path d="M10 9H17" stroke={c} strokeWidth="1.8" strokeLinecap="round" />
+    <path d="M10 13H17" stroke={c} strokeWidth="1.8" strokeLinecap="round" />
+    <path d="M10 17H15" stroke={c} strokeWidth="1.8" strokeLinecap="round" opacity="0.6" />
+  </svg>
+);
+
 const IconClipboard = ({ s = 24, c = "white" }: { s?: number; c?: string }) => (
   <svg width={s} height={s} viewBox="0 0 24 24" fill="none" style={{ display: "inline-block", verticalAlign: "middle" }}>
     <path d="M9 4H7C5.89543 4 5 4.89543 5 6V20C5 21.1046 5.89543 22 7 22H17C18.1046 22 19 21.1046 19 20V6C19 4.89543 18.1046 4 17 4H15" stroke={c} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
@@ -1046,6 +1148,8 @@ function App() {
   const [notes, setNotes] = useState<NotaCalendario[]>(loadNotes);
   const [calendarView, setCalendarView] = useState<'month' | 'agenda'>('month');
   const [calendarMonth, setCalendarMonth] = useState<Date>(new Date());
+  const [showMonthPicker, setShowMonthPicker] = useState(false);
+  const [pickerYear, setPickerYear] = useState<number>(new Date().getFullYear());
   const [selectedDate, setSelectedDate] = useState<string>(today());
   const [showReservaDialog, setShowReservaDialog] = useState(false);
   const [showNotaDialog, setShowNotaDialog] = useState(false);
@@ -1061,7 +1165,7 @@ function App() {
   const [reservaNotas, setReservaNotas] = useState("");
 
   // Campos formulario Nota
-  const [notaTipo, setNotaTipo] = useState<'ITV' | 'Seguro' | 'Autónomos' | 'Libre' | 'Día libre'>('Libre');
+  const [notaTipo, setNotaTipo] = useState<NotaTipo>('Normal');
   const [notaTexto, setNotaTexto] = useState("");
 
   const [showBackupMenu, setShowBackupMenu] = useState(false);
@@ -1436,6 +1540,200 @@ function App() {
     },
   };
 
+  // --- Handlers globales del modal de Reserva (accesibles desde cualquier pantalla) ---
+  const openNewReserva = (date?: string) => {
+    setEditingReserva(null);
+    setSelectedDate(date || today());
+    setReservaTime(timeNow());
+    setReservaOrigen("");
+    setReservaDestino("");
+    setReservaCliente("");
+    setReservaTelefono("");
+    setReservaNotas("");
+    setShowReservaDialog(true);
+  };
+
+  const saveReserva = () => {
+    if (!reservaTime || !reservaOrigen || !reservaDestino || !reservaCliente || !reservaTelefono) {
+      alert("Por favor rellena todos los campos obligatorios.");
+      return;
+    }
+    if (editingReserva) {
+      setReservations(prev => prev.map(r => r.id === editingReserva.id ? {
+        ...r,
+        date: selectedDate,
+        time: reservaTime,
+        origen: reservaOrigen,
+        destino: reservaDestino,
+        cliente: reservaCliente,
+        telefono: reservaTelefono,
+        notas: reservaNotas
+      } : r));
+    } else {
+      const newRes: Reserva = {
+        id: Date.now().toString() + Math.random().toString(36).substring(2, 7),
+        date: selectedDate,
+        time: reservaTime,
+        origen: reservaOrigen,
+        destino: reservaDestino,
+        cliente: reservaCliente,
+        telefono: reservaTelefono,
+        notas: reservaNotas
+      };
+      setReservations(prev => [...prev, newRes]);
+    }
+    setShowReservaDialog(false);
+  };
+
+  // Renderiza el modal de Nueva/Editar Reserva. Se invoca desde cada pantalla que lo necesita.
+  const renderReservaDialog = () => showReservaDialog && (
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-label="Formulario Reserva"
+      style={{
+        position: "fixed",
+        top: 0, left: 0, right: 0, bottom: 0,
+        background: "rgba(0,0,0,0.65)",
+        backdropFilter: "blur(4px)",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        zIndex: 10000,
+        animation: "fadeUp 0.2s ease"
+      }}
+    >
+      <div
+        style={{
+          background: "oklch(0.18 0.03 260)",
+          borderRadius: 20,
+          padding: 24,
+          width: "90%",
+          maxWidth: 380,
+          border: "1px solid rgba(255,255,255,0.1)",
+          boxShadow: "0 20px 40px rgba(0,0,0,0.5)",
+          maxHeight: "90vh",
+          overflowY: "auto",
+          display: "flex",
+          flexDirection: "column",
+          gap: 12
+        }}
+      >
+        <div style={{ fontSize: 16, fontWeight: 800, color: C, textTransform: "uppercase", marginBottom: 4 }}>
+          {editingReserva ? "Editar Reserva" : "Nueva Reserva"}
+        </div>
+
+        <div>
+          <div style={{ fontSize: 11, fontWeight: 700, color: "rgba(255,255,255,0.4)", textTransform: "uppercase", marginBottom: 4 }}>Fecha *</div>
+          <input
+            type="date"
+            value={selectedDate}
+            onChange={e => setSelectedDate(e.target.value)}
+            style={{ width: "100%", background: "rgba(0,0,0,0.3)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 12, color: "white", padding: "10px 14px", fontSize: 14, outline: "none", boxSizing: "border-box" }}
+          />
+        </div>
+
+        <div>
+          <div style={{ fontSize: 11, fontWeight: 700, color: "rgba(255,255,255,0.4)", textTransform: "uppercase", marginBottom: 4 }}>Hora *</div>
+          <input
+            type="time"
+            value={reservaTime}
+            onChange={e => setReservaTime(e.target.value)}
+            style={{ width: "100%", background: "rgba(0,0,0,0.3)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 12, color: "white", padding: "10px 14px", fontSize: 14, outline: "none", boxSizing: "border-box" }}
+          />
+        </div>
+
+        <div>
+          <div style={{ fontSize: 11, fontWeight: 700, color: "rgba(255,255,255,0.4)", textTransform: "uppercase", marginBottom: 4 }}>Cliente *</div>
+          <input
+            type="text"
+            placeholder="Nombre del cliente"
+            value={reservaCliente}
+            onChange={e => setReservaCliente(e.target.value)}
+            style={{ width: "100%", background: "rgba(0,0,0,0.3)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 12, color: "white", padding: "10px 14px", fontSize: 14, outline: "none", boxSizing: "border-box" }}
+          />
+        </div>
+
+        <div>
+          <div style={{ fontSize: 11, fontWeight: 700, color: "rgba(255,255,255,0.4)", textTransform: "uppercase", marginBottom: 4 }}>Teléfono *</div>
+          <input
+            type="tel"
+            placeholder="Número de teléfono"
+            value={reservaTelefono}
+            onChange={e => setReservaTelefono(e.target.value)}
+            style={{ width: "100%", background: "rgba(0,0,0,0.3)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 12, color: "white", padding: "10px 14px", fontSize: 14, outline: "none", boxSizing: "border-box" }}
+          />
+        </div>
+
+        <div>
+          <div style={{ fontSize: 11, fontWeight: 700, color: "rgba(255,255,255,0.4)", textTransform: "uppercase", marginBottom: 4 }}>Origen *</div>
+          <input
+            type="text"
+            placeholder="Lugar de recogida"
+            value={reservaOrigen}
+            onChange={e => setReservaOrigen(e.target.value)}
+            style={{ width: "100%", background: "rgba(0,0,0,0.3)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 12, color: "white", padding: "10px 14px", fontSize: 14, outline: "none", boxSizing: "border-box" }}
+          />
+        </div>
+
+        <div>
+          <div style={{ fontSize: 11, fontWeight: 700, color: "rgba(255,255,255,0.4)", textTransform: "uppercase", marginBottom: 4 }}>Destino *</div>
+          <input
+            type="text"
+            placeholder="Destino"
+            value={reservaDestino}
+            onChange={e => setReservaDestino(e.target.value)}
+            style={{ width: "100%", background: "rgba(0,0,0,0.3)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 12, color: "white", padding: "10px 14px", fontSize: 14, outline: "none", boxSizing: "border-box" }}
+          />
+        </div>
+
+        <div>
+          <div style={{ fontSize: 11, fontWeight: 700, color: "rgba(255,255,255,0.4)", textTransform: "uppercase", marginBottom: 4 }}>Notas opcionales</div>
+          <input
+            type="text"
+            placeholder="Indicaciones para el viaje"
+            value={reservaNotas}
+            onChange={e => setReservaNotas(e.target.value)}
+            style={{ width: "100%", background: "rgba(0,0,0,0.3)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 12, color: "white", padding: "10px 14px", fontSize: 14, outline: "none", boxSizing: "border-box" }}
+          />
+        </div>
+
+        <div style={{ display: "flex", gap: 10, marginTop: 8 }}>
+          {editingReserva && (
+            <button
+              onClick={() => {
+                const id = editingReserva.id;
+                setConfirmDialog({
+                  text: "¿Seguro que quieres eliminar esta reserva?",
+                  onConfirm: () => {
+                    setReservations(prev => prev.filter(r => r.id !== id));
+                    setShowReservaDialog(false);
+                  }
+                });
+              }}
+              aria-label="Eliminar reserva"
+              style={{ width: 48, padding: "12px 0", borderRadius: 12, border: "1px solid rgba(255, 100, 100, 0.3)", background: "rgba(255, 80, 80, 0.12)", color: "#ff6b6b", fontSize: 16, fontWeight: 700, cursor: "pointer" }}
+            >
+              🗑️
+            </button>
+          )}
+          <button
+            onClick={() => setShowReservaDialog(false)}
+            style={{ flex: 1, padding: "12px 0", borderRadius: 12, border: "none", background: "rgba(255,255,255,0.08)", color: "rgba(255,255,255,0.7)", fontSize: 14, fontWeight: 700, cursor: "pointer" }}
+          >
+            Cancelar
+          </button>
+          <button
+            onClick={saveReserva}
+            style={{ flex: 1.2, padding: "12px 0", borderRadius: 12, border: "none", background: C, color: "black", fontSize: 14, fontWeight: 800, cursor: "pointer" }}
+          >
+            Guardar
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+
   if (screen === "home") {
     const hasActive = current.entries.length > 0 || !!current.startTime;
     const totalHoy = totalP + totalD + totalA + totalE;
@@ -1581,7 +1879,27 @@ function App() {
           </div>
         </div>
         <button
-          onClick={() => setScreen("calendar")}
+          onClick={() => openNewReserva()}
+          aria-label="Nueva reserva"
+          style={{
+            position: "absolute",
+            top: 24,
+            right: 92,
+            background: "rgba(0, 200, 220, 0.08)",
+            border: "1px solid rgba(0, 200, 220, 0.28)",
+            borderRadius: 16,
+            padding: 14,
+            cursor: "pointer",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            fontSize: 22
+          }}
+        >
+          <IconCalendar s={24} c={C} />
+        </button>
+        <button
+          onClick={() => { setCalendarView('agenda'); setScreen("calendar"); }}
           style={{
             position: "absolute",
             top: 24,
@@ -1597,8 +1915,9 @@ function App() {
             fontSize: 22
           }}
         >
-          <IconCalendar s={24} c="oklch(0.75 0.15 290)" />
+          <IconAgenda s={24} c="oklch(0.75 0.15 290)" />
         </button>
+        {renderReservaDialog()}
         <button
           onClick={() => setScreen("settings")}
           style={{
@@ -1635,22 +1954,10 @@ function App() {
       setCalendarMonth(new Date(year, month + 1, 1));
     };
 
-    const openNewReserva = (date?: string) => {
-      setEditingReserva(null);
-      setSelectedDate(date || today());
-      setReservaTime(timeNow());
-      setReservaOrigen("");
-      setReservaDestino("");
-      setReservaCliente("");
-      setReservaTelefono("");
-      setReservaNotas("");
-      setShowReservaDialog(true);
-    };
-
     const openNewNota = (date?: string) => {
       setEditingNota(null);
       setSelectedDate(date || today());
-      setNotaTipo("Libre");
+      setNotaTipo("Normal");
       setNotaTexto("");
       setShowNotaDialog(true);
     };
@@ -1673,38 +1980,6 @@ function App() {
       setNotaTipo(n.tipo);
       setNotaTexto(n.texto);
       setShowNotaDialog(true);
-    };
-
-    const saveReserva = () => {
-      if (!reservaTime || !reservaOrigen || !reservaDestino || !reservaCliente || !reservaTelefono) {
-        alert("Por favor rellena todos los campos obligatorios.");
-        return;
-      }
-      if (editingReserva) {
-        setReservations(prev => prev.map(r => r.id === editingReserva.id ? {
-          ...r,
-          date: selectedDate,
-          time: reservaTime,
-          origen: reservaOrigen,
-          destino: reservaDestino,
-          cliente: reservaCliente,
-          telefono: reservaTelefono,
-          notas: reservaNotas
-        } : r));
-      } else {
-        const newRes: Reserva = {
-          id: Date.now().toString() + Math.random().toString(36).substring(2, 7),
-          date: selectedDate,
-          time: reservaTime,
-          origen: reservaOrigen,
-          destino: reservaDestino,
-          cliente: reservaCliente,
-          telefono: reservaTelefono,
-          notas: reservaNotas
-        };
-        setReservations(prev => [...prev, newRes]);
-      }
-      setShowReservaDialog(false);
     };
 
     const saveNota = () => {
@@ -1750,7 +2025,7 @@ function App() {
     };
 
     // Eventos del día seleccionado
-    const dayReservations = reservations.filter(r => r.date === selectedDate).sort((a,b) => a.time.localeCompare(b.time));
+    const dayReservations = reservations.filter(r => r.date === selectedDate).sort((a, b) => a.time.localeCompare(b.time));
     const dayNotes = notes.filter(n => n.date === selectedDate);
     const dayTurnos = history.filter(t => (t.startDate || t.date) === selectedDate);
 
@@ -1773,13 +2048,12 @@ function App() {
       "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"
     ];
 
-    const getNotaTipoColor = (t: 'ITV' | 'Seguro' | 'Autónomos' | 'Libre' | 'Día libre') => {
+    const getNotaTipoColor = (t: NotaTipo) => {
       switch (t) {
         case 'ITV': return 'oklch(0.70 0.18 25)';
-        case 'Seguro': return 'oklch(0.72 0.14 200)';
-        case 'Autónomos': return 'oklch(0.75 0.16 70)';
-        case 'Libre': return 'oklch(0.68 0.20 145)';
-        case 'Día libre': return 'oklch(0.65 0.20 280)';
+        case 'Seguro': return 'oklch(0.75 0.16 70)';
+        case 'Normal': return 'oklch(0.65 0.20 280)';
+        case 'Día libre': return 'oklch(0.68 0.20 145)';
         default: return 'white';
       }
     };
@@ -1796,93 +2070,82 @@ function App() {
     return (
       <Shell burst={false}>
         <div style={{ flex: 1, padding: "16px 20px", display: "flex", flexDirection: "column", gap: 16, overflowY: "auto", position: "relative" }}>
-          
-          {/* Cabecera superior */}
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10, flexShrink: 0 }}>
+
+          {/* Cabecera superior: volver + título + toggle Mes/Agenda */}
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 4, flexShrink: 0, gap: 12 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
               <button style={S.iconBtn} onClick={() => setScreen("home")}><IconBack /></button>
               <div style={{ fontSize: 24, fontWeight: 800, color: "white" }}>Calendario</div>
             </div>
 
-            {/* Selector de Vista (Mes / Agenda) */}
-            <div style={{ display: "flex", background: "rgba(0, 0, 0, 0.35)", borderRadius: 12, padding: 3, border: "1px solid rgba(255, 255, 255, 0.05)" }}>
-              <button
-                onClick={() => setCalendarView('month')}
-                style={{
-                  border: "none",
-                  borderRadius: 9,
-                  padding: "6px 12px",
-                  background: calendarView === 'month' ? "rgba(255, 255, 255, 0.1)" : "transparent",
-                  color: calendarView === 'month' ? "white" : "rgba(255, 255, 255, 0.5)",
-                  fontSize: 13,
-                  fontWeight: 700,
-                  cursor: "pointer",
-                  transition: "all 0.15s"
-                }}
-              >
-                Mes
-              </button>
-              <button
-                onClick={() => setCalendarView('agenda')}
-                style={{
-                  border: "none",
-                  borderRadius: 9,
-                  padding: "6px 12px",
-                  background: calendarView === 'agenda' ? "rgba(255, 255, 255, 0.1)" : "transparent",
-                  color: calendarView === 'agenda' ? "white" : "rgba(255, 255, 255, 0.5)",
-                  fontSize: 13,
-                  fontWeight: 700,
-                  cursor: "pointer",
-                  transition: "all 0.15s"
-                }}
-              >
-                Agenda
-              </button>
-            </div>
+            {/* Botón intercambio de vista (Mes <-> Agenda) */}
+            <button
+              onClick={() => setCalendarView(calendarView === 'month' ? 'agenda' : 'month')}
+              style={{
+                height: 44,
+                border: "1px solid rgba(255, 255, 255, 0.08)",
+                borderRadius: 12,
+                padding: "0 22px",
+                background: "rgba(255, 255, 255, 0.08)",
+                color: "white",
+                fontSize: 16,
+                fontWeight: 800,
+                cursor: "pointer",
+                display: "flex",
+                alignItems: "center",
+                gap: 10,
+                transition: "all 0.15s"
+              }}
+            >
+              <span style={{ fontSize: 18 }}>⇄</span>
+              <span>{calendarView === 'month' ? 'Agenda' : 'Calendario'}</span>
+            </button>
+          </div>
 
-            {/* Botones rápidos para añadir */}
-            <div style={{ display: "flex", gap: 6 }}>
-              <button
-                onClick={() => openNewReserva()}
-                style={{
-                  height: 34,
-                  borderRadius: 10,
-                  border: "none",
-                  background: C,
-                  color: "black",
-                  fontSize: 12,
-                  fontWeight: 800,
-                  cursor: "pointer",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  padding: "0 10px",
-                  gap: 4
-                }}
-              >
-                + 📅
-              </button>
-              <button
-                onClick={() => openNewNota()}
-                style={{
-                  height: 34,
-                  borderRadius: 10,
-                  border: "1px solid rgba(255,255,255,0.12)",
-                  background: "rgba(255,255,255,0.06)",
-                  color: "rgba(255,255,255,0.8)",
-                  fontSize: 12,
-                  fontWeight: 800,
-                  cursor: "pointer",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  padding: "0 10px",
-                  gap: 4
-                }}
-              >
-                + 📝
-              </button>
-            </div>
+          {/* Fila inferior: + Reserva | + Nota */}
+          <div style={{ display: "flex", gap: 8, flexShrink: 0 }}>
+            <button
+              onClick={() => openNewReserva()}
+              style={{
+                flex: 1,
+                height: 44,
+                borderRadius: 12,
+                border: "none",
+                background: C,
+                color: "black",
+                fontSize: 14,
+                fontWeight: 800,
+                cursor: "pointer",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: 8
+              }}
+            >
+              <span>+ 📅</span>
+              <span>Reserva</span>
+            </button>
+            <button
+              onClick={() => openNewNota()}
+              style={{
+                flex: 1,
+                height: 44,
+                borderRadius: 12,
+                border: "1px solid rgba(255,255,255,0.12)",
+                background: "rgba(255,255,255,0.06)",
+                color: "rgba(255,255,255,0.85)",
+                fontSize: 14,
+                fontWeight: 800,
+                cursor: "pointer",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: 8
+              }}
+            >
+              <span>+ 📝</span>
+              <span>Nota</span>
+            </button>
           </div>
 
           {/* Vistas condicionales */}
@@ -1891,11 +2154,88 @@ function App() {
               {/* Selector de Mes */}
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: "rgba(255,255,255,0.03)", borderRadius: 16, padding: "8px 12px", border: "1px solid rgba(255,255,255,0.05)" }}>
                 <button onClick={prevMonth} style={{ background: "none", border: "none", color: C, fontSize: 18, cursor: "pointer", padding: "8px 12px" }}>◀</button>
-                <div style={{ fontSize: 16, fontWeight: 800, color: "white" }}>
+                <button
+                  onClick={() => {
+                    setPickerYear(year);
+                    setShowMonthPicker(v => !v);
+                  }}
+                  style={{ background: "none", border: "none", color: "white", fontSize: 16, fontWeight: 800, cursor: "pointer", padding: "4px 8px", display: "flex", alignItems: "center", gap: 6 }}
+                >
                   {MONTHS_ES[month]} {year}
-                </div>
+                  <span style={{ fontSize: 11, color: "rgba(255,255,255,0.5)" }}>{showMonthPicker ? "▲" : "▼"}</span>
+                </button>
                 <button onClick={nextMonth} style={{ background: "none", border: "none", color: C, fontSize: 18, cursor: "pointer", padding: "8px 12px" }}>▶</button>
               </div>
+
+              {/* Picker de mes/año */}
+              {showMonthPicker && (
+                <div style={{ background: "rgba(255,255,255,0.03)", borderRadius: 16, padding: 14, border: "1px solid rgba(255,255,255,0.05)", display: "flex", flexDirection: "column", gap: 12 }}>
+                  {/* Selector de año */}
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                    <button
+                      onClick={() => setPickerYear(y => y - 1)}
+                      style={{ background: "rgba(255,255,255,0.06)", border: "none", color: C, fontSize: 16, cursor: "pointer", width: 36, height: 36, borderRadius: 10 }}
+                    >◀</button>
+                    <div style={{ fontSize: 18, fontWeight: 800, color: "white" }}>{pickerYear}</div>
+                    <button
+                      onClick={() => setPickerYear(y => y + 1)}
+                      style={{ background: "rgba(255,255,255,0.06)", border: "none", color: C, fontSize: 16, cursor: "pointer", width: 36, height: 36, borderRadius: 10 }}
+                    >▶</button>
+                  </div>
+
+                  {/* Rejilla 12 meses (4 cols x 3 filas) */}
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 6 }}>
+                    {MONTHS_ES.map((mLabel, mIdx) => {
+                      const isCurrent = mIdx === month && pickerYear === year;
+                      const isToday = mIdx === new Date().getMonth() && pickerYear === new Date().getFullYear();
+                      return (
+                        <button
+                          key={mIdx}
+                          onClick={() => {
+                            setCalendarMonth(new Date(pickerYear, mIdx, 1));
+                            setShowMonthPicker(false);
+                          }}
+                          style={{
+                            padding: "10px 0",
+                            borderRadius: 10,
+                            border: isToday ? `1px solid ${C}` : "1px solid rgba(255,255,255,0.06)",
+                            background: isCurrent ? C : "rgba(255,255,255,0.04)",
+                            color: isCurrent ? "black" : "rgba(255,255,255,0.85)",
+                            fontSize: 13,
+                            fontWeight: isCurrent ? 800 : 700,
+                            cursor: "pointer",
+                            transition: "all 0.15s"
+                          }}
+                        >
+                          {mLabel.slice(0, 3)}
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  {/* Botón Hoy */}
+                  <button
+                    onClick={() => {
+                      const now = new Date();
+                      setCalendarMonth(new Date(now.getFullYear(), now.getMonth(), 1));
+                      setSelectedDate(today());
+                      setShowMonthPicker(false);
+                    }}
+                    style={{
+                      padding: "10px 0",
+                      borderRadius: 10,
+                      border: "1px solid rgba(255,255,255,0.12)",
+                      background: "rgba(255,255,255,0.06)",
+                      color: "white",
+                      fontSize: 13,
+                      fontWeight: 700,
+                      cursor: "pointer"
+                    }}
+                  >
+                    Ir a Hoy
+                  </button>
+                </div>
+              )}
 
               {/* Cabecera L-M-X-J-V-S-D */}
               <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 4, textAlign: "center" }}>
@@ -1932,10 +2272,10 @@ function App() {
                       style={{
                         aspectRatio: "1",
                         background: isSelected ? "rgba(180, 120, 255, 0.12)" : isToday ? "rgba(0, 220, 180, 0.08)" : "rgba(255,255,255,0.02)",
-                        border: isSelected 
-                          ? `1.5px solid ${C}` 
-                          : isToday 
-                            ? `1.5px solid ${G}` 
+                        border: isSelected
+                          ? `1.5px solid ${C}`
+                          : isToday
+                            ? `1.5px solid ${G}`
                             : "1px solid rgba(255,255,255,0.05)",
                         borderRadius: 12,
                         display: "flex",
@@ -1948,10 +2288,10 @@ function App() {
                         transition: "all 0.15s"
                       }}
                     >
-                      <span style={{ 
-                        fontSize: 14, 
-                        fontWeight: isSelected || isToday ? 800 : 500, 
-                        color: isSelected ? C : isToday ? G : "white" 
+                      <span style={{
+                        fontSize: 14,
+                        fontWeight: isSelected || isToday ? 800 : 500,
+                        color: isSelected ? C : isToday ? G : "white"
                       }}>
                         {dayNum}
                       </span>
@@ -2001,7 +2341,7 @@ function App() {
 
                   {/* Turno Cerrado */}
                   {dayTurnos.map(turno => (
-                    <div 
+                    <div
                       key={turno.id}
                       onClick={() => { setViewTurno(turno); setScreen("summary"); }}
                       style={{
@@ -2038,15 +2378,14 @@ function App() {
                         </div>
                         <div style={{ display: "flex", gap: 6 }}>
                           <button onClick={() => openEditReserva(res)} style={{ background: "none", border: "none", color: "rgba(255,255,255,0.5)", cursor: "pointer", fontSize: 13 }}>✏️</button>
-                          <button onClick={() => deleteReserva(res.id)} style={{ background: "none", border: "none", color: "rgba(255,255,255,0.5)", cursor: "pointer", fontSize: 13 }}>🗑️</button>
                         </div>
                       </div>
                       <div style={{ fontSize: 13, color: "rgba(255,255,255,0.8)" }}>
-                        <span style={{ fontWeight: 600 }}>Origen:</span> {res.origen} <br/>
+                        <span style={{ fontWeight: 600 }}>Origen:</span> {res.origen} <br />
                         <span style={{ fontWeight: 600 }}>Destino:</span> {res.destino}
                       </div>
                       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 4 }}>
-                        <a 
+                        <a
                           href={`tel:${res.telefono}`}
                           style={{
                             color: C,
@@ -2080,7 +2419,6 @@ function App() {
                         </div>
                         <div style={{ display: "flex", gap: 6 }}>
                           <button onClick={() => openEditNota(note)} style={{ background: "none", border: "none", color: "rgba(255,255,255,0.4)", cursor: "pointer", fontSize: 13 }}>✏️</button>
-                          <button onClick={() => deleteNota(note.id)} style={{ background: "none", border: "none", color: "rgba(255,255,255,0.4)", cursor: "pointer", fontSize: 13 }}>🗑️</button>
                         </div>
                       </div>
                     );
@@ -2099,7 +2437,7 @@ function App() {
                 </div>
               ) : (
                 daysWithEvents.map(dayStr => {
-                  const dayRes = reservations.filter(r => r.date === dayStr).sort((a,b) => a.time.localeCompare(b.time));
+                  const dayRes = reservations.filter(r => r.date === dayStr).sort((a, b) => a.time.localeCompare(b.time));
                   const dayN = notes.filter(n => n.date === dayStr);
                   const dayT = history.filter(t => (t.startDate || t.date) === dayStr);
 
@@ -2152,206 +2490,8 @@ function App() {
             </div>
           )}
 
-          {/* Dialogo Añadir/Editar Reserva */}
-          {showReservaDialog && (
-            <div
-              role="dialog"
-              aria-modal="true"
-              aria-label="Formulario Reserva"
-              style={{
-                position: "fixed",
-                top: 0, left: 0, right: 0, bottom: 0,
-                background: "rgba(0,0,0,0.65)",
-                backdropFilter: "blur(4px)",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                zIndex: 10000,
-                animation: "fadeUp 0.2s ease"
-              }}
-            >
-              <div
-                style={{
-                  background: "oklch(0.18 0.03 260)",
-                  borderRadius: 20,
-                  padding: 24,
-                  width: "90%",
-                  maxWidth: 380,
-                  border: "1px solid rgba(255,255,255,0.1)",
-                  boxShadow: "0 20px 40px rgba(0,0,0,0.5)",
-                  maxHeight: "90vh",
-                  overflowY: "auto",
-                  display: "flex",
-                  flexDirection: "column",
-                  gap: 12
-                }}
-              >
-                <div style={{ fontSize: 16, fontWeight: 800, color: C, textTransform: "uppercase", marginBottom: 4 }}>
-                  {editingReserva ? "Editar Reserva" : "Nueva Reserva"}
-                </div>
-
-                <div>
-                  <div style={{ fontSize: 11, fontWeight: 700, color: "rgba(255,255,255,0.4)", textTransform: "uppercase", marginBottom: 4 }}>Hora *</div>
-                  <input
-                    type="time"
-                    value={reservaTime}
-                    onChange={e => setReservaTime(e.target.value)}
-                    style={{
-                      width: "100%",
-                      background: "rgba(0,0,0,0.3)",
-                      border: "1px solid rgba(255,255,255,0.1)",
-                      borderRadius: 12,
-                      color: "white",
-                      padding: "10px 14px",
-                      fontSize: 14,
-                      outline: "none",
-                      boxSizing: "border-box"
-                    }}
-                  />
-                </div>
-
-                <div>
-                  <div style={{ fontSize: 11, fontWeight: 700, color: "rgba(255,255,255,0.4)", textTransform: "uppercase", marginBottom: 4 }}>Cliente *</div>
-                  <input
-                    type="text"
-                    placeholder="Nombre del cliente"
-                    value={reservaCliente}
-                    onChange={e => setReservaCliente(e.target.value)}
-                    style={{
-                      width: "100%",
-                      background: "rgba(0,0,0,0.3)",
-                      border: "1px solid rgba(255,255,255,0.1)",
-                      borderRadius: 12,
-                      color: "white",
-                      padding: "10px 14px",
-                      fontSize: 14,
-                      outline: "none",
-                      boxSizing: "border-box"
-                    }}
-                  />
-                </div>
-
-                <div>
-                  <div style={{ fontSize: 11, fontWeight: 700, color: "rgba(255,255,255,0.4)", textTransform: "uppercase", marginBottom: 4 }}>Teléfono *</div>
-                  <input
-                    type="tel"
-                    placeholder="Número de teléfono"
-                    value={reservaTelefono}
-                    onChange={e => setReservaTelefono(e.target.value)}
-                    style={{
-                      width: "100%",
-                      background: "rgba(0,0,0,0.3)",
-                      border: "1px solid rgba(255,255,255,0.1)",
-                      borderRadius: 12,
-                      color: "white",
-                      padding: "10px 14px",
-                      fontSize: 14,
-                      outline: "none",
-                      boxSizing: "border-box"
-                    }}
-                  />
-                </div>
-
-                <div>
-                  <div style={{ fontSize: 11, fontWeight: 700, color: "rgba(255,255,255,0.4)", textTransform: "uppercase", marginBottom: 4 }}>Origen *</div>
-                  <input
-                    type="text"
-                    placeholder="Lugar de recogida"
-                    value={reservaOrigen}
-                    onChange={e => setReservaOrigen(e.target.value)}
-                    style={{
-                      width: "100%",
-                      background: "rgba(0,0,0,0.3)",
-                      border: "1px solid rgba(255,255,255,0.1)",
-                      borderRadius: 12,
-                      color: "white",
-                      padding: "10px 14px",
-                      fontSize: 14,
-                      outline: "none",
-                      boxSizing: "border-box"
-                    }}
-                  />
-                </div>
-
-                <div>
-                  <div style={{ fontSize: 11, fontWeight: 700, color: "rgba(255,255,255,0.4)", textTransform: "uppercase", marginBottom: 4 }}>Destino *</div>
-                  <input
-                    type="text"
-                    placeholder="Destino"
-                    value={reservaDestino}
-                    onChange={e => setReservaDestino(e.target.value)}
-                    style={{
-                      width: "100%",
-                      background: "rgba(0,0,0,0.3)",
-                      border: "1px solid rgba(255,255,255,0.1)",
-                      borderRadius: 12,
-                      color: "white",
-                      padding: "10px 14px",
-                      fontSize: 14,
-                      outline: "none",
-                      boxSizing: "border-box"
-                    }}
-                  />
-                </div>
-
-                <div>
-                  <div style={{ fontSize: 11, fontWeight: 700, color: "rgba(255,255,255,0.4)", textTransform: "uppercase", marginBottom: 4 }}>Notas opcionales</div>
-                  <input
-                    type="text"
-                    placeholder="Indicaciones para el viaje"
-                    value={reservaNotas}
-                    onChange={e => setReservaNotas(e.target.value)}
-                    style={{
-                      width: "100%",
-                      background: "rgba(0,0,0,0.3)",
-                      border: "1px solid rgba(255,255,255,0.1)",
-                      borderRadius: 12,
-                      color: "white",
-                      padding: "10px 14px",
-                      fontSize: 14,
-                      outline: "none",
-                      boxSizing: "border-box"
-                    }}
-                  />
-                </div>
-
-                <div style={{ display: "flex", gap: 10, marginTop: 8 }}>
-                  <button
-                    onClick={() => setShowReservaDialog(false)}
-                    style={{
-                      flex: 1,
-                      padding: "12px 0",
-                      borderRadius: 12,
-                      border: "none",
-                      background: "rgba(255,255,255,0.08)",
-                      color: "rgba(255,255,255,0.7)",
-                      fontSize: 14,
-                      fontWeight: 700,
-                      cursor: "pointer"
-                    }}
-                  >
-                    Cancelar
-                  </button>
-                  <button
-                    onClick={saveReserva}
-                    style={{
-                      flex: 1.2,
-                      padding: "12px 0",
-                      borderRadius: 12,
-                      border: "none",
-                      background: C,
-                      color: "black",
-                      fontSize: 14,
-                      fontWeight: 800,
-                      cursor: "pointer"
-                    }}
-                  >
-                    Guardar
-                  </button>
-                </div>
-              </div>
-            </div>
-          )}
+          {/* Dialogo Añadir/Editar Reserva (renderizado a nivel de App) */}
+          {renderReservaDialog()}
 
           {/* Dialogo Añadir/Editar Nota */}
           {showNotaDialog && (
@@ -2392,7 +2532,7 @@ function App() {
                 <div>
                   <div style={{ fontSize: 11, fontWeight: 700, color: "rgba(255,255,255,0.4)", textTransform: "uppercase", marginBottom: 6 }}>Categoría</div>
                   <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-                    {(['ITV', 'Seguro', 'Autónomos', 'Libre', 'Día libre'] as const).map(t => {
+                    {(['ITV', 'Seguro', 'Normal', 'Día libre'] as const).map(t => {
                       const isSelected = notaTipo === t;
                       const col = getNotaTipoColor(t);
                       return (
@@ -2440,6 +2580,34 @@ function App() {
                 </div>
 
                 <div style={{ display: "flex", gap: 10, marginTop: 8 }}>
+                  {editingNota && (
+                    <button
+                      onClick={() => {
+                        const id = editingNota.id;
+                        setConfirmDialog({
+                          text: "¿Seguro que quieres eliminar esta nota?",
+                          onConfirm: () => {
+                            setNotes(prev => prev.filter(n => n.id !== id));
+                            setShowNotaDialog(false);
+                          }
+                        });
+                      }}
+                      aria-label="Eliminar nota"
+                      style={{
+                        width: 48,
+                        padding: "12px 0",
+                        borderRadius: 12,
+                        border: "1px solid rgba(255, 100, 100, 0.3)",
+                        background: "rgba(255, 80, 80, 0.12)",
+                        color: "#ff6b6b",
+                        fontSize: 16,
+                        fontWeight: 700,
+                        cursor: "pointer"
+                      }}
+                    >
+                      🗑️
+                    </button>
+                  )}
                   <button
                     onClick={() => setShowNotaDialog(false)}
                     style={{
@@ -2787,6 +2955,8 @@ function App() {
                             if (backup.current) localStorage.setItem(KEY_CURRENT, backup.current);
                             if (backup.weekOverrides) localStorage.setItem(KEY_WEEK_OVERRIDES, backup.weekOverrides);
                             if (backup.weeksFrozen) localStorage.setItem(KEY_WEEKS_FROZEN, backup.weeksFrozen);
+                            if (backup.reservations) localStorage.setItem(KEY_RESERVATIONS, backup.reservations);
+                            if (backup.notes) localStorage.setItem(KEY_NOTES, backup.notes);
                             window.location.reload();
                           }
                         });
@@ -2956,7 +3126,7 @@ function App() {
               setEditJ({ ...viewTurno, entries: [...viewTurno.entries] });
               setScreen('editTurno');
             }}>
-              <span style={{ fontSize: 16 }}>✏️</span>
+              <IconPencilNeon />
             </button>
           </div>
 
@@ -3220,8 +3390,8 @@ function App() {
                       {e.note}
                     </div>
                     <button onClick={() => openEditEntry(e)}
-                      style={{ background: 'rgba(255,255,255,0.08)', border: 'none', borderRadius: 7, color: 'rgba(255,255,255,0.7)', fontSize: 11, cursor: 'pointer', width: 26, height: 26, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                      ✏️
+                      style={{ background: 'rgba(255,255,255,0.08)', border: 'none', borderRadius: 7, color: 'rgba(255,255,255,0.7)', fontSize: 11, cursor: 'pointer', width: 30, height: 30, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                      <IconPencilNeon />
                     </button>
                   </div>
                 );
@@ -4838,15 +5008,15 @@ function App() {
                       color: "rgba(255,255,255,0.7)",
                       fontSize: 13,
                       cursor: "pointer",
-                      width: 28,
-                      height: 28,
+                      width: 32,
+                      height: 32,
                       display: "flex",
                       alignItems: "center",
                       justifyContent: "center",
                       marginLeft: 8,
                     }}
                   >
-                    ✏️
+                    <IconPencilNeon />
                   </button>
                 </div>
               );
@@ -5560,15 +5730,15 @@ function App() {
                           color: "rgba(255,255,255,0.7)",
                           fontSize: 12,
                           cursor: "pointer",
-                          width: 24,
-                          height: 24,
+                          width: 30,
+                          height: 30,
                           display: "flex",
                           alignItems: "center",
                           justifyContent: "center",
                           marginLeft: 6,
                         }}
                       >
-                        ✏️
+                        <IconPencilNeon />
                       </button>
                     </div>
                   );
