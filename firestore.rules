@@ -1,0 +1,53 @@
+rules_version = '2';
+
+// Reglas de seguridad para "Mi Turno APP Taxi".
+//
+// Modelo:
+//   users/{uid}/...          → datos privados de cada taxista.
+//   usernames/{username}     → diccionario público username → {email, uid}, usado por el login.
+//   admins/{uid}             → presencia del documento marca a un usuario como admin.
+//
+// Pegar este contenido en Firebase Console → Firestore Database → Reglas → Publicar.
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ¿El usuario autenticado es admin?
+    function isAdmin() {
+      return request.auth != null
+        && exists(/databases/$(database)/documents/admins/$(request.auth.uid));
+    }
+
+    // Datos privados del usuario.
+    //   - Lectura: el dueño SIEMPRE; el admin TAMBIÉN puede leer.
+    //   - Escritura: solo el dueño. El admin no puede modificar datos ajenos.
+    match /users/{userId}/{document=**} {
+      allow read: if request.auth != null
+                  && (request.auth.uid == userId || isAdmin());
+      allow write: if request.auth != null
+                   && request.auth.uid == userId;
+    }
+
+    // Diccionario público username → {email, uid}.
+    //   - Lectura abierta: necesaria para resolver el username antes de autenticar.
+    //   - Crear: cualquier usuario autenticado puede registrar un username
+    //     SI el campo uid del documento coincide con su propia uid
+    //     (impide que A reserve un username apuntando al uid de B).
+    //   - Actualizar o borrar: solo el dueño actual.
+    match /usernames/{username} {
+      allow read: if true;
+      allow create: if request.auth != null
+                    && request.resource.data.uid == request.auth.uid;
+      allow update, delete: if request.auth != null
+                            && resource.data.uid == request.auth.uid;
+    }
+
+    // Colección de admins.
+    //   - Lectura permitida (la usa isAdmin()).
+    //   - Escritura desde código DENEGADA. Solo se gestiona desde Firebase Console.
+    match /admins/{uid} {
+      allow read: if request.auth != null;
+      allow write: if false;
+    }
+  }
+}

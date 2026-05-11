@@ -3,8 +3,23 @@ import ReactDOM from "react-dom/client";
 import { Capacitor } from "@capacitor/core";
 import { Filesystem, Directory, Encoding } from "@capacitor/filesystem";
 import { Share } from "@capacitor/share";
+import { onAuthStateChanged, signOut, type User } from "firebase/auth";
+import {
+  onSnapshot,
+  doc,
+  setDoc,
+  writeBatch,
+} from "firebase/firestore";
+import { auth, db } from "./firebase";
+import { LoginScreen } from "./login-screen";
+import {
+  userMetaDocRef,
+  userSubcollectionRef,
+  saveUserDoc,
+  syncSubcollection,
+} from "./firestore-sync";
 
-const { useState, useEffect } = React;
+const { useState, useEffect, useRef } = React;
 
 export interface Entry {
   id: number;
@@ -74,6 +89,22 @@ const KEY_WEEK_OVERRIDES = "taxi_week_overrides_v1";
 const KEY_WEEKS_FROZEN = "taxi_weeks_frozen_v1";
 const KEY_RESERVATIONS = "taxi_reservations_v1";
 const KEY_NOTES = "taxi_notes_v1";
+
+function userStorageKey(baseKey: string, uid = auth.currentUser?.uid || ""): string {
+  return uid ? `${baseKey}__${uid}` : baseKey;
+}
+
+function readLocalJSON<T>(baseKey: string): T | null {
+  try {
+    return JSON.parse(localStorage.getItem(userStorageKey(baseKey)) || "null") as T | null;
+  } catch (e) {
+    return null;
+  }
+}
+
+function writeUserLocalJSON(uid: string, baseKey: string, value: unknown): void {
+  localStorage.setItem(userStorageKey(baseKey, uid), JSON.stringify(value));
+}
 
 export interface Reserva {
   id: string;
@@ -190,7 +221,7 @@ function loadSettings(): AppSettings {
     diaLibreDesde: null,
   };
   try {
-    const d = JSON.parse(localStorage.getItem(KEY_SETTINGS) || "null");
+    const d = readLocalJSON<Partial<AppSettings>>(KEY_SETTINGS);
     if (d) {
       return { ...defaults, ...d };
     }
@@ -356,7 +387,7 @@ export function mergeTurnos(actuales: Turno[], nuevos: Turno[]) {
 
 function loadCurrent(): CurrentState {
   try {
-    const d = JSON.parse(localStorage.getItem(KEY_CURRENT) || "null");
+    const d = readLocalJSON<CurrentState>(KEY_CURRENT);
     if (d) {
       return {
         ...d,
@@ -370,21 +401,21 @@ function loadCurrent(): CurrentState {
 }
 function loadHistory(): Turno[] {
   try {
-    const d = JSON.parse(localStorage.getItem(KEY_HISTORY) || "null");
+    const d = readLocalJSON<Turno[]>(KEY_HISTORY);
     if (Array.isArray(d)) return d;
   } catch (e) { }
   return [];
 }
 function loadReservations(): Reserva[] {
   try {
-    const d = JSON.parse(localStorage.getItem(KEY_RESERVATIONS) || "null");
+    const d = readLocalJSON<Reserva[]>(KEY_RESERVATIONS);
     if (Array.isArray(d)) return d;
   } catch (e) { }
   return [];
 }
 function loadNotes(): NotaCalendario[] {
   try {
-    const d = JSON.parse(localStorage.getItem(KEY_NOTES) || "null");
+    const d = readLocalJSON<NotaCalendario[]>(KEY_NOTES);
     if (Array.isArray(d)) return d;
   } catch (e) { }
   return [];
@@ -566,7 +597,7 @@ function freezeOldWeeks(
 
 function loadWeekOverrides(): WeekOverride[] {
   try {
-    const d = JSON.parse(localStorage.getItem(KEY_WEEK_OVERRIDES) || "null");
+    const d = readLocalJSON<WeekOverride[]>(KEY_WEEK_OVERRIDES);
     if (Array.isArray(d)) return d;
   } catch (e) { }
   return [];
@@ -574,7 +605,7 @@ function loadWeekOverrides(): WeekOverride[] {
 
 function loadFrozenWeeks(): FrozenWeek[] {
   try {
-    const d = JSON.parse(localStorage.getItem(KEY_WEEKS_FROZEN) || "null");
+    const d = readLocalJSON<FrozenWeek[]>(KEY_WEEKS_FROZEN);
     if (Array.isArray(d)) return d;
   } catch (e) { }
   return [];
@@ -829,6 +860,118 @@ const IconPencilNeon = ({ s = 28 }: { s?: number }) => (
         strokeLinecap="round"
         opacity="0.65"
       />
+    </g>
+  </svg>
+);
+
+const IconReservaWrite = ({ s = 24, c = C }: { s?: number; c?: string }) => (
+  <span
+    style={{
+      position: "relative",
+      width: s,
+      height: s,
+      display: "inline-block",
+      verticalAlign: "middle",
+    }}
+  >
+    <svg
+      width={s}
+      height={s}
+      viewBox="0 0 24 24"
+      fill="none"
+      style={{
+        position: "absolute",
+        inset: 0,
+        overflow: "visible",
+      }}
+    >
+      <path
+        d="M6.5 3.5H14.8L18.5 7.2V19.5C18.5 20.05 18.05 20.5 17.5 20.5H6.5C5.95 20.5 5.5 20.05 5.5 19.5V4.5C5.5 3.95 5.95 3.5 6.5 3.5Z"
+        stroke={c}
+        strokeWidth="1.7"
+        strokeLinejoin="round"
+        style={{
+          filter:
+            "drop-shadow(0 0 1px rgba(190,140,255,0.55)) drop-shadow(0 0 3px rgba(190,140,255,0.20))",
+        }}
+      />
+      <path
+        d="M14.8 3.5V7.2H18.5"
+        stroke={c}
+        strokeWidth="1.7"
+        strokeLinejoin="round"
+        strokeLinecap="round"
+      />
+      <path d="M8 10H14.5" stroke={c} strokeWidth="1.5" strokeLinecap="round" opacity="0.9" />
+      <path d="M8 13H13" stroke={c} strokeWidth="1.5" strokeLinecap="round" opacity="0.75" />
+      <path d="M8 16H11.5" stroke={c} strokeWidth="1.5" strokeLinecap="round" opacity="0.55" />
+    </svg>
+
+    <span
+      style={{
+        position: "absolute",
+        right: -2,
+        bottom: -1,
+        transform: "scale(0.58) rotate(-6deg)",
+        transformOrigin: "bottom right",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        pointerEvents: "none",
+      }}
+    >
+      <IconPencilNeon s={24} />
+    </span>
+  </span>
+);
+
+const IconTaxiBadgeNeon = ({ s = 24, c = C }: { s?: number; c?: string }) => (
+  <svg
+    width={s}
+    height={s}
+    viewBox="0 0 24 24"
+    fill="none"
+    style={{
+      display: "inline-block",
+      verticalAlign: "middle",
+    }}
+  >
+    <g
+      style={{
+        transform: "scale(1.4)",
+        transformOrigin: "center",
+      }}
+    >
+      {/* Asa superior */}
+      <path
+        d="M9.4 9.05V8.2C9.4 7.51 9.96 6.95 10.65 6.95H13.35C14.04 6.95 14.6 7.51 14.6 8.2V9.05"
+        stroke={c}
+        strokeWidth="1.6"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+
+      {/* Cuerpo del cartel */}
+      <path
+        d="M6.75 9.05H17.25C17.84 9.05 18.34 9.47 18.45 10.04L19.18 13.96C19.36 14.92 18.62 15.8 17.64 15.8H6.36C5.38 15.8 4.64 14.92 4.82 13.96L5.55 10.04C5.66 9.47 6.16 9.05 6.75 9.05Z"
+        stroke={c}
+        strokeWidth="1.7"
+        strokeLinejoin="round"
+      />
+
+      {/* Texto */}
+      <text
+        x="12"
+        y="13.9"
+        textAnchor="middle"
+        fill={c}
+        fontSize="4.7"
+        fontWeight="800"
+        fontFamily="Outfit, sans-serif"
+        letterSpacing="0.5"
+      >
+        TAXI
+      </text>
     </g>
   </svg>
 );
@@ -1176,6 +1319,76 @@ function Burst() {
   );
 }
 
+// ============================================================================
+// MIGRACIÓN DE LOCALSTORAGE A FIRESTORE
+// ============================================================================
+// Esta función se ejecuta UNA SOLA VEZ por dispositivo, la primera vez que un
+// usuario inicia sesión tras la introducción de Firebase. Sube todo lo que haya
+// en localStorage a la cuenta del usuario logueado y deja un flag para que
+// futuras sesiones (de cualquier usuario en el mismo móvil) NO repitan la
+// subida — esto impide que los datos del usuario A se acaben en la cuenta de B
+// si comparten teléfono.
+const LOCAL_MIGRATION_KEY = "taxi_migration_done_v1";
+
+async function migrarLocalStorageAFirestore(uid: string): Promise<void> {
+  if (localStorage.getItem(LOCAL_MIGRATION_KEY)) return;
+
+  const currentRaw = localStorage.getItem(KEY_CURRENT);
+  const historyRaw = localStorage.getItem(KEY_HISTORY);
+  const settingsRaw = localStorage.getItem(KEY_SETTINGS);
+  const weekOverridesRaw = localStorage.getItem(KEY_WEEK_OVERRIDES);
+  const weeksFrozenRaw = localStorage.getItem(KEY_WEEKS_FROZEN);
+  const reservationsRaw = localStorage.getItem(KEY_RESERVATIONS);
+  const notesRaw = localStorage.getItem(KEY_NOTES);
+
+  const todoVacio =
+    !currentRaw && !historyRaw && !settingsRaw &&
+    !weekOverridesRaw && !weeksFrozenRaw &&
+    !reservationsRaw && !notesRaw;
+
+  if (todoVacio) {
+    localStorage.setItem(LOCAL_MIGRATION_KEY, JSON.stringify({
+      uid, at: new Date().toISOString(), migrado: false,
+    }));
+    return;
+  }
+
+  const current = currentRaw ? JSON.parse(currentRaw) as CurrentState : null;
+  const history = historyRaw ? JSON.parse(historyRaw) as Turno[] : [];
+  const settings = settingsRaw ? JSON.parse(settingsRaw) as AppSettings : null;
+  const weekOverrides = weekOverridesRaw ? JSON.parse(weekOverridesRaw) as WeekOverride[] : [];
+  const frozenWeeks = weeksFrozenRaw ? JSON.parse(weeksFrozenRaw) as FrozenWeek[] : [];
+  const reservations = reservationsRaw ? JSON.parse(reservationsRaw) as Reserva[] : [];
+  const notes = notesRaw ? JSON.parse(notesRaw) as NotaCalendario[] : [];
+
+  const docPromises: Promise<unknown>[] = [];
+  if (current) docPromises.push(setDoc(userMetaDocRef(db, uid, "current"), current));
+  if (settings) docPromises.push(setDoc(userMetaDocRef(db, uid, "settings"), settings));
+
+  function subirSubcoleccion<T>(coll: string, items: T[], getId: (it: T) => string | number) {
+    for (let i = 0; i < items.length; i += 400) {
+      const slice = items.slice(i, i + 400);
+      const batch = writeBatch(db);
+      for (const item of slice) {
+        batch.set(doc(db, "users", uid, coll, String(getId(item))), item as any);
+      }
+      docPromises.push(batch.commit());
+    }
+  }
+
+  subirSubcoleccion("turnos", history, (t) => t.id);
+  subirSubcoleccion("reservations", reservations, (r) => r.id);
+  subirSubcoleccion("notes", notes, (n) => n.id);
+  subirSubcoleccion("weekOverrides", weekOverrides, (w) => w.weekId);
+  subirSubcoleccion("frozenWeeks", frozenWeeks, (w) => w.weekId);
+
+  await Promise.all(docPromises);
+
+  localStorage.setItem(LOCAL_MIGRATION_KEY, JSON.stringify({
+    uid, at: new Date().toISOString(), migrado: true,
+  }));
+}
+
 function App() {
   const [current, setCurrent] = useState<CurrentState>(loadCurrent);
   const [history, setHistory] = useState<Turno[]>(loadHistory);
@@ -1208,6 +1421,7 @@ function App() {
   const [isSelectingTurnos, setIsSelectingTurnos] = useState(false);
   const [selectedTurnosIds, setSelectedTurnosIds] = useState<number[]>([]);
   const [screen, setScreen] = useState("home");
+  const [returnScreen, setReturnScreen] = useState<string | null>(null);
   const [burst, setBurst] = useState(false);
   const [viewTurno, setViewTurno] = useState<Turno | null>(null);
   const [activeField, setActiveField] = useState("datafono");
@@ -1257,6 +1471,21 @@ function App() {
   // Estados Detalle de Semana (Fase 6)
   const [editingNotes, setEditingNotes] = useState(false);
   const [notesDraft, setNotesDraft] = useState("");
+
+  // Sincronización con Firestore.
+  //   - dataLoaded: cuando vale true, la app ya ha recibido el primer snapshot
+  //     de las 7 colecciones del usuario actual. Hasta entonces NO escribimos
+  //     (evitamos pisar Firestore con estado inicial vacío en un dispositivo nuevo).
+  //   - last*Ref: copia de lo último que recibimos de Firestore. La usamos como
+  //     baseline para hacer diffs y mandar solo lo que cambió.
+  const [dataLoaded, setDataLoaded] = useState(false);
+  const lastCurrentRef = useRef<CurrentState | null>(null);
+  const lastSettingsRef = useRef<AppSettings | null>(null);
+  const lastHistoryRef = useRef<Turno[]>([]);
+  const lastReservationsRef = useRef<Reserva[]>([]);
+  const lastNotesRef = useRef<NotaCalendario[]>([]);
+  const lastWeekOverridesRef = useRef<WeekOverride[]>([]);
+  const lastFrozenWeeksRef = useRef<FrozenWeek[]>([]);
 
   // Helper: actualiza o crea un override para una semana
   function updateWeekOverride(weekId: string, partial: Partial<Omit<WeekOverride, "weekId">>) {
@@ -1380,27 +1609,84 @@ function App() {
     }
   }
 
+  // -------------------------------------------------------------------------
+  // GUARDADO EN FIRESTORE
+  // -------------------------------------------------------------------------
+  // Cada useEffect observa una pieza del estado y la sube a Firestore cuando
+  // cambia. Reglas comunes:
+  //   - Si dataLoaded es false, NO escribimos: aún estamos en carga inicial.
+  //   - Si no hay usuario autenticado, no escribimos.
+  //   - Para subcolecciones (turnos, reservas, notas, weekOverrides, frozenWeeks)
+  //     usamos syncSubcollection, que hace diff y sólo escribe lo que cambió.
+  //   - lastXRef se actualiza después de escribir para que el siguiente diff
+  //     se compute contra lo último que hemos subido nosotros mismos.
+
   useEffect(() => {
-    localStorage.setItem(KEY_CURRENT, JSON.stringify(current));
-  }, [current]);
+    if (!dataLoaded || !auth.currentUser) return;
+    // Si el estado coincide con lo último que recibimos del servidor, no
+    // tiene sentido reescribir (evita bucle snapshot → setCurrent → save → snapshot).
+    if (JSON.stringify(current) === JSON.stringify(lastCurrentRef.current)) return;
+    const uid = auth.currentUser.uid;
+    writeUserLocalJSON(uid, KEY_CURRENT, current);
+    saveUserDoc(db, uid, "current", current).catch((err) =>
+      console.error("Save current failed:", err)
+    );
+  }, [current, dataLoaded]);
+
   useEffect(() => {
-    localStorage.setItem(KEY_HISTORY, JSON.stringify(history));
-  }, [history]);
+    if (!dataLoaded || !auth.currentUser) return;
+    if (JSON.stringify(settings) === JSON.stringify(lastSettingsRef.current)) return;
+    const uid = auth.currentUser.uid;
+    writeUserLocalJSON(uid, KEY_SETTINGS, settings);
+    saveUserDoc(db, uid, "settings", settings).catch((err) =>
+      console.error("Save settings failed:", err)
+    );
+  }, [settings, dataLoaded]);
+
   useEffect(() => {
-    localStorage.setItem(KEY_SETTINGS, JSON.stringify(settings));
-  }, [settings]);
+    if (!dataLoaded || !auth.currentUser) return;
+    const uid = auth.currentUser.uid;
+    writeUserLocalJSON(uid, KEY_HISTORY, history);
+    syncSubcollection(db, uid, "turnos", lastHistoryRef.current, history, (t) => t.id)
+      .then(() => { lastHistoryRef.current = history; })
+      .catch((err) => console.error("Sync turnos failed:", err));
+  }, [history, dataLoaded]);
+
   useEffect(() => {
-    localStorage.setItem(KEY_WEEK_OVERRIDES, JSON.stringify(weekOverrides));
-  }, [weekOverrides]);
+    if (!dataLoaded || !auth.currentUser) return;
+    const uid = auth.currentUser.uid;
+    writeUserLocalJSON(uid, KEY_RESERVATIONS, reservations);
+    syncSubcollection(db, uid, "reservations", lastReservationsRef.current, reservations, (r) => r.id)
+      .then(() => { lastReservationsRef.current = reservations; })
+      .catch((err) => console.error("Sync reservations failed:", err));
+  }, [reservations, dataLoaded]);
+
   useEffect(() => {
-    localStorage.setItem(KEY_WEEKS_FROZEN, JSON.stringify(frozenWeeks));
-  }, [frozenWeeks]);
+    if (!dataLoaded || !auth.currentUser) return;
+    const uid = auth.currentUser.uid;
+    writeUserLocalJSON(uid, KEY_NOTES, notes);
+    syncSubcollection(db, uid, "notes", lastNotesRef.current, notes, (n) => n.id)
+      .then(() => { lastNotesRef.current = notes; })
+      .catch((err) => console.error("Sync notes failed:", err));
+  }, [notes, dataLoaded]);
+
   useEffect(() => {
-    localStorage.setItem(KEY_RESERVATIONS, JSON.stringify(reservations));
-  }, [reservations]);
+    if (!dataLoaded || !auth.currentUser) return;
+    const uid = auth.currentUser.uid;
+    writeUserLocalJSON(uid, KEY_WEEK_OVERRIDES, weekOverrides);
+    syncSubcollection(db, uid, "weekOverrides", lastWeekOverridesRef.current, weekOverrides, (w) => w.weekId)
+      .then(() => { lastWeekOverridesRef.current = weekOverrides; })
+      .catch((err) => console.error("Sync weekOverrides failed:", err));
+  }, [weekOverrides, dataLoaded]);
+
   useEffect(() => {
-    localStorage.setItem(KEY_NOTES, JSON.stringify(notes));
-  }, [notes]);
+    if (!dataLoaded || !auth.currentUser) return;
+    const uid = auth.currentUser.uid;
+    writeUserLocalJSON(uid, KEY_WEEKS_FROZEN, frozenWeeks);
+    syncSubcollection(db, uid, "frozenWeeks", lastFrozenWeeksRef.current, frozenWeeks, (w) => w.weekId)
+      .then(() => { lastFrozenWeeksRef.current = frozenWeeks; })
+      .catch((err) => console.error("Sync frozenWeeks failed:", err));
+  }, [frozenWeeks, dataLoaded]);
 
 
 
@@ -1432,6 +1718,147 @@ function App() {
       navigator.serviceWorker.removeEventListener("message", onMessage);
     };
   }, []);
+
+  // -------------------------------------------------------------------------
+  // INICIALIZACIÓN DE FIRESTORE
+  // -------------------------------------------------------------------------
+  // Al montar el componente con un usuario autenticado:
+  //   1. Si el dispositivo nunca ha migrado, sube los datos de localStorage
+  //      al usuario actual.
+  //   2. Se suscribe a las 7 piezas de datos del usuario (current, settings,
+  //      turnos, reservas, notes, weekOverrides, frozenWeeks) con onSnapshot.
+  //   3. Cuando han llegado las 7 primeras respuestas, marca dataLoaded=true
+  //      y la app habilita la escritura.
+  useEffect(() => {
+    const user = auth.currentUser;
+    if (!user) return;
+    const uid = user.uid;
+
+    let cancelado = false;
+    const unsubs: Array<() => void> = [];
+
+    const recibido = {
+      current: false, settings: false, turnos: false,
+      reservations: false, notes: false,
+      weekOverrides: false, frozenWeeks: false,
+    };
+    function marcar(key: keyof typeof recibido) {
+      recibido[key] = true;
+      if (Object.values(recibido).every((v) => v)) {
+        setDataLoaded(true);
+      }
+    }
+
+    (async () => {
+      try {
+        await migrarLocalStorageAFirestore(uid);
+      } catch (err) {
+        console.error("Migración localStorage → Firestore fallida:", err);
+      }
+      if (cancelado) return;
+
+      // current (single doc)
+      unsubs.push(onSnapshot(userMetaDocRef(db, uid, "current"), (snap) => {
+        if (snap.exists()) {
+          const data = snap.data() as CurrentState;
+          lastCurrentRef.current = data;
+          writeUserLocalJSON(uid, KEY_CURRENT, data);
+          setCurrent(data);
+        } else {
+          lastCurrentRef.current = null;
+        }
+        marcar("current");
+      }));
+
+      // settings (single doc)
+      unsubs.push(onSnapshot(userMetaDocRef(db, uid, "settings"), (snap) => {
+        if (snap.exists()) {
+          const data = snap.data() as AppSettings;
+          lastSettingsRef.current = data;
+          writeUserLocalJSON(uid, KEY_SETTINGS, data);
+          setSettings(data);
+        }
+        marcar("settings");
+      }));
+
+      // turnos (subcollection)
+      unsubs.push(onSnapshot(userSubcollectionRef(db, uid, "turnos"), (snap) => {
+        const items: Turno[] = [];
+        snap.forEach((d) => items.push(d.data() as Turno));
+        lastHistoryRef.current = items;
+        writeUserLocalJSON(uid, KEY_HISTORY, items);
+        setHistory(items);
+        marcar("turnos");
+      }));
+
+      // reservations (subcollection)
+      unsubs.push(onSnapshot(userSubcollectionRef(db, uid, "reservations"), (snap) => {
+        const items: Reserva[] = [];
+        snap.forEach((d) => items.push(d.data() as Reserva));
+        lastReservationsRef.current = items;
+        writeUserLocalJSON(uid, KEY_RESERVATIONS, items);
+        setReservations(items);
+        marcar("reservations");
+      }));
+
+      // notes (subcollection)
+      unsubs.push(onSnapshot(userSubcollectionRef(db, uid, "notes"), (snap) => {
+        const items: NotaCalendario[] = [];
+        snap.forEach((d) => items.push(d.data() as NotaCalendario));
+        lastNotesRef.current = items;
+        writeUserLocalJSON(uid, KEY_NOTES, items);
+        setNotes(items);
+        marcar("notes");
+      }));
+
+      // weekOverrides (subcollection)
+      unsubs.push(onSnapshot(userSubcollectionRef(db, uid, "weekOverrides"), (snap) => {
+        const items: WeekOverride[] = [];
+        snap.forEach((d) => items.push(d.data() as WeekOverride));
+        lastWeekOverridesRef.current = items;
+        writeUserLocalJSON(uid, KEY_WEEK_OVERRIDES, items);
+        setWeekOverrides(items);
+        marcar("weekOverrides");
+      }));
+
+      // frozenWeeks (subcollection)
+      unsubs.push(onSnapshot(userSubcollectionRef(db, uid, "frozenWeeks"), (snap) => {
+        const items: FrozenWeek[] = [];
+        snap.forEach((d) => items.push(d.data() as FrozenWeek));
+        lastFrozenWeeksRef.current = items;
+        writeUserLocalJSON(uid, KEY_WEEKS_FROZEN, items);
+        setFrozenWeeks(items);
+        marcar("frozenWeeks");
+      }));
+    })();
+
+    return () => {
+      cancelado = true;
+      unsubs.forEach((u) => u());
+    };
+  }, []);
+
+  // Mientras llegan las primeras respuestas de Firestore para este usuario,
+  // mostramos un placeholder de carga. Esto evita que la UI parezca vacía y,
+  // sobre todo, evita que el usuario pueda crear/editar antes de tener su
+  // historial cargado (lo cual provocaría diffs incorrectos).
+  if (!dataLoaded) {
+    return (
+      <div
+        style={{
+          minHeight: "100vh",
+          background: "oklch(0.14 0.02 260)",
+          color: "oklch(0.92 0.02 260)",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          fontSize: 16,
+        }}
+      >
+        Cargando tus datos…
+      </div>
+    );
+  }
 
   const propinas = current.entries.filter((e) => e.type === "propina");
   const datafonos = current.entries.filter((e) => e.type === "datafono");
@@ -2027,18 +2454,20 @@ function App() {
             position: "absolute",
             top: 24,
             left: 28,
+            width: 54,        // <-- Ancho fijo igual al tamaño original
+            height: 54,       // <-- Alto fijo igual al tamaño original
             background: "rgba(0, 200, 220, 0.08)",
             border: "1px solid rgba(0, 200, 220, 0.28)",
             borderRadius: 16,
-            padding: 14,
             cursor: "pointer",
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
-            fontSize: 22
+            fontSize: 22,
+            padding: 0        // <-- Quitamos el padding para que no empuje
           }}
         >
-          <IconCalendar s={24} c={C} />
+          <IconReservaWrite s={32} />
         </button>
         <button
           onClick={() => { setCalendarView('agenda'); setScreen("calendar"); }}
@@ -2046,18 +2475,20 @@ function App() {
             position: "absolute",
             top: 24,
             right: 28,
+            width: 54,        // <-- Ancho fijo igual al tamaño original
+            height: 54,       // <-- Alto fijo igual al tamaño original
             background: "rgba(180, 120, 255, 0.08)",
             border: "1px solid rgba(180, 120, 255, 0.28)",
             borderRadius: 16,
-            padding: 14,
             cursor: "pointer",
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
-            fontSize: 22
+            fontSize: 22,
+            padding: 0        // <-- Quitamos el padding para que no empuje
           }}
         >
-          <IconAgenda s={24} c="oklch(0.75 0.15 290)" />
+          <IconAgenda s={32} c="oklch(0.75 0.15 290)" />
         </button>
         {renderReservaDialog()}
         <button
@@ -2066,18 +2497,20 @@ function App() {
             position: "absolute",
             bottom: 32,
             right: 28,
+            width: 54,        // <-- Ancho fijo igual al tamaño original
+            height: 54,       // <-- Alto fijo igual al tamaño original
             background: "rgba(0, 220, 180, 0.08)",
             border: "1px solid rgba(0, 220, 180, 0.28)",
             borderRadius: 16,
-            padding: 14,
             cursor: "pointer",
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
-            fontSize: 22
+            fontSize: 22,
+            padding: 0        // <-- Quitamos el padding para que no empuje
           }}
         >
-          <IconSettings s={24} c="oklch(0.72 0.01 250)" />
+          <IconSettings s={32} c="oklch(0.72 0.01 250)" />
         </button>
       </Shell>
     );
@@ -2482,33 +2915,52 @@ function App() {
                   )}
 
                   {/* Turno Cerrado */}
-                  {dayTurnos.map(turno => (
-                    <div
-                      key={turno.id}
-                      onClick={() => { setViewTurno(turno); setScreen("summary"); }}
-                      style={{
-                        background: "rgba(255,255,255,0.02)",
-                        border: "1px solid rgba(255,255,255,0.05)",
-                        borderRadius: 14,
-                        padding: 12,
-                        display: "flex",
-                        justifyContent: "space-between",
-                        alignItems: "center",
-                        cursor: "pointer"
-                      }}
-                    >
-                      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                        <span style={{ fontSize: 18 }}>🚖</span>
-                        <div>
-                          <div style={{ fontSize: 10, fontWeight: 700, color: "rgba(255,255,255,0.4)", textTransform: "uppercase" }}>Turno del Historial</div>
-                          <div style={{ fontSize: 14, fontWeight: 800, color: G }}>
-                            Taxímetro: {fmt(turno.dinero || 0)} • {turno.km} KM
-                          </div>
+                  {dayTurnos.map(turno => {
+                    const propinasTurno = turno.entries.filter((e: any) => e.type === 'propina').reduce((s: number, e: any) => s + e.amount, 0);
+                    const nulosTurno = turno.entries.filter((e: any) => e.type === 'nulo').reduce((s: number, e: any) => s + e.amount, 0);
+                    const dineroEfectivo = (turno.dinero || 0) - nulosTurno;
+                    const gananciaTurno = (dineroEfectivo * (settings["porcentaje.chofer"] / 100)) + propinasTurno;
+
+                    let tiempoTurno = "0h 0m";
+                    if (turno.startTime && turno.endTime) {
+                      let totalMins = getDiffMins(turno.startTime, turno.endTime);
+                      if (turno.totalPausedMinutes) totalMins = Math.max(0, totalMins - turno.totalPausedMinutes);
+                      const hh = Math.floor(totalMins / 60);
+                      const mm = totalMins % 60;
+                      tiempoTurno = `${hh}h ${mm}m`;
+                    }
+
+                    return (
+                      <div
+                        key={turno.id}
+                        onClick={() => { setReturnScreen("calendar"); setViewTurno(turno); setScreen("summary"); }}
+                        style={{
+                          background: "rgba(255,255,255,0.02)",
+                          border: "1px solid rgba(255,255,255,0.05)",
+                          borderRadius: 14,
+                          padding: 12,
+                          display: "flex",
+                          justifyContent: "space-between",
+                          alignItems: "center",
+                          cursor: "pointer"
+                        }}
+                      >
+                        <div style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 13, color: "rgba(255,255,255,0.72)", flexWrap: "wrap" }}>
+                          <span style={{ fontSize: 16 }}>🚖</span>
+                          <span style={{ fontWeight: 800, color: "rgba(255,255,255,0.8)" }}>Turno cerrado</span>
+                          <span style={{ display: "flex", alignItems: "center", gap: 4, fontWeight: 900, color: "oklch(0.78 0.18 150)" }}>
+                            <IconMoneyBag s={16} c="oklch(0.78 0.18 150)" />
+                            {fmt(gananciaTurno)}
+                          </span>
+                          <span style={{ display: "flex", alignItems: "center", gap: 4, fontWeight: 900, color: "oklch(0.85 0.12 210)" }}>
+                            <IconTimer s={16} c="oklch(0.85 0.12 210)" />
+                            {tiempoTurno}
+                          </span>
                         </div>
+                        <span style={{ fontSize: 16, color: "rgba(255,255,255,0.3)" }}>➔</span>
                       </div>
-                      <span style={{ fontSize: 16, color: "rgba(255,255,255,0.3)" }}>➔</span>
-                    </div>
-                  ))}
+                    );
+                  })}
 
                   {/* Reservas */}
                   {dayReservations.map(res => (
@@ -2560,7 +3012,26 @@ function App() {
                           <div style={{ fontSize: 14, color: "white", lineHeight: 1.3 }}>{note.texto}</div>
                         </div>
                         <div style={{ display: "flex", gap: 6 }}>
-                          <button onClick={() => openEditNota(note)} style={{ background: "none", border: "none", color: "rgba(255,255,255,0.4)", cursor: "pointer", fontSize: 13 }}>✏️</button>
+                          <button
+                            onClick={() => openEditNota(note)}
+                            style={{
+                              width: 34,
+                              height: 34,
+                              flex: "0 0 34px",
+                              background: "rgba(255,255,255,0.06)",
+                              border: "1px solid rgba(255,255,255,0.08)",
+                              borderRadius: 10,
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "center",
+                              cursor: "pointer",
+                              padding: 0
+                            }}
+                            title="Editar nota"
+                            aria-label="Editar nota"
+                          >
+                            <IconPencilNeon s={22} />
+                          </button>
                         </div>
                       </div>
                     );
@@ -3158,6 +3629,23 @@ function App() {
                 >
                   <span style={{ fontSize: 16 }}>⚠️</span> Restaurar copia completa
                 </button>
+
+                <button
+                  onClick={() => {
+                    setConfirmDialog({
+                      text: "¿Cerrar sesión? Tus datos seguirán guardados y podrás volver a entrar más tarde.",
+                      confirmText: "Cerrar sesión",
+                      onConfirm: () => {
+                        signOut(auth).catch((err) => {
+                          console.error("signOut error:", err);
+                        });
+                      },
+                    });
+                  }}
+                  style={S.backupSubBtn}
+                >
+                  <span style={{ fontSize: 16 }}>🚪</span> Cerrar sesión
+                </button>
               </div>
             )}
           </div>
@@ -3302,7 +3790,13 @@ function App() {
       <Shell burst={false}>
         <div style={{ flex: 1, overflowY: 'auto', padding: '16px 20px 32px', display: 'flex', flexDirection: 'column', gap: 14, animation: 'slideIn 0.3s ease' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-            <button style={S.iconBtn} onClick={() => { setScreen(isToday ? 'home' : 'PantallaTurnos'); setViewTurno(null); }}><IconBack /></button>
+            <button style={S.iconBtn} onClick={() => {
+              setScreen(returnScreen || (isToday ? 'home' : 'PantallaTurnos'));
+              setViewTurno(null);
+              setReturnScreen(null);
+            }}>
+              <IconBack />
+            </button>
             <div style={{ flex: 1 }}>
               <div style={{ fontSize: 20, fontWeight: 800, color: 'white' }}>Resumen del Turno</div>
               <div style={{ fontSize: 13, color: "rgba(255,255,255,0.5)", textTransform: 'none', marginTop: 1 }}>
@@ -3325,7 +3819,7 @@ function App() {
             <div style={{ flex: 1, background: 'rgba(255,255,255,0.03)', borderRadius: 22, padding: '16px', border: '1px solid rgba(255,255,255,0.07)', display: 'flex', flexDirection: 'column', gap: 10 }}>
               <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', textAlign: 'center', background: 'rgba(255, 180, 0, 0.06)', borderRadius: 16, padding: '14px 8px', border: '1px solid rgba(255, 180, 0, 0.2)' }}>
                 <div style={{ fontSize: 10, fontWeight: 700, color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', letterSpacing: '0.3px', marginBottom: 6, display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 4, whiteSpace: 'nowrap' }}>
-                  <IconTaxiSign s={28} c="oklch(0.85 0.18 85)" /> Total Taxímetro
+                  <IconTaxiBadgeNeon s={28} c="oklch(0.85 0.18 85)" /> Total Taxímetro
                 </div>
                 <div style={{ fontSize: "clamp(16px, 4.5vw, 22px)", fontWeight: 900, color: 'oklch(0.85 0.18 85)', letterSpacing: '-0.5px' }}>{fmt(dineroV)}</div>
               </div>
@@ -3530,7 +4024,7 @@ function App() {
                 textAlign: "center"
               }}>
               <div style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', letterSpacing: '0.6px', marginBottom: 8, display: "flex", alignItems: "center", gap: 6, justifyContent: "center" }}>
-                <IconTaxiSign s={28} c="oklch(0.85 0.18 85)" /> Total Taxímetro
+                <IconTaxiBadgeNeon s={28} c="oklch(0.85 0.18 85)" /> Total Taxímetro
               </div>
               <div style={{ color: 'oklch(0.85 0.18 85)', fontSize: 22, fontWeight: 900, minHeight: 28 }}>
                 {eDinero ? `${eDinero} €` : "€"}
@@ -4724,7 +5218,7 @@ function App() {
             <div style={{ flex: 1, background: 'rgba(255,255,255,0.03)', borderRadius: 22, padding: '16px', border: '1px solid rgba(255,255,255,0.07)', display: 'flex', flexDirection: 'column', gap: 10 }}>
               <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', textAlign: 'center', background: 'rgba(255, 180, 0, 0.06)', borderRadius: 16, padding: '14px 8px', border: '1px solid rgba(255, 180, 0, 0.2)' }}>
                 <div style={{ fontSize: 10, fontWeight: 700, color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', letterSpacing: '0.3px', marginBottom: 6, display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 4, whiteSpace: 'nowrap' }}>
-                  <IconTaxiSign s={28} c="oklch(0.85 0.18 85)" /> Total Taxímetro
+                  <IconTaxiBadgeNeon s={28} c="oklch(0.85 0.18 85)" /> Total Taxímetro
                 </div>
                 <div style={{ fontSize: "clamp(16px, 4.5vw, 22px)", fontWeight: 900, color: 'oklch(0.85 0.18 85)', letterSpacing: '-0.5px' }}>{fmt(totales.dinero)}</div>
               </div>
@@ -4881,7 +5375,7 @@ function App() {
                   return (
                     <div
                       key={t.id}
-                      onClick={() => { setViewTurno(t); setScreen("summary"); }}
+                      onClick={() => { setReturnScreen("detalleSemana"); setViewTurno(t); setScreen("summary"); }}
                       style={{
                         background: "rgba(255,255,255,0.04)",
                         borderRadius: 12,
@@ -4911,7 +5405,7 @@ function App() {
                       <div style={{ display: "flex", gap: 10, textAlign: "right" }}>
                         <div style={{ display: "flex", flexDirection: "column", gap: 8, justifyContent: "center" }}>
                           <div style={{ fontSize: 17, fontWeight: 900, color: "oklch(0.78 0.18 150)", display: "flex", alignItems: "center", gap: 6, whiteSpace: "nowrap" }}>
-                            <IconTaxiSign s={20} c="oklch(0.85 0.18 85)" /> {fmt(t.dinero || 0)}
+                            <IconTaxiBadgeNeon s={20} c="oklch(0.85 0.18 85)" /> {fmt(t.dinero || 0)}
                           </div>
                           <div style={{ fontSize: 17, fontWeight: 900, color: "oklch(0.80 0.14 220)", display: "flex", alignItems: "center", gap: 6, whiteSpace: "nowrap" }}>
                             <IconRoad s={18} c="oklch(0.80 0.14 220)" /> {t.km || 0} KM
@@ -5082,6 +5576,7 @@ function App() {
                           setSelectedTurnosIds([...selectedTurnosIds, j.id]);
                         }
                       } else {
+                        setReturnScreen("PantallaTurnos");
                         setViewTurno(j);
                         setScreen("summary");
                       }
@@ -5116,7 +5611,7 @@ function App() {
                     <div style={{ display: "flex", gap: 10, textAlign: "right" }}>
                       <div style={{ display: "flex", flexDirection: "column", gap: 8, justifyContent: "center" }}>
                         <div style={{ fontSize: 17, fontWeight: 900, color: "oklch(0.78 0.18 150)", display: "flex", alignItems: "center", gap: 6, whiteSpace: "nowrap" }}>
-                          <IconTaxiSign s={20} c="oklch(0.85 0.18 85)" /> {fmt(j.dinero || 0)}
+                          <IconTaxiBadgeNeon s={20} c="oklch(0.85 0.18 85)" /> {fmt(j.dinero || 0)}
                         </div>
                         <div style={{ fontSize: 17, fontWeight: 900, color: "oklch(0.80 0.14 220)", display: "flex", alignItems: "center", gap: 6, whiteSpace: "nowrap" }}>
                           <IconRoad s={18} c="oklch(0.80 0.14 220)" /> {j.km || 0} KM
@@ -5286,7 +5781,7 @@ function App() {
                 textAlign: "center"
               }}>
               <div style={{ fontSize: 11, fontWeight: 700, color: "rgba(255,255,255,0.5)", textTransform: "uppercase", letterSpacing: "0.6px", marginBottom: 8, display: "flex", alignItems: "center", gap: 6, justifyContent: "center" }}>
-                <IconTaxiSign s={28} c="oklch(0.85 0.18 85)" /> Total Taxímetro
+                <IconTaxiBadgeNeon s={28} c="oklch(0.85 0.18 85)" /> Total Taxímetro
               </div>
               <div style={{ color: "oklch(0.85 0.18 85)", fontSize: 22, fontWeight: 900, letterSpacing: "-0.5px", minHeight: 28 }}>
                 {dineroJ ? `${dineroJ} €` : "€"}
@@ -6506,9 +7001,52 @@ function ConfirmDialog({ text, onConfirm, onCancel, confirmText, confirmBg, conf
   );
 }
 
+// AuthGate: decide qué pintar en función del estado de autenticación.
+//   - Mientras Firebase comprueba si hay sesión guardada → "Cargando…".
+//   - Sin usuario          → LoginScreen.
+//   - Con usuario          → App. Se usa key={user.uid} para forzar un remount
+//                             completo si cambia el usuario, asegurando que el
+//                             estado interno de App se reinicia entre usuarios.
+function AuthGate() {
+  const [user, setUser] = useState<User | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const unsub = onAuthStateChanged(auth, (u) => {
+      setUser(u);
+      setLoading(false);
+    });
+    return unsub;
+  }, []);
+
+  if (loading) {
+    return (
+      <div
+        style={{
+          minHeight: "100vh",
+          background: "oklch(0.14 0.02 260)",
+          color: "oklch(0.92 0.02 260)",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          fontSize: 16,
+        }}
+      >
+        Cargando…
+      </div>
+    );
+  }
+
+  if (!user) {
+    return <LoginScreen />;
+  }
+
+  return <App key={user.uid} />;
+}
+
 const rootElement = document.getElementById("root");
 if (rootElement) {
-  ReactDOM.createRoot(rootElement).render(<App />);
+  ReactDOM.createRoot(rootElement).render(<AuthGate />);
 }
 
 if ("serviceWorker" in navigator) {
