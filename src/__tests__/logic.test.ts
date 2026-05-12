@@ -10,6 +10,8 @@ import {
   calcularTotalesTurnos,
   mergeTurnos,
   buildBackupPayload,
+  getHomeQuickActionIds,
+  getBackupMenuActionIds,
   Turno
 } from '../main';
 
@@ -130,5 +132,18 @@ describe('Backup Logic', () => {
 
     expect(backup.reservations).toBe('[{"id":"r1"}]');
     expect(backup.notes).toBe('[{"id":"n1"}]');
+  });
+});
+
+describe('Home and Backup Actions', () => {
+  it('should expose admin access from home only for admins', () => {
+    expect(getHomeQuickActionIds(false)).not.toContain('admin-users');
+    expect(getHomeQuickActionIds(true)).toContain('admin-users');
+  });
+
+  it('should keep logout out of the backup menu', () => {
+    expect(getBackupMenuActionIds(false)).not.toContain('logout');
+    expect(getBackupMenuActionIds(true)).not.toContain('logout');
+    expect(getBackupMenuActionIds(true)).not.toContain('admin-users');
   });
 });

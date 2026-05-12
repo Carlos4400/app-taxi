@@ -7,6 +7,7 @@ import { onAuthStateChanged, signOut, type User } from "firebase/auth";
 import {
   onSnapshot,
   doc,
+  getDoc,
   setDoc,
   writeBatch,
 } from "firebase/firestore";
@@ -18,6 +19,7 @@ import {
   saveUserDoc,
   syncSubcollection,
 } from "./firestore-sync";
+import { AdminListScreen, AdminUserView } from "./admin-screens";
 
 const { useState, useEffect, useRef } = React;
 
@@ -337,6 +339,20 @@ export function buildBackupPayload(values: {
     reservations: values.reservations,
     notes: values.notes,
   };
+}
+
+export type HomeQuickActionId = "new-reservation" | "agenda" | "admin-users" | "logout" | "settings";
+export type BackupMenuActionId = "export-json" | "restore-json";
+
+export function getHomeQuickActionIds(isAdmin: boolean): HomeQuickActionId[] {
+  const actions: HomeQuickActionId[] = ["new-reservation", "agenda"];
+  if (isAdmin) actions.push("admin-users");
+  actions.push("logout", "settings");
+  return actions;
+}
+
+export function getBackupMenuActionIds(_isAdmin: boolean): BackupMenuActionId[] {
+  return ["export-json", "restore-json"];
 }
 
 async function exportBackupJSON() {
@@ -1211,6 +1227,56 @@ const IconPause = ({ s = 24, c = "white" }: { s?: number; c?: string }) => (
   </svg>
 );
 
+const IconLogoutNeon = ({ s = 24 }: { s?: number }) => (
+  <svg width={s} height={s} viewBox="0 0 24 24" fill="none" style={{ display: "inline-block", verticalAlign: "middle" }}>
+    <g transform="rotate(180 12 12)">
+      <path
+        d="M10.5 5.2H5.8C4.8 5.2 4 6 4 7V17C4 18 4.8 18.8 5.8 18.8H10.5"
+        stroke="#ff7a8a"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        style={{ filter: "drop-shadow(0 0 1.2px rgba(255,122,138,0.8)) drop-shadow(0 0 5px rgba(255,70,105,0.28))" }}
+      />
+      <path
+        d="M11 12H19"
+        stroke="#ffb1bc"
+        strokeWidth="2.2"
+        strokeLinecap="round"
+        style={{ filter: "drop-shadow(0 0 1.2px rgba(255,177,188,0.75)) drop-shadow(0 0 5px rgba(255,70,105,0.28))" }}
+      />
+      <path
+        d="M16 8.5L19.5 12L16 15.5"
+        stroke="#ffb1bc"
+        strokeWidth="2.2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        style={{ filter: "drop-shadow(0 0 1.2px rgba(255,177,188,0.75)) drop-shadow(0 0 5px rgba(255,70,105,0.28))" }}
+      />
+    </g>
+  </svg>
+);
+
+const IconAdminNeon = ({ s = 24 }: { s?: number }) => (
+  <svg width={s} height={s} viewBox="0 0 24 24" fill="none" style={{ display: "inline-block", verticalAlign: "middle" }}>
+    <path
+      d="M12 3.4L19 6.1V11.4C19 15.8 16.2 19.4 12 20.8C7.8 19.4 5 15.8 5 11.4V6.1L12 3.4Z"
+      stroke="#7dd3ff"
+      strokeWidth="2"
+      strokeLinejoin="round"
+      style={{ filter: "drop-shadow(0 0 1.2px rgba(125,211,255,0.8)) drop-shadow(0 0 5px rgba(66,165,245,0.32))" }}
+    />
+    <path
+      d="M9 12.2L11 14.2L15.4 9.8"
+      stroke="#b9f6ff"
+      strokeWidth="2.2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      style={{ filter: "drop-shadow(0 0 1.2px rgba(185,246,255,0.78)) drop-shadow(0 0 5px rgba(66,165,245,0.28))" }}
+    />
+  </svg>
+);
+
 const IconHomeNeon = ({ s = 24 }: { s?: number }) => (
   <svg width={s} height={s} viewBox="0 0 24 24" fill="none" style={{ display: "inline-block", verticalAlign: "middle" }}>
     <path
@@ -1486,6 +1552,17 @@ function App() {
   const lastNotesRef = useRef<NotaCalendario[]>([]);
   const lastWeekOverridesRef = useRef<WeekOverride[]>([]);
   const lastFrozenWeeksRef = useRef<FrozenWeek[]>([]);
+
+  // Vista de administrador.
+  //   - isAdmin: true si existe el documento admins/{uid_actual} en Firestore.
+  //     Se lee UNA VEZ al montar la app. El admin se concede manualmente
+  //     desde Firebase Console (ver firestore.rules: la colección admins/ es
+  //     de escritura denegada, solo se gestiona desde la consola).
+  //   - adminMode: null → vista normal del propio usuario.
+  //                "list" → pantalla con la lista de usuarios.
+  //                { uid, username } → pantalla de SOLO LECTURA de ese usuario.
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [adminMode, setAdminMode] = useState<null | "list" | { uid: string; username: string }>(null);
 
   // Helper: actualiza o crea un override para una semana
   function updateWeekOverride(weekId: string, partial: Partial<Omit<WeekOverride, "weekId">>) {
@@ -1838,6 +1915,25 @@ function App() {
     };
   }, []);
 
+  // Detección del rol de administrador.
+  // Lee UNA vez admins/{uid_actual}. Si existe, isAdmin = true y la app
+  // mostrará el botón "Ver datos de otro usuario" en la pantalla home.
+  // La existencia o no de este documento sólo se gestiona desde
+  // Firebase Console (las reglas bloquean cualquier escritura desde la app).
+  useEffect(() => {
+    const user = auth.currentUser;
+    if (!user) return;
+    let cancelado = false;
+    getDoc(doc(db, "admins", user.uid))
+      .then((snap) => {
+        if (!cancelado) setIsAdmin(snap.exists());
+      })
+      .catch((err) => {
+        console.error("Comprobación admin fallida:", err);
+      });
+    return () => { cancelado = true; };
+  }, []);
+
   // Mientras llegan las primeras respuestas de Firestore para este usuario,
   // mostramos un placeholder de carga. Esto evita que la UI parezca vacía y,
   // sobre todo, evita que el usuario pueda crear/editar antes de tener su
@@ -1857,6 +1953,27 @@ function App() {
       >
         Cargando tus datos…
       </div>
+    );
+  }
+
+  // Pantallas exclusivas del administrador. Se renderizan INSTEAD OF la app
+  // normal, no encima. Al pulsar "Volver" se restaura adminMode = null y
+  // vuelve a aparecer la home del propio admin.
+  if (adminMode === "list") {
+    return (
+      <AdminListScreen
+        onBack={() => setAdminMode(null)}
+        onSelect={(uid, username) => setAdminMode({ uid, username })}
+      />
+    );
+  }
+  if (adminMode && typeof adminMode === "object") {
+    return (
+      <AdminUserView
+        uid={adminMode.uid}
+        username={adminMode.username}
+        onBack={() => setAdminMode("list")}
+      />
     );
   }
 
@@ -2306,6 +2423,7 @@ function App() {
   if (screen === "home") {
     const hasActive = current.entries.length > 0 || !!current.startTime;
     const totalHoy = totalP + totalD + totalA + totalE;
+    const homeQuickActionIds = getHomeQuickActionIds(isAdmin);
     return (
       <Shell burst={false}>
         <div
@@ -2491,14 +2609,72 @@ function App() {
           <IconAgenda s={32} c="oklch(0.75 0.15 290)" />
         </button>
         {renderReservaDialog()}
+        {homeQuickActionIds.includes("admin-users") && (
+          <button
+            onClick={() => setAdminMode("list")}
+            aria-label="Ver datos de otro usuario"
+            title="Ver datos de otro usuario"
+            style={{
+              position: "absolute",
+              bottom: 32,
+              left: 28,
+              width: 54,
+              height: 54,
+              background: "rgba(75, 190, 255, 0.08)",
+              border: "1px solid rgba(75, 190, 255, 0.28)",
+              borderRadius: 16,
+              cursor: "pointer",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              fontSize: 22,
+              padding: 0
+            }}
+          >
+            <IconAdminNeon s={32} />
+          </button>
+        )}
         <button
-          onClick={() => setScreen("settings")}
+          onClick={() => {
+            setConfirmDialog({
+              text: "\u00bfCerrar sesi\u00f3n? Tus datos seguir\u00e1n guardados y podr\u00e1s volver a entrar m\u00e1s tarde.",
+              confirmText: "Cerrar sesi\u00f3n",
+              onConfirm: () => {
+                signOut(auth).catch((err) => {
+                  console.error("signOut error:", err);
+                });
+              },
+            });
+          }}
+          aria-label="Cerrar sesi\u00f3n"
+          title="Cerrar sesi\u00f3n"
+          style={{
+            position: "absolute",
+            bottom: 32,
+            right: 94,
+            width: 54,
+            height: 54,
+            background: "rgba(255, 95, 95, 0.08)",
+            border: "1px solid rgba(255, 95, 95, 0.28)",
+            borderRadius: 16,
+            cursor: "pointer",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            fontSize: 22,
+            padding: 0
+          }}
+        >
+          <IconLogoutNeon s={32} />
+        </button>
+        <button
+          onClick={() => { setConfirmDialog(null); setScreen("settings"); }}
           style={{
             position: "absolute",
             bottom: 32,
             right: 28,
-            width: 54,        // <-- Ancho fijo igual al tamaño original
-            height: 54,       // <-- Alto fijo igual al tamaño original
+            width: 54,
+            height: 54,
             background: "rgba(0, 220, 180, 0.08)",
             border: "1px solid rgba(0, 220, 180, 0.28)",
             borderRadius: 16,
@@ -2507,11 +2683,12 @@ function App() {
             alignItems: "center",
             justifyContent: "center",
             fontSize: 22,
-            padding: 0        // <-- Quitamos el padding para que no empuje
+            padding: 0
           }}
         >
           <IconSettings s={32} c="oklch(0.72 0.01 250)" />
         </button>
+        {confirmDialog && <ConfirmDialog {...confirmDialog} onCancel={() => setConfirmDialog(null)} />}
       </Shell>
     );
   }
@@ -3313,6 +3490,7 @@ function App() {
   }
 
   if (screen === "settings") {
+    const backupMenuActionIds = getBackupMenuActionIds(isAdmin);
     return (
       <Shell burst={false}>
         <div style={{ flex: 1, padding: "16px 20px", display: "flex", flexDirection: "column", gap: 16, overflowY: "auto" }}>
@@ -3592,11 +3770,14 @@ function App() {
                 flexDirection: "column",
                 gap: 8
               }}>
-                <button onClick={exportBackupJSON} style={S.backupSubBtn}>
-                  <IconDownload s={18} c="white" /> Exportar todo a JSON
-                </button>
+                {backupMenuActionIds.includes("export-json") && (
+                  <button onClick={exportBackupJSON} style={S.backupSubBtn}>
+                    <IconDownload s={18} c="white" /> Exportar todo a JSON
+                  </button>
+                )}
 
-                <button
+                {backupMenuActionIds.includes("restore-json") && (
+                  <button
                   onClick={() => {
                     const input = document.createElement('input');
                     input.type = 'file';
@@ -3628,24 +3809,9 @@ function App() {
                   style={S.backupSubBtn}
                 >
                   <span style={{ fontSize: 16 }}>⚠️</span> Restaurar copia completa
-                </button>
+                  </button>
+                )}
 
-                <button
-                  onClick={() => {
-                    setConfirmDialog({
-                      text: "¿Cerrar sesión? Tus datos seguirán guardados y podrás volver a entrar más tarde.",
-                      confirmText: "Cerrar sesión",
-                      onConfirm: () => {
-                        signOut(auth).catch((err) => {
-                          console.error("signOut error:", err);
-                        });
-                      },
-                    });
-                  }}
-                  style={S.backupSubBtn}
-                >
-                  <span style={{ fontSize: 16 }}>🚪</span> Cerrar sesión
-                </button>
               </div>
             )}
           </div>
