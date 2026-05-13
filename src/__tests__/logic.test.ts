@@ -16,6 +16,9 @@ import {
   calcularTotalesTurnos,
   calcularTurnoContable,
   calcularResumenContableTurnos,
+  fmtMoneyNumber,
+  fmtMoney,
+  fmtKmNumber,
   ensureTurnosDiaLibreContable,
   mergeTurnos,
   sortTurnosByDateDesc,
@@ -161,6 +164,17 @@ describe('Turno Totals Logic', () => {
     expect(totals.totalE).toBe(0);
     expect(totals.dinero).toBe(250);
     expect(totals.km).toBe(130);
+  });
+});
+
+describe('Money Formatting Logic', () => {
+  it('should format euros with Spanish thousands and decimal separators', () => {
+    expect(fmtMoneyNumber(1102.9)).toBe('1.102,90');
+    expect(fmtMoney(1102.9)).toBe('1.102,90 €');
+  });
+  it('should format kilometers with Spanish thousands separators', () => {
+    expect(fmtKmNumber(1029)).toBe('1.029');
+    expect(fmtKmNumber(12345.6)).toBe('12.345,6');
   });
 });
 

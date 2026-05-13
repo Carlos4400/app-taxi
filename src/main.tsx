@@ -12,6 +12,7 @@ import {
 } from "firebase/firestore";
 import { auth, db } from "./firebase";
 import { LoginScreen } from "./login-screen";
+import { fmtDuration, fmtKm, fmtKmNumber, fmtMoney, fmtMoneyNumber } from "./formatters";
 import {
   userMetaDocRef,
   userSubcollectionRef,
@@ -20,6 +21,8 @@ import {
   userHasFirestoreData,
 } from "./firestore-sync";
 import { AdminListScreen, AdminUserView } from "./admin-screens";
+
+export { fmtDuration, fmtKm, fmtKmNumber, fmtMoney, fmtMoneyNumber } from "./formatters";
 
 const { useState, useEffect, useRef } = React;
 
@@ -187,7 +190,7 @@ function getDiffMins(t1: string, t2: string): number {
 }
 
 function fmt(n: number): string {
-  return n.toFixed(2).replace(".", ",") + " €";
+  return fmtMoney(n);
 }
 function fmtDate(iso: string): string {
   return new Date(iso + "T12:00:00")
@@ -3195,13 +3198,11 @@ function App() {
                   {dayTurnos.map(turno => {
                     const gananciaTurno = calcularTurnoContable(turno, settings).miGanancia;
 
-                    let tiempoTurno = "0h 0m";
+                    let tiempoTurno = fmtDuration(0);
                     if (turno.startTime && turno.endTime) {
                       let totalMins = getDiffMins(turno.startTime, turno.endTime);
                       if (turno.totalPausedMinutes) totalMins = Math.max(0, totalMins - turno.totalPausedMinutes);
-                      const hh = Math.floor(totalMins / 60);
-                      const mm = totalMins % 60;
-                      tiempoTurno = `${hh}h ${mm}m`;
+                      tiempoTurno = fmtDuration(totalMins);
                     }
 
                     return (
@@ -3339,13 +3340,11 @@ function App() {
                         {dayT.map(t => {
                           const gananciaTurno = calcularTurnoContable(t, settings).miGanancia;
 
-                          let tiempoTurno = "0h 0m";
+                          let tiempoTurno = fmtDuration(0);
                           if (t.startTime && t.endTime) {
                             let totalMins = getDiffMins(t.startTime, t.endTime);
                             if (t.totalPausedMinutes) totalMins = Math.max(0, totalMins - t.totalPausedMinutes);
-                            const hh = Math.floor(totalMins / 60);
-                            const mm = totalMins % 60;
-                            tiempoTurno = `${hh}h ${mm}m`;
+                            tiempoTurno = fmtDuration(totalMins);
                           }
 
                           return (
@@ -4032,15 +4031,13 @@ function App() {
     ];
 
     // Cálculo de duración
-    let durationStr = "0h 0m";
+    let durationStr = fmtDuration(0);
     if (viewTurno.startTime && viewTurno.endTime) {
       let totalMins = getDiffMins(viewTurno.startTime, viewTurno.endTime);
       if (viewTurno.totalPausedMinutes) {
         totalMins = Math.max(0, totalMins - viewTurno.totalPausedMinutes);
       }
-      const hh = Math.floor(totalMins / 60);
-      const mm = totalMins % 60;
-      durationStr = `${hh}h ${mm}m`;
+      durationStr = fmtDuration(totalMins);
     }
 
     const calculoTurno = calcularTurnoContable(viewTurno, settings);
@@ -4129,7 +4126,7 @@ function App() {
                 <div style={{ fontSize: 10, fontWeight: 700, color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', letterSpacing: '0.3px', marginBottom: 6, display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 4, whiteSpace: 'nowrap' }}>
                   <IconRoad s={24} c="oklch(0.80 0.14 220)" /> Total KM
                 </div>
-                <div style={{ fontSize: "clamp(16px, 4.5vw, 22px)", fontWeight: 900, color: 'oklch(0.80 0.14 220)', letterSpacing: '-0.5px' }}>{kmV.toString().replace('.', ',')} <span style={{ fontSize: 13, fontWeight: 700, opacity: 0.6 }}>KM</span></div>
+                <div style={{ fontSize: "clamp(16px, 4.5vw, 22px)", fontWeight: 900, color: 'oklch(0.80 0.14 220)', letterSpacing: '-0.5px' }}>{fmtKmNumber(kmV)} <span style={{ fontSize: 13, fontWeight: 700, opacity: 0.6 }}>KM</span></div>
               </div>
             </div>
 
@@ -5236,7 +5233,7 @@ function App() {
                 totalMinsHero += mins;
               }
             }
-            const durationStrHero = `${Math.floor(totalMinsHero / 60)}h ${totalMinsHero % 60}m`;
+            const durationStrHero = fmtDuration(totalMinsHero);
 
             return (
               <div
@@ -5308,7 +5305,7 @@ function App() {
                         <IconMoneyBag s={24} c="oklch(0.78 0.18 150)" /> Mi Ganancia
                       </div>
                       <div style={{ fontSize: "clamp(22px, 6vw, 32px)", fontWeight: 900, color: "oklch(0.78 0.18 150)", letterSpacing: "-1px", lineHeight: 1 }}>
-                        {totales.miGanancia.toFixed(2).replace(".", ",")} <span style={{ fontSize: 20, fontWeight: 700, opacity: 0.6 }}>€</span>
+                        {fmtMoneyNumber(totales.miGanancia)} <span style={{ fontSize: 20, fontWeight: 700, opacity: 0.6 }}>€</span>
                       </div>
                     </div>
                     <div>
@@ -5339,10 +5336,10 @@ function App() {
                 </div>
                 <div style={{ display: "flex", gap: 16, marginTop: 4 }}>
                   <div style={{ fontSize: "clamp(22px, 6vw, 32px)", fontWeight: 900, color: "oklch(0.85 0.18 85)", letterSpacing: "-1px" }}>
-                    {totalTaximetroHero.toFixed(2).replace(".", ",")} <span style={{ fontSize: 20, fontWeight: 700, opacity: 0.6 }}>€</span>
+                    {fmtMoneyNumber(totalTaximetroHero)} <span style={{ fontSize: 20, fontWeight: 700, opacity: 0.6 }}>€</span>
                   </div>
                   <div style={{ fontSize: "clamp(22px, 6vw, 32px)", fontWeight: 900, color: "oklch(0.80 0.14 220)", letterSpacing: "-1px" }}>
-                    {(totales.km || 0).toString().replace('.', ',')} <span style={{ fontSize: 20, fontWeight: 700, opacity: 0.6 }}>KM</span>
+                    {fmtKmNumber(totales.km || 0)} <span style={{ fontSize: 20, fontWeight: 700, opacity: 0.6 }}>KM</span>
                   </div>
                 </div>
               </div>
@@ -5479,7 +5476,7 @@ function App() {
                     totalMinsSem += mins;
                   }
                 }
-                const durationStrSem = `${Math.floor(totalMinsSem / 60)}h ${totalMinsSem % 60}m`;
+                const durationStrSem = fmtDuration(totalMinsSem);
 
                 return (
                   <div
@@ -5532,7 +5529,7 @@ function App() {
                           <IconTaxiBadgeNeon s={20} c="oklch(0.85 0.18 85)" /> {fmt(totalTaximetroSemana)}
                         </div>
                         <div style={{ fontSize: 17, fontWeight: 900, color: "oklch(0.80 0.14 220)", display: "flex", alignItems: "center", gap: 6, whiteSpace: "nowrap" }}>
-                          <IconRoad s={18} c="oklch(0.80 0.14 220)" /> {kmSemana || 0} KM
+                          <IconRoad s={18} c="oklch(0.80 0.14 220)" /> {fmtKm(kmSemana || 0)}
                         </div>
                       </div>
                       <div style={{ display: "flex", flexDirection: "column", gap: 8, alignItems: "flex-end", justifyContent: "center" }}>
@@ -5650,7 +5647,7 @@ function App() {
         totalMins += mins;
       }
     }
-    const durationStr = `${Math.floor(totalMins / 60)}h ${totalMins % 60}m`;
+    const durationStr = fmtDuration(totalMins);
 
     const mesesAnio = monthLabels.map((label, index) => {
       const month = index + 1;
@@ -5703,7 +5700,7 @@ function App() {
               </div>
               <div style={{ flex: 1, textAlign: 'center', background: 'rgba(0, 210, 255, 0.06)', borderRadius: 16, padding: '14px 8px', border: '1px solid rgba(0, 210, 255, 0.2)' }}>
                 <div style={{ fontSize: 11, fontWeight: 800, color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', marginBottom: 6 }}>Total KM</div>
-                <div style={{ fontSize: "clamp(16px, 4.5vw, 22px)", fontWeight: 900, color: 'oklch(0.80 0.14 220)' }}>{(resumenAnual.km || 0).toString().replace('.', ',')} <span style={{ fontSize: 13, opacity: 0.7 }}>KM</span></div>
+                <div style={{ fontSize: "clamp(16px, 4.5vw, 22px)", fontWeight: 900, color: 'oklch(0.80 0.14 220)' }}>{fmtKmNumber(resumenAnual.km || 0)} <span style={{ fontSize: 13, opacity: 0.7 }}>KM</span></div>
               </div>
             </div>
             <div style={{ flex: 1, background: 'rgba(255,255,255,0.03)', borderRadius: 22, padding: '16px', border: '1px solid rgba(255,255,255,0.07)', display: 'flex', flexDirection: 'column', gap: 10 }}>
@@ -5790,7 +5787,7 @@ function App() {
         totalMins += mins;
       }
     }
-    const durationStr = `${Math.floor(totalMins / 60)}h ${totalMins % 60}m`;
+    const durationStr = fmtDuration(totalMins);
 
     return (
       <Shell burst={false}>
@@ -5864,7 +5861,7 @@ function App() {
                 <div style={{ fontSize: 11, fontWeight: 800, color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', marginBottom: 6, display: 'flex', alignItems: 'center', gap: 6 }}>
                   <IconRoad s={24} c="oklch(0.80 0.14 220)" /> Total KM
                 </div>
-                <div style={{ fontSize: "clamp(16px, 4.5vw, 22px)", fontWeight: 900, color: 'oklch(0.80 0.14 220)', letterSpacing: '-0.5px' }}>{(resumenMes.km || 0).toString().replace('.', ',')} <span style={{ fontSize: 13, opacity: 0.7 }}>KM</span></div>
+                <div style={{ fontSize: "clamp(16px, 4.5vw, 22px)", fontWeight: 900, color: 'oklch(0.80 0.14 220)', letterSpacing: '-0.5px' }}>{fmtKmNumber(resumenMes.km || 0)} <span style={{ fontSize: 13, opacity: 0.7 }}>KM</span></div>
               </div>
             </div>
 
@@ -5918,11 +5915,11 @@ function App() {
               <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                 {turnosMes.map((turno) => {
                   const calculo = calcularTurnoContable(turno, settings);
-                  let turnoDuration = "0h 0m";
+                  let turnoDuration = fmtDuration(0);
                   if (turno.startTime && turno.endTime) {
                     let mins = getDiffMins(turno.startTime, turno.endTime);
                     if (turno.totalPausedMinutes) mins = Math.max(0, mins - turno.totalPausedMinutes);
-                    turnoDuration = `${Math.floor(mins / 60)}h ${mins % 60}m`;
+                    turnoDuration = fmtDuration(mins);
                   }
 
                   return (
@@ -5999,9 +5996,7 @@ function App() {
         totalMins += mins;
       }
     }
-    const hh = Math.floor(totalMins / 60);
-    const mm = totalMins % 60;
-    const durationStr = `${hh}h ${mm}m`;
+    const durationStr = fmtDuration(totalMins);
 
     const dineroV = (totales.dinero || 0) - (totales.totalN || 0);
     const resumenContableSemana = calcularResumenContableTurnos(turnosSemana, settings);
@@ -6053,7 +6048,7 @@ function App() {
                 <div style={{ fontSize: 10, fontWeight: 700, color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', letterSpacing: '0.3px', marginBottom: 6, display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 4, whiteSpace: 'nowrap' }}>
                   <IconRoad s={24} c="oklch(0.80 0.14 220)" /> Total KM
                 </div>
-                <div style={{ fontSize: "clamp(16px, 4.5vw, 22px)", fontWeight: 900, color: 'oklch(0.80 0.14 220)', letterSpacing: '-0.5px' }}>{(totales.km || 0).toString().replace('.', ',')} <span style={{ fontSize: 13, fontWeight: 700, opacity: 0.6 }}>KM</span></div>
+                <div style={{ fontSize: "clamp(16px, 4.5vw, 22px)", fontWeight: 900, color: 'oklch(0.80 0.14 220)', letterSpacing: '-0.5px' }}>{fmtKmNumber(totales.km || 0)} <span style={{ fontSize: 13, fontWeight: 700, opacity: 0.6 }}>KM</span></div>
               </div>
             </div>
 
@@ -6186,15 +6181,13 @@ function App() {
             ) : (
               <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                 {[...turnosSemana].sort((a, b) => (getTurnoFechaEfectiva(a, settings.diaLibre) < getTurnoFechaEfectiva(b, settings.diaLibre) ? 1 : -1)).map((t) => {
-                  let durationStr = "0h 0m";
+                  let durationStr = fmtDuration(0);
                   if (t.startTime && t.endTime) {
                     let totalMins = getDiffMins(t.startTime, t.endTime);
                     if (t.totalPausedMinutes) {
                       totalMins = Math.max(0, totalMins - t.totalPausedMinutes);
                     }
-                    const hh = Math.floor(totalMins / 60);
-                    const mm = totalMins % 60;
-                    durationStr = `${hh}h ${mm}m`;
+                    durationStr = fmtDuration(totalMins);
                   }
                   const taximetroTurno = (t.dinero || 0) - (t.totalN || 0);
                   const miGanancia = calcularTurnoContable(t, settings).miGanancia;
@@ -6235,7 +6228,7 @@ function App() {
                             <IconTaxiBadgeNeon s={20} c="oklch(0.85 0.18 85)" /> {fmt(taximetroTurno)}
                           </div>
                           <div style={{ fontSize: 17, fontWeight: 900, color: "oklch(0.80 0.14 220)", display: "flex", alignItems: "center", gap: 6, whiteSpace: "nowrap" }}>
-                            <IconRoad s={18} c="oklch(0.80 0.14 220)" /> {t.km || 0} KM
+                            <IconRoad s={18} c="oklch(0.80 0.14 220)" /> {fmtKm(t.km || 0)}
                           </div>
                         </div>
                         <div style={{ display: "flex", flexDirection: "column", gap: 8, alignItems: "flex-end", justifyContent: "center" }}>
@@ -6352,15 +6345,13 @@ function App() {
             </div>
           ) : (
             history.map((j) => {
-              let durationStr = "0h 0m";
+              let durationStr = fmtDuration(0);
               if (j.startTime && j.endTime) {
                 let totalMins = getDiffMins(j.startTime, j.endTime);
                 if (j.totalPausedMinutes) {
                   totalMins = Math.max(0, totalMins - j.totalPausedMinutes);
                 }
-                const hh = Math.floor(totalMins / 60);
-                const mm = totalMins % 60;
-                durationStr = `${hh}h ${mm}m`;
+                durationStr = fmtDuration(totalMins);
               }
               const miGanancia = calcularTurnoContable(j, settings).miGanancia;
 
@@ -6430,7 +6421,7 @@ function App() {
                           <IconTaxiBadgeNeon s={20} c="oklch(0.85 0.18 85)" /> {fmt(j.dinero || 0)}
                         </div>
                         <div style={{ fontSize: 17, fontWeight: 900, color: "oklch(0.80 0.14 220)", display: "flex", alignItems: "center", gap: 6, whiteSpace: "nowrap" }}>
-                          <IconRoad s={18} c="oklch(0.80 0.14 220)" /> {j.km || 0} KM
+                          <IconRoad s={18} c="oklch(0.80 0.14 220)" /> {fmtKm(j.km || 0)}
                         </div>
                       </div>
                       <div style={{ display: "flex", flexDirection: "column", gap: 8, alignItems: "flex-end", justifyContent: "center" }}>

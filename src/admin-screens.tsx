@@ -13,6 +13,7 @@ import React from "react";
 import { collection, getDocs, onSnapshot } from "firebase/firestore";
 import { db } from "./firebase";
 import { userMetaDocRef, userSubcollectionRef } from "./firestore-sync";
+import { fmtKm, fmtMoney as fmtEuro } from "./formatters";
 
 const { useState, useEffect, useMemo } = React;
 
@@ -119,10 +120,6 @@ const MUTED = "oklch(0.60 0.04 260)";
 // ============================================================================
 // HELPERS DE FORMATO
 // ============================================================================
-
-function fmtEuro(n: number): string {
-  return n.toFixed(2).replace(".", ",") + " €";
-}
 
 function fmtFecha(iso: string): string {
   if (!iso) return "—";
@@ -521,7 +518,7 @@ function TurnosTab({
           </div>
           <div style={{ display: "flex", gap: 12, flexWrap: "wrap", fontSize: 13 }}>
             <span style={{ color: G }}>{fmtEuro(t.dinero)}</span>
-            <span style={{ color: MUTED }}>{t.km} km</span>
+            <span style={{ color: MUTED }}>{fmtKm(t.km || 0)}</span>
             {t.totalP > 0 && <span style={{ color: A }}>P: {fmtEuro(t.totalP)}</span>}
             {t.totalD > 0 && <span style={{ color: MUTED }}>D: {fmtEuro(t.totalD)}</span>}
           </div>
@@ -567,7 +564,7 @@ function TurnoDetail({ turno, onBack }: { turno: Turno; onBack: () => void }) {
         </div>
         <div style={{ display: "flex", justifyContent: "space-between" }}>
           <span style={{ fontSize: 14, color: MUTED }}>Kilómetros</span>
-          <span style={{ fontSize: 16, color: TEXT }}>{turno.km} km</span>
+          <span style={{ fontSize: 16, color: TEXT }}>{fmtKm(turno.km || 0)}</span>
         </div>
       </div>
 
