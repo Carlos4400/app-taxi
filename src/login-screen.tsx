@@ -357,6 +357,8 @@ export function LoginScreen() {
           <form onSubmit={onSubmitLogin} autoComplete="on">
             <label style={labelStyle}>Usuario o email</label>
             <input
+              id="login-username"
+              name="login-username"
               type="text"
               autoComplete="username"
               value={usuarioOEmail}
@@ -365,6 +367,8 @@ export function LoginScreen() {
             />
             <label style={labelStyle}>Contraseña</label>
             <input
+              id="login-password"
+              name="login-password"
               type="password"
               autoComplete="current-password"
               value={password}
@@ -404,6 +408,8 @@ export function LoginScreen() {
           <form onSubmit={onSubmitRegister} autoComplete="on">
             <label style={labelStyle}>Nombre de usuario</label>
             <input
+              id="reg-username"
+              name="reg-username"
               type="text"
               autoComplete="username"
               value={regUsername}
@@ -413,6 +419,8 @@ export function LoginScreen() {
             />
             <label style={labelStyle}>Email</label>
             <input
+              id="reg-email"
+              name="reg-email"
               type="email"
               autoComplete="email"
               value={regEmail}
@@ -421,6 +429,8 @@ export function LoginScreen() {
             />
             <label style={labelStyle}>Contraseña</label>
             <input
+              id="reg-password"
+              name="reg-password"
               type="password"
               autoComplete="new-password"
               value={regPassword}
@@ -430,6 +440,8 @@ export function LoginScreen() {
             />
             <label style={labelStyle}>Repite la contraseña</label>
             <input
+              id="reg-password-repeat"
+              name="reg-password-repeat"
               type="password"
               autoComplete="new-password"
               value={regPassword2}
@@ -458,6 +470,8 @@ export function LoginScreen() {
           <form onSubmit={onSubmitReset} autoComplete="on">
             <label style={labelStyle}>Email asociado a tu cuenta</label>
             <input
+              id="reset-email"
+              name="reset-email"
               type="email"
               autoComplete="email"
               value={resetEmail}
