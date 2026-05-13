@@ -4145,7 +4145,7 @@ function App() {
               style={{
                 margin: "0",
                 color: "white",
-                fontSize: 22,
+                fontSize: 20,
                 lineHeight: 1.15,
                 fontWeight: 900,
                 letterSpacing: 0,
@@ -4280,7 +4280,7 @@ function App() {
                         <span style={{ fontSize: 11, color: "rgba(255,255,255,0.5)", fontWeight: 600 }}>{e.time}</span>
                         <span style={{ fontWeight: 900, color: col, fontSize: 10, textTransform: 'uppercase', minWidth: 60 }}>{e.type}</span>
                         <span style={{ color: 'rgba(255,255,255,0.85)', lineHeight: 1.4 }}>{e.note}</span>
-                        <span style={{ marginLeft: 'auto', fontSize: 11, color: "rgba(255,255,255,0.5)", fontWeight: 600 }}>{fmt(e.amount)}</span>
+                        <span style={{ marginLeft: 'auto', fontSize: 11, color: "rgba(255,255,255,0.5)", fontWeight: 600, whiteSpace: 'nowrap', flexShrink: 0 }}>{fmt(e.amount)}</span>
                       </div>
                     );
                   })}
@@ -4371,12 +4371,20 @@ function App() {
       const finalKm = editJ.kmStr !== undefined
         ? parseFloat(editJ.kmStr.replace(',', '.')) || 0
         : (editJ.km || 0);
-      const updated = {
-        ...editJ,
+      const {
+        dineroStr: _dineroStr,
+        kmStr: _kmStr,
+        newType: _newType,
+        newAmount: _newAmount,
+        newNote: _newNote,
+        isAddingNote: _isAddingNote,
+        tempNote: _tempNote,
+        ...turnoBase
+      } = editJ;
+      const updated: Turno = {
+        ...turnoBase,
         dinero: finalDinero,
         km: finalKm,
-        dineroStr: undefined,
-        kmStr: undefined,
         totalP: editJ.entries.filter((e: Entry) => e.type === 'propina').reduce((s: number, e: Entry) => s + e.amount, 0),
         totalD: editJ.entries.filter((e: Entry) => e.type === 'datafono').reduce((s: number, e: Entry) => s + e.amount, 0),
         totalA: editJ.entries.filter((e: Entry) => e.type === 'agencia_bono').reduce((s: number, e: Entry) => s + e.amount, 0),
@@ -6093,10 +6101,30 @@ function App() {
               <div style={{ fontSize: 20, fontWeight: 800, color: "white" }}>
                 Detalle de Semana
               </div>
-              <div style={{ fontSize: 12, color: "rgba(255,255,255,0.4)", marginTop: 2 }}>
-                {formatWeekRangeFull(weekId)}
-              </div>
             </div>
+          </div>
+
+          <div style={{
+            background: "rgba(255,255,255,0.03)",
+            borderRadius: 22,
+            padding: "16px",
+            border: "1px solid rgba(255,255,255,0.07)",
+          }}>
+            <h1
+              aria-label="Rango de fechas de la semana"
+              style={{
+                margin: "0",
+                color: "white",
+                fontSize: 20,
+                lineHeight: 1.15,
+                fontWeight: 900,
+                letterSpacing: 0,
+                textAlign: "center",
+                overflowWrap: "anywhere",
+              }}
+            >
+              {formatWeekRangeFull(weekId)}
+            </h1>
           </div>
 
           {/* Badge de estado */}
