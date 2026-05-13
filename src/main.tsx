@@ -12,7 +12,7 @@ import {
 } from "firebase/firestore";
 import { auth, db } from "./firebase";
 import { LoginScreen } from "./login-screen";
-import { fmtDuration, fmtKm, fmtKmNumber, fmtMoney, fmtMoneyNumber } from "./formatters";
+import { fmtDuration, fmtKm, fmtKmNumber, fmtMoney, fmtMoneyNumber, splitDurationLabel } from "./formatters";
 import {
   userMetaDocRef,
   userSubcollectionRef,
@@ -22,7 +22,7 @@ import {
 } from "./firestore-sync";
 import { AdminListScreen, AdminUserView } from "./admin-screens";
 
-export { fmtDuration, fmtKm, fmtKmNumber, fmtMoney, fmtMoneyNumber } from "./formatters";
+export { fmtDuration, fmtKm, fmtKmNumber, fmtMoney, fmtMoneyNumber, splitDurationLabel } from "./formatters";
 
 const { useState, useEffect, useRef } = React;
 
@@ -66,6 +66,13 @@ export interface Turno {
   diaLibreContable?: number;
 }
 
+export interface TurnoNotasSemana {
+  turno: Turno;
+  notaTurno: string;
+  notasGenerales: Entry[];
+  notasDetalladas: Entry[];
+}
+
 interface EditTurnoState extends Turno {
   dineroStr?: string;
   kmStr?: string;
@@ -107,6 +114,24 @@ export const WEEK_LIST_CARD_TEXT_SIZES = {
   range: "clamp(13px, 4.2cqw, 16px)",
   meta: "clamp(11px, 3.4cqw, 13px)",
   metric: "clamp(14px, 4.5cqw, 17px)",
+} as const;
+
+export const KM_CARD_UNIT_STYLE = {
+  fontSize: "0.72em",
+  fontWeight: 900,
+  letterSpacing: "normal",
+} as const;
+
+export const TIME_CARD_UNIT_STYLE = {
+  fontSize: "1em",
+  fontWeight: KM_CARD_UNIT_STYLE.fontWeight,
+  marginLeft: 2,
+  letterSpacing: KM_CARD_UNIT_STYLE.letterSpacing,
+} as const;
+
+export const TIME_CARD_HOUR_UNIT_STYLE = {
+  ...TIME_CARD_UNIT_STYLE,
+  marginRight: 6,
 } as const;
 
 const KEY_CURRENT = "taxi_current_v3";
@@ -198,6 +223,17 @@ function getDiffMins(t1: string, t2: string): number {
 function fmt(n: number): string {
   return fmtMoney(n);
 }
+
+function DurationCardValue({ value }: { value: string }) {
+  const parts = splitDurationLabel(value);
+  return (
+    <>
+      {parts.hours}<span style={TIME_CARD_HOUR_UNIT_STYLE}>h</span>
+      {parts.minutes}<span style={TIME_CARD_UNIT_STYLE}>m</span>
+    </>
+  );
+}
+
 function fmtDate(iso: string): string {
   return new Date(iso + "T12:00:00")
     .toLocaleDateString("es-ES", {
@@ -697,6 +733,17 @@ export function updateTurnoEntrega(
       ? { ...t, entregada, fechaEntrega: entregada ? fechaEntrega : null }
       : t
   );
+}
+
+export function getTurnosNotasSemana(turnos: Turno[]): TurnoNotasSemana[] {
+  return turnos
+    .map((turno) => {
+      const notaTurno = (turno.notes || "").trim();
+      const notasGenerales = turno.entries.filter((entry) => entry.type === "nota" && !!entry.note?.trim());
+      const notasDetalladas = turno.entries.filter((entry) => entry.type !== "nota" && !!entry.note?.trim());
+      return { turno, notaTurno, notasGenerales, notasDetalladas };
+    })
+    .filter((item) => item.notaTurno || item.notasGenerales.length > 0 || item.notasDetalladas.length > 0);
 }
 
 // ============================================================================
@@ -4045,7 +4092,6 @@ function App() {
       }
       durationStr = fmtDuration(totalMins);
     }
-
     const calculoTurno = calcularTurnoContable(viewTurno, settings);
     const miGanancia = calculoTurno.miGanancia;
 
@@ -4055,6 +4101,10 @@ function App() {
     const isLooseAccountingTurno = returnScreen === "contabilidad" && getTurnoAccountingWeekId(viewTurno, settings.diaLibre) === null;
     const turnoEntregado = viewTurno.entregada || false;
     const turnoFechaEntrega = viewTurno.fechaEntrega || null;
+    const turnoSummaryDateTitle =
+      viewTurno.startDate && viewTurno.startDate !== viewTurno.date
+        ? `${fmtDate(viewTurno.startDate)} ${viewTurno.startTime} - ${fmtDate(viewTurno.date)} ${viewTurno.endTime}`
+        : `${fmtDate(viewTurno.date)} \u00B7 ${viewTurno.startTime} - ${viewTurno.endTime}`;
 
     function applyTurnoEntrega(entregada: boolean) {
       const fechaEntrega = entregada ? today() : null;
@@ -4075,11 +4125,6 @@ function App() {
             </button>
             <div style={{ flex: 1 }}>
               <div style={{ fontSize: 20, fontWeight: 800, color: 'white' }}>Resumen del Turno</div>
-              <div style={{ fontSize: 13, color: "rgba(255,255,255,0.5)", textTransform: 'none', marginTop: 1 }}>
-                {viewTurno.startDate && viewTurno.startDate !== viewTurno.date
-                  ? <>{fmtDate(viewTurno.startDate)} {viewTurno.startTime} – {fmtDate(viewTurno.date)} {viewTurno.endTime}</>
-                  : <>{fmtDate(viewTurno.date)} · {viewTurno.startTime} – {viewTurno.endTime}</>}
-              </div>
             </div>
             <button style={{ ...S.iconBtn, background: 'rgba(255,255,255,0.09)' }} onClick={() => {
               setEditJ({ ...viewTurno, entries: [...viewTurno.entries] });
@@ -4087,6 +4132,29 @@ function App() {
             }}>
               <IconPencilNeon />
             </button>
+          </div>
+
+          <div style={{
+            background: 'rgba(255,255,255,0.03)',
+            borderRadius: 22,
+            padding: '16px',
+            border: '1px solid rgba(255,255,255,0.07)'
+          }}>
+            <h1
+              aria-label="Fecha del turno"
+              style={{
+                margin: "0",
+                color: "white",
+                fontSize: 22,
+                lineHeight: 1.15,
+                fontWeight: 900,
+                letterSpacing: 0,
+                textAlign: "center",
+                overflowWrap: "anywhere",
+              }}
+            >
+              {turnoSummaryDateTitle}
+            </h1>
           </div>
 
           {isLooseAccountingTurno && (
@@ -4132,7 +4200,7 @@ function App() {
                 <div style={{ fontSize: 10, fontWeight: 700, color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', letterSpacing: '0.3px', marginBottom: 6, display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 4, whiteSpace: 'nowrap' }}>
                   <IconRoad s={24} c="oklch(0.80 0.14 220)" /> Total KM
                 </div>
-                <div style={{ fontSize: "clamp(16px, 4.5vw, 22px)", fontWeight: 900, color: 'oklch(0.80 0.14 220)', letterSpacing: '-0.5px' }}>{fmtKmNumber(kmV)} <span style={{ fontSize: 13, fontWeight: 700, opacity: 0.6 }}>KM</span></div>
+                <div style={{ fontSize: "clamp(16px, 4.5vw, 22px)", fontWeight: 900, color: 'oklch(0.80 0.14 220)', letterSpacing: '-0.5px' }}>{fmtKmNumber(kmV)} <span style={KM_CARD_UNIT_STYLE}>KM</span></div>
               </div>
             </div>
 
@@ -4148,7 +4216,9 @@ function App() {
                 <div style={{ fontSize: 10, fontWeight: 700, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '0.3px', marginBottom: 6, display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 4, whiteSpace: 'nowrap' }}>
                   <IconTimer s={26} c="oklch(0.85 0.12 210)" /> Tiempo Trabajado
                 </div>
-                <div style={{ fontSize: "clamp(16px, 4.5vw, 22px)", fontWeight: 900, color: 'oklch(0.85 0.12 210)', letterSpacing: '-0.5px' }}>{durationStr}</div>
+                <div style={{ fontSize: "clamp(16px, 4.5vw, 22px)", fontWeight: 900, color: 'oklch(0.85 0.12 210)', letterSpacing: '-0.5px' }}>
+                  <DurationCardValue value={durationStr} />
+                </div>
               </div>
             </div>
           </div>
@@ -4385,7 +4455,7 @@ function App() {
                 <IconRoad s={24} c="oklch(0.80 0.14 220)" /> Total KM
               </div>
               <div style={{ color: 'oklch(0.80 0.14 220)', fontSize: 22, fontWeight: 900, minHeight: 28 }}>
-                {eKm ? `${eKm} KM` : "KM"}
+                {eKm ? <>{eKm} <span style={KM_CARD_UNIT_STYLE}>KM</span></> : <span style={KM_CARD_UNIT_STYLE}>KM</span>}
               </div>
             </div>
           </div>
@@ -5707,7 +5777,7 @@ function App() {
               </div>
               <div style={{ flex: 1, textAlign: 'center', background: 'rgba(0, 210, 255, 0.06)', borderRadius: 16, padding: '14px 8px', border: '1px solid rgba(0, 210, 255, 0.2)' }}>
                 <div style={{ fontSize: 11, fontWeight: 800, color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', marginBottom: 6 }}>Total KM</div>
-                <div style={{ fontSize: "clamp(16px, 4.5vw, 22px)", fontWeight: 900, color: 'oklch(0.80 0.14 220)' }}>{fmtKmNumber(resumenAnual.km || 0)} <span style={{ fontSize: 13, opacity: 0.7 }}>KM</span></div>
+                <div style={{ fontSize: "clamp(16px, 4.5vw, 22px)", fontWeight: 900, color: 'oklch(0.80 0.14 220)' }}>{fmtKmNumber(resumenAnual.km || 0)} <span style={KM_CARD_UNIT_STYLE}>KM</span></div>
               </div>
             </div>
             <div style={{ flex: 1, background: 'rgba(255,255,255,0.03)', borderRadius: 22, padding: '16px', border: '1px solid rgba(255,255,255,0.07)', display: 'flex', flexDirection: 'column', gap: 10 }}>
@@ -5717,7 +5787,7 @@ function App() {
               </div>
               <div style={{ flex: 1, textAlign: 'center', background: 'rgba(120, 200, 255, 0.08)', borderRadius: 16, padding: '14px 8px', border: '1px solid rgba(120, 200, 255, 0.22)' }}>
                 <div style={{ fontSize: 11, fontWeight: 800, color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', marginBottom: 6 }}>Tiempo Trabajado</div>
-                <div style={{ fontSize: "clamp(16px, 4.5vw, 22px)", fontWeight: 900, color: 'oklch(0.85 0.12 210)' }}>{durationStr}</div>
+                <div style={{ fontSize: "clamp(16px, 4.5vw, 22px)", fontWeight: 900, color: 'oklch(0.85 0.12 210)' }}><DurationCardValue value={durationStr} /></div>
               </div>
             </div>
           </div>
@@ -5868,7 +5938,7 @@ function App() {
                 <div style={{ fontSize: 11, fontWeight: 800, color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', marginBottom: 6, display: 'flex', alignItems: 'center', gap: 6 }}>
                   <IconRoad s={24} c="oklch(0.80 0.14 220)" /> Total KM
                 </div>
-                <div style={{ fontSize: "clamp(16px, 4.5vw, 22px)", fontWeight: 900, color: 'oklch(0.80 0.14 220)', letterSpacing: '-0.5px' }}>{fmtKmNumber(resumenMes.km || 0)} <span style={{ fontSize: 13, opacity: 0.7 }}>KM</span></div>
+                <div style={{ fontSize: "clamp(16px, 4.5vw, 22px)", fontWeight: 900, color: 'oklch(0.80 0.14 220)', letterSpacing: '-0.5px' }}>{fmtKmNumber(resumenMes.km || 0)} <span style={KM_CARD_UNIT_STYLE}>KM</span></div>
               </div>
             </div>
 
@@ -5883,7 +5953,7 @@ function App() {
                 <div style={{ fontSize: 11, fontWeight: 800, color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', marginBottom: 6, display: 'flex', alignItems: 'center', gap: 6 }}>
                   <IconTimer s={26} c="oklch(0.85 0.12 210)" /> Tiempo Trabajado
                 </div>
-                <div style={{ fontSize: "clamp(16px, 4.5vw, 22px)", fontWeight: 900, color: 'oklch(0.85 0.12 210)', letterSpacing: '-0.5px' }}>{durationStr}</div>
+                <div style={{ fontSize: "clamp(16px, 4.5vw, 22px)", fontWeight: 900, color: 'oklch(0.85 0.12 210)', letterSpacing: '-0.5px' }}><DurationCardValue value={durationStr} /></div>
               </div>
             </div>
           </div>
@@ -6010,6 +6080,7 @@ function App() {
     const miGanancia = resumenContableSemana.miGanancia;
     const totalDescontar = resumenContableSemana.totalDescontar;
     const totalADar = resumenContableSemana.totalADar;
+    const turnosConNotas = getTurnosNotasSemana(turnosSemana);
     return (
       <Shell burst={false}>
         <div style={{ flex: 1, padding: "16px 20px 32px", display: "flex", flexDirection: "column", gap: 14, overflowY: "auto" }}>
@@ -6055,7 +6126,9 @@ function App() {
                 <div style={{ fontSize: 10, fontWeight: 700, color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', letterSpacing: '0.3px', marginBottom: 6, display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 4, whiteSpace: 'nowrap' }}>
                   <IconRoad s={24} c="oklch(0.80 0.14 220)" /> Total KM
                 </div>
-                <div style={{ fontSize: "clamp(16px, 4.5vw, 22px)", fontWeight: 900, color: 'oklch(0.80 0.14 220)', letterSpacing: '-0.5px' }}>{fmtKmNumber(totales.km || 0)} <span style={{ fontSize: 13, fontWeight: 700, opacity: 0.6 }}>KM</span></div>
+                <div style={{ fontSize: "clamp(16px, 4.5vw, 22px)", fontWeight: 900, color: 'oklch(0.80 0.14 220)', letterSpacing: '-0.5px' }}>
+                  {fmtKmNumber(totales.km || 0)} <span style={KM_CARD_UNIT_STYLE}>KM</span>
+                </div>
               </div>
             </div>
 
@@ -6071,7 +6144,7 @@ function App() {
                 <div style={{ fontSize: 10, fontWeight: 700, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '0.3px', marginBottom: 6, display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 4, whiteSpace: 'nowrap' }}>
                   <IconTimer s={26} c="oklch(0.85 0.12 210)" /> Tiempo Trabajado
                 </div>
-                <div style={{ fontSize: "clamp(16px, 4.5vw, 22px)", fontWeight: 900, color: 'oklch(0.85 0.12 210)', letterSpacing: '-0.5px' }}>{durationStr}</div>
+                <div style={{ fontSize: "clamp(16px, 4.5vw, 22px)", fontWeight: 900, color: 'oklch(0.85 0.12 210)', letterSpacing: '-0.5px' }}><DurationCardValue value={durationStr} /></div>
               </div>
             </div>
           </div>
@@ -6175,6 +6248,79 @@ function App() {
               </div>
             )}
           </div>
+
+          {turnosConNotas.length > 0 && (
+            <div style={{ background: 'rgba(255,255,255,0.03)', borderRadius: 22, padding: '16px', border: '1px solid rgba(255,255,255,0.07)' }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: "rgba(255,255,255,0.4)", textTransform: "uppercase", letterSpacing: "0.6px", marginBottom: 12 }}>
+                Notas de turnos
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                {turnosConNotas.map(({ turno, notaTurno, notasGenerales, notasDetalladas }) => (
+                  <div
+                    key={`notas-${turno.id}`}
+                    onClick={() => { setReturnScreen("detalleSemana"); setViewTurno(turno); setScreen("summary"); }}
+                    style={{ background: "rgba(255,255,255,0.035)", borderRadius: 14, padding: "12px", border: "1px solid rgba(255,255,255,0.06)", cursor: "pointer" }}
+                  >
+                    <div style={{ display: "flex", justifyContent: "space-between", gap: 10, alignItems: "baseline", marginBottom: 10 }}>
+                      <div style={{ fontSize: 15, fontWeight: 800, color: "white" }}>{fmtDate(turno.date)}</div>
+                      <div style={{ fontSize: 12, fontWeight: 700, color: "rgba(255,255,255,0.42)", whiteSpace: "nowrap" }}>
+                        {turno.startTime} - {turno.endTime}
+                      </div>
+                    </div>
+
+                    {notaTurno && (
+                      <div style={{ marginBottom: notasGenerales.length || notasDetalladas.length ? 10 : 0 }}>
+                        <div style={{ fontSize: 10, fontWeight: 800, color: "rgba(255,255,255,0.38)", textTransform: "uppercase", letterSpacing: "0.6px", marginBottom: 6 }}>
+                          Nota del turno
+                        </div>
+                        <div style={{ fontSize: 13, color: "rgba(255,255,255,0.82)", lineHeight: 1.4, whiteSpace: "pre-wrap", overflowWrap: "anywhere" }}>
+                          {notaTurno}
+                        </div>
+                      </div>
+                    )}
+
+                    {notasGenerales.length > 0 && (
+                      <div style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: notasDetalladas.length ? 10 : 0 }}>
+                        <div style={{ fontSize: 10, fontWeight: 800, color: "rgba(255,255,255,0.38)", textTransform: "uppercase", letterSpacing: "0.6px" }}>
+                          Notas del turno
+                        </div>
+                        {notasGenerales.map((entry) => (
+                          <div key={entry.id} style={{ fontSize: 13, color: "rgba(255,255,255,0.82)", background: "rgba(255,255,255,0.025)", borderRadius: 10, padding: "8px 10px", lineHeight: 1.35, overflowWrap: "anywhere" }}>
+                            <span style={{ fontSize: 11, fontWeight: 700, color: "rgba(255,255,255,0.45)", marginRight: 6 }}>{entry.time}</span>
+                            {entry.note}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    {notasDetalladas.length > 0 && (
+                      <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                        <div style={{ fontSize: 10, fontWeight: 800, color: "rgba(255,255,255,0.38)", textTransform: "uppercase", letterSpacing: "0.6px" }}>
+                          Notas detalladas
+                        </div>
+                        {notasDetalladas.map((entry) => {
+                          const meta = entry.type === "propina" ? { color: G, label: "Propina" }
+                            : entry.type === "datafono" ? { color: P, label: "Datafono" }
+                              : entry.type === "agencia_bono" ? { color: A, label: "Agencia/Bono" }
+                                : entry.type === "extra" ? { color: E, label: "Extra" }
+                                  : entry.type === "gasolina" ? { color: F, label: "Gasolina" }
+                                    : { color: N, label: "Nulo" };
+                          return (
+                            <div key={entry.id} style={{ fontSize: 13, background: "rgba(255,255,255,0.025)", padding: "8px 10px", borderRadius: 10, display: "flex", alignItems: "baseline", gap: 7 }}>
+                              <span style={{ fontSize: 11, color: "rgba(255,255,255,0.45)", fontWeight: 700 }}>{entry.time}</span>
+                              <span style={{ fontSize: 10, fontWeight: 900, color: meta.color, textTransform: "uppercase", minWidth: 58 }}>{meta.label}</span>
+                              <span style={{ color: "rgba(255,255,255,0.82)", lineHeight: 1.35, overflowWrap: "anywhere" }}>{entry.note}</span>
+                              <span style={{ marginLeft: "auto", fontSize: 11, color: "rgba(255,255,255,0.45)", fontWeight: 700, whiteSpace: "nowrap" }}>{fmt(entry.amount)}</span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* Lista de turnos */}
           <div style={{ background: 'rgba(255,255,255,0.03)', borderRadius: 22, padding: '16px', border: '1px solid rgba(255,255,255,0.07)' }}>
@@ -6620,7 +6766,7 @@ function App() {
                 <IconRoad s={24} c="oklch(0.80 0.14 220)" /> Total KM
               </div>
               <div style={{ color: "oklch(0.80 0.14 220)", fontSize: 22, fontWeight: 900, letterSpacing: "-0.5px", minHeight: 28 }}>
-                {kmJ ? `${kmJ} KM` : "KM"}
+                {kmJ ? <>{kmJ} <span style={KM_CARD_UNIT_STYLE}>KM</span></> : <span style={KM_CARD_UNIT_STYLE}>KM</span>}
               </div>
             </div>
           </div>

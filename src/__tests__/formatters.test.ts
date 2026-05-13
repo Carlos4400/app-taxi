@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { fmtDuration, fmtKm, fmtKmNumber, fmtMoney, fmtMoneyNumber } from "../formatters";
+import { fmtDuration, fmtKm, fmtKmNumber, fmtMoney, fmtMoneyNumber, splitDurationLabel } from "../formatters";
 
 describe("Shared formatting helpers", () => {
   it("formats kilometers from the shared formatter", () => {
@@ -16,5 +16,10 @@ describe("Shared formatting helpers", () => {
     expect(fmtDuration(0)).toBe("0h 0m");
     expect(fmtDuration(2942)).toBe("49h 2m");
     expect(fmtDuration(-5)).toBe("0h 0m");
+  });
+
+  it("splits duration labels into numbers for custom unit spacing", () => {
+    expect(splitDurationLabel("6h 46m")).toEqual({ hours: "6", minutes: "46" });
+    expect(splitDurationLabel("0h")).toEqual({ hours: "0", minutes: "0" });
   });
 });

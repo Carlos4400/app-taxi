@@ -27,6 +27,10 @@ import {
   getHomeQuickActionIds,
   getBackupMenuActionIds,
   updateTurnoEntrega,
+  getTurnosNotasSemana,
+  KM_CARD_UNIT_STYLE,
+  TIME_CARD_UNIT_STYLE,
+  TIME_CARD_HOUR_UNIT_STYLE,
   WEEK_LIST_CARD_TEXT_SIZES,
   Turno
 } from '../main';
@@ -314,6 +318,27 @@ describe('Weekly Accounting Card Text Sizing', () => {
   });
 });
 
+describe('KM Card Unit Style', () => {
+  it('should keep KM visually aligned with the other compact units', () => {
+    expect(KM_CARD_UNIT_STYLE.fontSize).toBe('0.72em');
+    expect(KM_CARD_UNIT_STYLE.fontWeight).toBe(900);
+    expect(KM_CARD_UNIT_STYLE.letterSpacing).toBe('normal');
+  });
+});
+
+describe('Time Card Unit Style', () => {
+  it('should separate h and m manually from their numbers', () => {
+    expect(TIME_CARD_UNIT_STYLE.marginLeft).toBe(2);
+    expect(TIME_CARD_UNIT_STYLE.letterSpacing).toBe('normal');
+    expect(TIME_CARD_HOUR_UNIT_STYLE.marginRight).toBe(6);
+  });
+
+  it('should match the visual weight of the KM unit', () => {
+    expect(TIME_CARD_UNIT_STYLE.fontSize).toBe('1em');
+    expect(TIME_CARD_UNIT_STYLE.fontWeight).toBe(KM_CARD_UNIT_STYLE.fontWeight);
+  });
+});
+
 describe('Annual Turno Selection Logic', () => {
   it('should select turnos by calendar year using startDate when available', () => {
     const turnos = [
@@ -465,6 +490,47 @@ describe('Loose Turno Delivery Logic', () => {
     expect(updated.find(t => t.id === 1)?.entregada).toBe(true);
     expect(updated.find(t => t.id === 1)?.fechaEntrega).toBe('2026-05-14');
     expect(updated.find(t => t.id === 2)?.entregada).toBeUndefined();
+  });
+});
+
+describe('Weekly Turno Notes Logic', () => {
+  it('should return only turnos with turno notes or detailed entry notes', () => {
+    const turnos = [
+      {
+        id: 1,
+        date: '2026-05-11',
+        notes: 'Nota interna del turno',
+        entries: [],
+      },
+      {
+        id: 2,
+        date: '2026-05-12',
+        notes: '',
+        entries: [
+          { id: 21, type: 'extra', amount: 9, note: 'Compra', time: '17:47' },
+          { id: 22, type: 'propina', amount: 3, note: '', time: '18:00' },
+        ],
+      },
+      {
+        id: 3,
+        date: '2026-05-13',
+        notes: '',
+        entries: [{ id: 31, type: 'nota', amount: 0, note: 'Aviso general', time: '12:00' }],
+      },
+      {
+        id: 4,
+        date: '2026-05-14',
+        notes: '',
+        entries: [{ id: 41, type: 'extra', amount: 1, note: '', time: '12:00' }],
+      },
+    ] as Turno[];
+
+    const result = getTurnosNotasSemana(turnos);
+
+    expect(result.map((item) => item.turno.id)).toEqual([1, 2, 3]);
+    expect(result[0].notaTurno).toBe('Nota interna del turno');
+    expect(result[1].notasDetalladas.map((entry) => entry.id)).toEqual([21]);
+    expect(result[2].notasGenerales.map((entry) => entry.id)).toEqual([31]);
   });
 });
 
