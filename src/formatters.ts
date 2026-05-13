@@ -26,3 +26,11 @@ export function fmtDuration(totalMins: number): string {
   const mm = mins % 60;
   return `${hh}h ${mm}m`;
 }
+
+export function splitDurationLabel(duration: string): { hours: string; minutes: string } {
+  const [hoursPart, minutesPart] = duration.split(" ");
+  return {
+    hours: (hoursPart || "0h").replace("h", "") || "0",
+    minutes: (minutesPart || "0m").replace("m", "") || "0",
+  };
+}
