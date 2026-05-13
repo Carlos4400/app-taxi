@@ -103,6 +103,12 @@ const CBG = "oklch(0.18 0.05 290 / 0.12)";
 const MESES_COMPLETOS = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
 const MESES_ABREVIADOS = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
 
+export const WEEK_LIST_CARD_TEXT_SIZES = {
+  range: "clamp(13px, 4.2cqw, 16px)",
+  meta: "clamp(11px, 3.4cqw, 13px)",
+  metric: "clamp(14px, 4.5cqw, 17px)",
+} as const;
+
 const KEY_CURRENT = "taxi_current_v3";
 const KEY_HISTORY = "taxi_history_v3";
 const KEY_SETTINGS = "taxi_settings_v3";
@@ -5494,6 +5500,7 @@ function App() {
                         ? `1.5px solid ${G}88`
                         : "1px solid rgba(255,255,255,0.1)",
                       display: "flex",
+                      containerType: "inline-size",
                       justifyContent: "space-between",
                       alignItems: "center",
                       gap: 12,
@@ -5502,14 +5509,14 @@ function App() {
                   >
                     <div style={{ display: "flex", flexDirection: "column", gap: 4, flex: 1, minWidth: 0 }}>
                       <div style={{
-                        fontSize: 16,
+                        fontSize: WEEK_LIST_CARD_TEXT_SIZES.range,
                         fontWeight: 800,
                         color: "white",
                       }}>
                         {formatWeekRange(sem.weekId)}
                       </div>
                       <div style={{
-                        fontSize: 13,
+                        fontSize: WEEK_LIST_CARD_TEXT_SIZES.meta,
                         color: "rgba(255,255,255,0.4)",
                         display: "flex",
                         alignItems: "center",
@@ -5525,18 +5532,18 @@ function App() {
 
                     <div style={{ display: "flex", gap: 10, textAlign: "right" }}>
                       <div style={{ display: "flex", flexDirection: "column", gap: 8, justifyContent: "center" }}>
-                        <div style={{ fontSize: 17, fontWeight: 900, color: "oklch(0.78 0.18 150)", display: "flex", alignItems: "center", gap: 6, whiteSpace: "nowrap" }}>
+                        <div style={{ fontSize: WEEK_LIST_CARD_TEXT_SIZES.metric, fontWeight: 900, color: "oklch(0.78 0.18 150)", display: "flex", alignItems: "center", gap: 6, whiteSpace: "nowrap" }}>
                           <IconTaxiBadgeNeon s={20} c="oklch(0.85 0.18 85)" /> {fmt(totalTaximetroSemana)}
                         </div>
-                        <div style={{ fontSize: 17, fontWeight: 900, color: "oklch(0.80 0.14 220)", display: "flex", alignItems: "center", gap: 6, whiteSpace: "nowrap" }}>
+                        <div style={{ fontSize: WEEK_LIST_CARD_TEXT_SIZES.metric, fontWeight: 900, color: "oklch(0.80 0.14 220)", display: "flex", alignItems: "center", gap: 6, whiteSpace: "nowrap" }}>
                           <IconRoad s={18} c="oklch(0.80 0.14 220)" /> {fmtKm(kmSemana || 0)}
                         </div>
                       </div>
                       <div style={{ display: "flex", flexDirection: "column", gap: 8, alignItems: "flex-end", justifyContent: "center" }}>
-                        <div style={{ fontSize: 17, fontWeight: 900, color: "oklch(0.78 0.18 150)", display: "flex", alignItems: "center", gap: 6, whiteSpace: "nowrap" }}>
+                        <div style={{ fontSize: WEEK_LIST_CARD_TEXT_SIZES.metric, fontWeight: 900, color: "oklch(0.78 0.18 150)", display: "flex", alignItems: "center", gap: 6, whiteSpace: "nowrap" }}>
                           <IconMoneyBag s={20} c="oklch(0.78 0.18 150)" /> {fmt(miGananciaSemana)}
                         </div>
-                        <div style={{ fontSize: 17, fontWeight: 900, color: "oklch(0.85 0.12 210)", display: "flex", alignItems: "center", gap: 6, whiteSpace: "nowrap" }}>
+                        <div style={{ fontSize: WEEK_LIST_CARD_TEXT_SIZES.metric, fontWeight: 900, color: "oklch(0.85 0.12 210)", display: "flex", alignItems: "center", gap: 6, whiteSpace: "nowrap" }}>
                           <IconTimer s={18} c="oklch(0.85 0.12 210)" /> {durationStrSem}
                         </div>
                       </div>

@@ -27,6 +27,7 @@ import {
   getHomeQuickActionIds,
   getBackupMenuActionIds,
   updateTurnoEntrega,
+  WEEK_LIST_CARD_TEXT_SIZES,
   Turno
 } from '../main';
 
@@ -301,6 +302,15 @@ describe('Monthly Turno Selection Logic', () => {
 describe('Accounting Period Label Logic', () => {
   it('should format the selected accounting month and year', () => {
     expect(getAccountingPeriodLabel(2026, 5)).toBe('Mayo 2026');
+  });
+});
+
+describe('Weekly Accounting Card Text Sizing', () => {
+  it('should use container-based dynamic font sizes for compact mobile cards', () => {
+    expect(WEEK_LIST_CARD_TEXT_SIZES.range).toContain('clamp(');
+    expect(WEEK_LIST_CARD_TEXT_SIZES.range).toContain('cqw');
+    expect(WEEK_LIST_CARD_TEXT_SIZES.meta).toContain('clamp(');
+    expect(WEEK_LIST_CARD_TEXT_SIZES.metric).toContain('clamp(');
   });
 });
 
