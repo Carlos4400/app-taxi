@@ -10,7 +10,6 @@
 //   users/{uid}/reservations/{id} ← un doc por Reserva
 //   users/{uid}/notes/{id}        ← un doc por NotaCalendario
 //   users/{uid}/weekOverrides/{wid} ← un doc por WeekOverride
-//   users/{uid}/frozenWeeks/{wid} ← un doc por FrozenWeek
 //
 // Decisión arquitectónica: las listas usan SUBCOLECCIONES (un doc por item).
 // Motivos verificables:
@@ -23,7 +22,6 @@ import {
   collection,
   doc,
   getDoc,
-  getDocs,
   setDoc,
   writeBatch,
   CollectionReference,
@@ -56,7 +54,7 @@ export async function saveUserDoc<T extends object>(
 // escribe lo que cambió, para no malgastar cupo de escrituras.
 //
 // El parámetro getId es opcional: por defecto toma item.id, pero permite usar
-// otros campos como identificador (p.ej. weekId para WeekOverride/FrozenWeek).
+// otros campos como identificador (p.ej. weekId para WeekOverride).
 export async function syncSubcollection<T>(
   db: Firestore,
   uid: string,
@@ -98,30 +96,6 @@ export async function syncSubcollection<T>(
     }
     await batch.commit();
   }
-}
-
-// Lectura única (no realtime) de un doc bajo users/{uid}/meta/{name}.
-// Devuelve null si no existe.
-export async function readUserDoc<T>(
-  db: Firestore,
-  uid: string,
-  name: string,
-): Promise<T | null> {
-  const snap = await getDoc(userMetaDocRef(db, uid, name));
-  if (!snap.exists()) return null;
-  return snap.data() as T;
-}
-
-// Lectura única (no realtime) de toda una subcolección.
-export async function readUserSubcollection<T>(
-  db: Firestore,
-  uid: string,
-  name: string,
-): Promise<T[]> {
-  const snap = await getDocs(userSubcollectionRef(db, uid, name));
-  const items: T[] = [];
-  snap.forEach((d) => items.push(d.data() as T));
-  return items;
 }
 
 // Comprueba si users/{uid} ya tiene datos en Firestore.

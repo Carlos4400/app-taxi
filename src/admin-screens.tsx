@@ -74,28 +74,6 @@ interface WeekOverride {
   fechaEntrega: string | null;
 }
 
-interface FrozenWeek {
-  weekId: string;
-  fechaInicio: string;
-  fechaFin: string;
-  diaLibreUsado: number;
-  totales: {
-    totalP: number;
-    totalD: number;
-    totalA: number;
-    totalE: number;
-    totalF: number;
-    totalN: number;
-    dinero: number;
-    km: number;
-  };
-  turnoIds: number[];
-  notes: string;
-  entregada: boolean;
-  fechaEntrega: string | null;
-  numTurnos: number;
-}
-
 interface Reserva {
   id: string;
   date: string;
@@ -312,7 +290,6 @@ export function AdminUserView({
   const [reservations, setReservations] = useState<Reserva[]>([]);
   const [notes, setNotes] = useState<NotaCalendario[]>([]);
   const [weekOverrides, setWeekOverrides] = useState<WeekOverride[]>([]);
-  const [frozenWeeks, setFrozenWeeks] = useState<FrozenWeek[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [tab, setTab] = useState<Tab>("turnos");
@@ -324,7 +301,7 @@ export function AdminUserView({
     const recibido = {
       current: false, settings: false, turnos: false,
       reservations: false, notes: false,
-      weekOverrides: false, frozenWeeks: false,
+      weekOverrides: false,
     };
     function marcar(key: keyof typeof recibido) {
       recibido[key] = true;
@@ -376,15 +353,6 @@ export function AdminUserView({
         marcar("weekOverrides");
       },
       manejarError));
-    unsubs.push(onSnapshot(userSubcollectionRef(db, uid, "frozenWeeks"),
-      (snap) => {
-        const items: FrozenWeek[] = [];
-        snap.forEach((d) => items.push(d.data() as FrozenWeek));
-        setFrozenWeeks(items);
-        marcar("frozenWeeks");
-      },
-      manejarError));
-
     return () => {
       cancelado = true;
       unsubs.forEach((u) => u());
@@ -484,7 +452,6 @@ export function AdminUserView({
           <ContabilidadTab
             history={history}
             weekOverrides={weekOverrides}
-            frozenWeeks={frozenWeeks}
           />
         )}
         {tab === "calendario" && (
@@ -662,15 +629,12 @@ function TurnoDetail({ turno, onBack }: { turno: Turno; onBack: () => void }) {
 function ContabilidadTab({
   history,
   weekOverrides,
-  frozenWeeks,
 }: {
   history: Turno[];
   weekOverrides: WeekOverride[];
-  frozenWeeks: FrozenWeek[];
 }) {
   type Row = {
     weekId: string;
-    isFrozen: boolean;
     numTurnos: number;
     dinero: number;
     totalP: number;
@@ -685,30 +649,10 @@ function ContabilidadTab({
   const rows = useMemo(() => {
     const map = new Map<string, Row>();
 
-    // Semanas congeladas: copiamos tal cual.
-    for (const fw of frozenWeeks) {
-      map.set(fw.weekId, {
-        weekId: fw.weekId,
-        isFrozen: true,
-        numTurnos: fw.numTurnos,
-        dinero: fw.totales.dinero,
-        totalP: fw.totales.totalP,
-        totalD: fw.totales.totalD,
-        totalA: fw.totales.totalA,
-        totalE: fw.totales.totalE,
-        totalF: fw.totales.totalF,
-        notes: fw.notes,
-        entregada: fw.entregada,
-      });
-    }
-
-    // Turnos activos no congelados: agregamos por semana.
-    const frozenIds = new Set(frozenWeeks.flatMap((f) => f.turnoIds));
+    // Turnos guardados: agregamos por semana.
     for (const t of history) {
-      if (frozenIds.has(t.id)) continue;
       const wid = getWeekId(t.date);
       const existing = map.get(wid);
-      if (existing && existing.isFrozen) continue;
       if (existing) {
         existing.numTurnos += 1;
         existing.dinero += t.dinero;
@@ -721,7 +665,6 @@ function ContabilidadTab({
         const ov = weekOverrides.find((o) => o.weekId === wid);
         map.set(wid, {
           weekId: wid,
-          isFrozen: false,
           numTurnos: 1,
           dinero: t.dinero,
           totalP: t.totalP,
@@ -736,7 +679,7 @@ function ContabilidadTab({
     }
 
     return [...map.values()].sort((a, b) => b.weekId.localeCompare(a.weekId));
-  }, [history, weekOverrides, frozenWeeks]);
+  }, [history, weekOverrides]);
 
   if (rows.length === 0) {
     return (
@@ -752,19 +695,18 @@ function ContabilidadTab({
         background: NBG, border: `1px solid ${N}`, borderRadius: 12,
         padding: 10, marginBottom: 12, fontSize: 12, color: MUTED,
       }}>
-        Los importes son **brutos** (antes de aplicar porcentajes y descuentos). Las semanas marcadas en naranja están congeladas.
+        Los importes son **brutos** (antes de aplicar porcentajes y descuentos).
       </div>
       <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
         {rows.map((r) => (
           <div key={r.weekId} style={{
-            background: r.isFrozen ? ABG : NBG,
-            border: `1px solid ${r.isFrozen ? A : N}`,
+            background: NBG,
+            border: `1px solid ${N}`,
             borderRadius: 12, padding: 14,
           }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 8 }}>
-              <div style={{ fontSize: 16, fontWeight: 700, color: r.isFrozen ? A : TEXT }}>
+              <div style={{ fontSize: 16, fontWeight: 700, color: TEXT }}>
                 Semana {r.weekId}
-                {r.isFrozen && " · congelada"}
                 {r.entregada && " · entregada"}
               </div>
               <div style={{ fontSize: 14, color: MUTED }}>{r.numTurnos} turnos</div>

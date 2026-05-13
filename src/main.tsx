@@ -1,6 +1,5 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
-import { Capacitor } from "@capacitor/core";
 import { Filesystem, Directory, Encoding } from "@capacitor/filesystem";
 import { Share } from "@capacitor/share";
 import { onAuthStateChanged, signOut, type User } from "firebase/auth";
@@ -18,6 +17,7 @@ import {
   userSubcollectionRef,
   saveUserDoc,
   syncSubcollection,
+  userHasFirestoreData,
 } from "./firestore-sync";
 import { AdminListScreen, AdminUserView } from "./admin-screens";
 
@@ -29,6 +29,15 @@ export interface Entry {
   amount: number;
   note: string;
   time: string;
+}
+
+export interface TurnoConfig {
+  porcentajeJefe: number;
+  porcentajeChofer: number;
+  descDatafono: boolean;
+  descAgencia: boolean;
+  descExtra: boolean;
+  descGasolina: boolean;
 }
 
 export interface Turno {
@@ -48,6 +57,10 @@ export interface Turno {
   notes: string;
   startDate: string | null;
   totalPausedMinutes?: number;
+  entregada?: boolean;
+  fechaEntrega?: string | null;
+  configTurno?: TurnoConfig;
+  diaLibreContable?: number;
 }
 
 interface EditTurnoState extends Turno {
@@ -84,11 +97,13 @@ const NBG = "oklch(0.18 0.03 260)";
 const C = "oklch(0.75 0.15 290)";
 const CBG = "oklch(0.18 0.05 290 / 0.12)";
 
+const MESES_COMPLETOS = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
+const MESES_ABREVIADOS = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
+
 const KEY_CURRENT = "taxi_current_v3";
 const KEY_HISTORY = "taxi_history_v3";
 const KEY_SETTINGS = "taxi_settings_v3";
 const KEY_WEEK_OVERRIDES = "taxi_week_overrides_v1";
-const KEY_WEEKS_FROZEN = "taxi_weeks_frozen_v1";
 const KEY_RESERVATIONS = "taxi_reservations_v1";
 const KEY_NOTES = "taxi_notes_v1";
 
@@ -135,37 +150,7 @@ interface WeekOverride {
   fechaEntrega: string | null;
 }
 
-interface FrozenWeek {
-  weekId: string;
-  fechaInicio: string;
-  fechaFin: string;
-  diaLibreUsado: number;
-  totales: {
-    totalP: number;
-    totalD: number;
-    totalA: number;
-    totalE: number;
-    totalF: number;
-    totalN: number;
-    dinero: number;
-    km: number;
-  };
-  turnoIds: number[];
-  notes: string;
-  entregada: boolean;
-  fechaEntrega: string | null;
-  numTurnos: number;
-  configCongelada?: {
-    porcentajeJefe: number;
-    porcentajeChofer: number;
-    descDatafono: boolean;
-    descAgencia: boolean;
-    descExtra: boolean;
-    descGasolina: boolean;
-  };
-}
-
-interface AppSettings {
+export interface AppSettings {
   "porcentaje.jefe": number;
   "porcentaje.chofer": number;
   "descontar.datafono": boolean;
@@ -180,7 +165,11 @@ declare const __APP_VERSION__: string;
 const APP_VERSION = __APP_VERSION__;
 
 function today(): string {
-  return new Date().toISOString().slice(0, 10);
+  const d = new Date();
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
 }
 function timeNow(): string {
   return new Date().toLocaleTimeString("es-ES", {
@@ -263,6 +252,38 @@ export function parseCSVLine(text: string): string[] {
   return result;
 }
 
+export function sortTurnosByDateDesc(turnos: Turno[]): Turno[] {
+  return [...turnos].sort((a, b) => {
+    const dateA = a.startDate || a.date;
+    const dateB = b.startDate || b.date;
+    const byDate = dateB.localeCompare(dateA);
+    if (byDate !== 0) return byDate;
+    return (b.startTime || "").localeCompare(a.startTime || "");
+  });
+}
+
+export function getTurnosByCalendarMonth(turnos: Turno[], year: number, month: number): Turno[] {
+  const monthId = `${year}-${String(month).padStart(2, "0")}`;
+  return sortTurnosByDateDesc(
+    turnos.filter((turno) => (turno.startDate || turno.date).slice(0, 7) === monthId)
+  );
+}
+
+export function getTurnosByCalendarYear(turnos: Turno[], year: number): Turno[] {
+  const yearId = String(year);
+  return sortTurnosByDateDesc(
+    turnos.filter((turno) => (turno.startDate || turno.date).slice(0, 4) === yearId)
+  );
+}
+
+export function ensureTurnosDiaLibreContable(turnos: Turno[], diaLibre: number): Turno[] {
+  return turnos.map((turno) =>
+    typeof turno.diaLibreContable === "number"
+      ? turno
+      : { ...turno, diaLibreContable: diaLibre }
+  );
+}
+
 export function parseCSVToHistory(csvText: string): Turno[] {
   const lines = csvText.split(/\r?\n/).filter(l => l.trim() !== "");
   if (lines.length < 2) return [];
@@ -314,11 +335,7 @@ export function parseCSVToHistory(csvText: string): Turno[] {
     }
   }
 
-  return Array.from(newTurnosMap.values()).sort((a, b) => {
-    const dateA = a.startDate || a.date;
-    const dateB = b.startDate || b.date;
-    return dateA < dateB ? 1 : -1;
-  });
+  return sortTurnosByDateDesc(Array.from(newTurnosMap.values()));
 }
 
 export function buildBackupPayload(values: {
@@ -326,7 +343,6 @@ export function buildBackupPayload(values: {
   settings: string | null;
   current: string | null;
   weekOverrides: string | null;
-  weeksFrozen: string | null;
   reservations: string | null;
   notes: string | null;
 }) {
@@ -335,10 +351,27 @@ export function buildBackupPayload(values: {
     settings: values.settings,
     current: values.current,
     weekOverrides: values.weekOverrides,
-    weeksFrozen: values.weeksFrozen,
     reservations: values.reservations,
     notes: values.notes,
   };
+}
+
+export function buildBackupPayloadFromState(values: {
+  history: Turno[];
+  settings: AppSettings;
+  current: CurrentState;
+  weekOverrides: WeekOverride[];
+  reservations: Reserva[];
+  notes: NotaCalendario[];
+}) {
+  return buildBackupPayload({
+    history: JSON.stringify(values.history),
+    settings: JSON.stringify(values.settings),
+    current: JSON.stringify(values.current),
+    weekOverrides: JSON.stringify(values.weekOverrides),
+    reservations: JSON.stringify(values.reservations),
+    notes: JSON.stringify(values.notes),
+  });
 }
 
 export type HomeQuickActionId = "new-reservation" | "agenda" | "admin-users" | "logout" | "settings";
@@ -355,16 +388,11 @@ export function getBackupMenuActionIds(_isAdmin: boolean): BackupMenuActionId[] 
   return ["export-json", "restore-json"];
 }
 
-async function exportBackupJSON() {
-  const backup = buildBackupPayload({
-    history: localStorage.getItem(KEY_HISTORY),
-    settings: localStorage.getItem(KEY_SETTINGS),
-    current: localStorage.getItem(KEY_CURRENT),
-    weekOverrides: localStorage.getItem(KEY_WEEK_OVERRIDES),
-    weeksFrozen: localStorage.getItem(KEY_WEEKS_FROZEN),
-    reservations: localStorage.getItem(KEY_RESERVATIONS),
-    notes: localStorage.getItem(KEY_NOTES),
-  });
+// El payload se construye en el call site con buildBackupPayloadFromState
+// pasando los estados React vivos (espejo de Firestore en memoria).
+// Antes había un default que leía de localStorage; eliminado para evitar
+// exportar datos obsoletos: localStorage va un tick por detrás del estado.
+async function exportBackupJSON(backup: ReturnType<typeof buildBackupPayload>) {
   const json = JSON.stringify(backup, null, 2);
   const fileName = `taxi_backup_${new Date().toISOString().split("T")[0]}.json`;
 
@@ -389,16 +417,23 @@ async function exportBackupJSON() {
 }
 
 // Esta función mezcla los turnos seleccionados con los actuales sin duplicar
+function getTurnoMergeKey(t: Turno): string {
+  return [
+    t.startDate || "",
+    t.date || "",
+    t.startTime || "",
+    t.endTime || "",
+  ].join("|");
+}
+
 export function mergeTurnos(actuales: Turno[], nuevos: Turno[]) {
   const map = new Map();
   // Primero metemos los que ya tienes
-  actuales.forEach(t => map.set(`${t.date}|${t.startTime}`, t));
+  actuales.forEach(t => map.set(getTurnoMergeKey(t), t));
   // Luego añadimos los nuevos (si coinciden fecha e inicio, el map no se duplica)
-  nuevos.forEach(t => map.set(`${t.date}|${t.startTime}`, t));
+  nuevos.forEach(t => map.set(getTurnoMergeKey(t), t));
 
-  return Array.from(map.values()).sort((a: any, b: any) =>
-    (b.startDate || b.date).localeCompare(a.startDate || a.date)
-  );
+  return sortTurnosByDateDesc(Array.from(map.values()));
 }
 
 function loadCurrent(): CurrentState {
@@ -418,7 +453,7 @@ function loadCurrent(): CurrentState {
 function loadHistory(): Turno[] {
   try {
     const d = readLocalJSON<Turno[]>(KEY_HISTORY);
-    if (Array.isArray(d)) return d;
+    if (Array.isArray(d)) return sortTurnosByDateDesc(d);
   } catch (e) { }
   return [];
 }
@@ -472,6 +507,23 @@ export function getWeekRange(weekId: string): { inicio: string; fin: string } {
   return { inicio, fin };
 }
 
+export function getCurrentOpenWeekId(hoyISO: string, diaLibre: number): string | null {
+  const hoy = new Date(hoyISO + "T12:00:00");
+  if (hoy.getDay() === diaLibre) return null;
+
+  const weekId = getWeekId(hoyISO, diaLibre);
+  return isWeekClosed(weekId, hoyISO) ? null : weekId;
+}
+
+export function selectAccountingHeroWeek(
+  currentOpenWeekId: string | null,
+  recentWeekIds: string[]
+): { weekId: string; kind: "current" | "latest" } | null {
+  if (currentOpenWeekId) return { weekId: currentOpenWeekId, kind: "current" };
+  const latestWeekId = recentWeekIds[0];
+  return latestWeekId ? { weekId: latestWeekId, kind: "latest" } : null;
+}
+
 /**
  * Devuelve la fecha "efectiva" de un turno para asignarlo a una semana.
  *
@@ -498,6 +550,25 @@ export function getTurnoFechaEfectiva(turno: Turno, diaLibre: number): string {
   return fechaInicio;
 }
 
+export function getTurnoAccountingWeekId(turno: Turno, diaLibre: number): string | null {
+  const diaLibreTurno = turno.diaLibreContable ?? diaLibre;
+  const fechaInicio = turno.startDate || turno.date;
+  if (!fechaInicio) return getWeekId(turno.date, diaLibreTurno);
+
+  const diaInicio = new Date(fechaInicio + "T12:00:00").getDay();
+  const diaFin = new Date(turno.date + "T12:00:00").getDay();
+
+  if (diaInicio === diaLibreTurno && turno.date === fechaInicio) {
+    return null;
+  }
+
+  if (diaInicio === diaLibreTurno && turno.date && turno.date !== fechaInicio && diaFin !== diaLibreTurno) {
+    return getWeekId(turno.date, diaLibreTurno);
+  }
+
+  return getWeekId(fechaInicio, diaLibreTurno);
+}
+
 export function groupTurnosByWeek(turnos: Turno[], diaLibre: number): Map<string, Turno[]> {
   const map = new Map<string, Turno[]>();
   const sorted = [...turnos].sort((a, b) => {
@@ -506,8 +577,8 @@ export function groupTurnosByWeek(turnos: Turno[], diaLibre: number): Map<string
     return dateA.localeCompare(dateB);
   });
   for (const t of sorted) {
-    const f = getTurnoFechaEfectiva(t, diaLibre);
-    const weekId = getWeekId(f, diaLibre);
+    const weekId = getTurnoAccountingWeekId(t, diaLibre);
+    if (!weekId) continue;
     if (!map.has(weekId)) {
       map.set(weekId, []);
     }
@@ -543,68 +614,80 @@ export function calcularTotalesTurnos(turnos: Turno[]) {
   return { totalP, totalD, totalA, totalE, totalF, totalN, dinero, km };
 }
 
-/**
- * Genera snapshots (FrozenWeek) de todas las semanas YA CERRADAS según el día
- * libre anterior, en el momento en que el usuario va a cambiar de día libre.
- *
- * Las semanas que se congelan son aquellas que terminaron antes de "fechaCambio".
- * La semana en curso (si la hay) NO se congela: pasará a recalcularse con el
- * nuevo día libre a partir de fechaCambio.
- *
- * Si ya existían frozen weeks previas (de un cambio anterior), se preservan
- * íntegras y sólo se añaden las nuevas que no estuvieran ya congeladas.
- */
-function freezeOldWeeks(
-  turnos: Turno[],
-  diaLibreAnterior: number,
-  fechaCambio: string,
-  frozenExistentes: FrozenWeek[],
-  overrides: WeekOverride[]
-): FrozenWeek[] {
-  const yaCongeladas = new Set(frozenExistentes.map((w) => w.weekId));
-  const nuevas: FrozenWeek[] = [];
+function roundMoney(n: number): number {
+  return Math.round((n + Number.EPSILON) * 100) / 100;
+}
 
-  // Agrupar turnos según el día libre ANTERIOR
-  const grupos = groupTurnosByWeek(turnos, diaLibreAnterior);
+export function buildTurnoConfigFromSettings(settings: AppSettings): TurnoConfig {
+  return {
+    porcentajeJefe: settings["porcentaje.jefe"],
+    porcentajeChofer: settings["porcentaje.chofer"],
+    descDatafono: settings["descontar.datafono"],
+    descAgencia: settings["descontar.agencia_bono"],
+    descExtra: settings["descontar.extra"],
+    descGasolina: settings["descontar.gasolina"],
+  };
+}
 
-  for (const [key, turnosSemana] of grupos.entries()) {
-    const weekId = key;
+export function getTurnoConfig(turno: Turno, settings: AppSettings): TurnoConfig {
+  return turno.configTurno || buildTurnoConfigFromSettings(settings);
+}
 
-    // Si la semana ya estaba congelada de antes, no la tocamos
-    if (yaCongeladas.has(weekId)) continue;
+export function calcularTurnoContable(turno: Turno, settings: AppSettings) {
+  const config = getTurnoConfig(turno, settings);
+  const dineroBase = (turno.dinero || 0) - (turno.totalN || 0);
+  const descD = config.descDatafono ? (turno.totalD || 0) : 0;
+  const descA = config.descAgencia ? (turno.totalA || 0) : 0;
+  const descE = config.descExtra ? (turno.totalE || 0) : 0;
+  const descF = config.descGasolina ? (turno.totalF || 0) : 0;
+  const totalDescontar = descD + descA + descE + descF;
 
-    const range = getWeekRange(weekId);
+  return {
+    dineroBase: roundMoney(dineroBase),
+    miGanancia: roundMoney((dineroBase * (config.porcentajeChofer / 100)) + (turno.totalP || 0)),
+    descD,
+    descA,
+    descE,
+    descF,
+    totalDescontar: roundMoney(totalDescontar),
+    totalADar: roundMoney((dineroBase * (config.porcentajeJefe / 100)) - totalDescontar),
+    config,
+  };
+}
 
-    // Sólo congelamos semanas que ya hayan terminado antes de fechaCambio
-    if (range.fin >= fechaCambio) continue;
+export function calcularResumenContableTurnos(turnos: Turno[], settings: AppSettings) {
+  const totales = calcularTotalesTurnos(turnos);
+  let miGanancia = 0;
+  let totalDescontar = 0;
+  let totalADar = 0;
 
-    const totales = calcularTotalesTurnos(turnosSemana);
-    const override = getWeekOverride(overrides, weekId);
-
-    nuevas.push({
-      weekId,
-      fechaInicio: range.inicio,
-      fechaFin: range.fin,
-      diaLibreUsado: diaLibreAnterior,
-      totales: {
-        totalP: totales.totalP,
-        totalD: totales.totalD,
-        totalA: totales.totalA,
-        totalE: totales.totalE,
-        totalF: totales.totalF,
-        totalN: totales.totalN,
-        dinero: totales.dinero,
-        km: totales.km,
-      },
-      turnoIds: turnosSemana.map((t) => t.id),
-      notes: override?.notes || "",
-      entregada: override?.entregada || false,
-      fechaEntrega: override?.fechaEntrega || null,
-      numTurnos: turnosSemana.length,
-    });
+  for (const turno of turnos) {
+    const calculo = calcularTurnoContable(turno, settings);
+    miGanancia += calculo.miGanancia;
+    totalDescontar += calculo.totalDescontar;
+    totalADar += calculo.totalADar;
   }
 
-  return [...frozenExistentes, ...nuevas];
+  return {
+    ...totales,
+    dineroBase: roundMoney((totales.dinero || 0) - (totales.totalN || 0)),
+    miGanancia: roundMoney(miGanancia),
+    totalDescontar: roundMoney(totalDescontar),
+    totalADar: roundMoney(totalADar),
+  };
+}
+
+export function updateTurnoEntrega(
+  turnos: Turno[],
+  turnoId: number,
+  entregada: boolean,
+  fechaEntrega: string | null
+): Turno[] {
+  return turnos.map((t) =>
+    t.id === turnoId
+      ? { ...t, entregada, fechaEntrega: entregada ? fechaEntrega : null }
+      : t
+  );
 }
 
 // ============================================================================
@@ -619,26 +702,9 @@ function loadWeekOverrides(): WeekOverride[] {
   return [];
 }
 
-function loadFrozenWeeks(): FrozenWeek[] {
-  try {
-    const d = readLocalJSON<FrozenWeek[]>(KEY_WEEKS_FROZEN);
-    if (Array.isArray(d)) return d;
-  } catch (e) { }
-  return [];
-}
-
 /**
  * Crea un override por defecto (vacío) para un weekId dado.
  */
-function emptyOverride(weekId: string): WeekOverride {
-  return {
-    weekId,
-    notes: "",
-    entregada: false,
-    fechaEntrega: null,
-  };
-}
-
 /**
  * Devuelve el override de una semana, o null si no existe.
  */
@@ -695,10 +761,9 @@ function getWeekMonth(weekId: string, diaLibre: number): {
   }
 
   // Empate
-  const meses = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
   const labelOf = (mesId: string) => {
     const [y, m] = mesId.split("-").map(Number);
-    return `${meses[m - 1]} ${y}`;
+    return `${MESES_COMPLETOS[m - 1]} ${y}`;
   };
 
   // Ordenar candidatos cronológicamente (mes anterior primero)
@@ -713,9 +778,12 @@ function getWeekMonth(weekId: string, diaLibre: number): {
  * Devuelve el label legible de un mesId "YYYY-MM" → "Mayo 2026"
  */
 function getMesLabel(mesId: string): string {
-  const meses = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
   const [y, m] = mesId.split("-").map(Number);
-  return `${meses[m - 1]} ${y}`;
+  return `${MESES_COMPLETOS[m - 1]} ${y}`;
+}
+
+export function getAccountingPeriodLabel(year: number, month: number): string {
+  return getMesLabel(`${year}-${String(month).padStart(2, "0")}`);
 }
 
 /**
@@ -726,11 +794,10 @@ function formatWeekRange(weekId: string): string {
   const { inicio, fin } = getWeekRange(weekId);
   const dInicio = new Date(inicio + "T12:00:00");
   const dFin = new Date(fin + "T12:00:00");
-  const meses = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
   if (dInicio.getMonth() === dFin.getMonth() && dInicio.getFullYear() === dFin.getFullYear()) {
-    return `${dInicio.getDate()} - ${dFin.getDate()} ${meses[dFin.getMonth()]}`;
+    return `${dInicio.getDate()} - ${dFin.getDate()} ${MESES_COMPLETOS[dFin.getMonth()]}`;
   }
-  return `${dInicio.getDate()} ${meses[dInicio.getMonth()]} - ${dFin.getDate()} ${meses[dFin.getMonth()]}`;
+  return `${dInicio.getDate()} ${MESES_COMPLETOS[dInicio.getMonth()]} - ${dFin.getDate()} ${MESES_COMPLETOS[dFin.getMonth()]}`;
 }
 
 /**
@@ -742,8 +809,7 @@ function formatWeekRangeFull(weekId: string): string {
   const dInicio = new Date(inicio + "T12:00:00");
   const dFin = new Date(fin + "T12:00:00");
   const dias = ["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"];
-  const meses = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
-  return `${dias[dInicio.getDay()]} ${dInicio.getDate()} ${meses[dInicio.getMonth()]} - ${dias[dFin.getDay()]} ${dFin.getDate()} ${meses[dFin.getMonth()]} ${dFin.getFullYear()}`;
+  return `${dias[dInicio.getDay()]} ${dInicio.getDate()} ${MESES_ABREVIADOS[dInicio.getMonth()]} - ${dias[dFin.getDay()]} ${dFin.getDate()} ${MESES_ABREVIADOS[dFin.getMonth()]} ${dFin.getFullYear()}`;
 }
 
 const IconCoin = ({ s = 24, c = G }: { s?: number; c?: string }) => (
@@ -1136,13 +1202,6 @@ const IconTimer = ({ s = 24, c = "white" }: { s?: number; c?: string }) => (
   </svg>
 );
 
-const IconTaxiSign = ({ s = 24, c = "white" }: { s?: number; c?: string }) => (
-  <svg width={s} height={s} viewBox="0 0 24 24" fill="none" style={{ display: "inline-block", verticalAlign: "middle" }}>
-    <path d="M4 16H20C21 16 22 15 21 12L19 7C18.5 5.5 17 4.5 15.5 4.5H8.5C7 4.5 5.5 5.5 5 7L3 12C2 15 3 16 4 16Z" stroke={c} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-    <path d="M8 9V11.5M16 9V11.5M12 9V11.5" stroke={c} strokeWidth="1.8" strokeLinecap="round" />
-  </svg>
-);
-
 const IconRoad = ({ s = 24, c = "white" }: { s?: number; c?: string }) => (
   <svg width={s} height={s} viewBox="0 0 24 24" fill="none" style={{ display: "inline-block", verticalAlign: "middle" }}>
     <path d="M3 22L9 2M21 22L15 2" stroke={c} strokeWidth="1.8" strokeLinecap="round" />
@@ -1396,20 +1455,35 @@ function Burst() {
 // si comparten teléfono.
 const LOCAL_MIGRATION_KEY = "taxi_migration_done_v1";
 
+// Tiempo máximo (ms) que esperamos a que lleguen los snapshots iniciales de
+// Firestore antes de mostrar al usuario los botones Reintentar / Cerrar sesión.
+const LOAD_TIMEOUT_MS = 15000;
+
 async function migrarLocalStorageAFirestore(uid: string): Promise<void> {
   if (localStorage.getItem(LOCAL_MIGRATION_KEY)) return;
+
+  // Guarda extra: si el usuario ya tiene datos en Firestore (p.ej. porque
+  // instaló la app antes en otro dispositivo y migró allí), NO subimos lo que
+  // haya en localStorage para evitar contaminar su cuenta con datos de otro
+  // usuario que pudiera haber usado este mismo móvil antes.
+  // Marcamos como migrado=false con un motivo trazable y salimos.
+  if (await userHasFirestoreData(db, uid)) {
+    localStorage.setItem(LOCAL_MIGRATION_KEY, JSON.stringify({
+      uid, at: new Date().toISOString(), migrado: false, motivo: "ya-tenia-datos-en-firestore",
+    }));
+    return;
+  }
 
   const currentRaw = localStorage.getItem(KEY_CURRENT);
   const historyRaw = localStorage.getItem(KEY_HISTORY);
   const settingsRaw = localStorage.getItem(KEY_SETTINGS);
   const weekOverridesRaw = localStorage.getItem(KEY_WEEK_OVERRIDES);
-  const weeksFrozenRaw = localStorage.getItem(KEY_WEEKS_FROZEN);
   const reservationsRaw = localStorage.getItem(KEY_RESERVATIONS);
   const notesRaw = localStorage.getItem(KEY_NOTES);
 
   const todoVacio =
     !currentRaw && !historyRaw && !settingsRaw &&
-    !weekOverridesRaw && !weeksFrozenRaw &&
+    !weekOverridesRaw &&
     !reservationsRaw && !notesRaw;
 
   if (todoVacio) {
@@ -1423,7 +1497,6 @@ async function migrarLocalStorageAFirestore(uid: string): Promise<void> {
   const history = historyRaw ? JSON.parse(historyRaw) as Turno[] : [];
   const settings = settingsRaw ? JSON.parse(settingsRaw) as AppSettings : null;
   const weekOverrides = weekOverridesRaw ? JSON.parse(weekOverridesRaw) as WeekOverride[] : [];
-  const frozenWeeks = weeksFrozenRaw ? JSON.parse(weeksFrozenRaw) as FrozenWeek[] : [];
   const reservations = reservationsRaw ? JSON.parse(reservationsRaw) as Reserva[] : [];
   const notes = notesRaw ? JSON.parse(notesRaw) as NotaCalendario[] : [];
 
@@ -1446,9 +1519,20 @@ async function migrarLocalStorageAFirestore(uid: string): Promise<void> {
   subirSubcoleccion("reservations", reservations, (r) => r.id);
   subirSubcoleccion("notes", notes, (n) => n.id);
   subirSubcoleccion("weekOverrides", weekOverrides, (w) => w.weekId);
-  subirSubcoleccion("frozenWeeks", frozenWeeks, (w) => w.weekId);
 
   await Promise.all(docPromises);
+
+  // Tras subir TODO a Firestore, eliminamos las claves globales antiguas del
+  // localStorage. A partir de este momento, los datos del usuario activo
+  // viven en claves sufijadas por uid (writeUserLocalJSON) y en Firestore.
+  // Esto evita que, si otro usuario inicia sesión en este móvil más tarde,
+  // estas claves globales puedan ser leídas o migradas a su cuenta.
+  localStorage.removeItem(KEY_CURRENT);
+  localStorage.removeItem(KEY_HISTORY);
+  localStorage.removeItem(KEY_SETTINGS);
+  localStorage.removeItem(KEY_WEEK_OVERRIDES);
+  localStorage.removeItem(KEY_RESERVATIONS);
+  localStorage.removeItem(KEY_NOTES);
 
   localStorage.setItem(LOCAL_MIGRATION_KEY, JSON.stringify({
     uid, at: new Date().toISOString(), migrado: true,
@@ -1483,7 +1567,6 @@ function App() {
   const [notaTexto, setNotaTexto] = useState("");
 
   const [showBackupMenu, setShowBackupMenu] = useState(false);
-  const [pendingImport, setPendingImport] = useState<Turno[]>([]); // Para la selección de turnos
   const [isSelectingTurnos, setIsSelectingTurnos] = useState(false);
   const [selectedTurnosIds, setSelectedTurnosIds] = useState<number[]>([]);
   const [screen, setScreen] = useState("home");
@@ -1524,10 +1607,11 @@ function App() {
   const [editEntryNote, setEditEntryNote] = useState("");
   const [settings, setSettings] = useState<AppSettings>(loadSettings);
   const [weekOverrides, setWeekOverrides] = useState<WeekOverride[]>(loadWeekOverrides);
-  const [frozenWeeks, setFrozenWeeks] = useState<FrozenWeek[]>(loadFrozenWeeks);
 
   // Estados Contabilidad (Fase 5)
   const [selectedWeekId, setSelectedWeekId] = useState<string | null>(null);
+  const [selectedAccountingYear, setSelectedAccountingYear] = useState<number>(() => new Date().getFullYear());
+  const [selectedAccountingMonth, setSelectedAccountingMonth] = useState<number>(() => new Date().getMonth() + 1);
   const [tieResolutions, setTieResolutions] = useState<Map<string, string>>(new Map());
   const [pendingTie, setPendingTie] = useState<{
     weekId: string;
@@ -1540,18 +1624,21 @@ function App() {
 
   // Sincronización con Firestore.
   //   - dataLoaded: cuando vale true, la app ya ha recibido el primer snapshot
-  //     de las 7 colecciones del usuario actual. Hasta entonces NO escribimos
+  //     de las 6 colecciones del usuario actual. Hasta entonces NO escribimos
   //     (evitamos pisar Firestore con estado inicial vacío en un dispositivo nuevo).
+  //   - loadTimedOut: si la carga inicial tarda más de LOAD_TIMEOUT_MS, lo
+  //     ponemos a true para mostrar al usuario botones de Reintentar / Cerrar
+  //     sesión y que no quede atrapado en "Cargando tus datos…".
   //   - last*Ref: copia de lo último que recibimos de Firestore. La usamos como
   //     baseline para hacer diffs y mandar solo lo que cambió.
   const [dataLoaded, setDataLoaded] = useState(false);
+  const [loadTimedOut, setLoadTimedOut] = useState(false);
   const lastCurrentRef = useRef<CurrentState | null>(null);
   const lastSettingsRef = useRef<AppSettings | null>(null);
   const lastHistoryRef = useRef<Turno[]>([]);
   const lastReservationsRef = useRef<Reserva[]>([]);
   const lastNotesRef = useRef<NotaCalendario[]>([]);
   const lastWeekOverridesRef = useRef<WeekOverride[]>([]);
-  const lastFrozenWeeksRef = useRef<FrozenWeek[]>([]);
 
   // Vista de administrador.
   //   - isAdmin: true si existe el documento admins/{uid_actual} en Firestore.
@@ -1586,17 +1673,6 @@ function App() {
         ];
       }
     });
-  }
-
-  // Helper: actualiza una FrozenWeek (cuando la semana ya está congelada)
-  function updateFrozenWeek(weekId: string, partial: Partial<Omit<FrozenWeek, "weekId" | "fechaInicio" | "fechaFin" | "diaLibreUsado" | "totales" | "turnoIds" | "numTurnos">>) {
-    setFrozenWeeks((prev) =>
-      prev.map((w) =>
-        w.weekId === weekId
-          ? { ...w, ...partial }
-          : w
-      )
-    );
   }
 
   function openEditEntry(e: Entry) {
@@ -1693,7 +1769,7 @@ function App() {
   // cambia. Reglas comunes:
   //   - Si dataLoaded es false, NO escribimos: aún estamos en carga inicial.
   //   - Si no hay usuario autenticado, no escribimos.
-  //   - Para subcolecciones (turnos, reservas, notas, weekOverrides, frozenWeeks)
+  //   - Para subcolecciones (turnos, reservas, notas, weekOverrides)
   //     usamos syncSubcollection, que hace diff y sólo escribe lo que cambió.
   //   - lastXRef se actualiza después de escribir para que el siguiente diff
   //     se compute contra lo último que hemos subido nosotros mismos.
@@ -1730,6 +1806,12 @@ function App() {
   }, [history, dataLoaded]);
 
   useEffect(() => {
+    if (!dataLoaded) return;
+    if (!history.some((turno) => typeof turno.diaLibreContable !== "number")) return;
+    setHistory((prev) => ensureTurnosDiaLibreContable(prev, settings.diaLibre));
+  }, [history, settings.diaLibre, dataLoaded]);
+
+  useEffect(() => {
     if (!dataLoaded || !auth.currentUser) return;
     const uid = auth.currentUser.uid;
     writeUserLocalJSON(uid, KEY_RESERVATIONS, reservations);
@@ -1756,14 +1838,6 @@ function App() {
       .catch((err) => console.error("Sync weekOverrides failed:", err));
   }, [weekOverrides, dataLoaded]);
 
-  useEffect(() => {
-    if (!dataLoaded || !auth.currentUser) return;
-    const uid = auth.currentUser.uid;
-    writeUserLocalJSON(uid, KEY_WEEKS_FROZEN, frozenWeeks);
-    syncSubcollection(db, uid, "frozenWeeks", lastFrozenWeeksRef.current, frozenWeeks, (w) => w.weekId)
-      .then(() => { lastFrozenWeeksRef.current = frozenWeeks; })
-      .catch((err) => console.error("Sync frozenWeeks failed:", err));
-  }, [frozenWeeks, dataLoaded]);
 
 
 
@@ -1802,9 +1876,9 @@ function App() {
   // Al montar el componente con un usuario autenticado:
   //   1. Si el dispositivo nunca ha migrado, sube los datos de localStorage
   //      al usuario actual.
-  //   2. Se suscribe a las 7 piezas de datos del usuario (current, settings,
-  //      turnos, reservas, notes, weekOverrides, frozenWeeks) con onSnapshot.
-  //   3. Cuando han llegado las 7 primeras respuestas, marca dataLoaded=true
+  //   2. Se suscribe a las 6 piezas de datos del usuario (current, settings,
+  //      turnos, reservas, notes, weekOverrides) con onSnapshot.
+  //   3. Cuando han llegado las 6 primeras respuestas, marca dataLoaded=true
   //      y la app habilita la escritura.
   useEffect(() => {
     const user = auth.currentUser;
@@ -1817,7 +1891,7 @@ function App() {
     const recibido = {
       current: false, settings: false, turnos: false,
       reservations: false, notes: false,
-      weekOverrides: false, frozenWeeks: false,
+      weekOverrides: false,
     };
     function marcar(key: keyof typeof recibido) {
       recibido[key] = true;
@@ -1862,9 +1936,10 @@ function App() {
       unsubs.push(onSnapshot(userSubcollectionRef(db, uid, "turnos"), (snap) => {
         const items: Turno[] = [];
         snap.forEach((d) => items.push(d.data() as Turno));
-        lastHistoryRef.current = items;
-        writeUserLocalJSON(uid, KEY_HISTORY, items);
-        setHistory(items);
+        const orderedItems = sortTurnosByDateDesc(items);
+        lastHistoryRef.current = orderedItems;
+        writeUserLocalJSON(uid, KEY_HISTORY, orderedItems);
+        setHistory(orderedItems);
         marcar("turnos");
       }));
 
@@ -1898,15 +1973,7 @@ function App() {
         marcar("weekOverrides");
       }));
 
-      // frozenWeeks (subcollection)
-      unsubs.push(onSnapshot(userSubcollectionRef(db, uid, "frozenWeeks"), (snap) => {
-        const items: FrozenWeek[] = [];
-        snap.forEach((d) => items.push(d.data() as FrozenWeek));
-        lastFrozenWeeksRef.current = items;
-        writeUserLocalJSON(uid, KEY_WEEKS_FROZEN, items);
-        setFrozenWeeks(items);
-        marcar("frozenWeeks");
-      }));
+
     })();
 
     return () => {
@@ -1914,6 +1981,16 @@ function App() {
       unsubs.forEach((u) => u());
     };
   }, []);
+
+  // Timeout de la carga inicial. Si en LOAD_TIMEOUT_MS no han llegado las 6
+  // colecciones (Firestore caído, red sin conexión, certificado bloqueado…),
+  // activamos loadTimedOut para que el usuario pueda Reintentar (recargar la
+  // página) o Cerrar sesión, en lugar de quedarse mirando "Cargando tus datos…".
+  useEffect(() => {
+    if (dataLoaded) return;
+    const t = setTimeout(() => setLoadTimedOut(true), LOAD_TIMEOUT_MS);
+    return () => clearTimeout(t);
+  }, [dataLoaded]);
 
   // Detección del rol de administrador.
   // Lee UNA vez admins/{uid_actual}. Si existe, isAdmin = true y la app
@@ -1946,12 +2023,60 @@ function App() {
           background: "oklch(0.14 0.02 260)",
           color: "oklch(0.92 0.02 260)",
           display: "flex",
+          flexDirection: "column",
           alignItems: "center",
           justifyContent: "center",
-          fontSize: 16,
+          gap: 20,
+          padding: "0 24px",
+          textAlign: "center",
         }}
       >
-        Cargando tus datos…
+        <div style={{ fontSize: 16 }}>
+          {loadTimedOut ? "Esto está tardando más de lo normal." : "Cargando tus datos…"}
+        </div>
+        {loadTimedOut && (
+          <>
+            <div style={{ fontSize: 13, color: "rgba(255,255,255,0.55)", lineHeight: 1.45, maxWidth: 320 }}>
+              No hemos podido contactar con el servidor. Comprueba tu conexión a internet y vuelve a intentarlo.
+            </div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 10, width: "100%", maxWidth: 320 }}>
+              <button
+                onClick={() => window.location.reload()}
+                style={{
+                  padding: "14px 0",
+                  borderRadius: 14,
+                  border: `2px solid ${G}`,
+                  background: GBG,
+                  color: G,
+                  fontSize: 15,
+                  fontWeight: 800,
+                  cursor: "pointer",
+                }}
+              >
+                Reintentar
+              </button>
+              <button
+                onClick={() => {
+                  signOut(auth).catch((err) => {
+                    console.error("signOut error:", err);
+                  });
+                }}
+                style={{
+                  padding: "14px 0",
+                  borderRadius: 14,
+                  border: "1px solid rgba(255, 95, 95, 0.28)",
+                  background: "rgba(255, 95, 95, 0.08)",
+                  color: "rgba(255, 130, 130, 0.9)",
+                  fontSize: 14,
+                  fontWeight: 700,
+                  cursor: "pointer",
+                }}
+              >
+                Cerrar sesión
+              </button>
+            </div>
+          </>
+        )}
       </div>
     );
   }
@@ -1990,13 +2115,6 @@ function App() {
   const totalF = gasolinas.reduce((s, e) => s + e.amount, 0);
   const totalN = nulos.reduce((s, e) => s + e.amount, 0);
   const active = current.entries.length > 0 || !!current.startTime;
-
-  function handleDelete(id: number) {
-    setCurrent((d) => ({
-      ...d,
-      entries: d.entries.filter((e) => e.id !== id),
-    }));
-  }
 
   function togglePause() {
     const now = timeNow();
@@ -2039,6 +2157,8 @@ function App() {
       notes: notesJ.trim(),
       startDate: current.startDate,
       totalPausedMinutes: current.totalPausedMinutes || 0,
+      configTurno: buildTurnoConfigFromSettings(settings),
+      diaLibreContable: settings.diaLibre,
     };
     setHistory((h) => [turno, ...h]);
     setCurrent({ entries: [], startTime: null, startDate: null, isPaused: false, pauseStartTime: null, totalPausedMinutes: 0 });
@@ -2122,7 +2242,7 @@ function App() {
   // --- Handlers globales del modal de Reserva (accesibles desde cualquier pantalla) ---
   const openNewReserva = (date?: string) => {
     setEditingReserva(null);
-    setSelectedDate("");
+    setSelectedDate(date || "");
     setReservaTime("");
     setReservaOrigen("");
     setReservaDestino("");
@@ -2421,8 +2541,6 @@ function App() {
   );
 
   if (screen === "home") {
-    const hasActive = current.entries.length > 0 || !!current.startTime;
-    const totalHoy = totalP + totalD + totalA + totalE;
     const homeQuickActionIds = getHomeQuickActionIds(isAdmin);
     return (
       <Shell burst={false}>
@@ -2487,7 +2605,7 @@ function App() {
                 gap: 12,
               }}
             >
-              {hasActive ? (
+              {active ? (
                 <>
                   <IconRocket s={30} c={G} />
                   <IconPlay s={40} c="#3b82f6" />
@@ -2495,7 +2613,7 @@ function App() {
               ) : (
                 <IconRocket s={30} c={G} />
               )}
-              {hasActive ? "Continuar Turno" : "Iniciar Turno"}
+              {active ? "Continuar Turno" : "Iniciar Turno"}
             </button>
             <button
               onClick={() => setScreen("PantallaTurnos")}
@@ -2756,24 +2874,6 @@ function App() {
         setNotes(prev => [...prev, newNote]);
       }
       setShowNotaDialog(false);
-    };
-
-    const deleteReserva = (id: string) => {
-      setConfirmDialog({
-        text: "¿Seguro que quieres eliminar esta reserva?",
-        onConfirm: () => {
-          setReservations(prev => prev.filter(r => r.id !== id));
-        }
-      });
-    };
-
-    const deleteNota = (id: string) => {
-      setConfirmDialog({
-        text: "¿Seguro que quieres eliminar esta nota?",
-        onConfirm: () => {
-          setNotes(prev => prev.filter(n => n.id !== id));
-        }
-      });
     };
 
     // Eventos del día seleccionado
@@ -3093,10 +3193,7 @@ function App() {
 
                   {/* Turno Cerrado */}
                   {dayTurnos.map(turno => {
-                    const propinasTurno = turno.entries.filter((e: any) => e.type === 'propina').reduce((s: number, e: any) => s + e.amount, 0);
-                    const nulosTurno = turno.entries.filter((e: any) => e.type === 'nulo').reduce((s: number, e: any) => s + e.amount, 0);
-                    const dineroEfectivo = (turno.dinero || 0) - nulosTurno;
-                    const gananciaTurno = (dineroEfectivo * (settings["porcentaje.chofer"] / 100)) + propinasTurno;
+                    const gananciaTurno = calcularTurnoContable(turno, settings).miGanancia;
 
                     let tiempoTurno = "0h 0m";
                     if (turno.startTime && turno.endTime) {
@@ -3240,10 +3337,7 @@ function App() {
                       <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                         {/* Turno */}
                         {dayT.map(t => {
-                          const propinasTurno = t.entries.filter((e: any) => e.type === 'propina').reduce((s: number, e: any) => s + e.amount, 0);
-                          const nulosTurno = t.entries.filter((e: any) => e.type === 'nulo').reduce((s: number, e: any) => s + e.amount, 0);
-                          const dineroEfectivo = (t.dinero || 0) - nulosTurno;
-                          const gananciaTurno = (dineroEfectivo * (settings["porcentaje.chofer"] / 100)) + propinasTurno;
+                          const gananciaTurno = calcularTurnoContable(t, settings).miGanancia;
 
                           let tiempoTurno = "0h 0m";
                           if (t.startTime && t.endTime) {
@@ -3700,7 +3794,6 @@ function App() {
                         onConfirm: () => {
                           const merged = mergeTurnos(history, nuevosTurnos);
                           setHistory(merged);
-                          localStorage.setItem(KEY_HISTORY, JSON.stringify(merged));
                           alert("Turnos añadidos correctamente");
                         },
                         confirmText: "Añadir todos",
@@ -3771,44 +3864,54 @@ function App() {
                 gap: 8
               }}>
                 {backupMenuActionIds.includes("export-json") && (
-                  <button onClick={exportBackupJSON} style={S.backupSubBtn}>
+                  <button
+                    onClick={() => exportBackupJSON(buildBackupPayloadFromState({
+                      history,
+                      settings,
+                      current,
+                      weekOverrides,
+                      reservations,
+                      notes,
+                    }))}
+                    style={S.backupSubBtn}
+                  >
                     <IconDownload s={18} c="white" /> Exportar todo a JSON
                   </button>
                 )}
 
                 {backupMenuActionIds.includes("restore-json") && (
                   <button
-                  onClick={() => {
-                    const input = document.createElement('input');
-                    input.type = 'file';
-                    input.accept = '.json';
-                    input.onchange = (e: any) => {
-                      const file = e.target.files?.[0];
-                      if (!file) return;
-                      const reader = new FileReader();
-                      reader.onload = (evt) => {
-                        const backup = JSON.parse(evt.target?.result as string);
-                        setConfirmDialog({
-                          text: "RESTAURAR TOTAL: Esto borrará tus datos actuales y pondrá los del archivo. ¿Continuar?",
-                          onConfirm: () => {
-                            if (backup.history) localStorage.setItem(KEY_HISTORY, backup.history);
-                            if (backup.settings) localStorage.setItem(KEY_SETTINGS, backup.settings);
-                            if (backup.current) localStorage.setItem(KEY_CURRENT, backup.current);
-                            if (backup.weekOverrides) localStorage.setItem(KEY_WEEK_OVERRIDES, backup.weekOverrides);
-                            if (backup.weeksFrozen) localStorage.setItem(KEY_WEEKS_FROZEN, backup.weeksFrozen);
-                            if (backup.reservations) localStorage.setItem(KEY_RESERVATIONS, backup.reservations);
-                            if (backup.notes) localStorage.setItem(KEY_NOTES, backup.notes);
-                            window.location.reload();
-                          }
-                        });
+                    onClick={() => {
+                      const input = document.createElement('input');
+                      input.type = 'file';
+                      input.accept = '.json';
+                      input.onchange = (e: any) => {
+                        const file = e.target.files?.[0];
+                        if (!file) return;
+                        const reader = new FileReader();
+                        reader.onload = (evt) => {
+                          const backup = JSON.parse(evt.target?.result as string);
+                          setConfirmDialog({
+                            text: "RESTAURAR TOTAL: Esto borrará tus datos actuales y pondrá los del archivo. ¿Continuar?",
+                            onConfirm: () => {
+                              const uid = auth.currentUser?.uid || "";
+                              if (backup.history) localStorage.setItem(userStorageKey(KEY_HISTORY, uid), backup.history);
+                              if (backup.settings) localStorage.setItem(userStorageKey(KEY_SETTINGS, uid), backup.settings);
+                              if (backup.current) localStorage.setItem(userStorageKey(KEY_CURRENT, uid), backup.current);
+                              if (backup.weekOverrides) localStorage.setItem(userStorageKey(KEY_WEEK_OVERRIDES, uid), backup.weekOverrides);
+                              if (backup.reservations) localStorage.setItem(userStorageKey(KEY_RESERVATIONS, uid), backup.reservations);
+                              if (backup.notes) localStorage.setItem(userStorageKey(KEY_NOTES, uid), backup.notes);
+                              window.location.reload();
+                            }
+                          });
+                        };
+                        reader.readAsText(file);
                       };
-                      reader.readAsText(file);
-                    };
-                    input.click();
-                  }}
-                  style={S.backupSubBtn}
-                >
-                  <span style={{ fontSize: 16 }}>⚠️</span> Restaurar copia completa
+                      input.click();
+                    }}
+                    style={S.backupSubBtn}
+                  >
+                    <span style={{ fontSize: 16 }}>⚠️</span> Restaurar copia completa
                   </button>
                 )}
 
@@ -3940,17 +4043,21 @@ function App() {
       durationStr = `${hh}h ${mm}m`;
     }
 
-    const miGanancia = (dineroV * (settings["porcentaje.chofer"] / 100)) + vP;
+    const calculoTurno = calcularTurnoContable(viewTurno, settings);
+    const miGanancia = calculoTurno.miGanancia;
 
-    // Cálculos dinámicos según ajustes
-    const descD = settings["descontar.datafono"] ? vD : 0;
-    const descA = settings["descontar.agencia_bono"] ? vA : 0;
-    const descE = settings["descontar.extra"] ? vE : 0;
-    const descF = settings["descontar.gasolina"] ? vF : 0;
+    // Calculos con la configuracion guardada del turno.
+    const totalDescontar = calculoTurno.totalDescontar;
+    const totalADar = calculoTurno.totalADar;
+    const isLooseAccountingTurno = returnScreen === "contabilidad" && getTurnoAccountingWeekId(viewTurno, settings.diaLibre) === null;
+    const turnoEntregado = viewTurno.entregada || false;
+    const turnoFechaEntrega = viewTurno.fechaEntrega || null;
 
-    // Se elimina descP porque las propinas ya no forman parte de la configuración de descuentos al jefe
-    const totalDescontar = descD + descA + descE + descF;
-    const totalADar = (dineroV * (settings["porcentaje.jefe"] / 100)) - totalDescontar;
+    function applyTurnoEntrega(entregada: boolean) {
+      const fechaEntrega = entregada ? today() : null;
+      setHistory((h) => updateTurnoEntrega(h, viewTurno.id, entregada, fechaEntrega));
+      setViewTurno({ ...viewTurno, entregada, fechaEntrega });
+    }
 
     return (
       <Shell burst={false}>
@@ -3978,6 +4085,35 @@ function App() {
               <IconPencilNeon />
             </button>
           </div>
+
+          {isLooseAccountingTurno && (
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+              <div style={{
+                fontSize: 11,
+                fontWeight: 700,
+                color: turnoEntregado ? G : "oklch(0.75 0.16 70)",
+                background: turnoEntregado ? "rgba(80,220,140,0.12)" : "rgba(255,200,80,0.10)",
+                padding: "5px 10px",
+                borderRadius: 8,
+                letterSpacing: "0.5px",
+                textTransform: "uppercase",
+              }}>
+                {turnoEntregado ? `✓ Entregado${turnoFechaEntrega ? " · " + new Date(turnoFechaEntrega + "T12:00:00").toLocaleDateString("es-ES") : ""}` : "Pendiente"}
+              </div>
+              <div style={{
+                fontSize: 11,
+                fontWeight: 700,
+                color: E,
+                background: EBG,
+                padding: "5px 10px",
+                borderRadius: 8,
+                letterSpacing: "0.5px",
+                textTransform: "uppercase",
+              }}>
+                Fuera de semana
+              </div>
+            </div>
+          )}
 
           {/* Contenedor Superior Agrupado (Dos columnas) */}
           <div style={{ display: 'flex', gap: 10 }}>
@@ -4109,6 +4245,37 @@ function App() {
             </div>
           </div>
 
+          {isLooseAccountingTurno && (
+            <button
+              onClick={() => {
+                if (turnoEntregado) {
+                  setConfirmDialog({
+                    text: "¿Marcar este turno como NO entregado?",
+                    onConfirm: () => {
+                      applyTurnoEntrega(false);
+                      setConfirmDialog(null);
+                    },
+                  });
+                } else {
+                  applyTurnoEntrega(true);
+                }
+              }}
+              style={{
+                padding: "16px 0",
+                borderRadius: 16,
+                border: "none",
+                background: turnoEntregado ? "rgba(255,255,255,0.08)" : G,
+                color: turnoEntregado ? "rgba(255,255,255,0.7)" : "black",
+                fontSize: 16,
+                fontWeight: 800,
+                cursor: "pointer",
+                marginTop: 4,
+              }}
+            >
+              {turnoEntregado ? "Desmarcar entregado" : "✓ Marcar turno como entregado"}
+            </button>
+          )}
+
           {isToday && (
             <button onClick={() => setScreen('home')}
               style={{ marginTop: 4, padding: '17px 0', borderRadius: 18, border: 'none', background: 'rgba(255,255,255,0.07)', color: 'rgba(255,255,255,0.7)', fontSize: 16, fontWeight: 700, cursor: 'pointer' }}>
@@ -4116,6 +4283,7 @@ function App() {
             </button>
           )}
         </div>
+        {confirmDialog && <ConfirmDialog {...confirmDialog} onCancel={() => setConfirmDialog(null)} />}
       </Shell>
     );
   }
@@ -4814,7 +4982,7 @@ function App() {
     const diaLibre = settings.diaLibre;
 
     // Construir lista de "elementos" a mostrar:
-    // - Cada semana (en curso, calculada al vuelo, o congelada)
+    // - Cada semana (en curso o calculada al vuelo)
     // - Cada turno suelto
     //
     // Cada elemento tiene una "fecha de orden" (la del último día laboral de la
@@ -4824,55 +4992,49 @@ function App() {
       kind: "semana";
       weekId: string;
       fechaOrden: string;
-      isFrozen: boolean;
       isEnCurso: boolean;
-      frozen?: FrozenWeek;
+      diaLibreUsado: number;
       turnos: Turno[];
       override: WeekOverride | null;
     };
-    type Elem = ElemSemana;
+    type ElemTurnoSuelto = {
+      kind: "turno";
+      turno: Turno;
+      fechaOrden: string;
+    };
+    type Elem = ElemSemana | ElemTurnoSuelto;
 
     const elementos: Elem[] = [];
 
-    // 1. Procesar frozen weeks (no se recalculan)
-    const frozenIds = new Set<string>();
-    for (const fw of frozenWeeks) {
-      frozenIds.add(fw.weekId);
-      const turnosFw = history.filter((t) => fw.turnoIds.includes(t.id));
-      elementos.push({
-        kind: "semana",
-        weekId: fw.weekId,
-        fechaOrden: fw.fechaFin,
-        isFrozen: true,
-        isEnCurso: false,
-        frozen: fw,
-        turnos: turnosFw,
-        override: getWeekOverride(weekOverrides, fw.weekId),
-      });
-    }
-
-    // 2. Agrupar resto del historial por semana con día libre actual
+    // 1. Agrupar historial por semana. Cada turno usa su diaLibreContable si existe.
     const grupos = groupTurnosByWeek(history, diaLibre);
     for (const [key, turnosSemana] of grupos.entries()) {
-      // Semana
       const weekId = key;
-      if (frozenIds.has(weekId)) continue; // ya añadida desde frozen
       const range = getWeekRange(weekId);
       const isEnCurso = !isWeekClosed(weekId, hoyISO);
       elementos.push({
         kind: "semana",
         weekId,
         fechaOrden: range.fin,
-        isFrozen: false,
         isEnCurso,
+        diaLibreUsado: turnosSemana[0]?.diaLibreContable ?? diaLibre,
         turnos: turnosSemana,
         override: getWeekOverride(weekOverrides, weekId),
       });
     }
 
-    // 3. Detectar si la semana en curso ya existe; si no, crear una "vacía"
-    //    para mostrarla siempre arriba aunque aún no haya turnos.
-    const weekIdHoy = getWeekId(hoyISO, diaLibre);
+    // 2. Añadir turnos sueltos de dia libre.
+    for (const turno of history) {
+      if (getTurnoAccountingWeekId(turno, diaLibre) !== null) continue;
+      elementos.push({
+        kind: "turno",
+        turno,
+        fechaOrden: turno.startDate || turno.date,
+      });
+    }
+
+    // 3. Detectar si la semana en curso ya existe; si no, crear una vacia.
+    const weekIdHoy = getCurrentOpenWeekId(hoyISO, diaLibre);
     const tieneEnCurso = elementos.some(
       (e) => e.kind === "semana" && e.isEnCurso
     );
@@ -4882,8 +5044,8 @@ function App() {
         kind: "semana",
         weekId: weekIdHoy,
         fechaOrden: range.fin,
-        isFrozen: false,
         isEnCurso: true,
+        diaLibreUsado: diaLibre,
         turnos: [],
         override: getWeekOverride(weekOverrides, weekIdHoy),
       });
@@ -4898,13 +5060,29 @@ function App() {
     // 5. Ordenar el resto por fechaOrden DESCENDENTE (más reciente primero)
     otros.sort((a, b) => (a.fechaOrden < b.fechaOrden ? 1 : -1));
 
+    const heroSelection = selectAccountingHeroWeek(
+      enCurso?.weekId || null,
+      otros.filter((e): e is ElemSemana => e.kind === "semana").map((e) => e.weekId)
+    );
+    const heroWeek = heroSelection
+      ? elementos.find((e) => e.kind === "semana" && e.weekId === heroSelection.weekId)
+      : undefined;
+    const otrosSinHero = heroSelection?.kind === "latest"
+      ? otros.filter((e) => e.kind !== "semana" || e.weekId !== heroSelection.weekId)
+      : otros;
+
     // 6. Asignar mes a cada elemento (resolviendo empates)
     type ElemConMes = { elem: Elem; mesId: string | null /* null = empate sin resolver */ };
     const otrosConMes: ElemConMes[] = [];
     let primerEmpate: { weekId: string; candidates: { mesId: string; mesLabel: string }[] } | null = null;
 
-    for (const elem of otros) {
-      const r = getWeekMonth(elem.weekId, elem.isFrozen ? elem.frozen!.diaLibreUsado : diaLibre);
+    for (const elem of otrosSinHero) {
+      if (elem.kind === "turno") {
+        const fechaMes = elem.turno.startDate || elem.turno.date;
+        otrosConMes.push({ elem, mesId: fechaMes.slice(0, 7) });
+        continue;
+      }
+      const r = getWeekMonth(elem.weekId, elem.diaLibreUsado);
       if (r.type === "single") {
         otrosConMes.push({ elem, mesId: r.mesId });
       } else {
@@ -4944,84 +5122,204 @@ function App() {
       }
     }
 
+    const weeklyPeriodLabel = getAccountingPeriodLabel(selectedAccountingYear, selectedAccountingMonth);
+
     // Render
     return (
       <Shell burst={false}>
         <div style={{ flex: 1, padding: "16px 20px 32px", display: "flex", flexDirection: "column", gap: 16, overflowY: "auto" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-            <button style={S.iconBtn} onClick={() => setScreen("home")}>
-              <IconBack />
-            </button>
-            <div style={{ fontSize: 24, fontWeight: 800, color: "white" }}>Contabilidad</div>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 12, minWidth: 0 }}>
+              <button style={S.iconBtn} onClick={() => setScreen("home")}>
+                <IconBack />
+              </button>
+              <div style={{ fontSize: 24, fontWeight: 800, color: "white" }}>Contabilidad</div>
+            </div>
+            <div style={{ display: "flex", gap: 10, flexShrink: 0 }}>
+              <button
+                onClick={() => setScreen("detalleMes")}
+                style={{
+                  border: `1px solid ${E}`,
+                  background: "rgba(0, 210, 255, 0.12)",
+                  color: E,
+                  borderRadius: 12,
+                  padding: "9px 11px",
+                  fontSize: 11,
+                  fontWeight: 900,
+                  textTransform: "uppercase",
+                  letterSpacing: "0.5px",
+                  cursor: "pointer",
+                  whiteSpace: "nowrap",
+                  boxShadow: `0 0 12px ${E}33`
+                }}
+              >
+                Mensual
+              </button>
+              <button
+                onClick={() => setScreen("detalleAnual")}
+                style={{
+                  border: `1px solid ${C}`,
+                  background: "rgba(180, 120, 255, 0.12)",
+                  color: C,
+                  borderRadius: 12,
+                  padding: "9px 11px",
+                  fontSize: 11,
+                  fontWeight: 900,
+                  textTransform: "uppercase",
+                  letterSpacing: "0.5px",
+                  cursor: "pointer",
+                  whiteSpace: "nowrap",
+                  boxShadow: `0 0 12px ${C}33`
+                }}
+              >
+                Anual
+              </button>
+            </div>
           </div>
 
-          {/* === SEMANA EN CURSO === */}
-          {enCurso && (() => {
-            const totales = calcularTotalesTurnos(enCurso.turnos);
-            const range = getWeekRange(enCurso.weekId);
+
+          <div style={{
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            textAlign: "center",
+            gap: 6,
+            marginTop: 12,
+            marginBottom: 8,
+            background: "rgba(255, 255, 255, 0.03)",
+            borderRadius: 22,
+            padding: "24px 16px",
+            border: "2px solid rgba(255, 255, 255, 0.12)",
+            boxShadow: "0 8px 32px rgba(0, 0, 0, 0.4), 0 0 16px rgba(255, 255, 255, 0.05)",
+            boxSizing: "border-box",
+          }}>
+            <div style={{
+              fontSize: 50,
+              fontWeight: 950,
+              color: "white",
+              letterSpacing: "-0.5px",
+              lineHeight: 1,
+              textShadow: "0 0 16px rgba(255,255,255,0.25)"
+            }}>
+              Semanal
+            </div>
+            <div style={{
+              fontSize: 26,
+              fontWeight: 900,
+              color: "rgba(255,255,255,0.6)",
+              textTransform: "uppercase",
+              letterSpacing: "1.2px"
+            }}>
+              {weeklyPeriodLabel}
+            </div>
+          </div>
+
+          {/* === SEMANA DESTACADA === */}
+          {heroWeek && heroSelection && (() => {
+            const totales = calcularResumenContableTurnos(heroWeek.turnos, settings);
+            const totalTaximetroHero = (totales.dinero || 0) - (totales.totalN || 0);
+            const range = getWeekRange(heroWeek.weekId);
+            const isCurrentHero = heroSelection.kind === "current";
             const dHoy = new Date(hoyISO + "T12:00:00");
             const dInicio = new Date(range.inicio + "T12:00:00");
             const diasTranscurridos = Math.min(
               6,
               Math.max(0, Math.floor((dHoy.getTime() - dInicio.getTime()) / 86400000) + 1)
             );
+            const entregadaHero = heroWeek.override?.entregada || false;
+
+            let totalMinsHero = 0;
+            for (const turno of heroWeek.turnos) {
+              if (turno.startTime && turno.endTime) {
+                let mins = getDiffMins(turno.startTime, turno.endTime);
+                if (turno.totalPausedMinutes) mins = Math.max(0, mins - turno.totalPausedMinutes);
+                totalMinsHero += mins;
+              }
+            }
+            const durationStrHero = `${Math.floor(totalMinsHero / 60)}h ${totalMinsHero % 60}m`;
 
             return (
               <div
                 onClick={() => {
-                  setSelectedWeekId(enCurso.weekId);
+                  setSelectedWeekId(heroWeek.weekId);
                   setScreen("detalleSemana");
                 }}
                 style={{
-                  background: `linear-gradient(135deg, ${ABG} 0%, oklch(0.20 0.05 200) 100%)`,
+                  background: "linear-gradient(135deg, rgba(180, 120, 255, 0.15) 0%, rgba(0, 210, 255, 0.15) 100%)",
                   borderRadius: 22,
                   padding: 20,
-                  border: `2px solid ${G}`,
+                  border: `2px solid ${entregadaHero ? G : E}`,
                   cursor: "pointer",
-                  boxShadow: "0 8px 24px rgba(0,0,0,0.3)",
+                  boxShadow: `0 8px 24px rgba(0,0,0,0.3), inset 0 0 20px ${entregadaHero ? G : E}11`,
                 }}
               >
-                <div style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 8,
-                  marginBottom: 12,
-                }}>
-                  <span style={{
-                    fontSize: 11,
-                    fontWeight: 800,
-                    color: A,
-                    background: "rgba(0,0,0,0.3)",
-                    padding: "4px 10px",
-                    borderRadius: 8,
-                    letterSpacing: "0.8px",
-                  }}>
-                    EN CURSO
-                  </span>
-                  <span style={{
-                    fontSize: 11,
-                    color: "rgba(255,255,255,0.4)",
-                    fontWeight: 600,
-                  }}>
-                    Día {diasTranscurridos} de 6
-                  </span>
-                </div>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12, marginBottom: 16 }}>
+                  {/* Columna Izquierda: Info de la semana */}
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 8,
+                      marginBottom: 12,
+                    }}>
+                      <span style={{
+                        fontSize: 11,
+                        fontWeight: 800,
+                        color: A,
+                        background: "rgba(0,0,0,0.3)",
+                        padding: "4px 10px",
+                        borderRadius: 8,
+                        letterSpacing: "0.8px",
+                      }}>
+                        {isCurrentHero ? "EN CURSO" : "ÚLTIMA SEMANA"}
+                      </span>
+                      {isCurrentHero && (
+                        <span style={{
+                          fontSize: 11,
+                          color: "rgba(255,255,255,0.4)",
+                          fontWeight: 600,
+                        }}>
+                          Día {diasTranscurridos} de 6
+                        </span>
+                      )}
+                    </div>
 
-                <div style={{
-                  fontSize: 22,
-                  fontWeight: 900,
-                  color: "white",
-                  marginBottom: 4,
-                  letterSpacing: "-0.5px",
-                }}>
-                  {formatWeekRange(enCurso.weekId)}
-                </div>
-                <div style={{
-                  fontSize: 13,
-                  color: "rgba(255,255,255,0.4)",
-                  marginBottom: 16,
-                }}>
-                  {enCurso.turnos.length} {enCurso.turnos.length === 1 ? "turno registrado" : "turnos registrados"}
+                    <div style={{
+                      fontSize: 22,
+                      fontWeight: 900,
+                      color: "white",
+                      marginBottom: 4,
+                      letterSpacing: "-0.5px",
+                    }}>
+                      {formatWeekRange(heroWeek.weekId)}
+                    </div>
+                    <div style={{
+                      fontSize: 13,
+                      color: "rgba(255,255,255,0.4)",
+                    }}>
+                      {heroWeek.turnos.length} {heroWeek.turnos.length === 1 ? "turno registrado" : "turnos registrados"}
+                    </div>
+                  </div>
+
+                  {/* Columna Derecha: Mi Ganancia y Tiempo Trabajado */}
+                  <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 10, flexShrink: 0, textAlign: "right" }}>
+                    <div>
+                      <div style={{ fontSize: 11, color: "rgba(255,255,255,0.5)", fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.6px", marginBottom: 2, display: "flex", alignItems: "center", gap: 5, justifyContent: "flex-end" }}>
+                        <IconMoneyBag s={24} c="oklch(0.78 0.18 150)" /> Mi Ganancia
+                      </div>
+                      <div style={{ fontSize: "clamp(22px, 6vw, 32px)", fontWeight: 900, color: "oklch(0.78 0.18 150)", letterSpacing: "-1px", lineHeight: 1 }}>
+                        {totales.miGanancia.toFixed(2).replace(".", ",")} <span style={{ fontSize: 20, fontWeight: 700, opacity: 0.6 }}>€</span>
+                      </div>
+                    </div>
+                    <div>
+                      <div style={{ fontSize: 11, color: "rgba(255,255,255,0.5)", fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.6px", marginBottom: 2, marginTop: 4, display: "flex", alignItems: "center", gap: 5, justifyContent: "flex-end" }}>
+                        <IconTimer s={24} c="oklch(0.85 0.12 210)" /> Tiempo Trab.
+                      </div>
+                      <div style={{ fontSize: "clamp(22px, 6vw, 32px)", fontWeight: 900, color: "oklch(0.85 0.12 210)", letterSpacing: "-1px", lineHeight: 1 }}>
+                        {(() => { const [hPart, mPart] = durationStrHero.split(" "); const hNum = hPart.replace("h", ""); const mNum = mPart?.replace("m", "") ?? "0"; return <>{hNum}<span style={{ fontSize: 20, fontWeight: 700, opacity: 0.6, marginLeft: 2, marginRight: 6, letterSpacing: "normal" }}>h</span> {mNum}<span style={{ fontSize: 20, fontWeight: 700, opacity: 0.6, marginLeft: 2, letterSpacing: "normal" }}>m</span></>; })()}
+                      </div>
+                    </div>
+                  </div>
                 </div>
 
                 <div style={{
@@ -5041,10 +5339,10 @@ function App() {
                 </div>
                 <div style={{ display: "flex", gap: 16, marginTop: 4 }}>
                   <div style={{ fontSize: "clamp(22px, 6vw, 32px)", fontWeight: 900, color: "oklch(0.85 0.18 85)", letterSpacing: "-1px" }}>
-                    {fmt(totales.dinero)}
+                    {totalTaximetroHero.toFixed(2).replace(".", ",")} <span style={{ fontSize: 20, fontWeight: 700, opacity: 0.6 }}>€</span>
                   </div>
                   <div style={{ fontSize: "clamp(22px, 6vw, 32px)", fontWeight: 900, color: "oklch(0.80 0.14 220)", letterSpacing: "-1px" }}>
-                    {(totales.km || 0).toString().replace('.', ',')} <span style={{ fontSize: 16, fontWeight: 700, opacity: 0.6 }}>KM</span>
+                    {(totales.km || 0).toString().replace('.', ',')} <span style={{ fontSize: 20, fontWeight: 700, opacity: 0.6 }}>KM</span>
                   </div>
                 </div>
               </div>
@@ -5052,7 +5350,7 @@ function App() {
           })()}
 
           {/* === SEMANAS ANTERIORES (agrupadas por mes) === */}
-          {grupos2.length === 0 && !enCurso && (
+          {grupos2.length === 0 && !heroWeek && (
             <div style={{
               textAlign: "center",
               color: "rgba(255,255,255,0.5)",
@@ -5078,15 +5376,110 @@ function App() {
               </div>
 
               {grupo.items.map((item) => {
+                if (item.elem.kind === "turno") {
+                  const turno = item.elem.turno;
+                  const entregado = turno.entregada || false;
+                  return (
+                    <div
+                      key={`turno-${turno.id}`}
+                      onClick={() => {
+                        setReturnScreen("contabilidad");
+                        setViewTurno(turno);
+                        setScreen("summary");
+                      }}
+                      style={{
+                        background: "rgba(255,255,255,0.04)",
+                        borderRadius: 16,
+                        padding: 16,
+                        cursor: "pointer",
+                        border: entregado
+                          ? "1px solid rgba(59, 130, 246, 0.5)"
+                          : "1px solid rgba(255,255,255,0.08)",
+                        display: "flex",
+                        justifyContent: "space-between",
+                        alignItems: "center",
+                        gap: 12,
+                      }}
+                    >
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{
+                          fontSize: 16,
+                          fontWeight: 800,
+                          color: "white",
+                          marginBottom: 4,
+                        }}>
+                          {fmtDate(turno.startDate || turno.date)}
+                        </div>
+                        <div style={{
+                          fontSize: 12,
+                          color: "rgba(255,255,255,0.4)",
+                        }}>
+                          Turno suelto
+                        </div>
+                      </div>
+
+                      <div style={{
+                        display: "flex",
+                        flexDirection: "column",
+                        alignItems: "flex-end",
+                        gap: 6,
+                      }}>
+                        <div style={{
+                          fontSize: 17,
+                          fontWeight: 900,
+                          color: "oklch(0.78 0.18 150)",
+                        }}>
+                          {fmt(turno.dinero || 0)}
+                        </div>
+                        <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 5 }}>
+                          <div style={{
+                            fontSize: 10,
+                            fontWeight: 700,
+                            color: entregado ? G : "oklch(0.75 0.16 70)",
+                            background: entregado ? "rgba(80,220,140,0.12)" : "rgba(255,200,80,0.10)",
+                            padding: "3px 8px",
+                            borderRadius: 6,
+                            letterSpacing: "0.5px",
+                            textTransform: "uppercase",
+                          }}>
+                            {entregado ? "✓ Entregado" : "Pendiente"}
+                          </div>
+                          <div style={{
+                            fontSize: 10,
+                            fontWeight: 700,
+                            color: E,
+                            background: EBG,
+                            padding: "3px 8px",
+                            borderRadius: 6,
+                            letterSpacing: "0.5px",
+                            textTransform: "uppercase",
+                          }}>
+                            Fuera de semana
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                }
+
                 // Tarjeta de semana
                 const sem = item.elem;
-                const totales = sem.isFrozen
-                  ? sem.frozen!.totales
-                  : calcularTotalesTurnos(sem.turnos);
-                const numTurnos = sem.isFrozen
-                  ? sem.frozen!.numTurnos
-                  : sem.turnos.length;
-                const entregada = sem.override?.entregada || sem.frozen?.entregada || false;
+                const resumenSemana = calcularResumenContableTurnos(sem.turnos, settings);
+                const totalTaximetroSemana = resumenSemana.dineroBase;
+                const miGananciaSemana = resumenSemana.miGanancia;
+                const kmSemana = resumenSemana.km;
+                const numTurnos = sem.turnos.length;
+                const entregada = sem.override?.entregada || false;
+
+                let totalMinsSem = 0;
+                for (const turno of sem.turnos) {
+                  if (turno.startTime && turno.endTime) {
+                    let mins = getDiffMins(turno.startTime, turno.endTime);
+                    if (turno.totalPausedMinutes) mins = Math.max(0, mins - turno.totalPausedMinutes);
+                    totalMinsSem += mins;
+                  }
+                }
+                const durationStrSem = `${Math.floor(totalMinsSem / 60)}h ${totalMinsSem % 60}m`;
 
                 return (
                   <div
@@ -5096,70 +5489,59 @@ function App() {
                       setScreen("detalleSemana");
                     }}
                     style={{
-                      background: "rgba(255,255,255,0.04)",
+                      background: "rgba(255,255,255,0.05)",
                       borderRadius: 16,
                       padding: 16,
                       cursor: "pointer",
-                      border: (entregada || sem.isFrozen)
-                        ? "1px solid rgba(59, 130, 246, 0.5)"
-                        : "1px solid rgba(255,255,255,0.08)",
+                      border: entregada
+                        ? `1.5px solid ${G}88`
+                        : "1px solid rgba(255,255,255,0.1)",
                       display: "flex",
                       justifyContent: "space-between",
                       alignItems: "center",
                       gap: 12,
+                      boxShadow: "0 4px 12px rgba(0,0,0,0.2)"
                     }}
                   >
-                    <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ display: "flex", flexDirection: "column", gap: 4, flex: 1, minWidth: 0 }}>
                       <div style={{
                         fontSize: 16,
                         fontWeight: 800,
                         color: "white",
-                        marginBottom: 4,
                       }}>
                         {formatWeekRange(sem.weekId)}
-                        {sem.isFrozen && (
-                          <span style={{
-                            fontSize: 11,
-                            marginLeft: 8,
-                            color: "rgba(180,220,255,0.7)",
-                            fontWeight: 600,
-                          }}>
-                            ❄️
-                          </span>
-                        )}
                       </div>
                       <div style={{
-                        fontSize: 12,
+                        fontSize: 13,
                         color: "rgba(255,255,255,0.4)",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 6,
                       }}>
-                        {numTurnos} {numTurnos === 1 ? "turno" : "turnos"}
+                        <span>{numTurnos} {numTurnos === 1 ? "turno" : "turnos"}</span>
+                        <span style={{ opacity: 0.5 }}>•</span>
+                        <span style={{ color: entregada ? G : "oklch(0.75 0.16 70)", fontWeight: 800 }}>
+                          {entregada ? "Entregada" : "Pendiente"}
+                        </span>
                       </div>
                     </div>
 
-                    <div style={{
-                      display: "flex",
-                      flexDirection: "column",
-                      alignItems: "flex-end",
-                      gap: 6,
-                    }}>
-                      <div style={{
-                        fontSize: 17,
-                        fontWeight: 900,
-                        color: "oklch(0.78 0.18 150)",
-                      }}>
-                        {fmt(totales.dinero)}
+                    <div style={{ display: "flex", gap: 10, textAlign: "right" }}>
+                      <div style={{ display: "flex", flexDirection: "column", gap: 8, justifyContent: "center" }}>
+                        <div style={{ fontSize: 17, fontWeight: 900, color: "oklch(0.78 0.18 150)", display: "flex", alignItems: "center", gap: 6, whiteSpace: "nowrap" }}>
+                          <IconTaxiBadgeNeon s={20} c="oklch(0.85 0.18 85)" /> {fmt(totalTaximetroSemana)}
+                        </div>
+                        <div style={{ fontSize: 17, fontWeight: 900, color: "oklch(0.80 0.14 220)", display: "flex", alignItems: "center", gap: 6, whiteSpace: "nowrap" }}>
+                          <IconRoad s={18} c="oklch(0.80 0.14 220)" /> {kmSemana || 0} KM
+                        </div>
                       </div>
-                      <div style={{
-                        fontSize: 10,
-                        fontWeight: 700,
-                        color: entregada ? G : "oklch(0.75 0.16 70)",
-                        background: entregada ? "rgba(80,220,140,0.12)" : "rgba(255,200,80,0.10)",
-                        padding: "3px 8px",
-                        borderRadius: 6,
-                        letterSpacing: "0.5px",
-                        textTransform: "uppercase",
-                      }}>
-                        {entregada ? "✓ Entregada" : "Pendiente"}
+                      <div style={{ display: "flex", flexDirection: "column", gap: 8, alignItems: "flex-end", justifyContent: "center" }}>
+                        <div style={{ fontSize: 17, fontWeight: 900, color: "oklch(0.78 0.18 150)", display: "flex", alignItems: "center", gap: 6, whiteSpace: "nowrap" }}>
+                          <IconMoneyBag s={20} c="oklch(0.78 0.18 150)" /> {fmt(miGananciaSemana)}
+                        </div>
+                        <div style={{ fontSize: 17, fontWeight: 900, color: "oklch(0.85 0.12 210)", display: "flex", alignItems: "center", gap: 6, whiteSpace: "nowrap" }}>
+                          <IconTimer s={18} c="oklch(0.85 0.12 210)" /> {durationStrSem}
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -5247,42 +5629,352 @@ function App() {
     );
   }
 
+  if (screen === "detalleAnual") {
+    const turnosAnual = getTurnosByCalendarYear(history, selectedAccountingYear);
+    const resumenAnual = calcularResumenContableTurnos(turnosAnual, settings);
+    const monthLabels = MESES_COMPLETOS;
+    const cats = [
+      { key: 'datafono', label: 'Datafono', color: P, bg: PBG, icon: <IconCard s={18} c={P} />, total: resumenAnual.totalD },
+      { key: 'propina', label: 'Propinas', color: G, bg: GBG, icon: <IconCoin s={18} c={G} />, total: resumenAnual.totalP },
+      { key: 'agencia_bono', label: 'Agencias/Bonos', color: A, bg: ABG, icon: <IconAgency s={18} c={A} />, total: resumenAnual.totalA },
+      { key: 'extra', label: 'Extras', color: E, bg: EBG, icon: <IconExtra s={18} c={E} />, total: resumenAnual.totalE },
+      { key: 'gasolina', label: 'Gasolina', color: F, bg: FBG, icon: <IconFuel s={22} c={F} />, total: resumenAnual.totalF },
+      { key: 'nulo', label: 'Nulos', color: N, bg: NBG, icon: <IconNulo s={18} c={N} />, total: resumenAnual.totalN },
+    ];
+
+    let totalMins = 0;
+    for (const turno of turnosAnual) {
+      if (turno.startTime && turno.endTime) {
+        let mins = getDiffMins(turno.startTime, turno.endTime);
+        if (turno.totalPausedMinutes) mins = Math.max(0, mins - turno.totalPausedMinutes);
+        totalMins += mins;
+      }
+    }
+    const durationStr = `${Math.floor(totalMins / 60)}h ${totalMins % 60}m`;
+
+    const mesesAnio = monthLabels.map((label, index) => {
+      const month = index + 1;
+      const turnosMes = getTurnosByCalendarMonth(history, selectedAccountingYear, month);
+      const resumenMes = calcularResumenContableTurnos(turnosMes, settings);
+      return { month, label, turnosMes, resumenMes };
+    });
+
+    return (
+      <Shell burst={false}>
+        <div style={{ flex: 1, padding: "16px 20px 32px", display: "flex", flexDirection: "column", gap: 14, overflowY: "auto" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+            <button style={S.iconBtn} onClick={() => setScreen("contabilidad")}>
+              <IconBack />
+            </button>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontSize: 20, fontWeight: 800, color: "white" }}>Resumen Anual</div>
+              <div style={{ fontSize: 13, color: "rgba(255,255,255,0.45)", marginTop: 2 }}>{selectedAccountingYear}</div>
+            </div>
+          </div>
+
+          <div style={{ background: "rgba(255,255,255,0.035)", borderRadius: 22, padding: 10, border: "1px solid rgba(255,255,255,0.08)" }}>
+            <div style={{ display: "grid", gridTemplateColumns: "40px 1fr 40px", alignItems: "center", gap: 8 }}>
+              <button
+                aria-label="Año anterior"
+                onClick={() => setSelectedAccountingYear((year) => year - 1)}
+                style={{ height: 40, borderRadius: 12, border: "1px solid rgba(255,255,255,0.10)", background: "rgba(0,0,0,0.26)", color: "white", fontSize: 17, fontWeight: 900, cursor: "pointer" }}
+              >
+                {"<"}
+              </button>
+              <div style={{ minHeight: 52, borderRadius: 12, border: "1px solid rgba(255,255,255,0.12)", background: "rgba(255,255,255,0.05)", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center" }}>
+                <div style={{ fontSize: 11, color: "rgba(255,255,255,0.46)", fontWeight: 900, textTransform: "uppercase", letterSpacing: "0.8px" }}>Año</div>
+                <div style={{ fontSize: 22, color: "white", fontWeight: 950, lineHeight: 1.1 }}>{selectedAccountingYear}</div>
+              </div>
+              <button
+                aria-label="Año siguiente"
+                onClick={() => setSelectedAccountingYear((year) => year + 1)}
+                style={{ height: 40, borderRadius: 12, border: "1px solid rgba(255,255,255,0.10)", background: "rgba(0,0,0,0.26)", color: "white", fontSize: 17, fontWeight: 900, cursor: "pointer" }}
+              >
+                {">"}
+              </button>
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', gap: 10 }}>
+            <div style={{ flex: 1, background: 'rgba(255,255,255,0.03)', borderRadius: 22, padding: '16px', border: '1px solid rgba(255,255,255,0.07)', display: 'flex', flexDirection: 'column', gap: 10 }}>
+              <div style={{ flex: 1, textAlign: 'center', background: 'rgba(255, 180, 0, 0.06)', borderRadius: 16, padding: '14px 8px', border: '1px solid rgba(255, 180, 0, 0.2)' }}>
+                <div style={{ fontSize: 11, fontWeight: 800, color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', marginBottom: 6 }}>Total Taximetro</div>
+                <div style={{ fontSize: "clamp(16px, 4.5vw, 22px)", fontWeight: 900, color: 'oklch(0.85 0.18 85)' }}>{fmt(resumenAnual.dineroBase)}</div>
+              </div>
+              <div style={{ flex: 1, textAlign: 'center', background: 'rgba(0, 210, 255, 0.06)', borderRadius: 16, padding: '14px 8px', border: '1px solid rgba(0, 210, 255, 0.2)' }}>
+                <div style={{ fontSize: 11, fontWeight: 800, color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', marginBottom: 6 }}>Total KM</div>
+                <div style={{ fontSize: "clamp(16px, 4.5vw, 22px)", fontWeight: 900, color: 'oklch(0.80 0.14 220)' }}>{(resumenAnual.km || 0).toString().replace('.', ',')} <span style={{ fontSize: 13, opacity: 0.7 }}>KM</span></div>
+              </div>
+            </div>
+            <div style={{ flex: 1, background: 'rgba(255,255,255,0.03)', borderRadius: 22, padding: '16px', border: '1px solid rgba(255,255,255,0.07)', display: 'flex', flexDirection: 'column', gap: 10 }}>
+              <div style={{ flex: 1, textAlign: 'center', background: 'rgba(80, 220, 140, 0.08)', borderRadius: 16, padding: '14px 8px', border: '1px solid rgba(80, 220, 140, 0.22)' }}>
+                <div style={{ fontSize: 11, fontWeight: 800, color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', marginBottom: 6 }}>Mi Ganancia</div>
+                <div style={{ fontSize: "clamp(16px, 4.5vw, 22px)", fontWeight: 900, color: 'oklch(0.78 0.18 150)' }}>{fmt(resumenAnual.miGanancia)}</div>
+              </div>
+              <div style={{ flex: 1, textAlign: 'center', background: 'rgba(120, 200, 255, 0.08)', borderRadius: 16, padding: '14px 8px', border: '1px solid rgba(120, 200, 255, 0.22)' }}>
+                <div style={{ fontSize: 11, fontWeight: 800, color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', marginBottom: 6 }}>Tiempo Trabajado</div>
+                <div style={{ fontSize: "clamp(16px, 4.5vw, 22px)", fontWeight: 900, color: 'oklch(0.85 0.12 210)' }}>{durationStr}</div>
+              </div>
+            </div>
+          </div>
+
+          <div style={{ background: 'rgba(255,255,255,0.03)', borderRadius: 22, padding: 16, border: '1px solid rgba(255,255,255,0.07)', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+            {cats.map(cat => (
+              <div key={cat.key} style={{ background: cat.bg, borderRadius: 14, padding: '14px 12px', display: 'flex', flexDirection: 'column', gap: 6 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, fontWeight: 800, color: 'rgba(255,255,255,0.55)' }}>
+                  {cat.icon} {cat.label}
+                </div>
+                <div style={{ fontSize: 20, fontWeight: 900, color: cat.color }}>{fmt(cat.total || 0)}</div>
+              </div>
+            ))}
+          </div>
+
+          <div style={{ display: 'flex', gap: 10, background: 'rgba(255,255,255,0.03)', borderRadius: 22, padding: 16, border: '1px solid rgba(255,255,255,0.07)' }}>
+            <div style={{ flex: 1, background: 'rgba(255,80,80,0.08)', borderRadius: 14, padding: '14px 12px', border: '1px solid rgba(255,80,80,0.22)', textAlign: 'center' }}>
+              <div style={{ fontSize: 11, fontWeight: 800, color: 'rgba(255,255,255,0.55)', textTransform: 'uppercase', marginBottom: 6 }}>Total a descontar</div>
+              <div style={{ fontSize: 20, fontWeight: 900, color: 'oklch(0.70 0.18 25)' }}>{fmt(resumenAnual.totalDescontar)}</div>
+            </div>
+            <div style={{ flex: 1, background: 'rgba(80,220,140,0.08)', borderRadius: 14, padding: '14px 12px', border: '1px solid rgba(80,220,140,0.22)', textAlign: 'center' }}>
+              <div style={{ fontSize: 11, fontWeight: 800, color: 'rgba(255,255,255,0.55)', textTransform: 'uppercase', marginBottom: 6 }}>Total a dar</div>
+              <div style={{ fontSize: 20, fontWeight: 900, color: G }}>{fmt(resumenAnual.totalADar)}</div>
+            </div>
+          </div>
+
+          <div style={{ background: "rgba(255,255,255,0.03)", borderRadius: 18, padding: 16, border: "1px solid rgba(255,255,255,0.07)" }}>
+            <div style={{ fontSize: 13, fontWeight: 800, color: "rgba(255,255,255,0.55)", textTransform: "uppercase", letterSpacing: "0.6px", marginBottom: 12 }}>
+              Meses del año ({turnosAnual.length} turnos)
+            </div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              {mesesAnio.map(({ month, label, turnosMes, resumenMes }) => (
+                <div
+                  key={label}
+                  onClick={() => { setSelectedAccountingMonth(month); setScreen("detalleMes"); }}
+                  style={{ background: "rgba(255,255,255,0.04)", borderRadius: 12, padding: "12px 14px", cursor: "pointer", border: month === selectedAccountingMonth ? `1px solid ${G}88` : "1px solid rgba(255,255,255,0.05)", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12 }}
+                >
+                  <div>
+                    <div style={{ fontWeight: 850, color: "white", fontSize: 15 }}>{label}</div>
+                    <div style={{ fontSize: 12, color: "rgba(255,255,255,0.4)", marginTop: 3 }}>{turnosMes.length} {turnosMes.length === 1 ? "turno" : "turnos"}</div>
+                  </div>
+                  <div style={{ textAlign: "right" }}>
+                    <div style={{ fontSize: 16, fontWeight: 900, color: "oklch(0.85 0.18 85)" }}>{fmt(resumenMes.dineroBase)}</div>
+                    <div style={{ fontSize: 12, fontWeight: 800, color: "oklch(0.78 0.18 150)", marginTop: 3 }}>{fmt(resumenMes.miGanancia)}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </Shell>
+    );
+  }
+
+  if (screen === "detalleMes") {
+    const monthId = `${selectedAccountingYear}-${String(selectedAccountingMonth).padStart(2, "0")}`;
+    const turnosMes = getTurnosByCalendarMonth(history, selectedAccountingYear, selectedAccountingMonth);
+    const resumenMes = calcularResumenContableTurnos(turnosMes, settings);
+    const mesLabel = getMesLabel(monthId);
+    const cats = [
+      { key: 'datafono', label: 'Datafono', color: P, bg: PBG, icon: <IconCard s={18} c={P} />, total: resumenMes.totalD },
+      { key: 'propina', label: 'Propinas', color: G, bg: GBG, icon: <IconCoin s={18} c={G} />, total: resumenMes.totalP },
+      { key: 'agencia_bono', label: 'Agencias/Bonos', color: A, bg: ABG, icon: <IconAgency s={18} c={A} />, total: resumenMes.totalA },
+      { key: 'extra', label: 'Extras', color: E, bg: EBG, icon: <IconExtra s={18} c={E} />, total: resumenMes.totalE },
+      { key: 'gasolina', label: 'Gasolina', color: F, bg: FBG, icon: <IconFuel s={22} c={F} />, total: resumenMes.totalF },
+      { key: 'nulo', label: 'Nulos', color: N, bg: NBG, icon: <IconNulo s={18} c={N} />, total: resumenMes.totalN },
+    ];
+
+    let totalMins = 0;
+    for (const turno of turnosMes) {
+      if (turno.startTime && turno.endTime) {
+        let mins = getDiffMins(turno.startTime, turno.endTime);
+        if (turno.totalPausedMinutes) mins = Math.max(0, mins - turno.totalPausedMinutes);
+        totalMins += mins;
+      }
+    }
+    const durationStr = `${Math.floor(totalMins / 60)}h ${totalMins % 60}m`;
+
+    return (
+      <Shell burst={false}>
+        <div style={{ flex: 1, padding: "16px 20px 32px", display: "flex", flexDirection: "column", gap: 14, overflowY: "auto" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+            <button style={S.iconBtn} onClick={() => setScreen("contabilidad")}>
+              <IconBack />
+            </button>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontSize: 20, fontWeight: 800, color: "white" }}>
+                Detalle de Mes
+              </div>
+              <div style={{ fontSize: 13, color: "rgba(255,255,255,0.45)", marginTop: 2 }}>
+                {mesLabel}
+              </div>
+            </div>
+          </div>
+
+          <div style={{ background: "rgba(255,255,255,0.035)", borderRadius: 22, padding: 10, border: "1px solid rgba(255,255,255,0.08)", display: "flex", flexDirection: "column", gap: 8 }}>
+            <div style={{ display: "grid", gridTemplateColumns: "40px 1fr 40px", alignItems: "center", gap: 8 }}>
+              <button
+                aria-label="Año anterior"
+                onClick={() => setSelectedAccountingYear((year) => year - 1)}
+                style={{ height: 40, borderRadius: 12, border: "1px solid rgba(255,255,255,0.10)", background: "rgba(0,0,0,0.26)", color: "white", fontSize: 17, fontWeight: 900, cursor: "pointer" }}
+              >
+                {"<"}
+              </button>
+              <div style={{ minHeight: 52, borderRadius: 12, border: "1px solid rgba(255,255,255,0.12)", background: "rgba(255,255,255,0.05)", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center" }}>
+                <div style={{ fontSize: 11, color: "rgba(255,255,255,0.46)", fontWeight: 900, textTransform: "uppercase", letterSpacing: "0.8px" }}>Año</div>
+                <div style={{ fontSize: 22, color: "white", fontWeight: 950, lineHeight: 1.1 }}>{selectedAccountingYear}</div>
+              </div>
+              <button
+                aria-label="Año siguiente"
+                onClick={() => setSelectedAccountingYear((year) => year + 1)}
+                style={{ height: 40, borderRadius: 12, border: "1px solid rgba(255,255,255,0.10)", background: "rgba(0,0,0,0.26)", color: "white", fontSize: 17, fontWeight: 900, cursor: "pointer" }}
+              >
+                {">"}
+              </button>
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "40px 1fr 40px", alignItems: "center", gap: 8 }}>
+              <button
+                aria-label="Mes anterior"
+                onClick={() => setSelectedAccountingMonth((month) => Math.max(1, month - 1))}
+                style={{ height: 40, borderRadius: 12, border: "1px solid rgba(255,255,255,0.10)", background: "rgba(0,0,0,0.26)", color: selectedAccountingMonth === 1 ? "rgba(255,255,255,0.22)" : "white", fontSize: 17, fontWeight: 900, cursor: selectedAccountingMonth === 1 ? "default" : "pointer" }}
+              >
+                {"<"}
+              </button>
+              <div style={{ minHeight: 52, borderRadius: 12, border: "1px solid rgba(255,255,255,0.12)", background: "rgba(255,255,255,0.05)", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center" }}>
+                <div style={{ fontSize: 11, color: "rgba(255,255,255,0.46)", fontWeight: 900, textTransform: "uppercase", letterSpacing: "0.8px" }}>Mes</div>
+                <div style={{ fontSize: 22, color: "white", fontWeight: 950, lineHeight: 1.1 }}>{mesLabel.split(" ")[0]}</div>
+              </div>
+              <button
+                aria-label="Mes siguiente"
+                onClick={() => setSelectedAccountingMonth((month) => Math.min(12, month + 1))}
+                style={{ height: 40, borderRadius: 12, border: "1px solid rgba(255,255,255,0.10)", background: "rgba(0,0,0,0.26)", color: selectedAccountingMonth === 12 ? "rgba(255,255,255,0.22)" : "white", fontSize: 17, fontWeight: 900, cursor: selectedAccountingMonth === 12 ? "default" : "pointer" }}
+              >
+                {">"}
+              </button>
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', gap: 10 }}>
+            <div style={{ flex: 1, background: 'rgba(255,255,255,0.03)', borderRadius: 22, padding: '16px', border: '1px solid rgba(255,255,255,0.07)', display: 'flex', flexDirection: 'column', gap: 10 }}>
+              <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', textAlign: 'center', background: 'rgba(255, 180, 0, 0.06)', borderRadius: 16, padding: '14px 8px', border: '1px solid rgba(255, 180, 0, 0.2)' }}>
+                <div style={{ fontSize: 11, fontWeight: 800, color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', marginBottom: 6, display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <IconTaxiBadgeNeon s={28} c="oklch(0.85 0.18 85)" /> Total Taximetro
+                </div>
+                <div style={{ fontSize: "clamp(16px, 4.5vw, 22px)", fontWeight: 900, color: 'oklch(0.85 0.18 85)', letterSpacing: '-0.5px' }}>{fmt(resumenMes.dineroBase)}</div>
+              </div>
+              <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', textAlign: 'center', background: 'rgba(0, 210, 255, 0.06)', borderRadius: 16, padding: '14px 8px', border: '1px solid rgba(0, 210, 255, 0.2)' }}>
+                <div style={{ fontSize: 11, fontWeight: 800, color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', marginBottom: 6, display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <IconRoad s={24} c="oklch(0.80 0.14 220)" /> Total KM
+                </div>
+                <div style={{ fontSize: "clamp(16px, 4.5vw, 22px)", fontWeight: 900, color: 'oklch(0.80 0.14 220)', letterSpacing: '-0.5px' }}>{(resumenMes.km || 0).toString().replace('.', ',')} <span style={{ fontSize: 13, opacity: 0.7 }}>KM</span></div>
+              </div>
+            </div>
+
+            <div style={{ flex: 1, background: 'rgba(255,255,255,0.03)', borderRadius: 22, padding: '16px', border: '1px solid rgba(255,255,255,0.07)', display: 'flex', flexDirection: 'column', gap: 10 }}>
+              <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', textAlign: 'center', background: 'rgba(80, 220, 140, 0.08)', borderRadius: 16, padding: '14px 8px', border: '1px solid rgba(80, 220, 140, 0.22)' }}>
+                <div style={{ fontSize: 11, fontWeight: 800, color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', marginBottom: 6, display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <IconMoneyBag s={26} c="oklch(0.78 0.18 150)" /> Mi Ganancia
+                </div>
+                <div style={{ fontSize: "clamp(16px, 4.5vw, 22px)", fontWeight: 900, color: 'oklch(0.78 0.18 150)', letterSpacing: '-0.5px' }}>{fmt(resumenMes.miGanancia)}</div>
+              </div>
+              <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', textAlign: 'center', background: 'rgba(120, 200, 255, 0.08)', borderRadius: 16, padding: '14px 8px', border: '1px solid rgba(120, 200, 255, 0.22)' }}>
+                <div style={{ fontSize: 11, fontWeight: 800, color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', marginBottom: 6, display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <IconTimer s={26} c="oklch(0.85 0.12 210)" /> Tiempo Trabajado
+                </div>
+                <div style={{ fontSize: "clamp(16px, 4.5vw, 22px)", fontWeight: 900, color: 'oklch(0.85 0.12 210)', letterSpacing: '-0.5px' }}>{durationStr}</div>
+              </div>
+            </div>
+          </div>
+
+          <div style={{ background: 'rgba(255,255,255,0.03)', borderRadius: 22, padding: 16, border: '1px solid rgba(255,255,255,0.07)', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+            {cats.map(cat => (
+              <div key={cat.key} style={{ background: cat.bg, borderRadius: 14, padding: '14px 12px', display: 'flex', flexDirection: 'column', gap: 6 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, fontWeight: 800, color: 'rgba(255,255,255,0.55)' }}>
+                  {cat.icon} {cat.label}
+                </div>
+                <div style={{ fontSize: 20, fontWeight: 900, color: cat.color }}>{fmt(cat.total || 0)}</div>
+              </div>
+            ))}
+          </div>
+
+          <div style={{ display: 'flex', gap: 10, background: 'rgba(255,255,255,0.03)', borderRadius: 22, padding: 16, border: '1px solid rgba(255,255,255,0.07)' }}>
+            <div style={{ flex: 1, background: 'rgba(255,80,80,0.08)', borderRadius: 14, padding: '14px 12px', border: '1px solid rgba(255,80,80,0.22)', textAlign: 'center' }}>
+              <div style={{ fontSize: 11, fontWeight: 800, color: 'rgba(255,255,255,0.55)', textTransform: 'uppercase', marginBottom: 6 }}>Total a descontar</div>
+              <div style={{ fontSize: 20, fontWeight: 900, color: 'oklch(0.70 0.18 25)' }}>{fmt(resumenMes.totalDescontar)}</div>
+            </div>
+            <div style={{ flex: 1, background: 'rgba(80,220,140,0.08)', borderRadius: 14, padding: '14px 12px', border: '1px solid rgba(80,220,140,0.22)', textAlign: 'center' }}>
+              <div style={{ fontSize: 11, fontWeight: 800, color: 'rgba(255,255,255,0.55)', textTransform: 'uppercase', marginBottom: 6 }}>Total a dar</div>
+              <div style={{ fontSize: 20, fontWeight: 900, color: G }}>{fmt(resumenMes.totalADar)}</div>
+            </div>
+          </div>
+
+          <div style={{ background: "rgba(255,255,255,0.03)", borderRadius: 18, padding: 16, border: "1px solid rgba(255,255,255,0.07)" }}>
+            <div style={{ fontSize: 13, fontWeight: 800, color: "rgba(255,255,255,0.55)", textTransform: "uppercase", letterSpacing: "0.6px", marginBottom: 12 }}>
+              Turnos del mes ({turnosMes.length})
+            </div>
+            {turnosMes.length === 0 ? (
+              <div style={{ color: "rgba(255,255,255,0.45)", fontSize: 13, fontStyle: "italic" }}>
+                Sin turnos en este mes
+              </div>
+            ) : (
+              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                {turnosMes.map((turno) => {
+                  const calculo = calcularTurnoContable(turno, settings);
+                  let turnoDuration = "0h 0m";
+                  if (turno.startTime && turno.endTime) {
+                    let mins = getDiffMins(turno.startTime, turno.endTime);
+                    if (turno.totalPausedMinutes) mins = Math.max(0, mins - turno.totalPausedMinutes);
+                    turnoDuration = `${Math.floor(mins / 60)}h ${mins % 60}m`;
+                  }
+
+                  return (
+                    <div
+                      key={turno.id}
+                      onClick={() => { setReturnScreen("detalleMes"); setViewTurno(turno); setScreen("summary"); }}
+                      style={{
+                        background: "rgba(255,255,255,0.04)",
+                        borderRadius: 12,
+                        padding: "12px 14px",
+                        cursor: "pointer",
+                        border: "1px solid rgba(255,255,255,0.05)",
+                        display: "flex",
+                        justifyContent: "space-between",
+                        alignItems: "center",
+                        gap: 12,
+                      }}
+                    >
+                      <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                        <div style={{ fontWeight: 800, color: "white", fontSize: 15 }}>{fmtDate(turno.startDate || turno.date)}</div>
+                        <div style={{ fontSize: 12, color: "rgba(255,255,255,0.4)" }}>
+                          {turno.startTime} - {turno.endTime}
+                        </div>
+                      </div>
+                      <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 6 }}>
+                        <div style={{ fontSize: 16, fontWeight: 900, color: "oklch(0.78 0.18 150)", whiteSpace: "nowrap" }}>{fmt(calculo.miGanancia)}</div>
+                        <div style={{ fontSize: 12, fontWeight: 800, color: "oklch(0.85 0.12 210)", whiteSpace: "nowrap" }}>{turnoDuration}</div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </div>
+      </Shell>
+    );
+  }
+
   if (screen === "detalleSemana" && selectedWeekId) {
     const weekId = selectedWeekId;
-    const frozen = frozenWeeks.find((w) => w.weekId === weekId);
-    const isFrozen = !!frozen;
+    const grupos = groupTurnosByWeek(history, settings.diaLibre);
+    const turnosSemana = grupos.get(weekId) || [];
+    const totales = calcularTotalesTurnos(turnosSemana);
 
-    // Obtener turnos de la semana
-    let turnosSemana: Turno[] = [];
-    if (isFrozen) {
-      turnosSemana = history.filter((t) => frozen!.turnoIds.includes(t.id));
-    } else {
-      const grupos = groupTurnosByWeek(history, settings.diaLibre);
-      turnosSemana = grupos.get(weekId) || [];
-    }
-
-    // Totales (los del frozen si lo está, calculados al vuelo si no)
-    const totales = isFrozen ? frozen!.totales : calcularTotalesTurnos(turnosSemana);
-
-    // Estado actual de notas/entrega: viene del frozen o del override
     const override = getWeekOverride(weekOverrides, weekId);
-    const notes = isFrozen
-      ? (frozen!.notes || "")
-      : (override?.notes || "");
-    const entregada = isFrozen
-      ? frozen!.entregada
-      : (override?.entregada || false);
-    const fechaEntrega = isFrozen
-      ? frozen!.fechaEntrega
-      : (override?.fechaEntrega || null);
+    const notes = override?.notes || "";
+    const entregada = override?.entregada || false;
+    const fechaEntrega = override?.fechaEntrega || null;
 
-    // Helper: aplicar cambio (a frozen o a override según corresponda)
     function applyChange(partial: Partial<Omit<WeekOverride, "weekId">>) {
-      if (isFrozen) {
-        updateFrozenWeek(weekId, partial);
-      } else {
-        updateWeekOverride(weekId, partial);
-      }
+      updateWeekOverride(weekId, partial);
     }
 
     function saveNotes() {
@@ -5290,7 +5982,6 @@ function App() {
       setEditingNotes(false);
     }
 
-    // Categorías (para el grid de resumen, igual que en summary del turno)
     const cats = [
       { key: 'datafono', label: 'Datáfono', color: P, bg: PBG, icon: <IconCard s={18} c={P} />, total: totales.totalD },
       { key: 'propina', label: 'Propinas', color: G, bg: GBG, icon: <IconCoin s={18} c={G} />, total: totales.totalP },
@@ -5300,7 +5991,6 @@ function App() {
       { key: 'nulo', label: 'Nulos', color: N, bg: NBG, icon: <IconNulo s={18} c={N} />, total: totales.totalN },
     ];
 
-    // Cálculos agregados de la semana
     let totalMins = 0;
     for (const t of turnosSemana) {
       if (t.startTime && t.endTime) {
@@ -5314,28 +6004,10 @@ function App() {
     const durationStr = `${hh}h ${mm}m`;
 
     const dineroV = (totales.dinero || 0) - (totales.totalN || 0);
-
-    // Determinar qué configuración usar
-    const config = isFrozen && frozen?.configCongelada
-      ? frozen.configCongelada
-      : {
-        porcentajeJefe: settings["porcentaje.jefe"],
-        porcentajeChofer: settings["porcentaje.chofer"],
-        descDatafono: settings["descontar.datafono"],
-        descAgencia: settings["descontar.agencia_bono"],
-        descExtra: settings["descontar.extra"],
-        descGasolina: settings["descontar.gasolina"],
-      };
-
-    const miGanancia = (dineroV * (config.porcentajeChofer / 100)) + (totales.totalP || 0);
-
-    const descD = config.descDatafono ? totales.totalD : 0;
-    const descA = config.descAgencia ? totales.totalA : 0;
-    const descE = config.descExtra ? totales.totalE : 0;
-    const descF = config.descGasolina ? totales.totalF : 0;
-    const totalDescontar = descD + descA + descE + descF;
-    const totalADar = (dineroV * (config.porcentajeJefe / 100)) - totalDescontar;
-
+    const resumenContableSemana = calcularResumenContableTurnos(turnosSemana, settings);
+    const miGanancia = resumenContableSemana.miGanancia;
+    const totalDescontar = resumenContableSemana.totalDescontar;
+    const totalADar = resumenContableSemana.totalADar;
     return (
       <Shell burst={false}>
         <div style={{ flex: 1, padding: "16px 20px 32px", display: "flex", flexDirection: "column", gap: 14, overflowY: "auto" }}>
@@ -5346,7 +6018,7 @@ function App() {
             </button>
             <div style={{ flex: 1 }}>
               <div style={{ fontSize: 20, fontWeight: 800, color: "white" }}>
-                Detalle de Semana {isFrozen && <span style={{ fontSize: 14, marginLeft: 6 }}>❄️</span>}
+                Detalle de Semana
               </div>
               <div style={{ fontSize: 12, color: "rgba(255,255,255,0.4)", marginTop: 2 }}>
                 {formatWeekRangeFull(weekId)}
@@ -5365,17 +6037,6 @@ function App() {
             }}>
               {entregada ? `✓ Entregada${fechaEntrega ? " · " + new Date(fechaEntrega + "T12:00:00").toLocaleDateString("es-ES") : ""}` : "Pendiente"}
             </div>
-            {isFrozen && (
-              <div style={{
-                fontSize: 11, fontWeight: 700,
-                color: "rgba(180,220,255,0.85)",
-                background: "rgba(120,180,255,0.10)",
-                padding: "5px 10px", borderRadius: 8,
-                letterSpacing: "0.5px", textTransform: "uppercase",
-              }}>
-                ❄️ Congelada
-              </div>
-            )}
           </div>
 
           {/* Contenedor Superior Agrupado (Dos columnas) */}
@@ -5386,7 +6047,7 @@ function App() {
                 <div style={{ fontSize: 10, fontWeight: 700, color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', letterSpacing: '0.3px', marginBottom: 6, display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 4, whiteSpace: 'nowrap' }}>
                   <IconTaxiBadgeNeon s={28} c="oklch(0.85 0.18 85)" /> Total Taxímetro
                 </div>
-                <div style={{ fontSize: "clamp(16px, 4.5vw, 22px)", fontWeight: 900, color: 'oklch(0.85 0.18 85)', letterSpacing: '-0.5px' }}>{fmt(totales.dinero)}</div>
+                <div style={{ fontSize: "clamp(16px, 4.5vw, 22px)", fontWeight: 900, color: 'oklch(0.85 0.18 85)', letterSpacing: '-0.5px' }}>{fmt(dineroV)}</div>
               </div>
               <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', textAlign: 'center', background: 'oklch(0.19 0.05 220)', borderRadius: 16, padding: '14px 8px', border: '1px solid oklch(0.65 0.14 220 / 0.35)' }}>
                 <div style={{ fontSize: 10, fontWeight: 700, color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', letterSpacing: '0.3px', marginBottom: 6, display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 4, whiteSpace: 'nowrap' }}>
@@ -5535,8 +6196,8 @@ function App() {
                     const mm = totalMins % 60;
                     durationStr = `${hh}h ${mm}m`;
                   }
-                  const choferPercent = config.porcentajeChofer || 0;
-                  const miGanancia = ((t.dinero || 0) * (choferPercent / 100)) + (t.totalP || 0);
+                  const taximetroTurno = (t.dinero || 0) - (t.totalN || 0);
+                  const miGanancia = calcularTurnoContable(t, settings).miGanancia;
 
                   return (
                     <div
@@ -5571,7 +6232,7 @@ function App() {
                       <div style={{ display: "flex", gap: 10, textAlign: "right" }}>
                         <div style={{ display: "flex", flexDirection: "column", gap: 8, justifyContent: "center" }}>
                           <div style={{ fontSize: 17, fontWeight: 900, color: "oklch(0.78 0.18 150)", display: "flex", alignItems: "center", gap: 6, whiteSpace: "nowrap" }}>
-                            <IconTaxiBadgeNeon s={20} c="oklch(0.85 0.18 85)" /> {fmt(t.dinero || 0)}
+                            <IconTaxiBadgeNeon s={20} c="oklch(0.85 0.18 85)" /> {fmt(taximetroTurno)}
                           </div>
                           <div style={{ fontSize: 17, fontWeight: 900, color: "oklch(0.80 0.14 220)", display: "flex", alignItems: "center", gap: 6, whiteSpace: "nowrap" }}>
                             <IconRoad s={18} c="oklch(0.80 0.14 220)" /> {t.km || 0} KM
@@ -5596,26 +6257,16 @@ function App() {
           {/* Botón Marcar como entregada */}
           <button
             onClick={() => {
-              if (isFrozen) {
-                if (entregada) {
-                  setConfirmDialog({
-                    text: "¿Marcar esta semana como NO entregada?",
-                    onConfirm: () => {
-                      updateFrozenWeek(weekId, { entregada: false, fechaEntrega: null });
-                      setConfirmDialog(null);
-                    },
-                  });
-                } else {
-                  updateFrozenWeek(weekId, { entregada: true, fechaEntrega: today() });
-                }
-              } else {
+              if (entregada) {
                 setConfirmDialog({
-                  text: "Al marcar como entregada, la semana se congelará con los totales y porcentajes actuales. ¿Continuar?",
+                  text: "¿Marcar esta semana como NO entregada?",
                   onConfirm: () => {
-                    freezeOneWeek(weekId);
+                    applyChange({ entregada: false, fechaEntrega: null });
                     setConfirmDialog(null);
                   },
                 });
+              } else {
+                applyChange({ entregada: true, fechaEntrega: today() });
               }
             }}
             style={{
@@ -5711,8 +6362,7 @@ function App() {
                 const mm = totalMins % 60;
                 durationStr = `${hh}h ${mm}m`;
               }
-              const choferPercent = settings["porcentaje.chofer"] || 0;
-              const miGanancia = ((j.dinero || 0) * (choferPercent / 100)) + (j.totalP || 0);
+              const miGanancia = calcularTurnoContable(j, settings).miGanancia;
 
               return (
                 <div key={j.id} style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
@@ -6165,57 +6815,7 @@ function App() {
       </Shell>
     );
   }
-  function freezeOneWeek(weekId: string): void {
-    if (!isWeekClosed(weekId, today())) {
-      alert("No puedes congelar una semana que aún está en curso. Espera a que termine.");
-      return;
-    }
 
-    const grupos = groupTurnosByWeek(history, settings.diaLibre);
-    const turnosSemana = grupos.get(weekId) || [];
-    if (turnosSemana.length === 0) return;
-
-    const totales = calcularTotalesTurnos(turnosSemana);
-    const range = getWeekRange(weekId);
-    const override = getWeekOverride(weekOverrides, weekId);
-
-    const nuevaFrozen: FrozenWeek = {
-      weekId,
-      fechaInicio: range.inicio,
-      fechaFin: range.fin,
-      diaLibreUsado: settings.diaLibre,
-      totales: {
-        totalP: totales.totalP,
-        totalD: totales.totalD,
-        totalA: totales.totalA,
-        totalE: totales.totalE,
-        totalF: totales.totalF,
-        totalN: totales.totalN,
-        dinero: totales.dinero,
-        km: totales.km,
-      },
-      turnoIds: turnosSemana.map((t) => t.id),
-      notes: override?.notes || "",
-      entregada: true,
-      fechaEntrega: today(),
-      numTurnos: turnosSemana.length,
-      configCongelada: {
-        porcentajeJefe: settings["porcentaje.jefe"],
-        porcentajeChofer: settings["porcentaje.chofer"],
-        descDatafono: settings["descontar.datafono"],
-        descAgencia: settings["descontar.agencia_bono"],
-        descExtra: settings["descontar.extra"],
-        descGasolina: settings["descontar.gasolina"],
-      },
-    };
-
-    setFrozenWeeks((prev) => {
-      const filtrado = prev.filter((fw) => fw.weekId !== weekId);
-      return [...filtrado, nuevaFrozen];
-    });
-
-    setWeekOverrides((prev) => prev.filter((o) => o.weekId !== weekId));
-  }
 
 
   return (
