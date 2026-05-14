@@ -39,3 +39,7 @@ android/capacitor-cordova-android-plugins/
 
 # Iconos web autogenerados por @capacitor/assets
 icons/
+
+# ── Archivos de datos / Contabilidad ─────────────────────────
+*.ods
+*.csv

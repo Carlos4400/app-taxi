@@ -68,7 +68,6 @@ export interface Turno {
 
 export interface TurnoNotasSemana {
   turno: Turno;
-  notaTurno: string;
   notasGenerales: Entry[];
   notasDetalladas: Entry[];
 }
@@ -353,7 +352,7 @@ export function parseCSVToHistory(csvText: string): Turno[] {
         totalP: 0, totalD: 0, totalA: 0, totalE: 0, totalF: 0, totalN: 0,
         dinero: parseFloat(dineroStr.replace(",", ".")) || 0,
         km: parseFloat(kmStr.replace(",", ".")) || 0,
-        notes: notesTurno || "",
+        notes: "",
         startDate: date,
         totalPausedMinutes: 0
       });
@@ -738,12 +737,11 @@ export function updateTurnoEntrega(
 export function getTurnosNotasSemana(turnos: Turno[]): TurnoNotasSemana[] {
   return turnos
     .map((turno) => {
-      const notaTurno = (turno.notes || "").trim();
       const notasGenerales = turno.entries.filter((entry) => entry.type === "nota" && !!entry.note?.trim());
       const notasDetalladas = turno.entries.filter((entry) => entry.type !== "nota" && !!entry.note?.trim());
-      return { turno, notaTurno, notasGenerales, notasDetalladas };
+      return { turno, notasGenerales, notasDetalladas };
     })
-    .filter((item) => item.notaTurno || item.notasGenerales.length > 0 || item.notasDetalladas.length > 0);
+    .filter((item) => item.notasGenerales.length > 0 || item.notasDetalladas.length > 0);
 }
 
 // ============================================================================
@@ -1675,8 +1673,6 @@ function App() {
   } | null>(null);
 
   // Estados Detalle de Semana (Fase 6)
-  const [editingNotes, setEditingNotes] = useState(false);
-  const [notesDraft, setNotesDraft] = useState("");
 
   // Sincronización con Firestore.
   //   - dataLoaded: cuando vale true, la app ya ha recibido el primer snapshot
@@ -4240,7 +4236,7 @@ function App() {
 
             {(() => {
               const generalNotes = viewTurno.entries.filter((e: any) => e.type === 'nota');
-              if (generalNotes.length === 0 && !viewTurno.notes) {
+              if (generalNotes.length === 0) {
                 return (
                   <div style={{ marginTop: 16, paddingTop: 14, borderTop: '1px solid rgba(255,255,255,0.06)', textAlign: 'center' }}>
                     <div style={{ fontSize: 12, color: "rgba(255,255,255,0.5)", fontStyle: 'italic' }}>Sin notas del turno</div>
@@ -4472,18 +4468,17 @@ function App() {
           <div style={{ background: 'rgba(255,255,255,0.03)', borderRadius: 18, padding: '14px', border: '1px solid rgba(255,255,255,0.07)', marginBottom: 14 }}>
             <div style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '0.6px', marginBottom: 10 }}>Entradas</div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-              {editJ.entries.map((e: Entry) => {
+              {editJ.entries.filter((e: Entry) => e.type !== 'nota').map((e: Entry) => {
                 const meta = e.type === 'propina' ? { col: G, lbl: 'Propina' }
                   : e.type === 'datafono' ? { col: P, lbl: 'Datáfono' }
                     : (e.type === 'agencia_bono') ? { col: A, lbl: 'Agencia/Bono' }
                       : e.type === 'extra' ? { col: E, lbl: 'Extra' }
                         : e.type === 'gasolina' ? { col: F, lbl: 'Gasolina' }
-                          : e.type === 'nota' ? { col: 'white', lbl: 'Nota' }
-                            : { col: N, lbl: 'Nulo' };
+                          : { col: N, lbl: 'Nulo' };
                 return (
                   <div key={e.id} style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'rgba(0,0,0,0.2)', borderRadius: 10, padding: '8px 12px' }}>
                     <span style={{ fontSize: 13, fontWeight: 600, color: meta.col, minWidth: 60 }}>{meta.lbl}</span>
-                    <span style={{ fontSize: 15, fontWeight: 700, color: 'white' }}>{e.type === 'nota' ? '' : fmt(e.amount)}</span>
+                    <span style={{ fontSize: 15, fontWeight: 700, color: 'white' }}>{fmt(e.amount)}</span>
                     <div style={{ flex: 1, textAlign: 'right', fontSize: 12, color: "rgba(255,255,255,0.5)", whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', paddingRight: 8 }}>
                       {e.note}
                     </div>
@@ -4494,7 +4489,7 @@ function App() {
                   </div>
                 );
               })}
-              {editJ.entries.length === 0 && <div style={{ textAlign: 'center', color: "rgba(255,255,255,0.5)", fontSize: 13, padding: '10px 0' }}>Sin entradas</div>}
+              {editJ.entries.filter((e: Entry) => e.type !== 'nota').length === 0 && <div style={{ textAlign: 'center', color: "rgba(255,255,255,0.5)", fontSize: 13, padding: '10px 0' }}>Sin entradas</div>}
             </div>
 
             {/* Formulario para añadir nueva entrada */}
@@ -5855,6 +5850,7 @@ function App() {
     const turnosMes = getTurnosByCalendarMonth(history, selectedAccountingYear, selectedAccountingMonth);
     const resumenMes = calcularResumenContableTurnos(turnosMes, settings);
     const mesLabel = getMesLabel(monthId);
+    const turnosConNotas = getTurnosNotasSemana(turnosMes);
     const cats = [
       { key: 'datafono', label: 'Datafono', color: P, bg: PBG, icon: <IconCard s={18} c={P} />, total: resumenMes.totalD },
       { key: 'propina', label: 'Propinas', color: G, bg: GBG, icon: <IconCoin s={18} c={G} />, total: resumenMes.totalP },
@@ -5987,6 +5983,23 @@ function App() {
               <div style={{ fontSize: 20, fontWeight: 900, color: G }}>{fmt(resumenMes.totalADar)}</div>
             </div>
           </div>
+
+          {turnosConNotas.length > 0 && (
+            <div style={{ background: 'rgba(255,255,255,0.03)', borderRadius: 22, padding: '16px', border: '1px solid rgba(255,255,255,0.07)' }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: "rgba(255,255,255,0.4)", textTransform: "uppercase", letterSpacing: "0.6px", marginBottom: 12 }}>
+                Notas de turnos
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                {turnosConNotas.map((data) => (
+                  <TurnoNotasCard
+                    key={`notas-${data.turno.id}`}
+                    data={data}
+                    onClick={() => { setReturnScreen("detalleMes"); setViewTurno(data.turno); setScreen("summary"); }}
+                  />
+                ))}
+              </div>
+            </div>
+          )}
 
           <div style={{ background: "rgba(255,255,255,0.03)", borderRadius: 18, padding: 16, border: "1px solid rgba(255,255,255,0.07)" }}>
             <div style={{ fontSize: 13, fontWeight: 800, color: "rgba(255,255,255,0.55)", textTransform: "uppercase", letterSpacing: "0.6px", marginBottom: 12 }}>
@@ -6219,63 +6232,7 @@ function App() {
             </div>
           </div>
 
-          {/* Notas de la semana */}
-          <div style={{ background: 'rgba(255,255,255,0.03)', borderRadius: 22, padding: '16px', border: '1px solid rgba(255,255,255,0.07)' }}>
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
-              <div style={{ fontSize: 11, fontWeight: 700, color: "rgba(255,255,255,0.4)", textTransform: "uppercase", letterSpacing: "0.6px" }}>
-                Notas de la semana
-              </div>
-              {!editingNotes && (
-                <button
-                  onClick={() => { setNotesDraft(notes); setEditingNotes(true); }}
-                  style={{ background: "rgba(255,255,255,0.08)", border: "none", borderRadius: 8, color: "rgba(255,255,255,0.7)", fontSize: 12, fontWeight: 700, padding: "6px 12px", cursor: "pointer" }}
-                >
-                  {notes ? "Editar" : "Añadir"}
-                </button>
-              )}
-            </div>
-            {editingNotes ? (
-              <div>
-                <textarea
-                  value={notesDraft}
-                  onChange={(ev) => setNotesDraft(ev.target.value)}
-                  placeholder="Escribe tus notas..."
-                  rows={4}
-                  style={{
-                    width: "100%",
-                    background: "rgba(0,0,0,0.3)",
-                    border: "1px solid rgba(255,255,255,0.1)",
-                    borderRadius: 12,
-                    color: "white",
-                    padding: "10px 14px",
-                    fontSize: 14,
-                    outline: "none",
-                    resize: "vertical",
-                    fontFamily: "inherit",
-                    boxSizing: "border-box",
-                  }}
-                />
-                <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
-                  <button
-                    onClick={() => setEditingNotes(false)}
-                    style={{ flex: 1, padding: "10px", borderRadius: 10, border: "none", background: "rgba(255,255,255,0.08)", color: "rgba(255,255,255,0.7)", fontWeight: 700, fontSize: 13, cursor: "pointer" }}
-                  >
-                    Cancelar
-                  </button>
-                  <button
-                    onClick={saveNotes}
-                    style={{ flex: 1.2, padding: "10px", borderRadius: 10, border: "none", background: G, color: "black", fontWeight: 800, fontSize: 13, cursor: "pointer" }}
-                  >
-                    Guardar
-                  </button>
-                </div>
-              </div>
-            ) : (
-              <div style={{ fontSize: 14, color: notes ? "rgba(255,255,255,0.85)" : "rgba(255,255,255,0.3)", fontStyle: notes ? "normal" : "italic", lineHeight: 1.4, whiteSpace: "pre-wrap" }}>
-                {notes || "Sin notas"}
-              </div>
-            )}
-          </div>
+
 
           {turnosConNotas.length > 0 && (
             <div style={{ background: 'rgba(255,255,255,0.03)', borderRadius: 22, padding: '16px', border: '1px solid rgba(255,255,255,0.07)' }}>
@@ -6283,68 +6240,12 @@ function App() {
                 Notas de turnos
               </div>
               <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-                {turnosConNotas.map(({ turno, notaTurno, notasGenerales, notasDetalladas }) => (
-                  <div
-                    key={`notas-${turno.id}`}
-                    onClick={() => { setReturnScreen("detalleSemana"); setViewTurno(turno); setScreen("summary"); }}
-                    style={{ background: "rgba(255,255,255,0.035)", borderRadius: 14, padding: "12px", border: "1px solid rgba(255,255,255,0.06)", cursor: "pointer" }}
-                  >
-                    <div style={{ display: "flex", justifyContent: "space-between", gap: 10, alignItems: "baseline", marginBottom: 10 }}>
-                      <div style={{ fontSize: 15, fontWeight: 800, color: "white" }}>{fmtDate(turno.date)}</div>
-                      <div style={{ fontSize: 12, fontWeight: 700, color: "rgba(255,255,255,0.42)", whiteSpace: "nowrap" }}>
-                        {turno.startTime} - {turno.endTime}
-                      </div>
-                    </div>
-
-                    {notaTurno && (
-                      <div style={{ marginBottom: notasGenerales.length || notasDetalladas.length ? 10 : 0 }}>
-                        <div style={{ fontSize: 10, fontWeight: 800, color: "rgba(255,255,255,0.38)", textTransform: "uppercase", letterSpacing: "0.6px", marginBottom: 6 }}>
-                          Nota del turno
-                        </div>
-                        <div style={{ fontSize: 13, color: "rgba(255,255,255,0.82)", lineHeight: 1.4, whiteSpace: "pre-wrap", overflowWrap: "anywhere" }}>
-                          {notaTurno}
-                        </div>
-                      </div>
-                    )}
-
-                    {notasGenerales.length > 0 && (
-                      <div style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: notasDetalladas.length ? 10 : 0 }}>
-                        <div style={{ fontSize: 10, fontWeight: 800, color: "rgba(255,255,255,0.38)", textTransform: "uppercase", letterSpacing: "0.6px" }}>
-                          Notas del turno
-                        </div>
-                        {notasGenerales.map((entry) => (
-                          <div key={entry.id} style={{ fontSize: 13, color: "rgba(255,255,255,0.82)", background: "rgba(255,255,255,0.025)", borderRadius: 10, padding: "8px 10px", lineHeight: 1.35, overflowWrap: "anywhere" }}>
-                            <span style={{ fontSize: 11, fontWeight: 700, color: "rgba(255,255,255,0.45)", marginRight: 6 }}>{entry.time}</span>
-                            {entry.note}
-                          </div>
-                        ))}
-                      </div>
-                    )}
-
-                    {notasDetalladas.length > 0 && (
-                      <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                        <div style={{ fontSize: 10, fontWeight: 800, color: "rgba(255,255,255,0.38)", textTransform: "uppercase", letterSpacing: "0.6px" }}>
-                          Notas detalladas
-                        </div>
-                        {notasDetalladas.map((entry) => {
-                          const meta = entry.type === "propina" ? { color: G, label: "Propina" }
-                            : entry.type === "datafono" ? { color: P, label: "Datafono" }
-                              : entry.type === "agencia_bono" ? { color: A, label: "Agencia/Bono" }
-                                : entry.type === "extra" ? { color: E, label: "Extra" }
-                                  : entry.type === "gasolina" ? { color: F, label: "Gasolina" }
-                                    : { color: N, label: "Nulo" };
-                          return (
-                            <div key={entry.id} style={{ fontSize: 13, background: "rgba(255,255,255,0.025)", padding: "8px 10px", borderRadius: 10, display: "flex", alignItems: "baseline", gap: 7 }}>
-                              <span style={{ fontSize: 11, color: "rgba(255,255,255,0.45)", fontWeight: 700 }}>{entry.time}</span>
-                              <span style={{ fontSize: 10, fontWeight: 900, color: meta.color, textTransform: "uppercase", minWidth: 58 }}>{meta.label}</span>
-                              <span style={{ color: "rgba(255,255,255,0.82)", lineHeight: 1.35, overflowWrap: "anywhere" }}>{entry.note}</span>
-                              <span style={{ marginLeft: "auto", fontSize: 11, color: "rgba(255,255,255,0.45)", fontWeight: 700, whiteSpace: "nowrap" }}>{fmt(entry.amount)}</span>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    )}
-                  </div>
+                {turnosConNotas.map((data) => (
+                  <TurnoNotasCard
+                    key={`notas-${data.turno.id}`}
+                    data={data}
+                    onClick={() => { setReturnScreen("detalleSemana"); setViewTurno(data.turno); setScreen("summary"); }}
+                  />
                 ))}
               </div>
             </div>
@@ -7935,6 +7836,67 @@ function ConfirmDialog({ text, onConfirm, onCancel, confirmText, confirmBg, conf
           </button>
         </div>
       </div>
+    </div>
+  );
+}
+
+function TurnoNotasCard({
+  data,
+  onClick
+}: {
+  data: TurnoNotasSemana;
+  onClick: () => void;
+}) {
+  const { turno, notasGenerales, notasDetalladas } = data;
+  return (
+    <div
+      onClick={onClick}
+      style={{ background: "rgba(255,255,255,0.035)", borderRadius: 14, padding: "12px", border: "1px solid rgba(255,255,255,0.06)", cursor: "pointer" }}
+    >
+      <div style={{ display: "flex", justifyContent: "space-between", gap: 10, alignItems: "baseline", marginBottom: 10 }}>
+        <div style={{ fontSize: 15, fontWeight: 800, color: "white" }}>{fmtDate(turno.date)}</div>
+        <div style={{ fontSize: 12, fontWeight: 700, color: "rgba(255,255,255,0.42)", whiteSpace: "nowrap" }}>
+          {turno.startTime} - {turno.endTime}
+        </div>
+      </div>
+
+      {notasGenerales.length > 0 && (
+        <div style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: notasDetalladas.length ? 10 : 0 }}>
+          <div style={{ fontSize: 10, fontWeight: 800, color: "rgba(255,255,255,0.38)", textTransform: "uppercase", letterSpacing: "0.6px" }}>
+            Notas del turno
+          </div>
+          {notasGenerales.map((entry) => (
+            <div key={entry.id} style={{ fontSize: 13, color: "rgba(255,255,255,0.82)", background: "rgba(255,255,255,0.025)", borderRadius: 10, padding: "8px 10px", lineHeight: 1.35, overflowWrap: "anywhere" }}>
+              <span style={{ fontSize: 11, fontWeight: 700, color: "rgba(255,255,255,0.45)", marginRight: 6 }}>{entry.time}</span>
+              {entry.note}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {notasDetalladas.length > 0 && (
+        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+          <div style={{ fontSize: 10, fontWeight: 800, color: "rgba(255,255,255,0.38)", textTransform: "uppercase", letterSpacing: "0.6px" }}>
+            Notas detalladas
+          </div>
+          {notasDetalladas.map((entry) => {
+            const meta = entry.type === "propina" ? { color: G, label: "Propina" }
+              : entry.type === "datafono" ? { color: P, label: "Datafono" }
+                : entry.type === "agencia_bono" ? { color: A, label: "Agencia/Bono" }
+                  : entry.type === "extra" ? { color: E, label: "Extra" }
+                    : entry.type === "gasolina" ? { color: F, label: "Gasolina" }
+                      : { color: N, label: "Nulo" };
+            return (
+              <div key={entry.id} style={{ fontSize: 13, background: "rgba(255,255,255,0.025)", padding: "8px 10px", borderRadius: 10, display: "flex", alignItems: "baseline", gap: 7 }}>
+                <span style={{ fontSize: 11, color: "rgba(255,255,255,0.45)", fontWeight: 700 }}>{entry.time}</span>
+                <span style={{ fontSize: 10, fontWeight: 900, color: meta.color, textTransform: "uppercase", minWidth: 58 }}>{meta.label}</span>
+                <span style={{ color: "rgba(255,255,255,0.82)", lineHeight: 1.35, overflowWrap: "anywhere" }}>{entry.note}</span>
+                <span style={{ marginLeft: "auto", fontSize: 11, color: "rgba(255,255,255,0.45)", fontWeight: 700, whiteSpace: "nowrap" }}>{fmt(entry.amount)}</span>
+              </div>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }
