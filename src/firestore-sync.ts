@@ -22,6 +22,9 @@ import {
   collection,
   doc,
   getDoc,
+  getDocs,
+  limit,
+  query,
   setDoc,
   writeBatch,
   CollectionReference,
@@ -98,13 +101,32 @@ export async function syncSubcollection<T>(
   }
 }
 
-// Comprueba si users/{uid} ya tiene datos en Firestore.
-// Usa la existencia del documento meta/profile como marca,
-// ya que se crea en el registro y siempre debe existir.
+// Comprueba si users/{uid} ya tiene datos en Firestore revisando
+// sus documentos y subcolecciones principales.
 export async function userHasFirestoreData(
   db: Firestore,
   uid: string,
 ): Promise<boolean> {
-  const snap = await getDoc(userMetaDocRef(db, uid, "profile"));
-  return snap.exists();
+  const currentSnap = await getDoc(userMetaDocRef(db, uid, "current"));
+  if (currentSnap.exists()) return true;
+
+  const settingsSnap = await getDoc(userMetaDocRef(db, uid, "settings"));
+  if (settingsSnap.exists()) return true;
+
+  const subcollections = [
+    "turnos",
+    "reservations",
+    "notes",
+    "weekOverrides",
+  ];
+
+  for (const name of subcollections) {
+    const snap = await getDocs(
+      query(userSubcollectionRef(db, uid, name), limit(1))
+    );
+
+    if (!snap.empty) return true;
+  }
+
+  return false;
 }
