@@ -264,14 +264,6 @@ function loadSettings(): AppSettings {
   return defaults;
 }
 
-function csvEscape(value: string | number): string {
-  const s = String(value ?? "");
-  if (/[";\n\r]/.test(s)) {
-    return '"' + s.replace(/"/g, '""') + '"';
-  }
-  return s;
-}
-
 export function parseCSVLine(text: string): string[] {
   const result: string[] = [];
   let current = "";
@@ -339,7 +331,7 @@ export function parseCSVToHistory(csvText: string): Turno[] {
     const cols = parseCSVLine(lines[i]);
     if (cols.length < 10) continue;
 
-    const [date, startTime, endTime, type, amountStr, note, time, dineroStr, kmStr, notesTurno] = cols;
+    const [date, startTime, endTime, type, amountStr, note, time, dineroStr, kmStr] = cols;
 
     const key = `${date}|${startTime}|${endTime}`;
     if (!newTurnosMap.has(key)) {
@@ -780,7 +772,7 @@ const DIAS_LABORABLES_SEMANA = 6;
  *   { type: "single", mesId: "2026-05" }                              // sin empate
  *   { type: "tie", candidates: [{mesId, mesLabel}, {mesId, mesLabel}] } // empate
  */
-function getWeekMonth(weekId: string, diaLibre: number): {
+function getWeekMonth(weekId: string): {
   type: "single";
   mesId: string;
 } | {
@@ -2361,12 +2353,6 @@ function App() {
     </div>
   );
 
-  const renderReservaHelp = (text: string) => (
-    <div style={{ fontSize: 13, color: "rgba(255,255,255,0.32)", marginTop: 5, lineHeight: 1.25 }}>
-      {text}
-    </div>
-  );
-
   const renderReservaSection = (title: string, subtitle: string) => (
     <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginTop: 4, marginBottom: 2 }}>
       <div style={{ fontSize: 16, fontWeight: 900, color: C, textTransform: "uppercase", letterSpacing: "0.8px" }}>
@@ -2602,7 +2588,7 @@ function App() {
             display: "flex",
             flexDirection: "column",
             justifyContent: "center",
-            padding: "32px 28px 48px",
+            padding: "32px 28px 110px",
           }}
         >
           <div style={{ textAlign: "center", marginBottom: 52 }}>
@@ -4103,6 +4089,7 @@ function App() {
         : `${fmtDate(viewTurno.date)} \u00B7 ${viewTurno.startTime} - ${viewTurno.endTime}`;
 
     function applyTurnoEntrega(entregada: boolean) {
+      if (!viewTurno) return;
       const fechaEntrega = entregada ? today() : null;
       setHistory((h) => updateTurnoEntrega(h, viewTurno.id, entregada, fechaEntrega));
       setViewTurno({ ...viewTurno, entregada, fechaEntrega });
@@ -4813,8 +4800,7 @@ function App() {
       gasolina: { accent: F, bg: FBG, label: "Gasolina", Icon: IconFuel },
       nulo: { accent: N, bg: NBG, label: "Nulo", Icon: IconNulo },
     }[singleMode] || { accent: E, bg: EBG, label: "Extra", Icon: IconExtra };
-    const { accent, Icon } = cfg;
-    const accentBg = cfg.bg;
+    const { accent } = cfg;
     const label = cfg.label;
 
     function kpS(v: string) {
@@ -5141,7 +5127,7 @@ function App() {
       otros.filter((e): e is ElemSemana => e.kind === "semana").map((e) => e.weekId)
     );
     const heroWeek = heroSelection
-      ? elementos.find((e) => e.kind === "semana" && e.weekId === heroSelection.weekId)
+      ? elementos.find((e): e is ElemSemana => e.kind === "semana" && e.weekId === heroSelection.weekId)
       : undefined;
     const otrosSinHero = heroSelection?.kind === "latest"
       ? otros.filter((e) => e.kind !== "semana" || e.weekId !== heroSelection.weekId)
@@ -5158,7 +5144,7 @@ function App() {
         otrosConMes.push({ elem, mesId: fechaMes.slice(0, 7) });
         continue;
       }
-      const r = getWeekMonth(elem.weekId, elem.diaLibreUsado);
+      const r = getWeekMonth(elem.weekId);
       if (r.type === "single") {
         otrosConMes.push({ elem, mesId: r.mesId });
       } else {
@@ -6064,17 +6050,11 @@ function App() {
     const totales = calcularTotalesTurnos(turnosSemana);
 
     const override = getWeekOverride(weekOverrides, weekId);
-    const notes = override?.notes || "";
     const entregada = override?.entregada || false;
     const fechaEntrega = override?.fechaEntrega || null;
 
     function applyChange(partial: Partial<Omit<WeekOverride, "weekId">>) {
       updateWeekOverride(weekId, partial);
-    }
-
-    function saveNotes() {
-      applyChange({ notes: notesDraft.trim() });
-      setEditingNotes(false);
     }
 
     const cats = [
@@ -7953,7 +7933,7 @@ if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => {
     navigator.serviceWorker
       .register("./sw.js")
-      .then((reg) => console.log("SW registered"))
+      .then(() => console.log("SW registered"))
       .catch((err) => console.warn("SW registration failed", err));
   });
 }
