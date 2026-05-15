@@ -264,14 +264,6 @@ function loadSettings(): AppSettings {
   return defaults;
 }
 
-function csvEscape(value: string | number): string {
-  const s = String(value ?? "");
-  if (/[";\n\r]/.test(s)) {
-    return '"' + s.replace(/"/g, '""') + '"';
-  }
-  return s;
-}
-
 export function parseCSVLine(text: string): string[] {
   const result: string[] = [];
   let current = "";
@@ -339,7 +331,7 @@ export function parseCSVToHistory(csvText: string): Turno[] {
     const cols = parseCSVLine(lines[i]);
     if (cols.length < 10) continue;
 
-    const [date, startTime, endTime, type, amountStr, note, time, dineroStr, kmStr, notesTurno] = cols;
+    const [date, startTime, endTime, type, amountStr, note, time, dineroStr, kmStr] = cols;
 
     const key = `${date}|${startTime}|${endTime}`;
     if (!newTurnosMap.has(key)) {
@@ -780,7 +772,7 @@ const DIAS_LABORABLES_SEMANA = 6;
  *   { type: "single", mesId: "2026-05" }                              // sin empate
  *   { type: "tie", candidates: [{mesId, mesLabel}, {mesId, mesLabel}] } // empate
  */
-function getWeekMonth(weekId: string, diaLibre: number): {
+function getWeekMonth(weekId: string): {
   type: "single";
   mesId: string;
 } | {
@@ -1507,7 +1499,7 @@ function Burst() {
 // futuras sesiones (de cualquier usuario en el mismo móvil) NO repitan la
 // subida — esto impide que los datos del usuario A se acaben en la cuenta de B
 // si comparten teléfono.
-const LOCAL_MIGRATION_KEY = "taxi_migration_done_v1";
+const LOCAL_MIGRATION_KEY = "taxi_migration_done_v2";
 
 // Tiempo máximo (ms) que esperamos a que lleguen los snapshots iniciales de
 // Firestore antes de mostrar al usuario los botones Reintentar / Cerrar sesión.
@@ -2361,12 +2353,6 @@ function App() {
     </div>
   );
 
-  const renderReservaHelp = (text: string) => (
-    <div style={{ fontSize: 13, color: "rgba(255,255,255,0.32)", marginTop: 5, lineHeight: 1.25 }}>
-      {text}
-    </div>
-  );
-
   const renderReservaSection = (title: string, subtitle: string) => (
     <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginTop: 4, marginBottom: 2 }}>
       <div style={{ fontSize: 16, fontWeight: 900, color: C, textTransform: "uppercase", letterSpacing: "0.8px" }}>
@@ -2602,7 +2588,7 @@ function App() {
             display: "flex",
             flexDirection: "column",
             justifyContent: "center",
-            padding: "32px 28px 48px",
+            padding: "32px 28px 110px",
           }}
         >
           <div style={{ textAlign: "center", marginBottom: 52 }}>
@@ -4103,6 +4089,7 @@ function App() {
         : `${fmtDate(viewTurno.date)} \u00B7 ${viewTurno.startTime} - ${viewTurno.endTime}`;
 
     function applyTurnoEntrega(entregada: boolean) {
+      if (!viewTurno) return;
       const fechaEntrega = entregada ? today() : null;
       setHistory((h) => updateTurnoEntrega(h, viewTurno.id, entregada, fechaEntrega));
       setViewTurno({ ...viewTurno, entregada, fechaEntrega });
@@ -4813,8 +4800,7 @@ function App() {
       gasolina: { accent: F, bg: FBG, label: "Gasolina", Icon: IconFuel },
       nulo: { accent: N, bg: NBG, label: "Nulo", Icon: IconNulo },
     }[singleMode] || { accent: E, bg: EBG, label: "Extra", Icon: IconExtra };
-    const { accent, Icon } = cfg;
-    const accentBg = cfg.bg;
+    const { accent } = cfg;
     const label = cfg.label;
 
     function kpS(v: string) {
@@ -5053,6 +5039,112 @@ function App() {
     );
   }
 
+  function renderTurnoCard(
+    turno: Turno,
+    options: {
+      onClick: () => void;
+      showEntriesCount?: boolean;
+      showStatus?: boolean; // For "Turnos sueltos"
+      isSelecting?: boolean;
+      isSelected?: boolean;
+      onToggleSelect?: (checked: boolean) => void;
+    }
+  ) {
+    let durationStr = fmtDuration(0);
+    if (turno.startTime && turno.endTime) {
+      let totalMins = getDiffMins(turno.startTime, turno.endTime);
+      if (turno.totalPausedMinutes) {
+        totalMins = Math.max(0, totalMins - turno.totalPausedMinutes);
+      }
+      durationStr = fmtDuration(totalMins);
+    }
+    const taximetroTurno = (turno.dinero || 0) - (turno.totalN || 0);
+    const miGanancia = calcularTurnoContable(turno, settings).miGanancia;
+    const entregado = turno.entregada || false;
+
+    return (
+      <div key={turno.id} style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
+        {options.isSelecting && options.onToggleSelect && (
+          <input
+            type="checkbox"
+            checked={options.isSelected}
+            onChange={(e) => options.onToggleSelect!(e.target.checked)}
+            style={{ width: 20, height: 20, accentColor: "#50dc8c", cursor: "pointer" }}
+          />
+        )}
+        <div
+          onClick={options.onClick}
+          style={{
+            flex: 1,
+            background: "rgba(255,255,255,0.05)",
+            borderRadius: 16,
+            padding: 16,
+            cursor: "pointer",
+            border: options.showStatus && entregado
+              ? "1px solid rgba(59, 130, 246, 0.5)"
+              : "1px solid rgba(255,255,255,0.1)",
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center"
+          }}
+        >
+          <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+            <div style={{ fontWeight: 700, color: "white", fontSize: 16 }}>{fmtDate(turno.startDate || turno.date)}</div>
+            <div style={{ fontSize: 13, color: "rgba(255,255,255,0.4)" }}>
+              {turno.startDate && turno.startDate !== turno.date
+                ? (() => {
+                  const startStr = new Date(turno.startDate + "T12:00:00").toLocaleDateString("es-ES");
+                  const endStr = new Date(turno.date + "T12:00:00").toLocaleDateString("es-ES");
+                  return `${startStr} ${turno.startTime} - ${endStr} ${turno.endTime}`;
+                })()
+                : `${turno.startTime} - ${turno.endTime}`}
+            </div>
+            {options.showEntriesCount && (
+              <div style={{ fontSize: 13, color: "rgba(255,255,255,0.4)" }}>
+                {turno.entries.length} {turno.entries.length === 1 ? "entrada" : "entradas"}
+              </div>
+            )}
+            {options.showStatus && (
+              <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-start", gap: 5, marginTop: 4 }}>
+                <div style={{
+                  fontSize: 10, fontWeight: 700, color: entregado ? G : "oklch(0.75 0.16 70)",
+                  background: entregado ? "rgba(80,220,140,0.12)" : "rgba(255,200,80,0.10)",
+                  padding: "3px 8px", borderRadius: 6, letterSpacing: "0.5px", textTransform: "uppercase",
+                }}>
+                  {entregado ? "✓ Entregado" : "Pendiente"}
+                </div>
+                <div style={{
+                  fontSize: 10, fontWeight: 700, color: E, background: EBG,
+                  padding: "3px 8px", borderRadius: 6, letterSpacing: "0.5px", textTransform: "uppercase",
+                }}>
+                  Fuera de semana
+                </div>
+              </div>
+            )}
+          </div>
+          <div style={{ display: "flex", gap: 10, textAlign: "right" }}>
+            <div style={{ display: "flex", flexDirection: "column", gap: 8, justifyContent: "center" }}>
+              <div style={{ fontSize: 17, fontWeight: 900, color: "oklch(0.78 0.18 150)", display: "flex", alignItems: "center", gap: 6, whiteSpace: "nowrap" }}>
+                <IconTaxiBadgeNeon s={20} c="oklch(0.85 0.18 85)" /> {fmt(taximetroTurno)}
+              </div>
+              <div style={{ fontSize: 17, fontWeight: 900, color: "oklch(0.80 0.14 220)", display: "flex", alignItems: "center", gap: 6, whiteSpace: "nowrap" }}>
+                <IconRoad s={18} c="oklch(0.80 0.14 220)" /> {fmtKm(turno.km || 0)}
+              </div>
+            </div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 8, alignItems: "flex-end", justifyContent: "center" }}>
+              <div style={{ fontSize: 17, fontWeight: 900, color: "oklch(0.78 0.18 150)", display: "flex", alignItems: "center", gap: 6, whiteSpace: "nowrap" }}>
+                <IconMoneyBag s={20} c="oklch(0.78 0.18 150)" /> {fmt(miGanancia)}
+              </div>
+              <div style={{ fontSize: 17, fontWeight: 900, color: "oklch(0.85 0.12 210)", display: "flex", alignItems: "center", gap: 6, whiteSpace: "nowrap" }}>
+                <IconTimer s={18} c="oklch(0.85 0.12 210)" /> {durationStr}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   if (screen === "contabilidad") {
     const hoyISO = today();
     const diaLibre = settings.diaLibre;
@@ -5141,7 +5233,7 @@ function App() {
       otros.filter((e): e is ElemSemana => e.kind === "semana").map((e) => e.weekId)
     );
     const heroWeek = heroSelection
-      ? elementos.find((e) => e.kind === "semana" && e.weekId === heroSelection.weekId)
+      ? elementos.find((e): e is ElemSemana => e.kind === "semana" && e.weekId === heroSelection.weekId)
       : undefined;
     const otrosSinHero = heroSelection?.kind === "latest"
       ? otros.filter((e) => e.kind !== "semana" || e.weekId !== heroSelection.weekId)
@@ -5158,7 +5250,7 @@ function App() {
         otrosConMes.push({ elem, mesId: fechaMes.slice(0, 7) });
         continue;
       }
-      const r = getWeekMonth(elem.weekId, elem.diaLibreUsado);
+      const r = getWeekMonth(elem.weekId);
       if (r.type === "single") {
         otrosConMes.push({ elem, mesId: r.mesId });
       } else {
@@ -5455,87 +5547,15 @@ function App() {
                 if (item.elem.kind === "turno") {
                   const turno = item.elem.turno;
                   const entregado = turno.entregada || false;
-                  return (
-                    <div
-                      key={`turno-${turno.id}`}
-                      onClick={() => {
-                        setReturnScreen("contabilidad");
-                        setViewTurno(turno);
-                        setScreen("summary");
-                      }}
-                      style={{
-                        background: "rgba(255,255,255,0.04)",
-                        borderRadius: 16,
-                        padding: 16,
-                        cursor: "pointer",
-                        border: entregado
-                          ? "1px solid rgba(59, 130, 246, 0.5)"
-                          : "1px solid rgba(255,255,255,0.08)",
-                        display: "flex",
-                        justifyContent: "space-between",
-                        alignItems: "center",
-                        gap: 12,
-                      }}
-                    >
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{
-                          fontSize: 16,
-                          fontWeight: 800,
-                          color: "white",
-                          marginBottom: 4,
-                        }}>
-                          {fmtDate(turno.startDate || turno.date)}
-                        </div>
-                        <div style={{
-                          fontSize: 12,
-                          color: "rgba(255,255,255,0.4)",
-                        }}>
-                          Turno suelto
-                        </div>
-                      </div>
-
-                      <div style={{
-                        display: "flex",
-                        flexDirection: "column",
-                        alignItems: "flex-end",
-                        gap: 6,
-                      }}>
-                        <div style={{
-                          fontSize: 17,
-                          fontWeight: 900,
-                          color: "oklch(0.78 0.18 150)",
-                        }}>
-                          {fmt(turno.dinero || 0)}
-                        </div>
-                        <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 5 }}>
-                          <div style={{
-                            fontSize: 10,
-                            fontWeight: 700,
-                            color: entregado ? G : "oklch(0.75 0.16 70)",
-                            background: entregado ? "rgba(80,220,140,0.12)" : "rgba(255,200,80,0.10)",
-                            padding: "3px 8px",
-                            borderRadius: 6,
-                            letterSpacing: "0.5px",
-                            textTransform: "uppercase",
-                          }}>
-                            {entregado ? "✓ Entregado" : "Pendiente"}
-                          </div>
-                          <div style={{
-                            fontSize: 10,
-                            fontWeight: 700,
-                            color: E,
-                            background: EBG,
-                            padding: "3px 8px",
-                            borderRadius: 6,
-                            letterSpacing: "0.5px",
-                            textTransform: "uppercase",
-                          }}>
-                            Fuera de semana
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  );
+                  return renderTurnoCard(turno, {
+                    onClick: () => {
+                      setReturnScreen("contabilidad");
+                      setViewTurno(turno);
+                      setScreen("summary");
+                    },
+                    showStatus: true,
+                    showEntriesCount: false,
+                  });
                 }
 
                 // Tarjeta de semana
@@ -5733,7 +5753,15 @@ function App() {
       const month = index + 1;
       const turnosMes = getTurnosByCalendarMonth(history, selectedAccountingYear, month);
       const resumenMes = calcularResumenContableTurnos(turnosMes, settings);
-      return { month, label, turnosMes, resumenMes };
+      let totalMins = 0;
+      for (const turno of turnosMes) {
+        if (turno.startTime && turno.endTime) {
+          let mins = getDiffMins(turno.startTime, turno.endTime);
+          if (turno.totalPausedMinutes) mins = Math.max(0, mins - turno.totalPausedMinutes);
+          totalMins += mins;
+        }
+      }
+      return { month, label, turnosMes, resumenMes, totalMins };
     });
 
     return (
@@ -5822,22 +5850,51 @@ function App() {
               Meses del año ({turnosAnual.length} turnos)
             </div>
             <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-              {mesesAnio.map(({ month, label, turnosMes, resumenMes }) => (
-                <div
-                  key={label}
-                  onClick={() => { setSelectedAccountingMonth(month); setScreen("detalleMes"); }}
-                  style={{ background: "rgba(255,255,255,0.04)", borderRadius: 12, padding: "12px 14px", cursor: "pointer", border: month === selectedAccountingMonth ? `1px solid ${G}88` : "1px solid rgba(255,255,255,0.05)", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12 }}
-                >
-                  <div>
-                    <div style={{ fontWeight: 850, color: "white", fontSize: 15 }}>{label}</div>
-                    <div style={{ fontSize: 12, color: "rgba(255,255,255,0.4)", marginTop: 3 }}>{turnosMes.length} {turnosMes.length === 1 ? "turno" : "turnos"}</div>
+              {mesesAnio.map(({ month, label, turnosMes, resumenMes, totalMins }) => {
+                const durationStr = fmtDuration(totalMins);
+                return (
+                  <div
+                    key={label}
+                    onClick={() => { setSelectedAccountingMonth(month); setScreen("detalleMes"); }}
+                    style={{
+                      background: "rgba(255,255,255,0.04)",
+                      borderRadius: 12,
+                      padding: "12px 14px",
+                      cursor: "pointer",
+                      border: month === selectedAccountingMonth ? `1px solid ${G}88` : "1px solid rgba(255,255,255,0.05)",
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                      gap: 12,
+                    }}
+                  >
+                    <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                      <div style={{ fontWeight: 850, color: "white", fontSize: 16 }}>{label}</div>
+                      <div style={{ fontSize: 13, color: "rgba(255,255,255,0.4)" }}>
+                        {turnosMes.length} {turnosMes.length === 1 ? "turno" : "turnos"}
+                      </div>
+                    </div>
+                    <div style={{ display: "flex", gap: 10, textAlign: "right" }}>
+                      <div style={{ display: "flex", flexDirection: "column", gap: 8, justifyContent: "center" }}>
+                        <div style={{ fontSize: 17, fontWeight: 900, color: "oklch(0.78 0.18 150)", display: "flex", alignItems: "center", gap: 6, whiteSpace: "nowrap" }}>
+                          <IconTaxiBadgeNeon s={20} c="oklch(0.85 0.18 85)" /> {fmt(resumenMes.dineroBase)}
+                        </div>
+                        <div style={{ fontSize: 17, fontWeight: 900, color: "oklch(0.80 0.14 220)", display: "flex", alignItems: "center", gap: 6, whiteSpace: "nowrap" }}>
+                          <IconRoad s={18} c="oklch(0.80 0.14 220)" /> {fmtKmNumber(resumenMes.km || 0)} <span style={KM_CARD_UNIT_STYLE}>KM</span>
+                        </div>
+                      </div>
+                      <div style={{ display: "flex", flexDirection: "column", gap: 8, alignItems: "flex-end", justifyContent: "center" }}>
+                        <div style={{ fontSize: 17, fontWeight: 900, color: "oklch(0.78 0.18 150)", display: "flex", alignItems: "center", gap: 6, whiteSpace: "nowrap" }}>
+                          <IconMoneyBag s={20} c="oklch(0.78 0.18 150)" /> {fmt(resumenMes.miGanancia)}
+                        </div>
+                        <div style={{ fontSize: 17, fontWeight: 900, color: "oklch(0.85 0.12 210)", display: "flex", alignItems: "center", gap: 6, whiteSpace: "nowrap" }}>
+                          <IconTimer s={18} c="oklch(0.85 0.12 210)" /> {durationStr}
+                        </div>
+                      </div>
+                    </div>
                   </div>
-                  <div style={{ textAlign: "right" }}>
-                    <div style={{ fontSize: 16, fontWeight: 900, color: "oklch(0.85 0.18 85)" }}>{fmt(resumenMes.dineroBase)}</div>
-                    <div style={{ fontSize: 12, fontWeight: 800, color: "oklch(0.78 0.18 150)", marginTop: 3 }}>{fmt(resumenMes.miGanancia)}</div>
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
         </div>
@@ -6011,44 +6068,12 @@ function App() {
               </div>
             ) : (
               <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                {turnosMes.map((turno) => {
-                  const calculo = calcularTurnoContable(turno, settings);
-                  let turnoDuration = fmtDuration(0);
-                  if (turno.startTime && turno.endTime) {
-                    let mins = getDiffMins(turno.startTime, turno.endTime);
-                    if (turno.totalPausedMinutes) mins = Math.max(0, mins - turno.totalPausedMinutes);
-                    turnoDuration = fmtDuration(mins);
-                  }
-
-                  return (
-                    <div
-                      key={turno.id}
-                      onClick={() => { setReturnScreen("detalleMes"); setViewTurno(turno); setScreen("summary"); }}
-                      style={{
-                        background: "rgba(255,255,255,0.04)",
-                        borderRadius: 12,
-                        padding: "12px 14px",
-                        cursor: "pointer",
-                        border: "1px solid rgba(255,255,255,0.05)",
-                        display: "flex",
-                        justifyContent: "space-between",
-                        alignItems: "center",
-                        gap: 12,
-                      }}
-                    >
-                      <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-                        <div style={{ fontWeight: 800, color: "white", fontSize: 15 }}>{fmtDate(turno.startDate || turno.date)}</div>
-                        <div style={{ fontSize: 12, color: "rgba(255,255,255,0.4)" }}>
-                          {turno.startTime} - {turno.endTime}
-                        </div>
-                      </div>
-                      <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 6 }}>
-                        <div style={{ fontSize: 16, fontWeight: 900, color: "oklch(0.78 0.18 150)", whiteSpace: "nowrap" }}>{fmt(calculo.miGanancia)}</div>
-                        <div style={{ fontSize: 12, fontWeight: 800, color: "oklch(0.85 0.12 210)", whiteSpace: "nowrap" }}>{turnoDuration}</div>
-                      </div>
-                    </div>
-                  );
-                })}
+                {turnosMes.map((turno) => (
+                  renderTurnoCard(turno, {
+                    onClick: () => { setReturnScreen("detalleMes"); setViewTurno(turno); setScreen("summary"); },
+                    showEntriesCount: false,
+                  })
+                ))}
               </div>
             )}
           </div>
@@ -6064,17 +6089,11 @@ function App() {
     const totales = calcularTotalesTurnos(turnosSemana);
 
     const override = getWeekOverride(weekOverrides, weekId);
-    const notes = override?.notes || "";
     const entregada = override?.entregada || false;
     const fechaEntrega = override?.fechaEntrega || null;
 
     function applyChange(partial: Partial<Omit<WeekOverride, "weekId">>) {
       updateWeekOverride(weekId, partial);
-    }
-
-    function saveNotes() {
-      applyChange({ notes: notesDraft.trim() });
-      setEditingNotes(false);
     }
 
     const cats = [
@@ -6262,69 +6281,12 @@ function App() {
               </div>
             ) : (
               <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                {[...turnosSemana].sort((a, b) => (getTurnoFechaEfectiva(a, settings.diaLibre) < getTurnoFechaEfectiva(b, settings.diaLibre) ? 1 : -1)).map((t) => {
-                  let durationStr = fmtDuration(0);
-                  if (t.startTime && t.endTime) {
-                    let totalMins = getDiffMins(t.startTime, t.endTime);
-                    if (t.totalPausedMinutes) {
-                      totalMins = Math.max(0, totalMins - t.totalPausedMinutes);
-                    }
-                    durationStr = fmtDuration(totalMins);
-                  }
-                  const taximetroTurno = (t.dinero || 0) - (t.totalN || 0);
-                  const miGanancia = calcularTurnoContable(t, settings).miGanancia;
-
-                  return (
-                    <div
-                      key={t.id}
-                      onClick={() => { setReturnScreen("detalleSemana"); setViewTurno(t); setScreen("summary"); }}
-                      style={{
-                        background: "rgba(255,255,255,0.04)",
-                        borderRadius: 12,
-                        padding: "12px 14px",
-                        cursor: "pointer",
-                        border: "1px solid rgba(255,255,255,0.05)",
-                        display: "flex",
-                        justifyContent: "space-between",
-                        alignItems: "center",
-                      }}
-                    >
-                      <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-                        <div style={{ fontWeight: 700, color: "white", fontSize: 16 }}>{fmtDate(t.date)}</div>
-                        <div style={{ fontSize: 13, color: "rgba(255,255,255,0.4)" }}>
-                          {t.startDate && t.startDate !== t.date
-                            ? (() => {
-                              const startStr = new Date(t.startDate + "T12:00:00").toLocaleDateString("es-ES");
-                              const endStr = new Date(t.date + "T12:00:00").toLocaleDateString("es-ES");
-                              return `${startStr} ${t.startTime} - ${endStr} ${t.endTime}`;
-                            })()
-                            : `${t.startTime} - ${t.endTime}`}
-                        </div>
-                        <div style={{ fontSize: 13, color: "rgba(255,255,255,0.4)" }}>
-                          {t.entries.length} {t.entries.length === 1 ? "entrada" : "entradas"}
-                        </div>
-                      </div>
-                      <div style={{ display: "flex", gap: 10, textAlign: "right" }}>
-                        <div style={{ display: "flex", flexDirection: "column", gap: 8, justifyContent: "center" }}>
-                          <div style={{ fontSize: 17, fontWeight: 900, color: "oklch(0.78 0.18 150)", display: "flex", alignItems: "center", gap: 6, whiteSpace: "nowrap" }}>
-                            <IconTaxiBadgeNeon s={20} c="oklch(0.85 0.18 85)" /> {fmt(taximetroTurno)}
-                          </div>
-                          <div style={{ fontSize: 17, fontWeight: 900, color: "oklch(0.80 0.14 220)", display: "flex", alignItems: "center", gap: 6, whiteSpace: "nowrap" }}>
-                            <IconRoad s={18} c="oklch(0.80 0.14 220)" /> {fmtKm(t.km || 0)}
-                          </div>
-                        </div>
-                        <div style={{ display: "flex", flexDirection: "column", gap: 8, alignItems: "flex-end", justifyContent: "center" }}>
-                          <div style={{ fontSize: 17, fontWeight: 900, color: "oklch(0.78 0.18 150)", display: "flex", alignItems: "center", gap: 6, whiteSpace: "nowrap" }}>
-                            <IconMoneyBag s={20} c="oklch(0.78 0.18 150)" /> {fmt(miGanancia)}
-                          </div>
-                          <div style={{ fontSize: 17, fontWeight: 900, color: "oklch(0.85 0.12 210)", display: "flex", alignItems: "center", gap: 6, whiteSpace: "nowrap" }}>
-                            <IconTimer s={18} c="oklch(0.85 0.12 210)" /> {durationStr}
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
+                {[...turnosSemana].sort((a, b) => (getTurnoFechaEfectiva(a, settings.diaLibre) < getTurnoFechaEfectiva(b, settings.diaLibre) ? 1 : -1)).map((t) => (
+                  renderTurnoCard(t, {
+                    onClick: () => { setReturnScreen("detalleSemana"); setViewTurno(t); setScreen("summary"); },
+                    showEntriesCount: true,
+                  })
+                ))}
               </div>
             )}
           </div>
@@ -6426,99 +6388,33 @@ function App() {
               No hay Turnos Anteriores.
             </div>
           ) : (
-            history.map((j) => {
-              let durationStr = fmtDuration(0);
-              if (j.startTime && j.endTime) {
-                let totalMins = getDiffMins(j.startTime, j.endTime);
-                if (j.totalPausedMinutes) {
-                  totalMins = Math.max(0, totalMins - j.totalPausedMinutes);
-                }
-                durationStr = fmtDuration(totalMins);
-              }
-              const miGanancia = calcularTurnoContable(j, settings).miGanancia;
-
-              return (
-                <div key={j.id} style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
-
-                  {/* Checkbox condicional */}
-                  {isSelectingTurnos && (
-                    <input
-                      type="checkbox"
-                      checked={selectedTurnosIds.includes(j.id)}
-                      onChange={(e) => {
-                        if (e.target.checked) {
-                          setSelectedTurnosIds([...selectedTurnosIds, j.id]);
-                        } else {
-                          setSelectedTurnosIds(selectedTurnosIds.filter(id => id !== j.id));
-                        }
-                      }}
-                      style={{ width: 20, height: 20, accentColor: "#50dc8c", cursor: "pointer" }}
-                    />
-                  )}
-
-                  <div
-                    onClick={() => {
-                      if (isSelectingTurnos) {
-                        if (selectedTurnosIds.includes(j.id)) {
-                          setSelectedTurnosIds(selectedTurnosIds.filter(id => id !== j.id));
-                        } else {
-                          setSelectedTurnosIds([...selectedTurnosIds, j.id]);
-                        }
-                      } else {
-                        setReturnScreen("PantallaTurnos");
-                        setViewTurno(j);
-                        setScreen("summary");
-                      }
-                    }}
-                    style={{
-                      flex: 1,
-                      background: "rgba(255,255,255,0.05)",
-                      borderRadius: 16,
-                      padding: 16,
-                      cursor: "pointer",
-                      border: "1px solid rgba(255,255,255,0.1)",
-                      display: "flex",
-                      justifyContent: "space-between",
-                      alignItems: "center"
-                    }}
-                  >
-                    <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-                      <div style={{ fontWeight: 700, color: "white", fontSize: 16 }}>{fmtDate(j.date)}</div>
-                      <div style={{ fontSize: 13, color: "rgba(255,255,255,0.4)" }}>
-                        {j.startDate && j.startDate !== j.date
-                          ? (() => {
-                            const startStr = new Date(j.startDate + "T12:00:00").toLocaleDateString("es-ES");
-                            const endStr = new Date(j.date + "T12:00:00").toLocaleDateString("es-ES");
-                            return `${startStr} ${j.startTime} - ${endStr} ${j.endTime}`;
-                          })()
-                          : `${j.startTime} - ${j.endTime}`}
-                      </div>
-                      <div style={{ fontSize: 13, color: "rgba(255,255,255,0.4)" }}>
-                        {j.entries.length} entradas
-                      </div>
-                    </div>
-                    <div style={{ display: "flex", gap: 10, textAlign: "right" }}>
-                      <div style={{ display: "flex", flexDirection: "column", gap: 8, justifyContent: "center" }}>
-                        <div style={{ fontSize: 17, fontWeight: 900, color: "oklch(0.78 0.18 150)", display: "flex", alignItems: "center", gap: 6, whiteSpace: "nowrap" }}>
-                          <IconTaxiBadgeNeon s={20} c="oklch(0.85 0.18 85)" /> {fmt(j.dinero || 0)}
-                        </div>
-                        <div style={{ fontSize: 17, fontWeight: 900, color: "oklch(0.80 0.14 220)", display: "flex", alignItems: "center", gap: 6, whiteSpace: "nowrap" }}>
-                          <IconRoad s={18} c="oklch(0.80 0.14 220)" /> {fmtKm(j.km || 0)}
-                        </div>
-                      </div>
-                      <div style={{ display: "flex", flexDirection: "column", gap: 8, alignItems: "flex-end", justifyContent: "center" }}>
-                        <div style={{ fontSize: 17, fontWeight: 900, color: "oklch(0.78 0.18 150)", display: "flex", alignItems: "center", gap: 6, whiteSpace: "nowrap" }}>
-                          <IconMoneyBag s={20} c="oklch(0.78 0.18 150)" /> {fmt(miGanancia)}
-                        </div>
-                        <div style={{ fontSize: 17, fontWeight: 900, color: "oklch(0.85 0.12 210)", display: "flex", alignItems: "center", gap: 6, whiteSpace: "nowrap" }}>
-                          <IconTimer s={18} c="oklch(0.85 0.12 210)" /> {durationStr}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              );
-            })
+            history.map((j) => (
+              renderTurnoCard(j, {
+                onClick: () => {
+                  if (isSelectingTurnos) {
+                    if (selectedTurnosIds.includes(j.id)) {
+                      setSelectedTurnosIds(selectedTurnosIds.filter(id => id !== j.id));
+                    } else {
+                      setSelectedTurnosIds([...selectedTurnosIds, j.id]);
+                    }
+                  } else {
+                    setReturnScreen("PantallaTurnos");
+                    setViewTurno(j);
+                    setScreen("summary");
+                  }
+                },
+                isSelecting: isSelectingTurnos,
+                isSelected: selectedTurnosIds.includes(j.id),
+                onToggleSelect: (checked) => {
+                  if (checked) {
+                    setSelectedTurnosIds([...selectedTurnosIds, j.id]);
+                  } else {
+                    setSelectedTurnosIds(selectedTurnosIds.filter(id => id !== j.id));
+                  }
+                },
+                showEntriesCount: true,
+              })
+            ))
           )}
         </div>
       </Shell>
@@ -7953,7 +7849,7 @@ if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => {
     navigator.serviceWorker
       .register("./sw.js")
-      .then((reg) => console.log("SW registered"))
+      .then(() => console.log("SW registered"))
       .catch((err) => console.warn("SW registration failed", err));
   });
 }
