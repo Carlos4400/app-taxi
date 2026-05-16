@@ -244,6 +244,16 @@ function fmtDate(iso: string): string {
     .replace(/^\w/, (c) => c.toUpperCase());
 }
 
+function fmtDateNoYear(iso: string): string {
+  return new Date(iso + "T12:00:00")
+    .toLocaleDateString("es-ES", {
+      weekday: "short",
+      day: "numeric",
+      month: "short",
+    })
+    .replace(/^\w/, (c) => c.toUpperCase());
+}
+
 function loadSettings(): AppSettings {
   const defaults: AppSettings = {
     "porcentaje.jefe": 0,
@@ -1051,6 +1061,37 @@ const IconReservaWrite = ({ s = 24, c = C }: { s?: number; c?: string }) => (
       <IconPencilNeon s={24} />
     </span>
   </span>
+);
+
+const IconNoteAdd = ({ s = 20, c = C }: { s?: number; c?: string }) => (
+  <svg width={s} height={s} viewBox="0 0 24 24" fill="none" style={{ overflow: "visible" }}>
+    {/* Círculo del "+" con brillo */}
+    <path
+      stroke={c}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      d="M11.25 17.25c0 1.5913 0.6321 3.1174 1.7574 4.2426 1.1252 1.1253 2.6513 1.7574 4.2426 1.7574 1.5913 0 3.1174 -0.6321 4.2426 -1.7574 1.1253 -1.1252 1.7574 -2.6513 1.7574 -4.2426 0 -1.5913 -0.6321 -3.1174 -1.7574 -4.2426 -1.1252 -1.1253 -2.6513 -1.7574 -4.2426 -1.7574 -1.5913 0 -3.1174 0.6321 -4.2426 1.7574 -1.1253 1.1252 -1.7574 2.6513 -1.7574 4.2426Z"
+      strokeWidth="1.5"
+      style={{ filter: `drop-shadow(0 0 1px ${c}) drop-shadow(0 0 2px ${c}66)` }}
+    />
+    <path stroke={c} strokeLinecap="round" strokeLinejoin="round" d="M17.25 14.25v6" strokeWidth="1.8" />
+    <path stroke={c} strokeLinecap="round" strokeLinejoin="round" d="M14.25 17.25h6" strokeWidth="1.8" />
+
+    {/* Líneas de texto con opacidad */}
+    <path stroke={c} strokeLinecap="round" strokeLinejoin="round" d="M3.75 6.75h10.5" strokeWidth="1.5" opacity="0.8" />
+    <path stroke={c} strokeLinecap="round" strokeLinejoin="round" d="M3.75 11.25h6" strokeWidth="1.5" opacity="0.6" />
+    <path stroke={c} strokeLinecap="round" strokeLinejoin="round" d="M3.75 15.75H7.5" strokeWidth="1.5" opacity="0.4" />
+
+    {/* Silueta del papel con brillo */}
+    <path
+      stroke={c}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      d="M7.5 20.25H2.25c-0.39782 0 -0.77936 -0.158 -1.06066 -0.4393C0.908035 19.5294 0.75 19.1478 0.75 18.75V2.25c0 -0.39782 0.158035 -0.77936 0.43934 -1.06066C1.47064 0.908035 1.85218 0.75 2.25 0.75h10.629c0.3975 0.000085 0.7788 0.157982 1.06 0.439l2.872 2.872c0.281 0.2812 0.4389 0.66245 0.439 1.06V7.5"
+      strokeWidth="1.7"
+      style={{ filter: `drop-shadow(0 0 1px ${c}88)` }}
+    />
+  </svg>
 );
 
 const IconTaxiBadgeNeon = ({ s = 24, c = C }: { s?: number; c?: string }) => (
@@ -4083,10 +4124,17 @@ function App() {
     const isLooseAccountingTurno = returnScreen === "contabilidad" && getTurnoAccountingWeekId(viewTurno, settings.diaLibre) === null;
     const turnoEntregado = viewTurno.entregada || false;
     const turnoFechaEntrega = viewTurno.fechaEntrega || null;
-    const turnoSummaryDateTitle =
-      viewTurno.startDate && viewTurno.startDate !== viewTurno.date
-        ? `${fmtDate(viewTurno.startDate)} ${viewTurno.startTime} - ${fmtDate(viewTurno.date)} ${viewTurno.endTime}`
-        : `${fmtDate(viewTurno.date)} \u00B7 ${viewTurno.startTime} - ${viewTurno.endTime}`;
+    const turnoSummaryDateTitle = (() => {
+      if (viewTurno.startDate && viewTurno.startDate !== viewTurno.date) {
+        const startYear = viewTurno.startDate.slice(0, 4);
+        const endYear = viewTurno.date.slice(0, 4);
+        if (startYear === endYear) {
+          return `${fmtDateNoYear(viewTurno.startDate)} ${viewTurno.startTime} - ${fmtDateNoYear(viewTurno.date)} ${viewTurno.endTime} \u00B7 ${endYear}`;
+        }
+        return `${fmtDate(viewTurno.startDate)} ${viewTurno.startTime} - ${fmtDate(viewTurno.date)} ${viewTurno.endTime}`;
+      }
+      return `${fmtDate(viewTurno.date)} \u00B7 ${viewTurno.startTime} - ${viewTurno.endTime}`;
+    })();
 
     function applyTurnoEntrega(entregada: boolean) {
       if (!viewTurno) return;
@@ -4121,14 +4169,15 @@ function App() {
             background: 'rgba(255,255,255,0.03)',
             borderRadius: 22,
             padding: '16px',
-            border: '1px solid rgba(255,255,255,0.07)'
+            border: '1px solid rgba(255,255,255,0.07)',
+            containerType: 'inline-size',
           }}>
             <h1
               aria-label="Fecha del turno"
               style={{
                 margin: "0",
                 color: "white",
-                fontSize: 20,
+                fontSize: "clamp(10px, 3.4cqw, 17px)",
                 lineHeight: 1.15,
                 fontWeight: 900,
                 letterSpacing: 0,
@@ -6984,7 +7033,8 @@ function App() {
               }}
               style={{
                 width: "100%",
-                padding: "14px 16px",
+                height: 48,
+                padding: "0 16px",
                 borderRadius: 16,
                 background: "rgba(255,255,255,0.03)",
                 border: "1px solid rgba(255,255,255,0.08)",
@@ -6994,12 +7044,12 @@ function App() {
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
-                gap: 8,
+                gap: 10,
                 cursor: "pointer",
                 transition: "all 0.2s"
               }}
             >
-              <span style={{ fontSize: 18 }}>📝</span> Añadir Nota al Turno
+              <IconNoteAdd s={26} /> Añadir Nota al Turno
             </button>
           </div>
         )}
