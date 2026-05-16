@@ -4154,7 +4154,7 @@ function App() {
               style={{
                 margin: "0",
                 color: "white",
-                fontSize: "clamp(15px, 4.2vw, 20px)",
+                fontSize: "clamp(17px, 4.6vw, 22px)",
                 lineHeight: 1.15,
                 fontWeight: 900,
                 letterSpacing: 0,
@@ -6173,7 +6173,7 @@ function App() {
               style={{
                 margin: "0",
                 color: "white",
-                fontSize: "clamp(15px, 4.2vw, 20px)",
+                fontSize: "clamp(17px, 4.6vw, 22px)",
                 lineHeight: 1.15,
                 fontWeight: 900,
                 letterSpacing: 0,

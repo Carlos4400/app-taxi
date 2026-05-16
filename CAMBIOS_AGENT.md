@@ -188,3 +188,67 @@ fontSize: "clamp(15px, 4.2vw, 20px)",
 
 #### Por qué se cambió
 Se cambió el tamaño fijo `20` por `clamp(15px, 4.2vw, 20px)` para que el rango de fechas de la semana use el mismo comportamiento responsive que el título del resumen de turno.
+
+## 2026-05-17 - Aumentar legibilidad de fechas en main.tsx
+
+### Fecha
+2026-05-17
+
+### Archivos modificados
+- `src/main.tsx`
+- `src/__tests__/responsive-title-fonts.test.ts`
+
+### Cambio 1 - Aumentar tamaño responsive del título de resumen de turno
+
+#### Código anterior
+```tsx
+fontSize: "clamp(15px, 4.2vw, 20px)",
+```
+
+#### Código nuevo
+```tsx
+fontSize: "clamp(17px, 4.6vw, 22px)",
+```
+
+#### Por qué se cambió
+Se cambió `clamp(15px, 4.2vw, 20px)` por `clamp(17px, 4.6vw, 22px)` porque en la captura del resumen de turno la fecha se veía demasiado pequeña para su papel como encabezado de la tarjeta.
+
+### Cambio 2 - Aumentar tamaño responsive del rango de fechas de detalle de semana
+
+#### Código anterior
+```tsx
+fontSize: "clamp(15px, 4.2vw, 20px)",
+```
+
+#### Código nuevo
+```tsx
+fontSize: "clamp(17px, 4.6vw, 22px)",
+```
+
+#### Por qué se cambió
+Se cambió `clamp(15px, 4.2vw, 20px)` por `clamp(17px, 4.6vw, 22px)` para que el rango de fechas del detalle de semana mantenga la misma legibilidad visual que el título de resumen de turno.
+
+### Cambio 3 - Actualizar comprobación literal del tamaño responsive
+
+#### Código anterior
+```tsx
+expect(source).toMatch(
+  /aria-label="Fecha del turno"[\s\S]*?fontSize: "clamp\(15px, 4\.2vw, 20px\)"/
+);
+expect(source).toMatch(
+  /aria-label="Rango de fechas de la semana"[\s\S]*?fontSize: "clamp\(15px, 4\.2vw, 20px\)"/
+);
+```
+
+#### Código nuevo
+```tsx
+expect(source).toMatch(
+  /aria-label="Fecha del turno"[\s\S]*?fontSize: "clamp\(17px, 4\.6vw, 22px\)"/
+);
+expect(source).toMatch(
+  /aria-label="Rango de fechas de la semana"[\s\S]*?fontSize: "clamp\(17px, 4\.6vw, 22px\)"/
+);
+```
+
+#### Por qué se cambió
+Se actualizó la comprobación literal para que valide el nuevo valor `clamp(17px, 4.6vw, 22px)` que quedó aplicado en los dos títulos.
