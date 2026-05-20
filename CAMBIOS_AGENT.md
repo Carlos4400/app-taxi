@@ -7,6 +7,115 @@ Cada entrada debe indicar archivos modificados, código anterior, código nuevo 
 El formato completo de una entrada está documentado en `AGENTS.md`, sección "Ejemplo de entrada".
 
 
+## 2026-05-20 15:52 - Ajustar colores para compatibilidad con html2canvas
+
+**Archivos modificados:** `src/main.tsx`, `src/__tests__/liquidacion-semana.test.ts`
+
+### Cambio 1 - Colores HEX en main.tsx
+
+#### Código anterior
+```tsx
+    const taximetroLimpio = roundMoney(resumen.dineroBase);
+
+    const copyTextFallback = () => {
+```
+
+#### Código nuevo
+```tsx
+    const taximetroLimpio = roundMoney(resumen.dineroBase);
+
+    // html2canvas compatible colors (HEX/RGB fallbacks for OKLCH)
+    const G_HEX = "#00b178";
+    const P_HEX = "#8d63f9";
+    const A_HEX = "#d69c2d";
+    const E_HEX = "#79a9c4";
+    const F_HEX = "#c95a43";
+    const TAXI_HEX = "#f8c654";
+    const KM_HEX = "#7e9ff9";
+
+    const copyTextFallback = () => {
+```
+
+#### Por qué se cambió
+html2canvas no soporta la sintaxis oklch(), por lo que se declaran colores HEX equivalentes para asegurar que el ticket se capture con sus colores originales correctos.
+
+### Cambio 2 - Reemplazo de oklch por HEX en ticket-digital
+
+#### Código anterior
+```tsx
+            {/* Apartado Principal */}
+            <div style={{ display: "flex", flexDirection: "column", gap: 10, borderBottom: "1px dashed rgba(255, 255, 255, 0.15)", paddingBottom: 16 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <span style={{ fontSize: 17, color: "rgba(255, 255, 255, 0.5)", display: "flex", alignItems: "center", gap: 6 }}>
+                  <IconTaxiBadgeNeon s={18} c="oklch(0.85 0.18 85)" /> Total Taxímetro
+                </span>
+                <span style={{ fontSize: 19, fontWeight: 700, color: "white", fontFamily: "monospace" }}>
+                  {fmt(taximetroLimpio)}
+                </span>
+              </div>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <span style={{ fontSize: 17, color: "rgba(255, 255, 255, 0.5)", display: "flex", alignItems: "center", gap: 6 }}>
+                  <IconRoad s={16} c="oklch(0.80 0.14 220)" /> Total KM
+                </span>
+                <span style={{ fontSize: 19, fontWeight: 700, color: "white", fontFamily: "monospace" }}>
+                  {fmtKmNumber(totalKMAcumulado)} KM
+                </span>
+              </div>
+            </div>
+```
+
+#### Código nuevo
+```tsx
+            {/* Apartado Principal */}
+            <div style={{ display: "flex", flexDirection: "column", gap: 10, borderBottom: "1px dashed rgba(255, 255, 255, 0.15)", paddingBottom: 16 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <span style={{ fontSize: 17, color: "rgba(255, 255, 255, 0.5)", display: "flex", alignItems: "center", gap: 6 }}>
+                  <IconTaxiBadgeNeon s={18} c={TAXI_HEX} /> Total Taxímetro
+                </span>
+                <span style={{ fontSize: 19, fontWeight: 700, color: "white", fontFamily: "monospace" }}>
+                  {fmt(taximetroLimpio)}
+                </span>
+              </div>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <span style={{ fontSize: 17, color: "rgba(255, 255, 255, 0.5)", display: "flex", alignItems: "center", gap: 6 }}>
+                  <IconRoad s={16} c={KM_HEX} /> Total KM
+                </span>
+                <span style={{ fontSize: 19, fontWeight: 700, color: "white", fontFamily: "monospace" }}>
+                  {fmtKmNumber(totalKMAcumulado)} KM
+                </span>
+              </div>
+            </div>
+```
+
+#### Por qué se cambió
+Utilizar las constantes HEX para los iconos de Taxímetro y KM en lugar de oklch() para compatibilidad con html2canvas.
+
+### Cambio 3 - Pruebas de colores en liquidacion-semana.test.ts
+
+#### Código anterior
+```tsx
+  it("applies default names and neon colors in swapped order", () => {
+    expect(source).toContain('Total Taxímetro');
+    expect(source).toContain('Total KM');
+    expect(source).toContain('oklch(0.85 0.18 85)'); // Yellow/orange neon for Taxímetro
+    expect(source).toContain('oklch(0.80 0.14 220)'); // Cyan/blue neon for KM
+  });
+```
+
+#### Código nuevo
+```tsx
+  it("applies default names and neon colors in swapped order", () => {
+    expect(source).toContain('Total Taxímetro');
+    expect(source).toContain('Total KM');
+    expect(source).toContain('#f8c654'); // Yellow/orange neon fallback for Taxímetro
+    expect(source).toContain('#7e9ff9'); // Cyan/blue neon fallback for KM
+  });
+```
+
+#### Por qué se cambió
+Adaptar las aserciones de la suite de pruebas para esperar los colores en formato HEX compatibles con html2canvas.
+
+
 ## 2026-05-20 15:43 - Copiar ticket de liquidación semanal como captura de pantalla
 
 **Archivos modificados:** `src/main.tsx`, `package.json`

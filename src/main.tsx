@@ -6487,6 +6487,15 @@ function App() {
 
     const taximetroLimpio = roundMoney(resumen.dineroBase);
 
+    // html2canvas compatible colors (HEX/RGB fallbacks for OKLCH)
+    const G_HEX = "#00b178";
+    const P_HEX = "#8d63f9";
+    const A_HEX = "#d69c2d";
+    const E_HEX = "#79a9c4";
+    const F_HEX = "#c95a43";
+    const TAXI_HEX = "#f8c654";
+    const KM_HEX = "#7e9ff9";
+
     const copyTextFallback = () => {
       const dates = formatWeekRangeFull(weekId);
       const text = `📋 *LIQUIDACIÓN SEMANAL*\n📅 *Semana:* ${dates}\n\n🚕 *Total Taxímetro:* ${fmt(taximetroLimpio)}\n🚗 *Total KM:* ${fmtKmNumber(totalKMAcumulado)} KM\n👤 *Comisión Bruta Jefe:* ${fmt(brutoJefeAcumulado)}\n\n⛔ *DESCONTAR:*\n  💳 Datáfonos: -${fmt(descDAcumulado)}\n  ⛽ Gasolina: -${fmt(descGAcumulado)}\n  🎟️ Agencias/Bonos: -${fmt(descAAcumulado)}\n  ➕ Extras: -${fmt(descEAcumulado)}\n💰 *Total Descuentos:* -${fmt(totalDescontarAcumulado)}\n\n💵 *NETO A ENTREGAR:*\n👉 *${fmt(totalNetoAcumulado)}* 👈\n\nℹ️ _Nulos acumulados: ${fmt(totalNulosAcumulado)}_`;
@@ -6627,7 +6636,7 @@ function App() {
             <div style={{ display: "flex", flexDirection: "column", gap: 10, borderBottom: "1px dashed rgba(255, 255, 255, 0.15)", paddingBottom: 16 }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                 <span style={{ fontSize: 17, color: "rgba(255, 255, 255, 0.5)", display: "flex", alignItems: "center", gap: 6 }}>
-                  <IconTaxiBadgeNeon s={18} c="oklch(0.85 0.18 85)" /> Total Taxímetro
+                  <IconTaxiBadgeNeon s={18} c={TAXI_HEX} /> Total Taxímetro
                 </span>
                 <span style={{ fontSize: 19, fontWeight: 700, color: "white", fontFamily: "monospace" }}>
                   {fmt(taximetroLimpio)}
@@ -6635,7 +6644,7 @@ function App() {
               </div>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                 <span style={{ fontSize: 17, color: "rgba(255, 255, 255, 0.5)", display: "flex", alignItems: "center", gap: 6 }}>
-                  <IconRoad s={16} c="oklch(0.80 0.14 220)" /> Total KM
+                  <IconRoad s={16} c={KM_HEX} /> Total KM
                 </span>
                 <span style={{ fontSize: 19, fontWeight: 700, color: "white", fontFamily: "monospace" }}>
                   {fmtKmNumber(totalKMAcumulado)} KM
@@ -6664,38 +6673,38 @@ function App() {
 
             {/* Bloque "Descontar" */}
             <div style={{ display: "flex", flexDirection: "column", gap: 10, borderBottom: "1px dashed rgba(255, 255, 255, 0.15)", paddingBottom: 16 }}>
-              <div style={{ fontSize: 15, fontWeight: 800, color: "oklch(0.70 0.18 25)", textTransform: "uppercase", letterSpacing: "0.6px" }}>
+              <div style={{ fontSize: 15, fontWeight: 800, color: F_HEX, textTransform: "uppercase", letterSpacing: "0.6px" }}>
                 Descontar
               </div>
               <div style={{ display: "flex", flexDirection: "column", gap: 8, paddingLeft: 4 }}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: 17 }}>
                   <span style={{ color: "rgba(255, 255, 255, 0.5)", display: "flex", alignItems: "center", gap: 6 }}>
-                    <IconCard s={14} c={P} /> Datáfonos
+                    <IconCard s={14} c={P_HEX} /> Datáfonos
                   </span>
                   <span style={{ color: "rgba(255,255,255,0.7)", fontFamily: "monospace" }}>-{fmt(descDAcumulado)}</span>
                 </div>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: 17 }}>
                   <span style={{ color: "rgba(255, 255, 255, 0.5)", display: "flex", alignItems: "center", gap: 6 }}>
-                    <IconFuel s={16} c={F} /> Gasolina
+                    <IconFuel s={16} c={F_HEX} /> Gasolina
                   </span>
                   <span style={{ color: "rgba(255,255,255,0.7)", fontFamily: "monospace" }}>-{fmt(descGAcumulado)}</span>
                 </div>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: 17 }}>
                   <span style={{ color: "rgba(255, 255, 255, 0.5)", display: "flex", alignItems: "center", gap: 6 }}>
-                    <IconAgency s={14} c={A} /> Agencias/Bonos
+                    <IconAgency s={14} c={A_HEX} /> Agencias/Bonos
                   </span>
                   <span style={{ color: "rgba(255,255,255,0.7)", fontFamily: "monospace" }}>-{fmt(descAAcumulado)}</span>
                 </div>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: 17 }}>
                   <span style={{ color: "rgba(255, 255, 255, 0.5)", display: "flex", alignItems: "center", gap: 6 }}>
-                    <IconExtra s={14} c={E} /> Extras
+                    <IconExtra s={14} c={E_HEX} /> Extras
                   </span>
                   <span style={{ color: "rgba(255,255,255,0.7)", fontFamily: "monospace" }}>-{fmt(descEAcumulado)}</span>
                 </div>
               </div>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", paddingTop: 4, fontWeight: 700 }}>
                 <span style={{ fontSize: 17, color: "white" }}>Total Descuentos</span>
-                <span style={{ fontSize: 19, color: "oklch(0.70 0.18 25)", fontFamily: "monospace" }}>-{fmt(totalDescontarAcumulado)}</span>
+                <span style={{ fontSize: 19, color: F_HEX, fontFamily: "monospace" }}>-{fmt(totalDescontarAcumulado)}</span>
               </div>
             </div>
 
@@ -6704,7 +6713,7 @@ function App() {
               <div style={{ fontSize: 15, fontWeight: 800, color: "rgba(255, 255, 255, 0.45)", textTransform: "uppercase", letterSpacing: "0.6px", marginBottom: 6 }}>
                 Neto a Entregar
               </div>
-              <div style={{ fontSize: 36, fontWeight: 950, color: G, fontFamily: "monospace", textShadow: "0 0 12px rgba(80, 220, 140, 0.25)" }}>
+              <div style={{ fontSize: 36, fontWeight: 950, color: G_HEX, fontFamily: "monospace", textShadow: "0 0 12px rgba(0, 177, 120, 0.25)" }}>
                 {fmt(totalNetoAcumulado)}
               </div>
             </div>
@@ -6733,8 +6742,8 @@ function App() {
                 padding: "16px 0",
                 borderRadius: 16,
                 background: copiado ? "rgba(80, 220, 140, 0.12)" : "rgba(255, 255, 255, 0.08)",
-                border: copiado ? `1px solid ${G}` : "1px solid rgba(255, 255, 255, 0.1)",
-                color: copiado ? G : "white",
+                border: copiado ? `1px solid ${G_HEX}` : "1px solid rgba(255, 255, 255, 0.1)",
+                color: copiado ? G_HEX : "white",
                 fontSize: 19,
                 fontWeight: 700,
                 cursor: "pointer",
