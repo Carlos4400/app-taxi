@@ -1,7 +1,9 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
 import { Filesystem, Directory, Encoding } from "@capacitor/filesystem";
-import { Share } from "@capacitor/share";
+import { Share } from "@capacitor/share";
+import { Capacitor } from "@capacitor/core";
+import html2canvas from "html2canvas";
 import { onAuthStateChanged, signOut, type User } from "firebase/auth";
 import {
   onSnapshot,
@@ -6485,13 +6487,79 @@ function App() {
 
     const taximetroLimpio = roundMoney(resumen.dineroBase);
 
-    const copyToClipboard = () => {
+    const copyTextFallback = () => {
       const dates = formatWeekRangeFull(weekId);
       const text = `📋 *LIQUIDACIÓN SEMANAL*\n📅 *Semana:* ${dates}\n\n🚕 *Total Taxímetro:* ${fmt(taximetroLimpio)}\n🚗 *Total KM:* ${fmtKmNumber(totalKMAcumulado)} KM\n👤 *Comisión Bruta Jefe:* ${fmt(brutoJefeAcumulado)}\n\n⛔ *DESCONTAR:*\n  💳 Datáfonos: -${fmt(descDAcumulado)}\n  ⛽ Gasolina: -${fmt(descGAcumulado)}\n  🎟️ Agencias/Bonos: -${fmt(descAAcumulado)}\n  ➕ Extras: -${fmt(descEAcumulado)}\n💰 *Total Descuentos:* -${fmt(totalDescontarAcumulado)}\n\n💵 *NETO A ENTREGAR:*\n👉 *${fmt(totalNetoAcumulado)}* 👈\n\nℹ️ _Nulos acumulados: ${fmt(totalNulosAcumulado)}_`;
 
       navigator.clipboard.writeText(text).then(() => {
         setCopiado(true);
         setTimeout(() => setCopiado(false), 2000);
+      }).catch((e) => {
+        console.error("Text copy failed: ", e);
+      });
+    };
+
+    const copyToClipboard = () => {
+      const element = document.getElementById("ticket-digital");
+      if (!element) {
+        copyTextFallback();
+        return;
+      }
+
+      html2canvas(element, {
+        backgroundColor: "#121212",
+        scale: 2,
+        useCORS: true,
+        logging: false,
+      }).then((canvas) => {
+        canvas.toBlob((blob) => {
+          if (!blob) {
+            copyTextFallback();
+            return;
+          }
+
+          if (Capacitor.isNativePlatform()) {
+            const reader = new FileReader();
+            reader.readAsDataURL(blob);
+            reader.onloadend = async () => {
+              const base64data = reader.result as string;
+              const base64 = base64data.split(",")[1];
+              try {
+                const fileName = `liquidacion_${weekId}.png`;
+                const result = await Filesystem.writeFile({
+                  path: fileName,
+                  data: base64,
+                  directory: Directory.Cache,
+                });
+                await Share.share({
+                  title: "Liquidación Semanal",
+                  text: `Liquidación de la semana ${formatWeekRangeFull(weekId)}`,
+                  url: result.uri,
+                  dialogTitle: "Compartir Liquidación",
+                });
+              } catch (e) {
+                console.error("Error sharing image, fallback to text:", e);
+                copyTextFallback();
+              }
+            };
+          } else {
+            if (navigator.clipboard && window.ClipboardItem) {
+              const item = new ClipboardItem({ "image/png": blob });
+              navigator.clipboard.write([item]).then(() => {
+                setCopiado(true);
+                setTimeout(() => setCopiado(false), 2000);
+              }).catch((err) => {
+                console.error("ClipboardItem write failed, fallback to text:", err);
+                copyTextFallback();
+              });
+            } else {
+              copyTextFallback();
+            }
+          }
+        }, "image/png");
+      }).catch((err) => {
+        console.error("html2canvas failed, fallback to text:", err);
+        copyTextFallback();
       });
     };
 
@@ -6514,7 +6582,7 @@ function App() {
           </div>
 
           {/* Ticket Digital */}
-          <div style={{
+          <div id="ticket-digital" style={{
             background: "rgba(255, 255, 255, 0.015)",
             borderRadius: 24,
             border: "1px solid rgba(255, 255, 255, 0.08)",

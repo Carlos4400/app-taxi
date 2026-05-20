@@ -7,6 +7,173 @@ Cada entrada debe indicar archivos modificados, código anterior, código nuevo 
 El formato completo de una entrada está documentado en `AGENTS.md`, sección "Ejemplo de entrada".
 
 
+## 2026-05-20 15:43 - Copiar ticket de liquidación semanal como captura de pantalla
+
+**Archivos modificados:** `src/main.tsx`, `package.json`
+
+### Cambio 1 - Dependencia html2canvas
+
+#### Código anterior
+```json
+  "dependencies": {
+    "@capacitor/core": "^6.2.0",
+    "@capacitor/filesystem": "^6.0.3",
+    "@capacitor/share": "^6.0.3",
+    "firebase": "^11.0.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+```
+
+#### Código nuevo
+```json
+  "dependencies": {
+    "@capacitor/core": "^6.2.0",
+    "@capacitor/filesystem": "^6.0.3",
+    "@capacitor/share": "^6.0.3",
+    "firebase": "^11.0.0",
+    "html2canvas": "^1.4.1",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+```
+
+#### Por qué se cambió
+Añadir html2canvas para permitir capturar un elemento del DOM como una imagen.
+
+### Cambio 2 - Importar Capacitor y html2canvas
+
+#### Código anterior
+```tsx
+import { Share } from "@capacitor/share";
+```
+
+#### Código nuevo
+```tsx
+import { Share } from "@capacitor/share";
+import { Capacitor } from "@capacitor/core";
+import html2canvas from "html2canvas";
+```
+
+#### Por qué se cambió
+Importar utilidades para comprobar la plataforma nativa y capturar la imagen.
+
+### Cambio 3 - Capturar y copiar ticket como imagen
+
+#### Código anterior
+```tsx
+    const copyToClipboard = () => {
+      const dates = formatWeekRangeFull(weekId);
+      const text = `📋 *LIQUIDACIÓN SEMANAL*\\n📅 *Semana:* ${dates}\\n\\n🚕 *Total Taxímetro:* ${fmt(taximetroLimpio)}\\n🚗 *Total KM:* ${fmtKmNumber(totalKMAcumulado)} KM\\n👤 *Comisión Bruta Jefe:* ${fmt(brutoJefeAcumulado)}\\n\\n⛔ *DESCONTAR:*\\n  💳 Datáfonos: -${fmt(descDAcumulado)}\\n  ⛽ Gasolina: -${fmt(descGAcumulado)}\\n  🎟️ Agencias/Bonos: -${fmt(descAAcumulado)}\\n  ➕ Extras: -${fmt(descEAcumulado)}\\n💰 *Total Descuentos:* -${fmt(totalDescontarAcumulado)}\\n\\n💵 *NETO A ENTREGAR:*\\n👉 *${fmt(totalNetoAcumulado)}* 👈\\n\\nℹ️ _Nulos acumulados: ${fmt(totalNulosAcumulado)}_`;
+
+      navigator.clipboard.writeText(text).then(() => {
+        setCopiado(true);
+        setTimeout(() => setCopiado(false), 2000);
+      });
+    };
+```
+
+#### Código nuevo
+```tsx
+    const copyTextFallback = () => {
+      const dates = formatWeekRangeFull(weekId);
+      const text = `📋 *LIQUIDACIÓN SEMANAL*\\n📅 *Semana:* ${dates}\\n\\n🚕 *Total Taxímetro:* ${fmt(taximetroLimpio)}\\n🚗 *Total KM:* ${fmtKmNumber(totalKMAcumulado)} KM\\n👤 *Comisión Bruta Jefe:* ${fmt(brutoJefeAcumulado)}\\n\\n⛔ *DESCONTAR:*\\n  💳 Datáfonos: -${fmt(descDAcumulado)}\\n  ⛽ Gasolina: -${fmt(descGAcumulado)}\\n  🎟️ Agencias/Bonos: -${fmt(descAAcumulado)}\\n  ➕ Extras: -${fmt(descEAcumulado)}\\n💰 *Total Descuentos:* -${fmt(totalDescontarAcumulado)}\\n\\n💵 *NETO A ENTREGAR:*\\n👉 *${fmt(totalNetoAcumulado)}* 👈\\n\\nℹ️ _Nulos acumulados: ${fmt(totalNulosAcumulado)}_`;
+
+      navigator.clipboard.writeText(text).then(() => {
+        setCopiado(true);
+        setTimeout(() => setCopiado(false), 2000);
+      }).catch((e) => {
+        console.error("Text copy failed: ", e);
+      });
+    };
+
+    const copyToClipboard = () => {
+      const element = document.getElementById("ticket-digital");
+      if (!element) {
+        copyTextFallback();
+        return;
+      }
+
+      html2canvas(element, {
+        backgroundColor: "#121212",
+        scale: 2,
+        useCORS: true,
+        logging: false,
+      }).then((canvas) => {
+        canvas.toBlob((blob) => {
+          if (!blob) {
+            copyTextFallback();
+            return;
+          }
+
+          if (Capacitor.isNativePlatform()) {
+            const reader = new FileReader();
+            reader.readAsDataURL(blob);
+            reader.onloadend = async () => {
+              const base64data = reader.result as string;
+              const base64 = base64data.split(",")[1];
+              try {
+                const fileName = `liquidacion_${weekId}.png`;
+                const result = await Filesystem.writeFile({
+                  path: fileName,
+                  data: base64,
+                  directory: Directory.Cache,
+                });
+                await Share.share({
+                  title: "Liquidación Semanal",
+                  text: `Liquidación de la semana ${formatWeekRangeFull(weekId)}`,
+                  url: result.uri,
+                  dialogTitle: "Compartir Liquidación",
+                });
+              } catch (e) {
+                console.error("Error sharing image, fallback to text:", e);
+                copyTextFallback();
+              }
+            };
+          } else {
+            if (navigator.clipboard && window.ClipboardItem) {
+              const item = new ClipboardItem({ "image/png": blob });
+              navigator.clipboard.write([item]).then(() => {
+                setCopiado(true);
+                setTimeout(() => setCopiado(false), 2000);
+              }).catch((err) => {
+                console.error("ClipboardItem write failed, fallback to text:", err);
+                copyTextFallback();
+              });
+            } else {
+              copyTextFallback();
+            }
+          }
+        }, "image/png");
+      }).catch((err) => {
+        console.error("html2canvas failed, fallback to text:", err);
+        copyTextFallback();
+      });
+    };
+```
+
+#### Por qué se cambió
+Permitir copiar el ticket como imagen (captura de pantalla) en navegadores web de escritorio/móvil, o compartir la imagen directamente en apps nativas (como WhatsApp), con un fallback de texto si falla.
+
+### Cambio 4 - Identificador para el ticket digital
+
+#### Código anterior
+```tsx
+          {/* Ticket Digital */}
+          <div style={{
+            background: "rgba(255, 255, 255, 0.015)",
+```
+
+#### Código nuevo
+```tsx
+          {/* Ticket Digital */}
+          <div id="ticket-digital" style={{
+            background: "rgba(255, 255, 255, 0.015)",
+```
+
+#### Por qué se cambió
+Proporcionar un id al elemento del ticket para poder referenciarlo y capturarlo con html2canvas.
+
 ## 2026-05-20 15:22 - Añadir pantalla de liquidación semanal
 
 **Archivos modificados:** `src/main.tsx`, `src/__tests__/liquidacion-semana.test.ts`
