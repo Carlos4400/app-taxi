@@ -34,8 +34,8 @@ describe("Liquidación Semanal screen and typography", () => {
   it("applies default names and neon colors in swapped order", () => {
     expect(source).toContain('Total Taxímetro');
     expect(source).toContain('Total KM');
-    expect(source).toContain('#f8c654'); // Yellow/orange neon fallback for Taxímetro
-    expect(source).toContain('#7e9ff9'); // Cyan/blue neon fallback for KM
+    expect(source).toContain('oklch(0.85 0.18 85)'); // Yellow/orange neon for Taxímetro
+    expect(source).toContain('oklch(0.80 0.14 220)'); // Cyan/blue neon for KM
   });
 
   it("implements the WhatsApp markdown template for copy to clipboard", () => {

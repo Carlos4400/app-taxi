@@ -7,6 +7,129 @@ Cada entrada debe indicar archivos modificados, código anterior, código nuevo 
 El formato completo de una entrada está documentado en `AGENTS.md`, sección "Ejemplo de entrada".
 
 
+## 2026-05-20 18:56 - Restaurar colores oklch en UI y mapear a HEX en clon de html2canvas
+
+**Archivos modificados:** `src/main.tsx`, `src/__tests__/liquidacion-semana.test.ts`
+
+### Cambio 1 - Mapeo dinámico y restauración de oklch en main.tsx
+
+#### Código anterior
+```tsx
+    const taximetroLimpio = roundMoney(resumen.dineroBase);
+
+    // html2canvas compatible colors (HEX/RGB fallbacks for OKLCH)
+    const G_HEX = "#00b178";
+    const P_HEX = "#8d63f9";
+    const A_HEX = "#d69c2d";
+    const E_HEX = "#79a9c4";
+    const F_HEX = "#c95a43";
+    const TAXI_HEX = "#f8c654";
+    const KM_HEX = "#7e9ff9";
+
+    const copyTextFallback = () => {
+```
+
+#### Código nuevo
+```tsx
+    const taximetroLimpio = roundMoney(resumen.dineroBase);
+
+    const copyTextFallback = () => {
+```
+
+#### Por qué se cambió
+Eliminar las declaraciones estáticas de HEX en el cuerpo de la pantalla y restaurar el uso de los colores oklch en la interfaz para mantener la estética original y vibrante de la app.
+
+### Cambio 2 - onclone en html2canvas para reemplazo de oklch
+
+#### Código anterior
+```tsx
+      html2canvas(element, {
+        backgroundColor: "#121212",
+        scale: 2,
+        useCORS: true,
+        logging: false,
+      }).then((canvas) => {
+```
+
+#### Código nuevo
+```tsx
+      html2canvas(element, {
+        backgroundColor: "#121212",
+        scale: 2,
+        useCORS: true,
+        logging: false,
+        onclone: (clonedDoc) => {
+          const ticket = clonedDoc.getElementById("ticket-digital");
+          if (!ticket) return;
+
+          const elements = ticket.getElementsByTagName("*");
+          const replaceOklch = (str: string) => {
+            return str.replace(/oklch\(\s*([\d.]+)\s+([\d.]+)\s+([\d.]+)\s*\)/gi, (match, l, c, h) => {
+              const lightness = parseFloat(l);
+              const chroma = parseFloat(c);
+              const hue = parseFloat(h);
+              if (Math.abs(lightness - 0.85) < 0.05 && Math.abs(chroma - 0.18) < 0.05 && Math.abs(hue - 85) < 5) return "#f8c654";
+              if (Math.abs(lightness - 0.80) < 0.05 && Math.abs(chroma - 0.14) < 0.05 && Math.abs(hue - 220) < 5) return "#7e9ff9";
+              if (Math.abs(lightness - 0.70) < 0.05 && Math.abs(chroma - 0.18) < 0.05 && Math.abs(hue - 25) < 5) return "#c95a43";
+              if (Math.abs(lightness - 0.68) < 0.05 && Math.abs(chroma - 0.20) < 0.05 && Math.abs(hue - 145) < 5) return "#00b178";
+              if (Math.abs(lightness - 0.65) < 0.05 && Math.abs(chroma - 0.20) < 0.05 && Math.abs(hue - 280) < 5) return "#8d63f9";
+              if (Math.abs(lightness - 0.75) < 0.05 && Math.abs(chroma - 0.16) < 0.05 && Math.abs(hue - 70) < 5) return "#d69c2d";
+              if (Math.abs(lightness - 0.72) < 0.05 && Math.abs(chroma - 0.14) < 0.05 && Math.abs(hue - 200) < 5) return "#79a9c4";
+              return match;
+            });
+          };
+
+          for (let i = 0; i < elements.length; i++) {
+            const el = elements[i] as HTMLElement;
+
+            const styleAttr = el.getAttribute("style");
+            if (styleAttr) {
+              el.setAttribute("style", replaceOklch(styleAttr));
+            }
+
+            const stroke = el.getAttribute("stroke");
+            if (stroke) {
+              el.setAttribute("stroke", replaceOklch(stroke));
+            }
+
+            const fill = el.getAttribute("fill");
+            if (fill) {
+              el.setAttribute("fill", replaceOklch(fill));
+            }
+          }
+        }
+      }).then((canvas) => {
+```
+
+#### Por qué se cambió
+Implementar una conversión dinámica de colores oklch() a HEX en el clon DOM que usa html2canvas, manteniendo la interfaz viva intacta con oklch() y evitando que la imagen exportada pierda los colores.
+
+### Cambio 3 - Aserciones oklch en pruebas
+
+#### Código anterior
+```tsx
+  it("applies default names and neon colors in swapped order", () => {
+    expect(source).toContain('Total Taxímetro');
+    expect(source).toContain('Total KM');
+    expect(source).toContain('#f8c654'); // Yellow/orange neon fallback for Taxímetro
+    expect(source).toContain('#7e9ff9'); // Cyan/blue neon fallback for KM
+  });
+```
+
+#### Código nuevo
+```tsx
+  it("applies default names and neon colors in swapped order", () => {
+    expect(source).toContain('Total Taxímetro');
+    expect(source).toContain('Total KM');
+    expect(source).toContain('oklch(0.85 0.18 85)'); // Yellow/orange neon for Taxímetro
+    expect(source).toContain('oklch(0.80 0.14 220)'); // Cyan/blue neon for KM
+  });
+```
+
+#### Por qué se cambió
+Restaurar las expectativas de color oklch en la suite de pruebas al haberse regresado los colores de la UI a oklch().
+
+
 ## 2026-05-20 15:52 - Ajustar colores para compatibilidad con html2canvas
 
 **Archivos modificados:** `src/main.tsx`, `src/__tests__/liquidacion-semana.test.ts`
