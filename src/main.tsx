@@ -2,6 +2,10 @@ import React from "react";
 import ReactDOM from "react-dom/client";
 import { Filesystem, Directory, Encoding } from "@capacitor/filesystem";
 import { Share } from "@capacitor/share";
+
+import { Capacitor } from "@capacitor/core";
+
+import html2canvas from "html2canvas";
 import { onAuthStateChanged, signOut, type User } from "firebase/auth";
 import {
   onSnapshot,
@@ -105,6 +109,16 @@ const N = "oklch(0.62 0.06 260)";
 const NBG = "oklch(0.18 0.03 260)";
 const C = "oklch(0.75 0.15 290)";
 const CBG = "oklch(0.18 0.05 290 / 0.12)";
+
+type EntryTypeMeta = {
+  color: string;
+  label: string;
+  icon: (size?: number) => React.ReactNode;
+};
+
+function getEntryTypeMeta(type: string): EntryTypeMeta {
+  return ENTRY_TYPE_META[type] || ENTRY_TYPE_META.nulo;
+}
 
 const MESES_COMPLETOS = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
 const MESES_ABREVIADOS = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
@@ -1053,29 +1067,43 @@ const IconReservaWrite = ({ s = 24, c = C }: { s?: number; c?: string }) => (
   </span>
 );
 
-const IconNoteAdd = ({ s = 20, c = C }: { s?: number; c?: string }) => (
+const IconNoteAdd = ({ s = 20, c = C, showPlus = true }: { s?: number; c?: string; showPlus?: boolean }) => (
   <svg width={s} height={s} viewBox="0 0 24 24" fill="none" style={{ overflow: "visible" }}>
+    {showPlus && (
+      <>
+        <path
+          stroke={c}
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          d="M11.25 17.25c0 1.5913 0.6321 3.1174 1.7574 4.2426 1.1252 1.1253 2.6513 1.7574 4.2426 1.7574 1.5913 0 3.1174 -0.6321 4.2426 -1.7574 1.1253 -1.1252 1.7574 -2.6513 1.7574 -4.2426 0 -1.5913 -0.6321 -3.1174 -1.7574 -4.2426 -1.1252 -1.1253 -2.6513 -1.7574 -4.2426 -1.7574 -1.5913 0 -3.1174 0.6321 -4.2426 1.7574 -1.1253 1.1252 -1.7574 2.6513 -1.7574 4.2426Z"
+          strokeWidth="1.5"
+          style={{ filter: `drop-shadow(0 0 1px ${c}) drop-shadow(0 0 2px ${c})` }}
+        />
+        <path stroke={c} strokeLinecap="round" strokeLinejoin="round" d="M17.25 14.25v6" strokeWidth="1.8" />
+        <path stroke={c} strokeLinecap="round" strokeLinejoin="round" d="M14.25 17.25h6" strokeWidth="1.8" />
+      </>
+    )}
+    <path stroke={c} strokeLinecap="round" strokeLinejoin="round" d={showPlus ? "M3.75 6.75h10.5" : "M7.5 10h8.25"} strokeWidth="1.5" opacity="0.8" />
+    <path stroke={c} strokeLinecap="round" strokeLinejoin="round" d={showPlus ? "M3.75 11.25h6" : "M7.5 13.75h6.5"} strokeWidth="1.5" opacity="0.6" />
+    <path stroke={c} strokeLinecap="round" strokeLinejoin="round" d={showPlus ? "M3.75 15.75H7.5" : "M7.5 17.5H12"} strokeWidth="1.5" opacity="0.4" />
     <path
       stroke={c}
       strokeLinecap="round"
       strokeLinejoin="round"
-      d="M11.25 17.25c0 1.5913 0.6321 3.1174 1.7574 4.2426 1.1252 1.1253 2.6513 1.7574 4.2426 1.7574 1.5913 0 3.1174 -0.6321 4.2426 -1.7574 1.1253 -1.1252 1.7574 -2.6513 1.7574 -4.2426 0 -1.5913 -0.6321 -3.1174 -1.7574 -4.2426 -1.1252 -1.1253 -2.6513 -1.7574 -4.2426 -1.7574 -1.5913 0 -3.1174 0.6321 -4.2426 1.7574 -1.1253 1.1252 -1.7574 2.6513 -1.7574 4.2426Z"
-      strokeWidth="1.5"
-      style={{ filter: `drop-shadow(0 0 1px ${c}) drop-shadow(0 0 2px ${c})` }}
-    />
-    <path stroke={c} strokeLinecap="round" strokeLinejoin="round" d="M17.25 14.25v6" strokeWidth="1.8" />
-    <path stroke={c} strokeLinecap="round" strokeLinejoin="round" d="M14.25 17.25h6" strokeWidth="1.8" />
-    <path stroke={c} strokeLinecap="round" strokeLinejoin="round" d="M3.75 6.75h10.5" strokeWidth="1.5" opacity="0.8" />
-    <path stroke={c} strokeLinecap="round" strokeLinejoin="round" d="M3.75 11.25h6" strokeWidth="1.5" opacity="0.6" />
-    <path stroke={c} strokeLinecap="round" strokeLinejoin="round" d="M3.75 15.75H7.5" strokeWidth="1.5" opacity="0.4" />
-    <path
-      stroke={c}
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      d="M7.5 20.25H2.25c-0.39782 0 -0.77936 -0.158 -1.06066 -0.4393C0.908035 19.5294 0.75 19.1478 0.75 18.75V2.25c0 -0.39782 0.158035 -0.77936 0.43934 -1.06066C1.47064 0.908035 1.85218 0.75 2.25 0.75h10.629c0.3975 0.000085 0.7788 0.157982 1.06 0.439l2.872 2.872c0.281 0.2812 0.4389 0.66245 0.439 1.06V7.5"
+      d={showPlus ? "M7.5 20.25H2.25c-0.39782 0 -0.77936 -0.158 -1.06066 -0.4393C0.908035 19.5294 0.75 19.1478 0.75 18.75V2.25c0 -0.39782 0.158035 -0.77936 0.43934 -1.06066C1.47064 0.908035 1.85218 0.75 2.25 0.75h10.629c0.3975 0.000085 0.7788 0.157982 1.06 0.439l2.872 2.872c0.281 0.2812 0.4389 0.66245 0.439 1.06V7.5" : "M5 21.25H19c0.4142 0 0.75 -0.3358 0.75 -0.75V7.25L15.25 2.75H5c-0.4142 0 -0.75 0.3358 -0.75 0.75v17c0 0.4142 0.3358 0.75 0.75 0.75Z"}
       strokeWidth="1.7"
       style={{ filter: `drop-shadow(0 0 1px ${c})` }}
     />
+    {!showPlus && (
+      <path
+        stroke={c}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        d="M15.25 2.75V7.25H19.75"
+        strokeWidth="1.7"
+        opacity="0.9"
+      />
+    )}
   </svg>
 );
 
@@ -1162,20 +1190,21 @@ const IconFuel = ({ s = 24, c = F }: { s?: number; c?: string }) => (
   <svg width={s} height={s} viewBox="0 0 24 24" fill="none">
     <rect
       x="4"
-      y="6"
-      width="11"
-      height="14"
+      y="5"
+      width="11.5"
+      height="15"
       rx="2"
       stroke={c}
       strokeWidth="1.8"
     />
     <path
-      d="M15 10L18 8V16L15 14"
+      d="M15.5 9L19 7V17L15.5 15"
       stroke={c}
       strokeWidth="1.8"
       strokeLinejoin="round"
+      strokeLinecap="round"
     />
-    <rect x="7" y="9" width="5" height="4" rx="1" fill={c} opacity="0.4" />
+    <rect x="7" y="8" width="5.5" height="4.5" rx="1" fill={c} opacity="0.4" />
   </svg>
 );
 const IconNulo = ({ s = 24, c = N }: { s?: number; c?: string }) => (
@@ -1278,6 +1307,36 @@ const IconRoad = ({ s = 24, c = "white" }: { s?: number; c?: string }) => (
   <svg width={s} height={s} viewBox="0 0 24 24" fill="none" style={{ display: "inline-block", verticalAlign: "middle" }}>
     <path d="M3 22L9 2M21 22L15 2" stroke={c} strokeWidth="1.8" strokeLinecap="round" />
     <path d="M12 22V18M12 14V10M12 6V2" stroke={c} strokeWidth="1.8" strokeLinecap="round" opacity="0.6" />
+  </svg>
+);
+
+const IconPinNeon = ({ s = 24, c = "oklch(0.72 0.14 28)" }: { s?: number; c?: string }) => (
+  <svg
+    width={s}
+    height={s}
+    viewBox="0 0 24 24"
+    fill="none"
+    style={{ display: "inline-block", verticalAlign: "middle", overflow: "visible" }}
+  >
+    <g transform="rotate(32 12 12)">
+      <path
+        d="M8.2 4.8h7.6c0.7 0 1.2 0.5 1.2 1.2v1.1c0 0.5-0.3 0.9-0.7 1.1l-1.8 1.1v3.1l2.7 2.7v1.2H6.8v-1.2l2.7-2.7V9.3L7.7 8.2C7.3 8 7 7.6 7 7.1V6c0-0.7 0.5-1.2 1.2-1.2Z"
+        fill={c}
+        fillOpacity="0.16"
+        stroke={c}
+        strokeWidth="1.75"
+        strokeLinejoin="round"
+        strokeLinecap="round"
+        style={{ filter: `drop-shadow(0 0 1px ${c})` }}
+      />
+      <path
+        d="M12 16.3V21"
+        stroke={c}
+        strokeWidth="1.75"
+        strokeLinecap="round"
+        style={{ filter: `drop-shadow(0 0 1px ${c})` }}
+      />
+    </g>
   </svg>
 );
 
@@ -1456,6 +1515,16 @@ const IconSettings = ({ s = 24, c = "white" }: { s?: number; c?: string }) => (
     <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1Z" stroke={c} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
   </svg>
 );
+
+const ENTRY_TYPE_META: Record<string, EntryTypeMeta> = {
+  propina:      { color: G,       label: "Propina",      icon: (s = 17) => <IconCoin   s={s} c={G} /> },
+  datafono:     { color: P,       label: "Datáfono",     icon: (s = 17) => <IconCard   s={s} c={P} /> },
+  agencia_bono: { color: A,       label: "Agencia/Bono", icon: (s = 17) => <IconAgency s={s} c={A} /> },
+  extra:        { color: E,       label: "Extra",        icon: (s = 17) => <IconExtra  s={s} c={E} /> },
+  gasolina:     { color: F,       label: "Gasolina",     icon: (s = 17) => <IconFuel   s={s} c={F} /> },
+  nulo:         { color: N,       label: "Nulo",         icon: (s = 17) => <IconNulo   s={s} c={N} /> },
+  nota:         { color: "white", label: "Nota",         icon: (s = 17) => <IconNoteAdd s={s} showPlus={false} /> },
+};
 
 function Shell({
   children,
@@ -1684,6 +1753,8 @@ function App() {
   const [selectedWeekId, setSelectedWeekId] = useState<string | null>(null);
   const [selectedAccountingYear, setSelectedAccountingYear] = useState<number>(() => new Date().getFullYear());
   const [selectedAccountingMonth, setSelectedAccountingMonth] = useState<number>(() => new Date().getMonth() + 1);
+  const [copiado, setCopiado] = useState(false);
+  const [procesandoTicket, setProcesandoTicket] = useState(false);
   const [tieResolutions, setTieResolutions] = useState<Map<string, string>>(new Map());
   const [pendingTie, setPendingTie] = useState<{
     weekId: string;
@@ -4258,12 +4329,14 @@ function App() {
               }
               return (
                 <div style={{ marginTop: 16, paddingTop: 14, borderTop: '1px solid rgba(255,255,255,0.06)' }}>
-                  <div style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '0.6px', marginBottom: 8 }}>📝 Nota del Turno</div>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '0.6px', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 5 }}>
+                    <IconNoteAdd s={17} showPlus={false} /> Notas del Turno
+                  </div>
                   <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                     {generalNotes.map((e: any) => (
-                      <div key={e.id} style={{ color: "rgba(255,255,255,0.9)", fontSize: 13, lineHeight: 1.4, background: "rgba(255,255,255,0.02)", padding: "8px 10px", borderRadius: 8, overflowWrap: "anywhere" }}>
-                        <span style={{ color: "rgba(255,255,255,0.5)", fontSize: 11, marginRight: 6, fontWeight: 600 }}>{e.time}</span>
-                        {e.note}
+                      <div key={e.id} style={{ display: "grid", gridTemplateColumns: "auto minmax(0, 1fr)", alignItems: "start", gap: 9, color: "rgba(255,255,255,0.8)", fontSize: 13, lineHeight: 1.4, background: "rgba(255,255,255,0.025)", padding: "8px 10px", borderRadius: 9, minWidth: 0 }}>
+                        <span style={{ color: "rgba(255,255,255,0.58)", fontSize: 11, fontWeight: 700, lineHeight: 1, whiteSpace: "nowrap", background: "rgba(150,130,255,0.10)", border: "1px solid rgba(150,130,255,0.14)", borderRadius: 7, padding: "4px 5px", marginTop: 1 }}>{e.time}</span>
+                        <span style={{ color: "rgba(255,255,255,0.82)", fontSize: 12, lineHeight: 1.38, minWidth: 0, overflowWrap: "anywhere" }}>{e.note}</span>
                       </div>
                     ))}
                   </div>
@@ -4279,17 +4352,17 @@ function App() {
             return (
               <div style={{ background: 'rgba(255,255,255,0.03)', borderRadius: 22, padding: '16px', border: '1px solid rgba(255,255,255,0.07)' }}>
                 <div style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '0.6px', marginBottom: 12, display: 'flex', alignItems: 'center', gap: 6 }}>
-                  <span>📌</span> Notas detalladas
+                  <IconPinNeon s={18} /> Notas detalladas
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                   {entriesWithNotes.map((e: any) => {
-                    const col = e.type === 'propina' ? G : e.type === 'datafono' ? P : e.type === 'agencia_bono' ? A : e.type === 'extra' ? E : e.type === 'gasolina' ? F : N;
+                    const meta = getEntryTypeMeta(e.type);
                     return (
-                      <div key={e.id} style={{ fontSize: 13, background: 'rgba(255,255,255,0.02)', padding: '10px 12px', borderRadius: 12, border: '1px solid rgba(255,255,255,0.04)', display: 'flex', alignItems: 'baseline', gap: 8 }}>
-                        <span style={{ fontSize: 11, color: "rgba(255,255,255,0.5)", fontWeight: 600 }}>{e.time}</span>
-                        <span style={{ fontWeight: 900, color: col, fontSize: 10, textTransform: 'uppercase', minWidth: 60 }}>{e.type}</span>
-                        <span style={{ color: 'rgba(255,255,255,0.85)', lineHeight: 1.4 }}>{e.note}</span>
-                        <span style={{ marginLeft: 'auto', fontSize: 11, color: "rgba(255,255,255,0.5)", fontWeight: 600, whiteSpace: 'nowrap', flexShrink: 0 }}>{fmt(e.amount)}</span>
+                      <div key={e.id} style={{ fontSize: 13, background: 'rgba(255,255,255,0.02)', padding: '10px 12px', borderRadius: 12, border: '1px solid rgba(255,255,255,0.04)', display: 'grid', gridTemplateColumns: 'auto auto minmax(0, 1fr) auto', alignItems: 'start', gap: 8, minWidth: 0 }}>
+                        <span style={{ fontSize: 12, color: "rgba(255,255,255,0.5)", fontWeight: 600, flexShrink: 0, alignSelf: "start" }}>{e.time}</span>
+                        <span style={{ fontWeight: 700, color: meta.color, fontSize: 14, whiteSpace: 'nowrap', flexShrink: 0 }}>{meta.label}</span>
+                        <span style={{ color: 'rgba(255,255,255,0.85)', fontSize: 12, lineHeight: 1.4, flex: 1, minWidth: 0, overflowWrap: "anywhere" }}>{e.note}</span>
+                        <span style={{ fontSize: 15, fontWeight: 700, color: meta.color, whiteSpace: 'nowrap', flexShrink: 0, alignSelf: "start" }}>{fmt(e.amount)}</span>
                       </div>
                     );
                   })}
@@ -4482,23 +4555,30 @@ function App() {
             <div style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '0.6px', marginBottom: 10 }}>Entradas</div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
               {editJ.entries.filter((e: Entry) => e.type !== 'nota').map((e: Entry) => {
-                const meta = e.type === 'propina' ? { col: G, lbl: 'Propina' }
-                  : e.type === 'datafono' ? { col: P, lbl: 'Datáfono' }
-                    : (e.type === 'agencia_bono') ? { col: A, lbl: 'Agencia/Bono' }
-                      : e.type === 'extra' ? { col: E, lbl: 'Extra' }
-                        : e.type === 'gasolina' ? { col: F, lbl: 'Gasolina' }
-                          : { col: N, lbl: 'Nulo' };
+                const meta = getEntryTypeMeta(e.type);
                 return (
-                  <div key={e.id} style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'rgba(0,0,0,0.2)', borderRadius: 10, padding: '8px 12px' }}>
-                    <span style={{ fontSize: 13, fontWeight: 600, color: meta.col, minWidth: 60 }}>{meta.lbl}</span>
-                    <span style={{ fontSize: 15, fontWeight: 700, color: 'white' }}>{fmt(e.amount)}</span>
-                    <div style={{ flex: 1, textAlign: 'right', fontSize: 12, color: "rgba(255,255,255,0.5)", whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', paddingRight: 8 }}>
-                      {e.note}
-                    </div>
-                    <button onClick={() => openEditEntry(e)}
-                      style={{ background: 'rgba(255,255,255,0.08)', border: 'none', borderRadius: 7, color: 'rgba(255,255,255,0.7)', fontSize: 11, cursor: 'pointer', width: 30, height: 30, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                      <IconPencilNeon />
-                    </button>
+                  <div
+                    key={e.id}
+                    onClick={() => openEditEntry(e)}
+                    role="button"
+                    tabIndex={0}
+                    title="Editar entrada"
+                    aria-label="Editar entrada"
+                    onKeyDown={(ev) => {
+                      if (ev.key === "Enter" || ev.key === " ") {
+                        ev.preventDefault();
+                        openEditEntry(e);
+                      }
+                    }}
+                    style={{ display: "grid", gridTemplateColumns: "auto minmax(0, 1fr) auto auto", alignItems: "center", gap: 10, background: "rgba(0,0,0,0.2)", borderRadius: 10, padding: "8px 12px", cursor: "pointer" }}
+                  >
+                    <span style={{ display: "inline-flex", alignItems: "center", gap: 7, whiteSpace: "nowrap", flexShrink: 0 }}>
+                      {meta.icon(17)}
+                      <span style={{ color: meta.color, fontSize: 14, fontWeight: 700 }}>{meta.label}</span>
+                    </span>
+                    <span style={{ color: "rgba(255,255,255,0.6)", fontSize: 12, lineHeight: 1.35, minWidth: 0, overflowWrap: "anywhere" }}>{e.note}</span>
+                    <span style={{ fontSize: 12, color: "rgba(255,255,255,0.5)", flexShrink: 0 }}>{e.time}</span>
+                    <span style={{ fontSize: 14, fontWeight: 700, color: meta.color, whiteSpace: "nowrap", flexShrink: 0 }}>{fmt(e.amount)}</span>
                   </div>
                 );
               })}
@@ -4609,7 +4689,9 @@ function App() {
 
           {/* Notas */}
           <div style={{ background: 'rgba(255,255,255,0.04)', borderRadius: 16, padding: '14px 16px', border: '1px solid rgba(255,255,255,0.08)', marginBottom: 14 }}>
-            <div style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', letterSpacing: '0.6px', marginBottom: 12 }}>📝 Notas del Turno</div>
+            <div style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', letterSpacing: '0.6px', marginBottom: 12, display: 'flex', alignItems: 'center', gap: 5 }}>
+              <IconNoteAdd s={17} showPlus={false} /> Notas del Turno
+            </div>
 
             {editJ.entries.filter((e: Entry) => e.type === 'nota').length === 0 && (
               <div style={{ fontSize: 13, color: "rgba(255,255,255,0.5)", fontStyle: 'italic', marginBottom: 12 }}>Sin notas del turno</div>
@@ -4696,7 +4778,7 @@ function App() {
                   marginTop: 4
                 }}
               >
-                <span style={{ fontSize: 16 }}>📝</span> Añadir Nueva Nota
+                <IconNoteAdd s={18} /> Añadir Nueva Nota
               </button>
             )}
           </div>
@@ -5757,7 +5839,7 @@ function App() {
     const resumenAnual = calcularResumenContableTurnos(turnosAnual, settings);
     const monthLabels = MESES_COMPLETOS;
     const cats = [
-      { key: 'datafono', label: 'Datafono', color: P, bg: PBG, icon: <IconCard s={18} c={P} />, total: resumenAnual.totalD },
+      { key: 'datafono', label: 'Datáfono', color: P, bg: PBG, icon: <IconCard s={18} c={P} />, total: resumenAnual.totalD },
       { key: 'propina', label: 'Propinas', color: G, bg: GBG, icon: <IconCoin s={18} c={G} />, total: resumenAnual.totalP },
       { key: 'agencia_bono', label: 'Agencias/Bonos', color: A, bg: ABG, icon: <IconAgency s={18} c={A} />, total: resumenAnual.totalA },
       { key: 'extra', label: 'Extras', color: E, bg: EBG, icon: <IconExtra s={18} c={E} />, total: resumenAnual.totalE },
@@ -5935,7 +6017,7 @@ function App() {
     const mesLabel = getMesLabel(monthId);
     const turnosConNotas = getTurnosNotasSemana(turnosMes);
     const cats = [
-      { key: 'datafono', label: 'Datafono', color: P, bg: PBG, icon: <IconCard s={18} c={P} />, total: resumenMes.totalD },
+      { key: 'datafono', label: 'Datáfono', color: P, bg: PBG, icon: <IconCard s={18} c={P} />, total: resumenMes.totalD },
       { key: 'propina', label: 'Propinas', color: G, bg: GBG, icon: <IconCoin s={18} c={G} />, total: resumenMes.totalP },
       { key: 'agencia_bono', label: 'Agencias/Bonos', color: A, bg: ABG, icon: <IconAgency s={18} c={A} />, total: resumenMes.totalA },
       { key: 'extra', label: 'Extras', color: E, bg: EBG, icon: <IconExtra s={18} c={E} />, total: resumenMes.totalE },
@@ -6156,10 +6238,25 @@ function App() {
               <IconBack />
             </button>
             <div style={{ flex: 1 }}>
-              <div style={{ fontSize: 20, fontWeight: 800, color: "white" }}>
+              <div style={{ fontSize: "clamp(16px, 4.5vw, 20px)", fontWeight: 800, color: "white" }}>
                 Detalle de Semana
               </div>
             </div>
+            <button
+              onClick={() => setScreen("liquidacionSemana")}
+              style={{
+                background: "rgba(80, 220, 140, 0.08)",
+                border: `1px solid ${G}`,
+                borderRadius: 12,
+                color: G,
+                padding: "8px 14px",
+                fontSize: 13,
+                fontWeight: 700,
+                cursor: "pointer",
+              }}
+            >
+              Liquidación
+            </button>
           </div>
 
           <div style={{
@@ -6353,6 +6450,580 @@ function App() {
     );
   }
 
+  if (screen === "liquidacionSemana" && selectedWeekId) {
+    const weekId = selectedWeekId;
+    const grupos = groupTurnosByWeek(history, settings.diaLibre);
+    const turnosSemana = grupos.get(weekId) || [];
+    const resumen = calcularResumenContableTurnos(turnosSemana, settings);
+
+    let brutoJefeAcumulado = 0;
+    let descDAcumulado = 0;
+    let descGAcumulado = 0;
+    let descAAcumulado = 0;
+    let descEAcumulado = 0;
+    let totalDescontarAcumulado = 0;
+    let totalNetoAcumulado = 0;
+    let totalKMAcumulado = 0;
+
+    for (const t of turnosSemana) {
+      const calc = calcularTurnoContable(t, settings);
+      brutoJefeAcumulado += (calc.dineroBase * (calc.config.porcentajeJefe / 100));
+      descDAcumulado += calc.descD;
+      descGAcumulado += calc.descF;
+      descAAcumulado += calc.descA;
+      descEAcumulado += calc.descE;
+      totalDescontarAcumulado += calc.totalDescontar;
+      totalNetoAcumulado += calc.totalADar;
+      totalKMAcumulado += (t.km || 0);
+    }
+
+    brutoJefeAcumulado = roundMoney(brutoJefeAcumulado);
+    descDAcumulado = roundMoney(descDAcumulado);
+    descGAcumulado = roundMoney(descGAcumulado);
+    descAAcumulado = roundMoney(descAAcumulado);
+    descEAcumulado = roundMoney(descEAcumulado);
+    totalDescontarAcumulado = roundMoney(totalDescontarAcumulado);
+    totalNetoAcumulado = roundMoney(totalNetoAcumulado);
+
+    const taximetroLimpio = roundMoney(resumen.dineroBase);
+    const turnosConNotas = getTurnosNotasSemana(turnosSemana);
+
+    const formatLiquidacionNotasText = () => {
+      if (turnosConNotas.length === 0) return "";
+
+      return `\n\n📝 *NOTAS DE LA SEMANA:*\n${turnosConNotas.map(({ turno, notasGenerales, notasDetalladas }) => {
+        const lineasGenerales = notasGenerales.map((entry) => `  ${entry.time} Nota: ${entry.note.trim()}`);
+        const lineasDetalladas = notasDetalladas.map((entry) => {
+          const meta = getEntryTypeMeta(entry.type);
+          return `  ${entry.time} ${meta.label}: ${entry.note.trim()} (${fmt(entry.amount)})`;
+        });
+        return `*${fmtDate(turno.date)}*\n${[...lineasGenerales, ...lineasDetalladas].join("\n")}`;
+      }).join("\n\n")}`;
+    };
+
+    const copyTextFallback = () => {
+      const dates = formatWeekRangeFull(weekId);
+      const text = `📋 *LIQUIDACIÓN SEMANAL*\n📅 *Semana:* ${dates}\n\n🚕 *Total Taxímetro:* ${fmt(taximetroLimpio)}\n🚗 *Total KM:* ${fmtKmNumber(totalKMAcumulado)} KM\n👤 *Comisión Bruta Jefe:* ${fmt(brutoJefeAcumulado)}\n\n⛔ *DESCONTAR:*\n  💳 Datáfonos: -${fmt(descDAcumulado)}\n  ⛽ Gasolina: -${fmt(descGAcumulado)}\n  🎟️ Agencias/Bonos: -${fmt(descAAcumulado)}\n  ➕ Extras: -${fmt(descEAcumulado)}\n💰 *Total Descuentos:* -${fmt(totalDescontarAcumulado)}\n\n💵 *NETO A ENTREGAR:*\n👉 *${fmt(totalNetoAcumulado)}* 👈${formatLiquidacionNotasText()}`;
+
+      navigator.clipboard.writeText(text).then(() => {
+        setCopiado(true);
+        setTimeout(() => setCopiado(false), 2000);
+      }).catch((e) => {
+        console.error("Text copy failed: ", e);
+      });
+    };
+
+    const copyToClipboard = async () => {
+      const element = document.getElementById("ticket-digital");
+      if (!element) {
+        copyTextFallback();
+        return;
+      }
+
+      try {
+        await document.fonts?.ready;
+      } catch {
+      }
+
+      html2canvas(element, {
+        backgroundColor: "#0d0d14",
+        scale: 3,
+        useCORS: true,
+        logging: false,
+        onclone: (clonedDoc) => {
+          const ticket = clonedDoc.getElementById("ticket-digital");
+          if (!ticket) return;
+
+          const elements = [ticket, ...Array.from(ticket.getElementsByTagName("*"))] as HTMLElement[];
+          const replaceOklch = (str: string) => {
+            return str.replace(/oklch\(\s*([\d.]+)\s+([\d.]+)\s+([\d.]+)\s*\)/gi, (match, l, c, h) => {
+              const lightness = parseFloat(l);
+              const chroma = parseFloat(c);
+              const hue = parseFloat(h);
+              if (Math.abs(lightness - 0.85) < 0.05 && Math.abs(chroma - 0.18) < 0.05 && Math.abs(hue - 85) < 5) return "#ffc200";
+              if (Math.abs(lightness - 0.80) < 0.05 && Math.abs(chroma - 0.14) < 0.05 && Math.abs(hue - 220) < 5) return "#25d2fc";
+              if (Math.abs(lightness - 0.70) < 0.05 && Math.abs(chroma - 0.18) < 0.05 && Math.abs(hue - 25) < 5) return "#fa6863";
+              if (Math.abs(lightness - 0.68) < 0.05 && Math.abs(chroma - 0.20) < 0.05 && Math.abs(hue - 145) < 5) return "#26b63d";
+              if (Math.abs(lightness - 0.65) < 0.05 && Math.abs(chroma - 0.20) < 0.05 && Math.abs(hue - 280) < 5) return "#7c79ff";
+              if (Math.abs(lightness - 0.75) < 0.05 && Math.abs(chroma - 0.16) < 0.05 && Math.abs(hue - 70) < 5) return "#ed990e";
+              if (Math.abs(lightness - 0.72) < 0.05 && Math.abs(chroma - 0.14) < 0.05 && Math.abs(hue - 200) < 5) return "#00bec7";
+              return match;
+            });
+          };
+          const replaceExportNeutrals = (str: string) => {
+            return str
+              .replace(/rgba\(\s*255\s*,\s*255\s*,\s*255\s*,\s*0\.015\s*\)/gi, "#111116")
+              .replace(/rgba\(\s*255\s*,\s*255\s*,\s*255\s*,\s*0\.025\s*\)/gi, "#17171c")
+              .replace(/rgba\(\s*255\s*,\s*255\s*,\s*255\s*,\s*0\.05\s*\)/gi, "rgba(255, 255, 255, 0.07)")
+              .replace(/rgba\(\s*255\s*,\s*255\s*,\s*255\s*,\s*0\.08\s*\)/gi, "rgba(255, 255, 255, 0.10)")
+              .replace(/rgba\(\s*255\s*,\s*255\s*,\s*255\s*,\s*0\.15\s*\)/gi, "rgba(255, 255, 255, 0.18)")
+              .replace(/rgba\(\s*255\s*,\s*255\s*,\s*255\s*,\s*0\.35\s*\)/gi, "rgba(255, 255, 255, 0.42)")
+              .replace(/rgba\(\s*255\s*,\s*255\s*,\s*255\s*,\s*0\.45\s*\)/gi, "rgba(255, 255, 255, 0.50)")
+              .replace(/rgba\(\s*255\s*,\s*255\s*,\s*255\s*,\s*0\.5\s*\)/gi, "rgba(255, 255, 255, 0.54)")
+              .replace(/rgba\(\s*255\s*,\s*255\s*,\s*255\s*,\s*0\.6\s*\)/gi, "rgba(255, 255, 255, 0.66)")
+              .replace(/rgba\(\s*255\s*,\s*255\s*,\s*255\s*,\s*0\.7\s*\)/gi, "rgba(255, 255, 255, 0.74)")
+              .replace(/rgba\(\s*80\s*,\s*220\s*,\s*140\s*,\s*0\.25\s*\)/gi, "rgba(38, 182, 61, 0.28)");
+          };
+          const normalizeExportColors = (str: string) => replaceExportNeutrals(replaceOklch(str));
+
+          for (const el of elements) {
+            const styleAttr = el.getAttribute("style");
+            if (styleAttr) {
+              el.setAttribute("style", normalizeExportColors(styleAttr));
+            }
+
+            const stroke = el.getAttribute("stroke");
+            if (stroke) {
+              el.setAttribute("stroke", normalizeExportColors(stroke));
+            }
+
+            const fill = el.getAttribute("fill");
+            if (fill) {
+              el.setAttribute("fill", normalizeExportColors(fill));
+            }
+          }
+        }
+      }).then((canvas) => {
+        canvas.toBlob((blob) => {
+          if (!blob) {
+            copyTextFallback();
+            return;
+          }
+
+          if (Capacitor.isNativePlatform()) {
+            const reader = new FileReader();
+            reader.readAsDataURL(blob);
+            reader.onloadend = async () => {
+              const base64data = reader.result as string;
+              const base64 = base64data.split(",")[1];
+              try {
+                const fileName = `liquidacion_${weekId}.png`;
+                const result = await Filesystem.writeFile({
+                  path: fileName,
+                  data: base64,
+                  directory: Directory.Cache,
+                });
+                await Share.share({
+                  title: "Liquidación Semanal",
+                  text: `Liquidación de la semana ${formatWeekRangeFull(weekId)}`,
+                  url: result.uri,
+                  dialogTitle: "Compartir Liquidación",
+                });
+              } catch (e) {
+                console.error("Error sharing image, fallback to text:", e);
+                copyTextFallback();
+              }
+            };
+          } else {
+            if (navigator.clipboard && window.ClipboardItem) {
+              const item = new ClipboardItem({ "image/png": blob });
+              navigator.clipboard.write([item]).then(() => {
+                setCopiado(true);
+                setTimeout(() => setCopiado(false), 2000);
+              }).catch((err) => {
+                console.error("ClipboardItem write failed, fallback to text:", err);
+                copyTextFallback();
+              });
+            } else {
+              copyTextFallback();
+            }
+          }
+        }, "image/png");
+      }).catch((err) => {
+        console.error("html2canvas failed, fallback to text:", err);
+        copyTextFallback();
+      });
+    };
+
+
+    const sharePrinterTicket = async () => {
+      const element = document.getElementById("ticket-impresora");
+      if (!element) return;
+      setProcesandoTicket(true);
+      try {
+        await document.fonts?.ready;
+      } catch {}
+      html2canvas(element, {
+        backgroundColor: "#ffffff",
+        scale: 3,
+        useCORS: true,
+        logging: false,
+      }).then((canvas) => {
+        canvas.toBlob((blob) => {
+          if (!blob) { setProcesandoTicket(false); return; }
+          if (Capacitor.isNativePlatform()) {
+            const reader = new FileReader();
+            reader.readAsDataURL(blob);
+            reader.onloadend = async () => {
+              const base64data = reader.result as string;
+              const base64 = base64data.split(",")[1];
+              try {
+                const fileName = `ticket_impresora_${weekId}.png`;
+                const result = await Filesystem.writeFile({
+                  path: fileName,
+                  data: base64,
+                  directory: Directory.Cache,
+                });
+                await Share.share({
+                  title: "Ticket Impresora",
+                  text: `Liquidacion semana ${formatWeekRangeFull(weekId)}`,
+                  url: result.uri,
+                  dialogTitle: "Enviar a Impresora",
+                });
+              } catch (e) {
+                console.error("Error al compartir ticket:", e);
+              } finally {
+                setProcesandoTicket(false);
+              }
+            };
+          } else {
+            const link = document.createElement("a");
+            link.download = `ticket_impresora_${weekId}.png`;
+            link.href = canvas.toDataURL("image/png");
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            setProcesandoTicket(false);
+          }
+        }, "image/png");
+      }).catch((err) => {
+        console.error("html2canvas ticket failed:", err);
+        setProcesandoTicket(false);
+      });
+    };
+
+    return (
+      <Shell burst={false}>
+        <div style={{ flex: 1, padding: "16px 20px 32px", minHeight: 0, display: "flex", flexDirection: "column", gap: 14, overflowY: "auto" }}>
+          {/* Cabecera */}
+          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+            <button style={S.iconBtn} onClick={() => setScreen("detalleSemana")}>
+              <IconBack />
+            </button>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontSize: "clamp(18px, 4.5vw, 22px)", fontWeight: 800, color: "white" }}>
+                Liquidación
+              </div>
+              <div style={{ fontSize: 17, color: "rgba(255,255,255,0.45)", marginTop: 2 }}>
+                Resumen de cuentas
+              </div>
+            </div>
+          </div>
+
+          {/* Ticket Digital */}
+          <div id="ticket-digital" style={{
+            background: "rgba(255, 255, 255, 0.015)",
+            borderRadius: 24,
+            border: "1px solid rgba(255, 255, 255, 0.08)",
+            padding: "24px 20px",
+            display: "flex",
+            flexDirection: "column",
+            gap: 16,
+            position: "relative",
+            boxShadow: "0 8px 32px rgba(0, 0, 0, 0.24)",
+            flexShrink: 0,
+            overflow: "hidden"
+          }}>
+            {/* Adorno de ticket (corte superior) */}
+            <div style={{
+              display: "flex",
+              justifyContent: "space-between",
+              position: "absolute",
+              top: 0,
+              left: 0,
+              right: 0,
+              height: 4,
+              overflow: "hidden"
+            }}>
+              {Array.from({ length: 20 }).map((_, i) => (
+                <div key={i} style={{
+                  width: 10,
+                  height: 10,
+                  background: "rgba(255,255,255,0.06)",
+                  borderRadius: "50%",
+                  transform: "translateY(-50%)"
+                }} />
+              ))}
+            </div>
+
+            {/* Cabecera del Recibo */}
+            <div style={{ textAlign: "center", borderBottom: "1px dashed rgba(255, 255, 255, 0.15)", paddingBottom: 16, marginTop: 4 }}>
+              <div style={{ fontSize: 20, fontWeight: 800, color: "white" }}>
+                {formatWeekRangeFull(weekId)}
+              </div>
+            </div>
+
+            {/* Apartado Principal */}
+            <div style={{ display: "flex", flexDirection: "column", gap: 10, borderBottom: "1px dashed rgba(255, 255, 255, 0.15)", paddingBottom: 16 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <span style={{ fontSize: 17, color: "rgba(255, 255, 255, 0.5)", display: "flex", alignItems: "center", gap: 6 }}>
+                  <IconTaxiBadgeNeon s={18} c="oklch(0.85 0.18 85)" /> Total Taxímetro
+                </span>
+                <span style={{ fontSize: 19, fontWeight: 700, color: "white", fontFamily: "monospace" }}>
+                  {fmt(taximetroLimpio)}
+                </span>
+              </div>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <span style={{ fontSize: 17, color: "rgba(255, 255, 255, 0.5)", display: "flex", alignItems: "center", gap: 6 }}>
+                  <IconRoad s={16} c="oklch(0.80 0.14 220)" /> Total KM
+                </span>
+                <span style={{ fontSize: 19, fontWeight: 700, color: "white", fontFamily: "monospace" }}>
+                  {fmtKmNumber(totalKMAcumulado)} KM
+                </span>
+              </div>
+            </div>
+
+            {/* Bloque Centrado: Comisión Bruta Jefe */}
+            <div style={{
+              background: "rgba(255, 255, 255, 0.025)",
+              border: "1px solid rgba(255, 255, 255, 0.05)",
+              borderRadius: 16,
+              padding: 16,
+              textAlign: "center",
+              display: "flex",
+              flexDirection: "column",
+              gap: 4
+            }}>
+              <div style={{ fontSize: 15, fontWeight: 800, color: "rgba(255, 255, 255, 0.45)", textTransform: "uppercase", letterSpacing: "0.6px" }}>
+                Comisión Bruta Jefe
+              </div>
+              <div style={{ fontSize: 26, fontWeight: 950, color: "white", fontFamily: "monospace" }}>
+                {fmt(brutoJefeAcumulado)}
+              </div>
+            </div>
+
+            {/* Bloque "Descontar" */}
+            <div style={{ display: "flex", flexDirection: "column", gap: 10, borderBottom: "1px dashed rgba(255, 255, 255, 0.15)", paddingBottom: 16 }}>
+              <div style={{ fontSize: 15, fontWeight: 800, color: "oklch(0.70 0.18 25)", textTransform: "uppercase", letterSpacing: "0.6px" }}>
+                Descontar
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 8, paddingLeft: 4 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: 17 }}>
+                  <span style={{ color: "rgba(255, 255, 255, 0.5)", display: "flex", alignItems: "center", gap: 6 }}>
+                    <IconCard s={14} c={P} /> Datáfonos
+                  </span>
+                  <span style={{ color: "rgba(255,255,255,0.7)", fontFamily: "monospace" }}>-{fmt(descDAcumulado)}</span>
+                </div>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: 17 }}>
+                  <span style={{ color: "rgba(255, 255, 255, 0.5)", display: "flex", alignItems: "center", gap: 6 }}>
+                    <IconFuel s={16} c={F} /> Gasolina
+                  </span>
+                  <span style={{ color: "rgba(255,255,255,0.7)", fontFamily: "monospace" }}>-{fmt(descGAcumulado)}</span>
+                </div>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: 17 }}>
+                  <span style={{ color: "rgba(255, 255, 255, 0.5)", display: "flex", alignItems: "center", gap: 6 }}>
+                    <IconAgency s={14} c={A} /> Agencias/Bonos
+                  </span>
+                  <span style={{ color: "rgba(255,255,255,0.7)", fontFamily: "monospace" }}>-{fmt(descAAcumulado)}</span>
+                </div>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: 17 }}>
+                  <span style={{ color: "rgba(255, 255, 255, 0.5)", display: "flex", alignItems: "center", gap: 6 }}>
+                    <IconExtra s={14} c={E} /> Extras
+                  </span>
+                  <span style={{ color: "rgba(255,255,255,0.7)", fontFamily: "monospace" }}>-{fmt(descEAcumulado)}</span>
+                </div>
+              </div>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", paddingTop: 4, fontWeight: 700 }}>
+                <span style={{ fontSize: 17, color: "white" }}>Total Descuentos</span>
+                <span style={{ fontSize: 19, color: "oklch(0.70 0.18 25)", fontFamily: "monospace" }}>-{fmt(totalDescontarAcumulado)}</span>
+              </div>
+            </div>
+
+            {/* Resultado Neto */}
+            <div style={{ textAlign: "center", padding: "8px 0" }}>
+              <div style={{ fontSize: 15, fontWeight: 800, color: "rgba(255, 255, 255, 0.45)", textTransform: "uppercase", letterSpacing: "0.6px", marginBottom: 6 }}>
+                Neto a Entregar
+              </div>
+              <div style={{ fontSize: 36, fontWeight: 950, color: G, fontFamily: "monospace", textShadow: "0 0 12px rgba(80, 220, 140, 0.25)" }}>
+                {fmt(totalNetoAcumulado)}
+              </div>
+            </div>
+
+            {turnosConNotas.length > 0 && (
+              <div style={{ borderTop: "1px dashed rgba(255, 255, 255, 0.15)", paddingTop: 14, display: "flex", flexDirection: "column", gap: 18 }}>
+                <div style={{ fontSize: 20, fontWeight: 800, color: "white", textAlign: "center", textTransform: "uppercase", letterSpacing: "0.6px", textShadow: "0 0 10px rgba(255,255,255,0.18)" }}>
+                  Notas de la semana
+                </div>
+                {turnosConNotas.map(({ turno, notasGenerales, notasDetalladas }, index) => (
+                  <div key={`ticket-notas-${turno.id}`} style={{ display: "flex", flexDirection: "column", gap: 8, paddingTop: index === 0 ? 2 : 12, borderTop: index === 0 ? "none" : "1px dashed rgba(255,255,255,0.10)" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, fontWeight: 800, color: "rgba(255,255,255,0.72)" }}>
+                      <span style={{ width: 12, height: 1, background: "rgba(255,255,255,0.24)", flexShrink: 0 }} />
+                      {fmtDate(turno.date)}
+                    </div>
+                    {notasGenerales.map((entry) => (
+                      <div key={`ticket-nota-general-${entry.id}`} style={{ display: "grid", gridTemplateColumns: "auto minmax(0, 1fr)", alignItems: "start", gap: 9, color: "rgba(255,255,255,0.8)", fontSize: 13, lineHeight: 1.4, minWidth: 0, marginLeft: 14 }}>
+                        <span style={{ color: "rgba(255,255,255,0.58)", fontSize: 11, fontWeight: 700, lineHeight: 1, whiteSpace: "nowrap", background: "rgba(150,130,255,0.10)", border: "1px solid rgba(150,130,255,0.14)", borderRadius: 7, padding: "4px 5px", marginTop: 1 }}>{entry.time}</span>
+                        <span style={{ color: "rgba(255,255,255,0.82)", fontSize: 12, lineHeight: 1.38, minWidth: 0, overflowWrap: "anywhere" }}>{entry.note}</span>
+                      </div>
+                    ))}
+                    {notasDetalladas.map((entry) => {
+                      const meta = getEntryTypeMeta(entry.type);
+                      return (
+                        <div key={`ticket-nota-detallada-${entry.id}`} style={{ fontSize: 13, display: "grid", gridTemplateColumns: "auto auto minmax(0, 1fr) auto", alignItems: "start", gap: 8, minWidth: 0, marginLeft: 14 }}>
+                                      <span style={{ fontSize: 11, color: "rgba(255,255,255,0.5)", fontWeight: 600, flexShrink: 0 }}>{entry.time}</span>
+                          <span style={{ fontWeight: 700, color: meta.color, fontSize: 14, whiteSpace: "nowrap", flexShrink: 0 }}>{meta.label}</span>
+                          <span style={{ color: "rgba(255,255,255,0.8)", fontSize: 12, lineHeight: 1.4, flex: 1, minWidth: 0, overflowWrap: "anywhere" }}>{entry.note}</span>
+                          <span style={{ fontSize: 15, fontWeight: 700, color: meta.color, whiteSpace: "nowrap", flexShrink: 0 }}>{fmt(entry.amount)}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+            <button
+              id="btn-imprimir-ticket"
+              onClick={sharePrinterTicket}
+              disabled={procesandoTicket}
+              style={{
+                padding: "16px 0",
+                borderRadius: 16,
+                background: procesandoTicket ? "rgba(255,255,255,0.04)" : "rgba(37, 210, 252, 0.1)",
+                border: procesandoTicket ? "1px solid rgba(255,255,255,0.08)" : "1px solid rgba(37, 210, 252, 0.3)",
+                color: procesandoTicket ? "rgba(255,255,255,0.35)" : "#25d2fc",
+                fontSize: 19,
+                fontWeight: 700,
+                cursor: procesandoTicket ? "not-allowed" : "pointer",
+                display: "flex",
+                justifyContent: "center",
+                alignItems: "center",
+                gap: 8,
+                transition: "all 0.2s"
+              }}
+            >
+              {procesandoTicket ? "Generando ticket..." : "Imprimir Ticket"}
+            </button>
+
+          {/* Ticket termico oculto para impresora */}
+          <div
+            id="ticket-impresora"
+            style={{
+              position: "absolute",
+              left: "-9999px",
+              top: 0,
+              width: 384,
+              backgroundColor: "#ffffff",
+              color: "#000000",
+              fontFamily: "'Courier New', Courier, monospace",
+              fontSize: 16,
+              fontWeight: 700,
+              padding: "24px 20px",
+              lineHeight: 1.4,
+              WebkitTextStroke: "0.2px #000000",
+            }}
+          >
+            <div style={{ textAlign: "center", fontSize: 18, fontWeight: 900, marginBottom: 4, color: "#000000", WebkitTextStroke: "0.6px #000000" }}>LIQUIDACION SEMANAL</div>
+            <div style={{ textAlign: "center", fontSize: 19, fontWeight: 900, marginBottom: 12, color: "#000000", WebkitTextStroke: "0.6px #000000" }}>{formatWeekRangeFull(weekId)}</div>
+            <div style={{ borderTop: "1px dashed #000000", marginBottom: 10 }} />
+            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 18, fontWeight: 900, color: "#000000", marginBottom: 4, WebkitTextStroke: "0.6px #000000" }}>
+              <span>Total Taximetro</span><span>{fmt(taximetroLimpio)}</span>
+            </div>
+            <div style={{ display: "flex", justifyContent: "space-between", color: "#000000", marginBottom: 4 }}>
+              <span>Total KM</span><span>{fmtKmNumber(totalKMAcumulado)} KM</span>
+            </div>
+            <div style={{ borderTop: "1px dashed #000000", margin: "6px 0" }} />
+            <div style={{ display: "flex", justifyContent: "space-between", color: "#000000", marginBottom: 4 }}>
+              <span>Comision Bruta Jefe</span><span>{fmt(brutoJefeAcumulado)}</span>
+            </div>
+            <div style={{ borderTop: "1px dashed #000000", margin: "8px 0" }} />
+            <div style={{ fontWeight: 900, color: "#000000", marginBottom: 4, WebkitTextStroke: "0.6px #000000" }}>DESCUENTOS:</div>
+            <div style={{ display: "flex", justifyContent: "space-between", color: "#000000", marginBottom: 2, paddingLeft: 8 }}>
+              <span>Datafonos</span><span>-{fmt(descDAcumulado)}</span>
+            </div>
+            <div style={{ display: "flex", justifyContent: "space-between", color: "#000000", marginBottom: 2, paddingLeft: 8 }}>
+              <span>Gasolina</span><span>-{fmt(descGAcumulado)}</span>
+            </div>
+            <div style={{ display: "flex", justifyContent: "space-between", color: "#000000", marginBottom: 2, paddingLeft: 8 }}>
+              <span>Agencias/Bonos</span><span>-{fmt(descAAcumulado)}</span>
+            </div>
+            <div style={{ display: "flex", justifyContent: "space-between", color: "#000000", marginBottom: 2, paddingLeft: 8 }}>
+              <span>Extras</span><span>-{fmt(descEAcumulado)}</span>
+            </div>
+            <div style={{ display: "flex", justifyContent: "space-between", fontWeight: 900, color: "#000000", marginTop: 4, WebkitTextStroke: "0.6px #000000" }}>
+              <span>Total Descuentos</span><span>-{fmt(totalDescontarAcumulado)}</span>
+            </div>
+            <div style={{ borderTop: "1px dashed #000000", margin: "8px 0" }} />
+            <div style={{ textAlign: "center", fontWeight: 900, fontSize: 22, color: "#000000", margin: "8px 0", WebkitTextStroke: "0.6px #000000" }}>
+              NETO A ENTREGAR: {fmt(totalNetoAcumulado)}
+            </div>
+            {turnosConNotas.length > 0 && (
+              <>
+                <div style={{ borderTop: "1px dashed #000000", margin: "8px 0" }} />
+                <div style={{ fontSize: 18, fontWeight: 900, color: "#000000", marginBottom: 4, WebkitTextStroke: "0.6px #000000" }}>NOTAS DE LA SEMANA:</div>
+                {turnosConNotas.map(({ turno, notasGenerales, notasDetalladas }) => (
+                  <div key={turno.id} style={{ marginBottom: 6 }}>
+                    <div style={{ fontWeight: 900, color: "#000000", fontSize: 16, WebkitTextStroke: "0.5px #000000" }}>{fmtDate(turno.date)}</div>
+                    {notasGenerales.map((entry) => (
+                      <div key={entry.id} style={{ fontSize: 14, color: "#000000", paddingLeft: 8, display: "grid", gridTemplateColumns: "46px auto minmax(0, 1fr)", gap: 4, alignItems: "start", marginBottom: 2 }}>
+                        <span>{entry.time}</span>
+                        <span>Nota:</span>
+                        <span style={{ minWidth: 0, overflowWrap: "anywhere", wordBreak: "break-word", whiteSpace: "normal", lineHeight: 1.35 }}>{entry.note.trim()}</span>
+                      </div>
+                    ))}
+                    {notasDetalladas.map((entry) => {
+                      const meta = getEntryTypeMeta(entry.type);
+                      return (
+                        <div key={entry.id} style={{ fontSize: 14, color: "#000000", paddingLeft: 8, display: "grid", gridTemplateColumns: "46px auto auto minmax(0, 1fr)", gap: 4, alignItems: "start", marginBottom: 2 }}>
+                          <span>{entry.time}</span>
+                          <span>{meta.label}:</span>
+                          <span>({fmt(entry.amount)})</span>
+                          <span style={{ minWidth: 0, overflowWrap: "anywhere", wordBreak: "break-word", whiteSpace: "normal", lineHeight: 1.35 }}>{entry.note.trim()}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                ))}
+              </>
+            )}
+          </div>
+
+          {/* Botones de acción */}
+          <div style={{ flexShrink: 0, display: "flex", flexDirection: "column", gap: 10, marginTop: 4 }}>
+            <button
+              onClick={copyToClipboard}
+              style={{
+                padding: "16px 0",
+                borderRadius: 16,
+                background: copiado ? "rgba(80, 220, 140, 0.12)" : "rgba(255, 255, 255, 0.08)",
+                border: copiado ? `1px solid ${G}` : "1px solid rgba(255, 255, 255, 0.1)",
+                color: copiado ? G : "white",
+                fontSize: 19,
+                fontWeight: 700,
+                cursor: "pointer",
+                display: "flex",
+                justifyContent: "center",
+                alignItems: "center",
+                gap: 8,
+                transition: "all 0.2s"
+              }}
+            >
+              {copiado ? "¡Copiado! ✓" : "Copiar Liquidación"}
+            </button>
+
+            <button
+              onClick={() => setScreen("detalleSemana")}
+              style={{
+                padding: "16px 0",
+                borderRadius: 16,
+                border: "none",
+                background: "rgba(255, 255, 255, 0.04)",
+                color: "rgba(255, 255, 255, 0.6)",
+                fontSize: 19,
+                fontWeight: 700,
+                cursor: "pointer",
+                textAlign: "center"
+              }}
+            >
+              Volver
+            </button>
+          </div>
+        </div>
+      </Shell>
+    );
+  }
+
   if (screen === "PantallaTurnos") {
     return (
       <Shell burst={false}>
@@ -6459,80 +7130,63 @@ function App() {
               Entradas de hoy
             </div>
           </div>
+          {current.entries.length > 0 && (
+            <div style={{
+              fontSize: 13,
+              color: "rgba(255,255,255,0.4)",
+              marginTop: -8,
+              marginBottom: 2,
+              fontStyle: "italic",
+            }}>
+              Toca una entrada para editar
+            </div>
+          )}
           <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
             {[...current.entries].reverse().map((e) => {
-              const meta =
-                e.type === "propina"
-                  ? { col: G, ic: <IconCoin s={17} c={G} />, lbl: "Propina" }
-                  : e.type === "datafono"
-                    ? { col: P, ic: <IconCard s={17} c={P} />, lbl: "Datáfono" }
-                    : (e.type === "agencia_bono")
-                      ? { col: A, ic: <IconAgency s={17} c={A} />, lbl: "Agencia/Bono" }
-                      : e.type === "extra"
-                        ? { col: E, ic: <IconExtra s={17} c={E} />, lbl: "Extra" }
-                        : e.type === "nulo"
-                          ? { col: N, ic: <IconNulo s={17} c={N} />, lbl: "Nulo" }
-                          : { col: F, ic: <IconFuel s={17} c={F} />, lbl: "Gasolina" };
+              const meta = getEntryTypeMeta(e.type);
               return (
                 <div
                   key={e.id}
+                  onClick={() => openEditEntry(e)}
+                  role="button"
+                  tabIndex={0}
+                  title="Editar entrada"
+                  aria-label="Editar entrada"
+                  onKeyDown={(ev) => {
+                    if (ev.key === "Enter" || ev.key === " ") {
+                      ev.preventDefault();
+                      openEditEntry(e);
+                    }
+                  }}
                   style={{
-                    display: "flex",
+                    display: "grid",
+                    gridTemplateColumns: "auto minmax(0, 1fr) auto auto",
                     alignItems: "center",
                     gap: 10,
                     background: "rgba(255,255,255,0.04)",
                     borderRadius: 13,
                     padding: "10px 14px",
+                    cursor: "pointer",
+                    transition: "background 0.15s",
+                  }}
+                  onMouseEnter={(ev) => {
+                    (ev.currentTarget as HTMLDivElement).style.background = "rgba(255,255,255,0.08)";
+                  }}
+                  onMouseLeave={(ev) => {
+                    (ev.currentTarget as HTMLDivElement).style.background = "rgba(255,255,255,0.04)";
                   }}
                 >
-                  {meta.ic}
-                  <div style={{ flex: 1, fontSize: 15, fontWeight: 600, color: "rgba(255,255,255,0.8)" }}>
-                    {meta.lbl}
-                    {e.note && <span style={{ color: "rgba(255,255,255,0.5)", fontSize: 13 }}> · {e.note}</span>}
-                  </div>
-                  <span style={{ fontSize: 13, color: "rgba(255,255,255,0.5)", marginRight: 8 }}>{e.time}</span>
-                  <span style={{ fontSize: 16, fontWeight: 800, color: meta.col }}>+{fmt(e.amount)}</span>
-                  <button
-                    onClick={() => openEditEntry(e)}
-                    title="Editar entrada"
-                    aria-label="Editar entrada"
-                    style={{
-                      background: "rgba(255,255,255,0.08)",
-                      border: "none",
-                      borderRadius: 7,
-                      color: "rgba(255,255,255,0.7)",
-                      fontSize: 13,
-                      cursor: "pointer",
-                      width: 32,
-                      height: 32,
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      marginLeft: 8,
-                    }}
-                  >
-                    <IconPencilNeon />
-                  </button>
+                  <span style={{ display: "inline-flex", alignItems: "center", gap: 7, whiteSpace: "nowrap", flexShrink: 0 }}>
+                    {meta.icon(17)}
+                    <span style={{ color: meta.color, fontSize: 14, fontWeight: 700 }}>{meta.label}</span>
+                  </span>
+                  <span style={{ color: "rgba(255,255,255,0.6)", fontSize: 12, lineHeight: 1.35, minWidth: 0, overflowWrap: "anywhere" }}>{e.note}</span>
+                  <span style={{ fontSize: 12, color: "rgba(255,255,255,0.5)", flexShrink: 0 }}>{e.time}</span>
+                  <span style={{ fontSize: 14, fontWeight: 700, color: meta.color, whiteSpace: "nowrap", flexShrink: 0 }}>{e.type !== "nota" && `+${fmt(e.amount)}`}</span>
                 </div>
               );
             })}
           </div>
-          {current.entries.length > 0 && (
-            <button
-              onClick={() => {
-                setConfirmDialog({
-                  text: "¿Seguro que quieres borrar TODAS las entradas de hoy?",
-                  onConfirm: () => {
-                    setCurrent({ entries: [], startTime: current.startTime, startDate: current.startDate });
-                    setScreen("main");
-                  }
-                });
-              }}
-              style={S.dangerBtn}
-            >
-              Borrar todas las entradas
-            </button>
-          )}
         </div>
         {confirmDialog && <ConfirmDialog {...confirmDialog} onCancel={() => setConfirmDialog(null)} />}
         {editEntry && (
@@ -6647,7 +7301,7 @@ function App() {
               <div style={{ background: ABG, borderRadius: 14, padding: "12px", border: `1px solid ${A}33` }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 6 }}>
                   <IconAgency s={15} c={A} />
-                  <span style={{ fontSize: 12, fontWeight: 600, color: "rgba(255,255,255,0.4)" }}>Agencias</span>
+                  <span style={{ fontSize: 12, fontWeight: 600, color: "rgba(255,255,255,0.4)" }}>Agencias/Bonos</span>
                 </div>
                 <div style={{ fontSize: 20, fontWeight: 900, color: A, letterSpacing: "-0.5px" }}>{fmt(totalA)}</div>
                 <div style={{ fontSize: 11, color: "rgba(255,255,255,0.5)", marginTop: 2 }}>{agencias.length} entrada{agencias.length !== 1 ? "s" : ""}</div>
@@ -6684,12 +7338,14 @@ function App() {
               if (gNotes.length > 0) {
                 return (
                   <div style={{ marginTop: 16, paddingTop: 14, borderTop: "1px solid rgba(255,255,255,0.06)" }}>
-                    <div style={{ fontSize: 11, fontWeight: 700, color: "rgba(255,255,255,0.4)", textTransform: "uppercase", letterSpacing: "0.6px", marginBottom: 8 }}>📝 Notas del Turno</div>
-                    <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                    <div style={{ fontSize: 11, fontWeight: 700, color: "rgba(255,255,255,0.4)", textTransform: "uppercase", letterSpacing: "0.6px", marginBottom: 8, display: "flex", alignItems: "center", gap: 5 }}>
+                      <IconNoteAdd s={17} showPlus={false} /> Notas del Turno
+                    </div>
+                    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                       {gNotes.map(e => (
-                        <div key={e.id} style={{ color: "rgba(255,255,255,0.8)", fontSize: 13, lineHeight: 1.4, background: "rgba(255,255,255,0.02)", padding: "8px 10px", borderRadius: 8 }}>
-                          <span style={{ color: "rgba(255,255,255,0.5)", fontSize: 11, marginRight: 6, fontWeight: 600 }}>{e.time}</span>
-                          {e.note}
+                        <div key={e.id} style={{ display: "grid", gridTemplateColumns: "auto minmax(0, 1fr)", alignItems: "start", gap: 9, color: "rgba(255,255,255,0.8)", fontSize: 13, lineHeight: 1.4, background: "rgba(255,255,255,0.025)", padding: "8px 10px", borderRadius: 9, minWidth: 0 }}>
+                          <span style={{ color: "rgba(255,255,255,0.58)", fontSize: 11, fontWeight: 700, lineHeight: 1, whiteSpace: "nowrap", background: "rgba(150,130,255,0.10)", border: "1px solid rgba(150,130,255,0.14)", borderRadius: 7, padding: "4px 5px", marginTop: 1 }}>{e.time}</span>
+                          <span style={{ color: "rgba(255,255,255,0.82)", fontSize: 12, lineHeight: 1.38, minWidth: 0, overflowWrap: "anywhere" }}>{e.note}</span>
                         </div>
                       ))}
                     </div>
@@ -6710,15 +7366,17 @@ function App() {
             if (entriesWithNotes.length === 0) return null;
             return (
               <div style={{ marginBottom: 12, display: "flex", flexDirection: "column", gap: 6, flexShrink: 0 }}>
-                <div style={{ fontSize: 11, fontWeight: 700, color: "rgba(255,255,255,0.4)", textTransform: "uppercase", letterSpacing: "0.6px", marginBottom: 2 }}>📌 Notas detalladas</div>
+                <div style={{ fontSize: 11, fontWeight: 700, color: "rgba(255,255,255,0.4)", textTransform: "uppercase", letterSpacing: "0.6px", marginBottom: 2, display: "flex", alignItems: "center", gap: 6 }}>
+                  <IconPinNeon s={18} /> Notas detalladas
+                </div>
                 {entriesWithNotes.map(e => {
-                  const col = e.type === 'propina' ? G : e.type === 'datafono' ? P : (e.type === 'agencia_bono') ? A : e.type === 'extra' ? E : e.type === 'gasolina' ? F : N;
+                  const meta = getEntryTypeMeta(e.type);
                   return (
-                    <div key={e.id} style={{ fontSize: 13, background: "rgba(255,255,255,0.03)", padding: "10px 12px", borderRadius: 12, border: "1px solid rgba(255,255,255,0.05)", display: "flex", alignItems: "baseline", gap: 8 }}>
-                      <span style={{ fontSize: 11, color: "rgba(255,255,255,0.5)", fontWeight: 600 }}>{e.time}</span>
-                      <span style={{ fontWeight: 900, color: col, fontSize: 10, textTransform: "uppercase", minWidth: 60 }}>{e.type === 'agencia_bono' ? 'agencia/bono' : e.type}</span>
-                      <span style={{ color: "rgba(255,255,255,0.8)", lineHeight: 1.4 }}>{e.note}</span>
-                      <span style={{ marginLeft: "auto", fontSize: 11, color: "rgba(255,255,255,0.5)", fontWeight: 600 }}>{fmt(e.amount)}</span>
+                    <div key={e.id} style={{ fontSize: 13, background: "rgba(255,255,255,0.03)", padding: "10px 12px", borderRadius: 12, border: "1px solid rgba(255,255,255,0.05)", display: "grid", gridTemplateColumns: "auto auto minmax(0, 1fr) auto", alignItems: "start", gap: 8, minWidth: 0 }}>
+                      <span style={{ fontSize: 12, color: "rgba(255,255,255,0.5)", fontWeight: 600, flexShrink: 0, alignSelf: "start" }}>{e.time}</span>
+                      <span style={{ fontWeight: 700, color: meta.color, fontSize: 14, whiteSpace: "nowrap", flexShrink: 0 }}>{meta.label}</span>
+                      <span style={{ color: "rgba(255,255,255,0.8)", fontSize: 12, lineHeight: 1.4, flex: 1, minWidth: 0, overflowWrap: "anywhere" }}>{e.note}</span>
+                      <span style={{ fontSize: 15, fontWeight: 700, color: meta.color, whiteSpace: "nowrap", flexShrink: 0, alignSelf: "start" }}>{fmt(e.amount)}</span>
                     </div>
                   );
                 })}
@@ -7040,9 +7698,34 @@ function App() {
               textTransform: "uppercase",
               letterSpacing: "0.8px",
               marginBottom: 10,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
             }}
           >
-            Últimas entradas
+            <span>Últimas entradas</span>
+            {current.entries.length > 0 && (
+              <button
+                onClick={() => setScreen("todayHistory")}
+                title="Editar entradas"
+                aria-label="Editar entradas"
+                style={{
+                  background: "rgba(255,255,255,0.08)",
+                  border: "none",
+                  borderRadius: 7,
+                  color: "rgba(255,255,255,0.7)",
+                  fontSize: 12,
+                  cursor: "pointer",
+                  width: 30,
+                  height: 30,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                }}
+              >
+                <IconPencilNeon />
+              </button>
+            )}
           </div>
           {current.entries.length === 0 ? (
             <div
@@ -7107,38 +7790,14 @@ function App() {
               {[...current.entries]
                 .reverse()
                 .map((e) => {
-                  const meta =
-                    e.type === "propina"
-                      ? { col: G, ic: <IconCoin s={17} c={G} />, lbl: "Propina" }
-                      : e.type === "datafono"
-                        ? {
-                          col: P,
-                          ic: <IconCard s={17} c={P} />,
-                          lbl: "Datáfono",
-                        }
-                        : (e.type === "agencia_bono")
-                          ? {
-                            col: A,
-                            ic: <IconAgency s={17} c={A} />,
-                            lbl: "Agencia/Bono",
-                          }
-                          : e.type === "extra"
-                            ? {
-                              col: E,
-                              ic: <IconExtra s={17} c={E} />,
-                              lbl: "Extra",
-                            }
-                            : e.type === "nulo"
-                              ? { col: N, ic: <IconNulo s={17} c={N} />, lbl: "Nulo" }
-                              : e.type === "nota"
-                                ? { col: "white", ic: <span style={{ fontSize: 16 }}>📝</span>, lbl: "Nota" }
-                                : { col: F, ic: <IconFuel s={17} c={F} />, lbl: "Gasolina" };
+                  const meta = getEntryTypeMeta(e.type);
                   return (
                     <div
                       key={e.id}
                       style={{
-                        display: "flex",
-                        alignItems: "center",
+                        display: "grid",
+                        gridTemplateColumns: "auto minmax(0, 1fr) auto auto",
+                        alignItems: "start",
                         gap: 10,
                         background: "rgba(255,255,255,0.04)",
                         borderRadius: 13,
@@ -7146,82 +7805,29 @@ function App() {
                         animation: "fadeUp 0.2s ease",
                       }}
                     >
-                      {meta.ic}
-                      <div
-                        style={{
-                          flex: 1,
-                          fontSize: 14,
-                          fontWeight: 500,
-                          color: "rgba(255,255,255,0.75)",
-                        }}
-                      >
-                        {meta.lbl}
-                        {e.note && (
-                          <span
-                            style={{
-                              color: "rgba(255,255,255,0.5)",
-                              fontSize: 12,
-                            }}
-                          >
-                            {" "}
-                            · {e.note}
-                          </span>
-                        )}
-                      </div>
+                      <span style={{ display: "inline-flex", alignItems: "center", gap: 7, whiteSpace: "nowrap", flexShrink: 0 }}>
+                        {meta.icon(17)}
+                        <span style={{ color: meta.color, fontSize: 14, fontWeight: 700 }}>{meta.label}</span>
+                      </span>
+                      <span style={{ color: "rgba(255,255,255,0.55)", fontSize: 12, lineHeight: 1.35, minWidth: 0, overflowWrap: "anywhere" }}>{e.note}</span>
                       <span
                         style={{
                           fontSize: 12,
                           color: "rgba(255,255,255,0.5)",
-                          marginRight: 6,
+                          flexShrink: 0,
+                          alignSelf: "start",
                         }}
                       >
                         {e.time}
                       </span>
                       <span
-                        style={{ fontSize: 15, fontWeight: 700, color: meta.col }}
+                        style={{ fontSize: 14, fontWeight: 700, color: meta.color, flexShrink: 0, alignSelf: "start" }}
                       >
                         {e.type !== "nota" && `+${fmt(e.amount)}`}
                       </span>
-                      <button
-                        onClick={() => openEditEntry(e)}
-                        title="Editar entrada"
-                        aria-label="Editar entrada"
-                        style={{
-                          background: "rgba(255,255,255,0.08)",
-                          border: "none",
-                          borderRadius: 7,
-                          color: "rgba(255,255,255,0.7)",
-                          fontSize: 12,
-                          cursor: "pointer",
-                          width: 30,
-                          height: 30,
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "center",
-                          marginLeft: 6,
-                        }}
-                      >
-                        <IconPencilNeon />
-                      </button>
                     </div>
                   );
                 })}
-              {current.entries.length > 4 && (
-                <button
-                  onClick={() => setScreen("todayHistory")}
-                  style={{
-                    background: "none",
-                    border: "none",
-                    color: "rgba(255,255,255,0.5)",
-                    fontSize: 13,
-                    cursor: "pointer",
-                    padding: "4px 0",
-                    textAlign: "left",
-                  }}
-                >
-                  Ver todas ({current.entries.length}) →
-                </button>
-              )}
             </div>
           )}
         </div>
@@ -7379,7 +7985,6 @@ function SmallCard({
             fontSize: 11,
             fontWeight: 600,
             color: "rgba(255,255,255,0.45)",
-            textTransform: "uppercase",
             letterSpacing: "0.5px",
           }}
         >
@@ -7499,14 +8104,7 @@ function EditEntryDialog({
   onCancel: () => void;
 }) {
   const [showKP, setShowKP] = React.useState(false);
-  const meta: { col: string; lbl: string } =
-    entry.type === "propina" ? { col: G, lbl: "Propina" }
-      : entry.type === "datafono" ? { col: P, lbl: "Datáfono" }
-        : (entry.type === "agencia_bono") ? { col: A, lbl: "Agencia/Bono" }
-          : entry.type === "extra" ? { col: E, lbl: "Extra" }
-            : entry.type === "gasolina" ? { col: F, lbl: "Gasolina" }
-              : entry.type === "nota" ? { col: "white", lbl: "Nota" }
-                : { col: N, lbl: "Nulo" };
+  const meta = getEntryTypeMeta(entry.type);
 
   function kpAmount(k: string) {
     if (k === "DEL") { onAmountChange(amount.slice(0, -1)); return; }
@@ -7544,8 +8142,8 @@ function EditEntryDialog({
         }}
       >
         <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 14 }}>
-          <span style={{ fontSize: 13, fontWeight: 700, color: meta.col, textTransform: "uppercase", letterSpacing: "0.5px" }}>
-            Editar {meta.lbl}
+          <span style={{ fontSize: 13, fontWeight: 700, color: meta.color, textTransform: "uppercase", letterSpacing: "0.5px" }}>
+            Editar {meta.label}
           </span>
           <span style={{ fontSize: 12, color: "rgba(255,255,255,0.5)", marginLeft: "auto" }}>{entry.time}</span>
         </div>
@@ -7555,14 +8153,14 @@ function EditEntryDialog({
           <div style={{ marginBottom: 12, cursor: "pointer" }} onClick={() => setShowKP(true)}>
             <div style={{ fontSize: 11, fontWeight: 700, color: "rgba(255,255,255,0.5)", marginBottom: 6, textTransform: "uppercase", letterSpacing: "0.6px", display: "flex", justifyContent: "space-between" }}>
               <span>Importe (€)</span>
-              {!showKP && <span style={{ color: meta.col, fontSize: 10 }}>Toca para editar</span>}
+              {!showKP && <span style={{ color: meta.color, fontSize: 10 }}>Toca para editar</span>}
             </div>
             <div style={{
               width: "100%",
               background: "rgba(0,0,0,0.3)",
-              border: `1px solid ${showKP ? meta.col : "rgba(255,255,255,0.1)"}`,
+              border: `1px solid ${showKP ? meta.color : "rgba(255,255,255,0.1)"}`,
               borderRadius: 12,
-              color: showKP ? meta.col : "white",
+              color: showKP ? meta.color : "white",
               padding: "12px 14px",
               fontSize: 26,
               fontWeight: 900,
@@ -7659,7 +8257,7 @@ function EditEntryDialog({
               padding: "14px",
               borderRadius: 12,
               border: "none",
-              background: meta.col,
+              background: meta.color,
               color: "black",
               fontWeight: 800,
               fontSize: 14,
@@ -7803,18 +8401,13 @@ function TurnoNotasCard({
             Notas detalladas
           </div>
           {notasDetalladas.map((entry) => {
-            const meta = entry.type === "propina" ? { color: G, label: "Propina" }
-              : entry.type === "datafono" ? { color: P, label: "Datafono" }
-                : entry.type === "agencia_bono" ? { color: A, label: "Agencia/Bono" }
-                  : entry.type === "extra" ? { color: E, label: "Extra" }
-                    : entry.type === "gasolina" ? { color: F, label: "Gasolina" }
-                      : { color: N, label: "Nulo" };
+            const meta = getEntryTypeMeta(entry.type);
             return (
-              <div key={entry.id} style={{ fontSize: 13, background: "rgba(255,255,255,0.025)", padding: "8px 10px", borderRadius: 10, display: "flex", alignItems: "baseline", gap: 7 }}>
-                <span style={{ fontSize: 11, color: "rgba(255,255,255,0.45)", fontWeight: 700 }}>{entry.time}</span>
-                <span style={{ fontSize: 10, fontWeight: 900, color: meta.color, textTransform: "uppercase", minWidth: 58 }}>{meta.label}</span>
-                <span style={{ color: "rgba(255,255,255,0.82)", lineHeight: 1.35, overflowWrap: "anywhere" }}>{entry.note}</span>
-                <span style={{ marginLeft: "auto", fontSize: 11, color: "rgba(255,255,255,0.45)", fontWeight: 700, whiteSpace: "nowrap" }}>{fmt(entry.amount)}</span>
+              <div key={entry.id} style={{ fontSize: 13, background: "rgba(255,255,255,0.025)", padding: "8px 10px", borderRadius: 10, display: "grid", gridTemplateColumns: "auto auto minmax(0, 1fr) auto", alignItems: "start", gap: 7, minWidth: 0 }}>
+                <span style={{ fontSize: 12, color: "rgba(255,255,255,0.45)", fontWeight: 700, flexShrink: 0, alignSelf: "start" }}>{entry.time}</span>
+                <span style={{ fontWeight: 700, color: meta.color, fontSize: 14, whiteSpace: "nowrap", flexShrink: 0 }}>{meta.label}</span>
+                <span style={{ color: "rgba(255,255,255,0.82)", fontSize: 12, lineHeight: 1.35, flex: 1, minWidth: 0, overflowWrap: "anywhere" }}>{entry.note}</span>
+                <span style={{ fontSize: 15, fontWeight: 700, color: meta.color, whiteSpace: "nowrap", flexShrink: 0, alignSelf: "start" }}>{fmt(entry.amount)}</span>
               </div>
             );
           })}

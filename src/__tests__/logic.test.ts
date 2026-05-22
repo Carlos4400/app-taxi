@@ -494,7 +494,7 @@ describe('Loose Turno Delivery Logic', () => {
 });
 
 describe('Weekly Turno Notes Logic', () => {
-  it('should return only turnos with turno notes or detailed entry notes', () => {
+  it('should return only turnos with entry notes', () => {
     const turnos = [
       {
         id: 1,
@@ -527,10 +527,9 @@ describe('Weekly Turno Notes Logic', () => {
 
     const result = getTurnosNotasSemana(turnos);
 
-    expect(result.map((item) => item.turno.id)).toEqual([1, 2, 3]);
-    expect(result[0].notaTurno).toBe('Nota interna del turno');
-    expect(result[1].notasDetalladas.map((entry) => entry.id)).toEqual([21]);
-    expect(result[2].notasGenerales.map((entry) => entry.id)).toEqual([31]);
+    expect(result.map((item) => item.turno.id)).toEqual([2, 3]);
+    expect(result[0].notasDetalladas.map((entry) => entry.id)).toEqual([21]);
+    expect(result[1].notasGenerales.map((entry) => entry.id)).toEqual([31]);
   });
 });
 
