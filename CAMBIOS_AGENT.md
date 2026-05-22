@@ -7,6 +7,67 @@ Cada entrada debe indicar archivos modificados, código anterior, código nuevo 
 El formato completo de una entrada está documentado en `AGENTS.md`, sección "Ejemplo de entrada".
 
 
+## 2026-05-22 22:28 - Resolver conflictos de merge del ticket de liquidación
+
+**Archivos modificados:** `src/__tests__/liquidacion-semana.test.ts`
+
+### Cambio 1 - Fusionar pruebas del ticket de impresora
+
+#### Código anterior
+```typescript
+  it("valida los tamaños y grosores del ticket de impresora térmica", () => {
+    const liquidacionBlock = source.match(
+      /if \(screen === "liquidacionSemana" && selectedWeekId\) \{[\s\S]*?if \(screen === "PantallaTurnos"\)/
+    )?.[0] || "";
+
+    expect(liquidacionBlock).toContain('id="ticket-impresora"');
+    expect(liquidacionBlock).toContain("fontSize: 16");
+    expect(liquidacionBlock).toContain("fontWeight: 700");
+    expect(liquidacionBlock).toContain('padding: "24px 20px"');
+    expect(liquidacionBlock).toContain('WebkitTextStroke: "0.2px #000000"');
+    expect(liquidacionBlock).toContain('textAlign: "center", fontSize: 18, fontWeight: 900, marginBottom: 4, color: "#000000", WebkitTextStroke: "0.6px #000000"');
+    expect(liquidacionBlock).toContain('textAlign: "center", fontSize: 19, fontWeight: 900, marginBottom: 12, color: "#000000", WebkitTextStroke: "0.6px #000000"');
+    expect(liquidacionBlock).toContain('display: "flex", justifyContent: "space-between", fontSize: 18, fontWeight: 900, color: "#000000", marginBottom: 4, WebkitTextStroke: "0.6px #000000"');
+    expect(liquidacionBlock).toContain('textAlign: "center", fontWeight: 900, fontSize: 22, color: "#000000", margin: "8px 0", WebkitTextStroke: "0.6px #000000"');
+    expect(liquidacionBlock).toContain('fontSize: 18, fontWeight: 900, color: "#000000", marginBottom: 4, WebkitTextStroke: "0.6px #000000"');
+    expect(liquidacionBlock).toContain('fontWeight: 900, color: "#000000", fontSize: 16, WebkitTextStroke: "0.5px #000000"');
+    expect(liquidacionBlock).toContain('gridTemplateColumns: "46px auto minmax(0, 1fr)"');
+    expect(liquidacionBlock).toContain('gridTemplateColumns: "46px auto auto minmax(0, 1fr)"');
+  });
+```
+
+#### Código nuevo
+```typescript
+  it("valida los tamaños, grosores y envoltura de notas del ticket de impresora térmica", () => {
+    const liquidacionBlock = source.match(
+      /if \(screen === "liquidacionSemana" && selectedWeekId\) \{[\s\S]*?if \(screen === "PantallaTurnos"\)/
+    )?.[0] || "";
+
+    expect(liquidacionBlock).toContain('id="ticket-impresora"');
+    expect(liquidacionBlock).toContain("fontSize: 16");
+    expect(liquidacionBlock).toContain("fontWeight: 700");
+    expect(liquidacionBlock).toContain('padding: "24px 20px"');
+    expect(liquidacionBlock).toContain('WebkitTextStroke: "0.2px #000000"');
+    expect(liquidacionBlock).toContain('textAlign: "center", fontSize: 18, fontWeight: 900, marginBottom: 4, color: "#000000", WebkitTextStroke: "0.6px #000000"');
+    expect(liquidacionBlock).toContain('textAlign: "center", fontSize: 19, fontWeight: 900, marginBottom: 12, color: "#000000", WebkitTextStroke: "0.6px #000000"');
+    expect(liquidacionBlock).toContain('display: "flex", justifyContent: "space-between", fontSize: 18, fontWeight: 900, color: "#000000", marginBottom: 4, WebkitTextStroke: "0.6px #000000"');
+    expect(liquidacionBlock).toContain('textAlign: "center", fontWeight: 900, fontSize: 22, color: "#000000", margin: "8px 0", WebkitTextStroke: "0.6px #000000"');
+    expect(liquidacionBlock).toContain('fontSize: 18, fontWeight: 900, color: "#000000", marginBottom: 4, WebkitTextStroke: "0.6px #000000"');
+    expect(liquidacionBlock).toContain('fontWeight: 900, color: "#000000", fontSize: 16, WebkitTextStroke: "0.5px #000000"');
+    expect(liquidacionBlock).toContain('gridTemplateColumns: "46px auto minmax(0, 1fr)"');
+    expect(liquidacionBlock).toContain('gridTemplateColumns: "46px auto auto minmax(0, 1fr)"');
+    expect(liquidacionBlock).toContain('overflowWrap: "anywhere"');
+    expect(liquidacionBlock).toContain('wordBreak: "break-word"');
+    expect(liquidacionBlock).toContain('whiteSpace: "normal"');
+    expect(liquidacionBlock).toContain('<span>Nota:</span>');
+    expect(liquidacionBlock).toContain('<span>{meta.label}:</span>');
+    expect(liquidacionBlock).toContain('<span>({fmt(entry.amount)})</span>');
+    expect(liquidacionBlock).toContain('{entry.note.trim()}</span>');
+  });
+```
+
+#### Por qué se cambió
+Se fusionan la prueba del tamaño de fuente e impresora de TaxiAPP con las aserciones de envoltura de notas de main para garantizar la verificación de ambas funcionalidades de forma consolidada tras el merge.
 
 
 ## 2026-05-22 22:16 - Incrementar tamaño de fuente en elementos clave del ticket
@@ -90,7 +151,7 @@ El formato completo de una entrada está documentado en `AGENTS.md`, sección "E
               <span>Extras</span><span>-{fmt(descEAcumulado)}</span>
             </div>
             <div style={{ display: "flex", justifyContent: "space-between", fontWeight: 900, color: "#000000", marginTop: 4, WebkitTextStroke: "0.6px #000000" }}>
-              <span>Total Descontar</span><span>-{fmt(totalDescontarAcumulado)}</span>
+              <span>Total Descuentos</span><span>-{fmt(totalDescontarAcumulado)}</span>
             </div>
             <div style={{ borderTop: "1px dashed #000000", margin: "8px 0" }} />
             <div style={{ textAlign: "center", fontWeight: 900, fontSize: 22, color: "#000000", margin: "8px 0", WebkitTextStroke: "0.6px #000000" }}>
@@ -155,6 +216,72 @@ Se aumenta en 2px el tamaño de fuente (`fontSize`) del rango de fechas (a 19px)
 
 #### Por qué se cambió
 Se actualizan las aserciones de la prueba de liquidación de semana para contemplar los nuevos tamaños de fuente configurados (+2px).
+
+
+## 2026-05-22 19:40 - Reordenar notas del ticket impreso
+
+**Archivos modificados:** `src/main.tsx`, `src/__tests__/liquidacion-semana.test.ts`
+
+### Cambio 1 - Título principal del ticket impreso
+
+#### Código anterior
+```tsx
+            <div style={{ textAlign: "center", fontWeight: 700, fontSize: 16, marginBottom: 4, color: "#000000" }}>LIQUIDACION SEMANAL</div>
+```
+
+#### Código nuevo
+```tsx
+            <div style={{ textAlign: "center", fontSize: 16, marginBottom: 4, color: "#000000" }}>LIQUIDACION SEMANAL</div>
+```
+
+#### Por qué se cambió
+El título principal del ticket impreso debía mantenerse igual de tamaño y posición, pero sin negrita.
+
+### Cambio 2 - Estructura de notas impresas
+
+#### Código anterior
+```tsx
+                    {notasGenerales.map((entry) => (
+                      <div key={entry.id} style={{ fontSize: 12, color: "#000000", paddingLeft: 8, display: "grid", gridTemplateColumns: "46px minmax(0, 1fr)", gap: 4, alignItems: "start", marginBottom: 2 }}>
+                        <span>{entry.time}</span>
+                        <span style={{ minWidth: 0, overflowWrap: "anywhere", wordBreak: "break-word", whiteSpace: "normal", lineHeight: 1.35 }}>Nota: {entry.note.trim()}</span>
+                      </div>
+                    ))}
+                    {notasDetalladas.map((entry) => {
+                      const meta = getEntryTypeMeta(entry.type);
+                      return (
+                        <div key={entry.id} style={{ fontSize: 12, color: "#000000", paddingLeft: 8, display: "grid", gridTemplateColumns: "46px minmax(0, 1fr)", gap: 4, alignItems: "start", marginBottom: 2 }}>
+                          <span>{entry.time}</span>
+                          <span style={{ minWidth: 0, overflowWrap: "anywhere", wordBreak: "break-word", whiteSpace: "normal", lineHeight: 1.35 }}>{meta.label}: {entry.note.trim()} ({fmt(entry.amount)})</span>
+                        </div>
+                      );
+                    })}
+```
+
+#### Código nuevo
+```tsx
+                    {notasGenerales.map((entry) => (
+                      <div key={entry.id} style={{ fontSize: 12, color: "#000000", paddingLeft: 8, display: "grid", gridTemplateColumns: "46px auto minmax(0, 1fr)", gap: 4, alignItems: "start", marginBottom: 2 }}>
+                        <span>{entry.time}</span>
+                        <span>Nota:</span>
+                        <span style={{ minWidth: 0, overflowWrap: "anywhere", wordBreak: "break-word", whiteSpace: "normal", lineHeight: 1.35 }}>{entry.note.trim()}</span>
+                      </div>
+                    ))}
+                    {notasDetalladas.map((entry) => {
+                      const meta = getEntryTypeMeta(entry.type);
+                      return (
+                        <div key={entry.id} style={{ fontSize: 12, color: "#000000", paddingLeft: 8, display: "grid", gridTemplateColumns: "46px auto auto minmax(0, 1fr)", gap: 4, alignItems: "start", marginBottom: 2 }}>
+                          <span>{entry.time}</span>
+                          <span>{meta.label}:</span>
+                          <span>({fmt(entry.amount)})</span>
+                          <span style={{ minWidth: 0, overflowWrap: "anywhere", wordBreak: "break-word", whiteSpace: "normal", lineHeight: 1.35 }}>{entry.note.trim()}</span>
+                        </div>
+                      );
+                    })}
+```
+
+#### Por qué se cambió
+Se reestructura el formato de las notas impresas para separar el prefijo 'Nota' y '{meta.label}' en columnas independientes, facilitando la visualización correcta.
 
 ## 2026-05-22 22:14 - Aumentar grosor de fuentes del ticket térmico
 
@@ -2568,6 +2695,2742 @@ Se reemplaza el tamaño de fuente estático de la cabecera por clamp responsivo 
               
               txt += `\n💵 *Total a Entregar:* ${fmt(resumenContableSemana.totalADar)}`;
               
+              navigator.clipboard.writeText(txt);
+              alert("Cuentas copiadas al portapapeles. ¡Ya puedes pegarlas en WhatsApp!");
+            }}
+            style={{
+              width: "100%",
+              padding: "16px 0",
+              borderRadius: 16,
+              border: "none",
+              background: "rgba(80, 220, 140, 0.15)",
+              border: "1px solid rgba(80, 220, 140, 0.3)",
+              color: "#50dc8c",
+              fontSize: 16,
+              fontWeight: 800,
+              cursor: "pointer",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: 8,
+              marginTop: 10,
+              transition: "all 0.2s"
+            }}
+          >
+            <IconCopy s={20} c="#50dc8c" />
+            Copiar cuentas para WhatsApp
+          </button>
+
+          {/* Botón Volver */}
+          <button
+            onClick={() => setScreen("detalleSemana")}
+            style={{
+              width: "100%",
+              padding: "16px 0",
+              borderRadius: 16,
+              border: "none",
+              background: "rgba(255, 255, 255, 0.08)",
+              color: "rgba(255, 255, 255, 0.7)",
+              fontSize: 16,
+              fontWeight: 800,
+              cursor: "pointer",
+              marginTop: 4,
+              transition: "all 0.2s"
+            }}
+          >
+            Volver al detalle
+          </button>
+        </div>
+      </Shell>
+    );
+  }
+```
+
+#### Por qué se cambió
+Se añade la nueva vista "Cuentas" para la semana. Esta calcula la kilometrada, la base neta del taxímetro, la comisión bruta acumulada del jefe según el porcentaje configurado de cada turno en la semana, los descuentos reales desglosados y el neto final de la liquidación destacando la cifra final.
+
+## 2026-05-19 02:04 - Rotar chincheta sin deformar
+
+**Archivos modificados:** `src/main.tsx`, `src/__tests__/detailed-notes-layout.test.ts`
+
+### Cambio 1 - Rotación completa de la chincheta
+
+#### Código anterior
+```tsx
+    <path
+      d="M9.3 5.1l6.9 1.9c0.7 0.2 1 0.8 0.8 1.5l-0.3 1c-0.1 0.5-0.5 0.8-1 0.9l-2 0.6-0.8 2.9 1.9 3.3-0.3 1.1-9.4-2.6 0.3-1.1 3.2-1.9 0.8-2.9-1.5-1.6c-0.3-0.4-0.4-0.8-0.3-1.3l0.3-1c0.2-0.7 0.8-1 1.5-0.8Z"
+      fill={c}
+      fillOpacity="0.16"
+      stroke={c}
+      strokeWidth="1.75"
+      strokeLinejoin="round"
+      strokeLinecap="round"
+      style={{ filter: `drop-shadow(0 0 1px ${c})` }}
+    />
+    <path
+      d="M8.6 17.1 5.2 21"
+      stroke={c}
+      strokeWidth="1.75"
+      strokeLinecap="round"
+      style={{ filter: `drop-shadow(0 0 1px ${c})` }}
+    />
+```
+
+#### Código nuevo
+```tsx
+    <g transform="rotate(32 12 12)">
+      <path
+        d="M8.2 4.8h7.6c0.7 0 1.2 0.5 1.2 1.2v1.1c0 0.5-0.3 0.9-0.7 1.1l-1.8 1.1v3.1l2.7 2.7v1.2H6.8v-1.2l2.7-2.7V9.3L7.7 8.2C7.3 8 7 7.6 7 7.1V6c0-0.7 0.5-1.2 1.2-1.2Z"
+        fill={c}
+        fillOpacity="0.16"
+        stroke={c}
+        strokeWidth="1.75"
+        strokeLinejoin="round"
+        strokeLinecap="round"
+        style={{ filter: `drop-shadow(0 0 1px ${c})` }}
+      />
+      <path
+        d="M12 16.3V21"
+        stroke={c}
+        strokeWidth="1.75"
+        strokeLinecap="round"
+        style={{ filter: `drop-shadow(0 0 1px ${c})` }}
+      />
+    </g>
+```
+
+#### Por qué se cambió
+La chincheta inclinada anterior apuntaba abajo-izquierda, pero se había deformado al dibujarla directamente inclinada. Se recupera la forma fiel y se rota el grupo completo para orientar la punta sin deformar la silueta.
+
+### Cambio 2 - Test contra deformación
+
+#### Código anterior
+```ts
+    expect(iconPinBlock).toMatch(/d="M9\.3 5\.1l6\.9 1\.9c0\.7 0\.2 1 0\.8 0\.8 1\.5l-0\.3 1c-0\.1 0\.5-0\.5 0\.8-1 0\.9l-2 0\.6-0\.8 2\.9 1\.9 3\.3-0\.3 1\.1-9\.4-2\.6 0\.3-1\.1 3\.2-1\.9 0\.8-2\.9-1\.5-1\.6c-0\.3-0\.4-0\.4-0\.8-0\.3-1\.3l0\.3-1c0\.2-0\.7 0\.8-1 1\.5-0\.8Z"/);
+    expect(iconPinBlock).toMatch(/d="M8\.6 17\.1 5\.2 21"/);
+```
+
+#### Código nuevo
+```ts
+    expect(iconPinBlock).toMatch(/<g transform="rotate\(32 12 12\)">/);
+    expect(iconPinBlock).toMatch(/d="M8\.2 4\.8h7\.6c0\.7 0 1\.2 0\.5 1\.2 1\.2v1\.1c0 0\.5-0\.3 0\.9-0\.7 1\.1l-1\.8 1\.1v3\.1l2\.7 2\.7v1\.2H6\.8v-1\.2l2\.7-2\.7V9\.3L7\.7 8\.2C7\.3 8 7 7\.6 7 7\.1V6c0-0\.7 0\.5-1\.2 1\.2-1\.2Z"/);
+    expect(iconPinBlock).toMatch(/d="M12 16\.3V21"/);
+    expect(iconPinBlock).not.toMatch(/d="M9\.3 5\.1l6\.9 1\.9/);
+```
+
+#### Por qué se cambió
+El test ahora exige una chincheta fiel rotada como grupo completo y bloquea la silueta inclinada deformada.
+
+## 2026-05-19 01:59 - Inclinar punta de chincheta
+
+**Archivos modificados:** `src/main.tsx`, `src/__tests__/detailed-notes-layout.test.ts`
+
+### Cambio 1 - Punta hacia abajo izquierda
+
+#### Código anterior
+```tsx
+    <path
+      d="M8.2 4.8h7.6c0.7 0 1.2 0.5 1.2 1.2v1.1c0 0.5-0.3 0.9-0.7 1.1l-1.8 1.1v3.1l2.7 2.7v1.2H6.8v-1.2l2.7-2.7V9.3L7.7 8.2C7.3 8 7 7.6 7 7.1V6c0-0.7 0.5-1.2 1.2-1.2Z"
+      fill={c}
+      fillOpacity="0.16"
+      stroke={c}
+      strokeWidth="1.75"
+      strokeLinejoin="round"
+      strokeLinecap="round"
+      style={{ filter: `drop-shadow(0 0 1px ${c})` }}
+    />
+    <path
+      d="M12 16.3V21"
+      stroke={c}
+      strokeWidth="1.75"
+      strokeLinecap="round"
+      style={{ filter: `drop-shadow(0 0 1px ${c})` }}
+    />
+```
+
+#### Código nuevo
+```tsx
+    <path
+      d="M9.3 5.1l6.9 1.9c0.7 0.2 1 0.8 0.8 1.5l-0.3 1c-0.1 0.5-0.5 0.8-1 0.9l-2 0.6-0.8 2.9 1.9 3.3-0.3 1.1-9.4-2.6 0.3-1.1 3.2-1.9 0.8-2.9-1.5-1.6c-0.3-0.4-0.4-0.8-0.3-1.3l0.3-1c0.2-0.7 0.8-1 1.5-0.8Z"
+      fill={c}
+      fillOpacity="0.16"
+      stroke={c}
+      strokeWidth="1.75"
+      strokeLinejoin="round"
+      strokeLinecap="round"
+      style={{ filter: `drop-shadow(0 0 1px ${c})` }}
+    />
+    <path
+      d="M8.6 17.1 5.2 21"
+      stroke={c}
+      strokeWidth="1.75"
+      strokeLinecap="round"
+      style={{ filter: `drop-shadow(0 0 1px ${c})` }}
+    />
+```
+
+#### Por qué se cambió
+La chincheta ya tenía una forma más fiel, pero la punta seguía apuntando recta hacia abajo. Se inclina el cuerpo y la punta para que apunte hacia la parte inferior izquierda.
+
+### Cambio 2 - Test de inclinación
+
+#### Código anterior
+```ts
+    expect(iconPinBlock).toMatch(/d="M8\.2 4\.8h7\.6c0\.7 0 1\.2 0\.5 1\.2 1\.2v1\.1c0 0\.5-0\.3 0\.9-0\.7 1\.1l-1\.8 1\.1v3\.1l2\.7 2\.7v1\.2H6\.8v-1\.2l2\.7-2\.7V9\.3L7\.7 8\.2C7\.3 8 7 7\.6 7 7\.1V6c0-0\.7 0\.5-1\.2 1\.2-1\.2Z"/);
+    expect(iconPinBlock).toMatch(/d="M12 16\.3V21"/);
+```
+
+#### Código nuevo
+```ts
+    expect(iconPinBlock).toMatch(/d="M9\.3 5\.1l6\.9 1\.9c0\.7 0\.2 1 0\.8 0\.8 1\.5l-0\.3 1c-0\.1 0\.5-0\.5 0\.8-1 0\.9l-2 0\.6-0\.8 2\.9 1\.9 3\.3-0\.3 1\.1-9\.4-2\.6 0\.3-1\.1 3\.2-1\.9 0\.8-2\.9-1\.5-1\.6c-0\.3-0\.4-0\.4-0\.8-0\.3-1\.3l0\.3-1c0\.2-0\.7 0\.8-1 1\.5-0\.8Z"/);
+    expect(iconPinBlock).toMatch(/d="M8\.6 17\.1 5\.2 21"/);
+```
+
+#### Por qué se cambió
+El test ahora protege que la chincheta conserve la punta orientada hacia abajo-izquierda.
+
+## 2026-05-19 01:48 - Redibujar chincheta fiel
+
+**Archivos modificados:** `src/main.tsx`, `src/__tests__/detailed-notes-layout.test.ts`
+
+### Cambio 1 - Silueta fiel de chincheta
+
+#### Código anterior
+```tsx
+    <path
+      d="M15.6 4.6l3.8 3.8-4.7 4.7 1.2 1.2-1.5 1.5-6.2-6.2 1.5-1.5 1.2 1.2 4.7-4.7Z"
+      stroke={c}
+      strokeWidth="1.75"
+      strokeLinejoin="round"
+      style={{ filter: `drop-shadow(0 0 1px ${c})` }}
+    />
+    <path
+      d="M9.2 14.8 5 19"
+      stroke={c}
+      strokeWidth="1.75"
+      strokeLinecap="round"
+      style={{ filter: `drop-shadow(0 0 1px ${c})` }}
+    />
+```
+
+#### Código nuevo
+```tsx
+    <path
+      d="M8.2 4.8h7.6c0.7 0 1.2 0.5 1.2 1.2v1.1c0 0.5-0.3 0.9-0.7 1.1l-1.8 1.1v3.1l2.7 2.7v1.2H6.8v-1.2l2.7-2.7V9.3L7.7 8.2C7.3 8 7 7.6 7 7.1V6c0-0.7 0.5-1.2 1.2-1.2Z"
+      fill={c}
+      fillOpacity="0.16"
+      stroke={c}
+      strokeWidth="1.75"
+      strokeLinejoin="round"
+      strokeLinecap="round"
+      style={{ filter: `drop-shadow(0 0 1px ${c})` }}
+    />
+    <path
+      d="M12 16.3V21"
+      stroke={c}
+      strokeWidth="1.75"
+      strokeLinecap="round"
+      style={{ filter: `drop-shadow(0 0 1px ${c})` }}
+    />
+```
+
+#### Por qué se cambió
+La versión lineal anterior era limpia pero no representaba fielmente una chincheta. Se redibuja con cabeza superior, cuerpo central y punta vertical, manteniendo rojo suave y brillo discreto.
+
+### Cambio 2 - Test de forma fiel
+
+#### Código anterior
+```ts
+    expect(iconPinBlock).toMatch(/d="M15\.6 4\.6l3\.8 3\.8-4\.7 4\.7 1\.2 1\.2-1\.5 1\.5-6\.2-6\.2 1\.5-1\.5 1\.2 1\.2 4\.7-4\.7Z"/);
+    expect(iconPinBlock).toMatch(/d="M9\.2 14\.8 5 19"/);
+```
+
+#### Código nuevo
+```ts
+    expect(iconPinBlock).toMatch(/d="M8\.2 4\.8h7\.6c0\.7 0 1\.2 0\.5 1\.2 1\.2v1\.1c0 0\.5-0\.3 0\.9-0\.7 1\.1l-1\.8 1\.1v3\.1l2\.7 2\.7v1\.2H6\.8v-1\.2l2\.7-2\.7V9\.3L7\.7 8\.2C7\.3 8 7 7\.6 7 7\.1V6c0-0\.7 0\.5-1\.2 1\.2-1\.2Z"/);
+    expect(iconPinBlock).toMatch(/d="M12 16\.3V21"/);
+    expect(iconPinBlock).toMatch(/fill=\{c\}/);
+```
+
+#### Por qué se cambió
+El test ahora protege que el icono conserve una silueta reconocible de chincheta, no solo una forma diagonal genérica.
+
+## 2026-05-19 01:40 - Refinar icono de chincheta
+
+**Archivos modificados:** `src/main.tsx`, `src/__tests__/detailed-notes-layout.test.ts`
+
+### Cambio 1 - Forma de la chincheta
+
+#### Código anterior
+```tsx
+const IconPinNeon = ({ s = 24, c = F }: { s?: number; c?: string }) => (
+  <svg
+    width={s}
+    height={s}
+    viewBox="0 0 24 24"
+    fill="none"
+    style={{ display: "inline-block", verticalAlign: "middle", overflow: "visible" }}
+  >
+    <g transform="rotate(45 12 12)">
+      <path
+        d="M12 17V22"
+        stroke={c}
+        strokeWidth="2"
+        strokeLinecap="round"
+        style={{ filter: `drop-shadow(0 0 1.2px ${c}) drop-shadow(0 0 4px ${c})` }}
+      />
+      <path
+        d="M9 10.76a2 2 0 0 1-1.11 1.79l-1.78.89A2 2 0 0 0 5 15.24V16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-.76a2 2 0 0 0-1.11-1.79l-1.78-.89A2 2 0 0 1 15 10.76V7a2 2 0 0 1 2-2h1a1 1 0 0 0 0-2H6a1 1 0 0 0 0 2h1a2 2 0 0 1 2 2Z"
+        fill="none"
+        stroke={c}
+        strokeWidth="1.8"
+        strokeLinejoin="round"
+        style={{ filter: `drop-shadow(0 0 1.2px ${c}) drop-shadow(0 0 4px ${c})` }}
+      />
+    </g>
+  </svg>
+);
+```
+
+#### Código nuevo
+```tsx
+const IconPinNeon = ({ s = 24, c = "oklch(0.72 0.14 28)" }: { s?: number; c?: string }) => (
+  <svg
+    width={s}
+    height={s}
+    viewBox="0 0 24 24"
+    fill="none"
+    style={{ display: "inline-block", verticalAlign: "middle", overflow: "visible" }}
+  >
+    <path
+      d="M15.6 4.6l3.8 3.8-4.7 4.7 1.2 1.2-1.5 1.5-6.2-6.2 1.5-1.5 1.2 1.2 4.7-4.7Z"
+      stroke={c}
+      strokeWidth="1.75"
+      strokeLinejoin="round"
+      style={{ filter: `drop-shadow(0 0 1px ${c})` }}
+    />
+    <path
+      d="M9.2 14.8 5 19"
+      stroke={c}
+      strokeWidth="1.75"
+      strokeLinecap="round"
+      style={{ filter: `drop-shadow(0 0 1px ${c})` }}
+    />
+  </svg>
+);
+```
+
+#### Por qué se cambió
+La chincheta anterior se veía pesada por la rotación del grupo, la silueta ancha y el brillo de `4px`. Se cambia a una chincheta lineal roja con brillo suave, más cercana al estilo del icono de nota.
+
+### Cambio 2 - Uso del color propio del icono
+
+#### Código anterior
+```tsx
+                  <IconPinNeon s={18} c={F} /> Notas detalladas
+```
+
+#### Código nuevo
+```tsx
+                  <IconPinNeon s={18} /> Notas detalladas
+```
+
+#### Por qué se cambió
+Pasar `c={F}` forzaba el rojo más intenso de gasolina. Al usar el color por defecto de `IconPinNeon`, la chincheta conserva tono rojo pero con una intensidad más controlada.
+
+### Cambio 3 - Test de chincheta refinada
+
+#### Código anterior
+```ts
+No existía el test `uses a restrained line pin icon for detailed notes` en `src/__tests__/detailed-notes-layout.test.ts`.
+```
+
+#### Código nuevo
+```ts
+  it("uses a restrained line pin icon for detailed notes", () => {
+    const iconPinBlock = source.match(/const IconPinNeon = \([\s\S]*?\n\);/)?.[0];
+
+    expect(iconPinBlock).toBeDefined();
+    expect(iconPinBlock).toMatch(/c = "oklch\(0\.72 0\.14 28\)"/);
+    expect(iconPinBlock).toMatch(/drop-shadow\(0 0 1px \$\{c\}\)/);
+    expect(iconPinBlock).toMatch(/d="M15\.6 4\.6l3\.8 3\.8-4\.7 4\.7 1\.2 1\.2-1\.5 1\.5-6\.2-6\.2 1\.5-1\.5 1\.2 1\.2 4\.7-4\.7Z"/);
+    expect(iconPinBlock).toMatch(/d="M9\.2 14\.8 5 19"/);
+    expect(iconPinBlock).not.toContain("rotate(45 12 12)");
+    expect(iconPinBlock).not.toContain("drop-shadow(0 0 4px");
+    expect(source).toMatch(/<IconPinNeon s=\{18\} \/> Notas detalladas/);
+    expect(source).not.toContain("<IconPinNeon s={18} c={F} /> Notas detalladas");
+  });
+```
+
+#### Por qué se cambió
+El test protege que `Notas detalladas` use una chincheta lineal, sin rotación antigua, sin brillo exagerado y sin heredar el color `F`.
+
+## 2026-05-19 01:25 - Reemplazar emoji de chincheta por IconPinNeon rojo
+
+**Archivos modificados:** `src/main.tsx`
+
+### Cambio 1 - Definición del icono de chincheta neón
+
+#### Código anterior
+```tsx
+`No existía IconPinNeon en src/main.tsx.`
+```
+
+#### Código nuevo
+```tsx
+const IconPinNeon = ({ s = 24, c = F }: { s?: number; c?: string }) => (
+  <svg
+    width={s}
+    height={s}
+    viewBox="0 0 24 24"
+    fill="none"
+    style={{ display: "inline-block", verticalAlign: "middle", overflow: "visible" }}
+  >
+    <g transform="rotate(45 12 12)">
+      <path
+        d="M12 17V22"
+        stroke={c}
+        strokeWidth="2"
+        strokeLinecap="round"
+        style={{ filter: `drop-shadow(0 0 1.2px ${c}) drop-shadow(0 0 4px ${c})` }}
+      />
+      <path
+        d="M9 10.76a2 2 0 0 1-1.11 1.79l-1.78.89A2 2 0 0 0 5 15.24V16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-.76a2 2 0 0 0-1.11-1.79l-1.78-.89A2 2 0 0 1 15 10.76V7a2 2 0 0 1 2-2h1a1 1 0 0 0 0-2H6a1 1 0 0 0 0 2h1a2 2 0 0 1 2 2Z"
+        fill="none"
+        stroke={c}
+        strokeWidth="1.8"
+        strokeLinejoin="round"
+        style={{ filter: `drop-shadow(0 0 1.2px ${c}) drop-shadow(0 0 4px ${c})` }}
+      />
+    </g>
+  </svg>
+);
+```
+
+#### Por qué se cambió
+Se crea un nuevo componente SVG interactivo con estilo neón, rotación de 45 grados y doble drop-shadow para sustituir el emoji de chincheta emoji clásico por una opción estética y premium.
+
+### Cambio 2 - Reemplazo del emoji en pantalla Resumen del Turno
+
+#### Código anterior
+```tsx
+              <div style={{ background: 'rgba(255,255,255,0.03)', borderRadius: 22, padding: '16px', border: '1px solid rgba(255,255,255,0.07)' }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '0.6px', marginBottom: 12, display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <span>📌</span> Notas detalladas
+                </div>
+```
+
+#### Código nuevo
+```tsx
+              <div style={{ background: 'rgba(255,255,255,0.03)', borderRadius: 22, padding: '16px', border: '1px solid rgba(255,255,255,0.07)' }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '0.6px', marginBottom: 12, display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <IconPinNeon s={18} c={F} /> Notas detalladas
+                </div>
+```
+
+#### Por qué se cambió
+Sustituye la cabecera con el emoji de chincheta clásico por el nuevo componente neón `IconPinNeon` de color rojo en la cabecera de la sección de notas detalladas del resumen de turno.
+
+### Cambio 3 - Reemplazo del emoji en pantalla de turno actual
+
+#### Código anterior
+```tsx
+              <div style={{ marginBottom: 12, display: "flex", flexDirection: "column", gap: 6, flexShrink: 0 }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: "rgba(255,255,255,0.4)", textTransform: "uppercase", letterSpacing: "0.6px", marginBottom: 2 }}>📌 Notas detalladas</div>
+```
+
+#### Código nuevo
+```tsx
+              <div style={{ marginBottom: 12, display: "flex", flexDirection: "column", gap: 6, flexShrink: 0 }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: "rgba(255,255,255,0.4)", textTransform: "uppercase", letterSpacing: "0.6px", marginBottom: 2, display: "flex", alignItems: "center", gap: 6 }}>
+                  <IconPinNeon s={18} c={F} /> Notas detalladas
+                </div>
+```
+
+#### Por qué se cambió
+Sustituye el emoji de chincheta clásico por el nuevo componente neón `IconPinNeon` de color rojo en el encabezado de notas detalladas de la pantalla de turno actual, alineando con flexbox para que mantenga un espaciado equilibrado.
+
+## 2026-05-19 00:48 - Reconstruir cambios confirmados
+
+**Archivos modificados:** `src/main.tsx`, `src/__tests__/latest-entries-layout.test.ts`, `src/__tests__/detailed-notes-layout.test.ts`
+
+### Cambio 1 - Metadatos con iconos de entrada
+
+#### Código anterior
+```tsx
+type EntryTypeMeta = {
+  color: string;
+  label: string;
+};
+
+function getEntryTypeMeta(type: string): EntryTypeMeta {
+  const metaByType: Record<string, EntryTypeMeta> = {
+    propina: { color: G, label: "Propina" },
+    datafono: { color: P, label: "Datáfono" },
+    agencia_bono: { color: A, label: "Agencia/Bono" },
+    extra: { color: E, label: "Extra" },
+    gasolina: { color: F, label: "Gasolina" },
+    nulo: { color: N, label: "Nulo" },
+    nota: { color: "white", label: "Nota" },
+  };
+
+  return metaByType[type] || { color: N, label: "Nulo" };
+}
+```
+
+#### Código nuevo
+```tsx
+type EntryTypeMeta = {
+  color: string;
+  label: string;
+  icon: (size?: number) => React.ReactNode;
+};
+
+function getEntryTypeMeta(type: string): EntryTypeMeta {
+  return ENTRY_TYPE_META[type] || ENTRY_TYPE_META.nulo;
+}
+```
+
+```tsx
+const ENTRY_TYPE_META: Record<string, EntryTypeMeta> = {
+  propina:      { color: G,       label: "Propina",      icon: (s = 17) => <IconCoin   s={s} c={G} /> },
+  datafono:     { color: P,       label: "Datáfono",     icon: (s = 17) => <IconCard   s={s} c={P} /> },
+  agencia_bono: { color: A,       label: "Agencia/Bono", icon: (s = 17) => <IconAgency s={s} c={A} /> },
+  extra:        { color: E,       label: "Extra",        icon: (s = 17) => <IconExtra  s={s} c={E} /> },
+  gasolina:     { color: F,       label: "Gasolina",     icon: (s = 17) => <IconFuel   s={s} c={F} /> },
+  nulo:         { color: N,       label: "Nulo",         icon: (s = 17) => <IconNulo   s={s} c={N} /> },
+  nota:         { color: "white", label: "Nota",         icon: (s = 17) => <IconNoteAdd s={s} showPlus={false} /> },
+};
+```
+
+#### Por qué se cambió
+El `main.tsx` antiguo solo centralizaba color y etiqueta. Se reconstruye la metadata confirmada para que las pantallas usen una única fuente de verdad también para iconos.
+
+### Cambio 2 - Icono de nota sin símbolo de añadir
+
+#### Código anterior
+```tsx
+                    {notasGenerales.map((entry) => (
+                      <div key={entry.id} style={{ fontSize: 12, color: "#000000", paddingLeft: 8, display: "grid", gridTemplateColumns: "46px auto minmax(0, 1fr)", gap: 4, alignItems: "start", marginBottom: 2 }}>
+                        <span>{entry.time}</span>
+                        <span>Nota:</span>
+                        <span style={{ minWidth: 0, overflowWrap: "anywhere", wordBreak: "break-word", whiteSpace: "normal", lineHeight: 1.35 }}>{entry.note.trim()}</span>
+                      </div>
+                    ))}
+                    {notasDetalladas.map((entry) => {
+                      const meta = getEntryTypeMeta(entry.type);
+                      return (
+                        <div key={entry.id} style={{ fontSize: 12, color: "#000000", paddingLeft: 8, display: "grid", gridTemplateColumns: "46px auto auto minmax(0, 1fr)", gap: 4, alignItems: "start", marginBottom: 2 }}>
+                          <span>{entry.time}</span>
+                          <span>{meta.label}:</span>
+                          <span>({fmt(entry.amount)})</span>
+                          <span style={{ minWidth: 0, overflowWrap: "anywhere", wordBreak: "break-word", whiteSpace: "normal", lineHeight: 1.35 }}>{entry.note.trim()}</span>
+                        </div>
+                      );
+                    })}
+```
+
+#### Por qué se cambió
+Las notas largas empezaban en una línea distinta porque etiqueta, texto e importe estaban dentro del mismo bloque flexible. Se separan en columnas para que la nota empiece alineada con las demás y el importe aparezca al principio, antes del texto.
+
+### Cambio 3 - Test de notas impresas
+
+#### Código anterior
+```ts
+    expect(printerTicketBlock).toContain('display: "grid", gridTemplateColumns: "46px minmax(0, 1fr)"');
+    expect(printerTicketBlock).toContain('entry.note.trim()');
+```
+
+#### Código nuevo
+```ts
+    expect(printerTicketBlock).toContain('textAlign: "center", fontSize: 16, marginBottom: 4, color: "#000000"');
+    expect(printerTicketBlock).not.toContain('textAlign: "center", fontWeight: 700, fontSize: 16, marginBottom: 4, color: "#000000"');
+    expect(printerTicketBlock).toContain('display: "grid", gridTemplateColumns: "46px auto minmax(0, 1fr)"');
+    expect(printerTicketBlock).toContain('display: "grid", gridTemplateColumns: "46px auto auto minmax(0, 1fr)"');
+    expect(printerTicketBlock).toContain('<span>Nota:</span>');
+    expect(printerTicketBlock).toContain('<span>{meta.label}:</span>');
+    expect(printerTicketBlock).toContain('<span>({fmt(entry.amount)})</span>');
+    expect(printerTicketBlock).toContain('{entry.note.trim()}</span>');
+```
+
+#### Por qué se cambió
+La prueba protege que el título principal no vuelva a negrita y que las notas impresas mantengan columnas separadas para hora, etiqueta, importe y texto.
+
+
+## 2026-05-22 19:33 - Mejorar ticket de impresora
+
+**Archivos modificados:** `src/main.tsx`, `src/__tests__/liquidacion-semana.test.ts`
+
+### Cambio 1 - Fecha y bloque superior del ticket
+
+#### Código anterior
+```tsx
+            <div style={{ textAlign: "center", fontSize: 13, marginBottom: 12, color: "#000000" }}>{formatWeekRangeFull(weekId)}</div>
+            <div style={{ borderTop: "1px dashed #000000", marginBottom: 10 }} />
+            <div style={{ display: "flex", justifyContent: "space-between", color: "#000000", marginBottom: 4 }}>
+              <span>Total Taximetro</span><span>{fmt(taximetroLimpio)}</span>
+            </div>
+            <div style={{ display: "flex", justifyContent: "space-between", color: "#000000", marginBottom: 4 }}>
+              <span>Total KM</span><span>{fmtKmNumber(totalKMAcumulado)} KM</span>
+            </div>
+            <div style={{ display: "flex", justifyContent: "space-between", color: "#000000", marginBottom: 4 }}>
+              <span>Comision Bruta Jefe</span><span>{fmt(brutoJefeAcumulado)}</span>
+            </div>
+```
+
+#### Código nuevo
+```tsx
+            <div style={{ textAlign: "center", fontSize: 15, fontWeight: 700, marginBottom: 12, color: "#000000" }}>{formatWeekRangeFull(weekId)}</div>
+            <div style={{ borderTop: "1px dashed #000000", marginBottom: 10 }} />
+            <div style={{ display: "flex", justifyContent: "space-between", fontWeight: 700, color: "#000000", marginBottom: 4 }}>
+              <span>Total Taximetro</span><span>{fmt(taximetroLimpio)}</span>
+            </div>
+            <div style={{ display: "flex", justifyContent: "space-between", color: "#000000", marginBottom: 4 }}>
+              <span>Total KM</span><span>{fmtKmNumber(totalKMAcumulado)} KM</span>
+            </div>
+            <div style={{ borderTop: "1px dashed #000000", margin: "6px 0" }} />
+            <div style={{ display: "flex", justifyContent: "space-between", color: "#000000", marginBottom: 4 }}>
+              <span>Comision Bruta Jefe</span><span>{fmt(brutoJefeAcumulado)}</span>
+            </div>
+```
+
+#### Por qué se cambió
+La fecha de la semana del ticket impreso necesitaba más presencia y negrita. El total de taxímetro también debía ir en negrita, y el bloque de taxímetro/KM debía quedar separado de la comisión bruta.
+
+### Cambio 2 - Notas largas del ticket de impresora
+
+#### Código anterior
+```tsx
+                    {notasGenerales.map((entry) => (
+                      <div key={entry.id} style={{ fontSize: 12, color: "#000000", paddingLeft: 8 }}>{entry.time} Nota: {entry.note.trim()}</div>
+                    ))}
+                    {notasDetalladas.map((entry) => {
+                      const meta = getEntryTypeMeta(entry.type);
+                      return (
+                        <div key={entry.id} style={{ fontSize: 12, color: "#000000", paddingLeft: 8 }}>{entry.time} {meta.label}: {entry.note.trim()} ({fmt(entry.amount)})</div>
+                      );
+                    })}
+```
+
+#### Código nuevo
+```tsx
+                    {notasGenerales.map((entry) => (
+                      <div key={entry.id} style={{ fontSize: 12, color: "#000000", paddingLeft: 8, display: "grid", gridTemplateColumns: "46px minmax(0, 1fr)", gap: 4, alignItems: "start", marginBottom: 2 }}>
+                        <span>{entry.time}</span>
+                        <span style={{ minWidth: 0, overflowWrap: "anywhere", wordBreak: "break-word", whiteSpace: "normal", lineHeight: 1.35 }}>Nota: {entry.note.trim()}</span>
+                      </div>
+                    ))}
+                    {notasDetalladas.map((entry) => {
+                      const meta = getEntryTypeMeta(entry.type);
+                      return (
+                        <div key={entry.id} style={{ fontSize: 12, color: "#000000", paddingLeft: 8, display: "grid", gridTemplateColumns: "46px minmax(0, 1fr)", gap: 4, alignItems: "start", marginBottom: 2 }}>
+                          <span>{entry.time}</span>
+                          <span style={{ minWidth: 0, overflowWrap: "anywhere", wordBreak: "break-word", whiteSpace: "normal", lineHeight: 1.35 }}>{meta.label}: {entry.note.trim()} ({fmt(entry.amount)})</span>
+                        </div>
+                      );
+                    })}
+```
+
+#### Por qué se cambió
+Las notas largas llegaban hasta el borde del ticket y quedaban difíciles de leer. La fila pasa a una estructura con hora fija y texto flexible que rompe palabras largas dentro del ancho disponible.
+
+### Cambio 3 - Test del ticket de impresora
+
+#### Código anterior
+```ts
+`No existía la prueba "formats the printer ticket header and wraps long notes" en src/__tests__/liquidacion-semana.test.ts.`
+```
+
+#### Código nuevo
+```ts
+  it("formats the printer ticket header and wraps long notes", () => {
+    const printerTicketBlock = source.match(
+      /id="ticket-impresora"[\s\S]*?onClick=\{copyToClipboard\}/
+    )?.[0] || "";
+
+    expect(printerTicketBlock).toContain('fontSize: 15, fontWeight: 700, marginBottom: 12');
+    expect(printerTicketBlock).toContain('fontWeight: 700, color: "#000000", marginBottom: 4');
+    expect(printerTicketBlock).toContain('margin: "6px 0"');
+    expect(printerTicketBlock).toContain('display: "grid", gridTemplateColumns: "46px minmax(0, 1fr)"');
+    expect(printerTicketBlock).toContain('overflowWrap: "anywhere"');
+    expect(printerTicketBlock).toContain('wordBreak: "break-word"');
+    expect(printerTicketBlock).toContain('whiteSpace: "normal"');
+    expect(printerTicketBlock).toContain('entry.note.trim()');
+  });
+```
+
+#### Por qué se cambió
+La prueba protege que el ticket impreso conserve la fecha destacada, el taxímetro en negrita, la separación con comisión y el ajuste de líneas para notas largas.
+
+
+## 2026-05-22 19:28 - Corregir tamaño de notas semanales
+
+**Archivos modificados:** `src/main.tsx`, `src/__tests__/liquidacion-semana.test.ts`
+
+### Cambio 1 - Título de notas de la semana
+
+#### Código anterior
+```tsx
+              <div style={{ borderTop: "1px dashed rgba(255, 255, 255, 0.15)", paddingTop: 14, display: "flex", flexDirection: "column", gap: 14 }}>
+                <div style={{ fontSize: 13, fontWeight: 800, color: "white", textAlign: "center", textTransform: "uppercase", letterSpacing: "0.6px", textShadow: "0 0 10px rgba(255,255,255,0.18)" }}>
+```
+
+#### Código nuevo
+```tsx
+              <div style={{ borderTop: "1px dashed rgba(255, 255, 255, 0.15)", paddingTop: 14, display: "flex", flexDirection: "column", gap: 18 }}>
+                <div style={{ fontSize: 20, fontWeight: 800, color: "white", textAlign: "center", textTransform: "uppercase", letterSpacing: "0.6px", textShadow: "0 0 10px rgba(255,255,255,0.18)" }}>
+```
+
+#### Por qué se cambió
+El título "Notas de la semana" debía tener el mismo tamaño que el rango de semana del principio del ticket, no el tamaño de las fechas internas de cada bloque de notas. También se aumenta la separación antes de la primera nota.
+
+### Cambio 2 - Test del título de notas semanales
+
+#### Código anterior
+```ts
+    expect(liquidacionBlock).toContain('paddingTop: 14, display: "flex", flexDirection: "column", gap: 14');
+    expect(liquidacionBlock).toContain('fontSize: 13, fontWeight: 800, color: "white", textAlign: "center"');
+```
+
+#### Código nuevo
+```ts
+    expect(liquidacionBlock).toContain('paddingTop: 14, display: "flex", flexDirection: "column", gap: 18');
+    expect(liquidacionBlock).toContain('fontSize: 20, fontWeight: 800, color: "white", textAlign: "center"');
+```
+
+#### Por qué se cambió
+La prueba fija que el título queda al tamaño del rango de semana del ticket y que hay más separación vertical antes del primer bloque de notas.
+
+
+## 2026-05-22 19:19 - Eliminar nulos acumulados de liquidación
+
+**Archivos modificados:** `src/main.tsx`, `src/__tests__/liquidacion-semana.test.ts`
+
+### Cambio 1 - Variable informativa de nulos en liquidación
+
+#### Código anterior
+```tsx
+    let totalDescontarAcumulado = 0;
+    let totalNetoAcumulado = 0;
+    let totalNulosAcumulado = 0;
+    let totalKMAcumulado = 0;
+```
+
+```tsx
+      totalDescontarAcumulado += calc.totalDescontar;
+      totalNetoAcumulado += calc.totalADar;
+      totalNulosAcumulado += (t.totalN || 0);
+      totalKMAcumulado += (t.km || 0);
+```
+
+```tsx
+    totalDescontarAcumulado = roundMoney(totalDescontarAcumulado);
+    totalNetoAcumulado = roundMoney(totalNetoAcumulado);
+    totalNulosAcumulado = roundMoney(totalNulosAcumulado);
+```
+
+#### Código nuevo
+```tsx
+    let totalDescontarAcumulado = 0;
+    let totalNetoAcumulado = 0;
+    let totalKMAcumulado = 0;
+```
+
+```tsx
+      totalDescontarAcumulado += calc.totalDescontar;
+      totalNetoAcumulado += calc.totalADar;
+      totalKMAcumulado += (t.km || 0);
+```
+
+```tsx
+    totalDescontarAcumulado = roundMoney(totalDescontarAcumulado);
+    totalNetoAcumulado = roundMoney(totalNetoAcumulado);
+```
+
+#### Por qué se cambió
+`totalNulosAcumulado` solo alimentaba un dato informativo visible en liquidación. Al quitar ese dato, se elimina también su variable local para no dejar código muerto en la pantalla.
+
+### Cambio 2 - Texto copiado de liquidación
+
+#### Código anterior
+```tsx
+      const text = `📋 *LIQUIDACIÓN SEMANAL*\n📅 *Semana:* ${dates}\n\n🚕 *Total Taxímetro:* ${fmt(taximetroLimpio)}\n🚗 *Total KM:* ${fmtKmNumber(totalKMAcumulado)} KM\n👤 *Comisión Bruta Jefe:* ${fmt(brutoJefeAcumulado)}\n\n⛔ *DESCONTAR:*\n  💳 Datáfonos: -${fmt(descDAcumulado)}\n  ⛽ Gasolina: -${fmt(descGAcumulado)}\n  🎟️ Agencias/Bonos: -${fmt(descAAcumulado)}\n  ➕ Extras: -${fmt(descEAcumulado)}\n💰 *Total Descuentos:* -${fmt(totalDescontarAcumulado)}\n\n💵 *NETO A ENTREGAR:*\n👉 *${fmt(totalNetoAcumulado)}* 👈\n\nℹ️ _Nulos acumulados: ${fmt(totalNulosAcumulado)}_${formatLiquidacionNotasText()}`;
+```
+
+#### Código nuevo
+```tsx
+      const text = `📋 *LIQUIDACIÓN SEMANAL*\n📅 *Semana:* ${dates}\n\n🚕 *Total Taxímetro:* ${fmt(taximetroLimpio)}\n🚗 *Total KM:* ${fmtKmNumber(totalKMAcumulado)} KM\n👤 *Comisión Bruta Jefe:* ${fmt(brutoJefeAcumulado)}\n\n⛔ *DESCONTAR:*\n  💳 Datáfonos: -${fmt(descDAcumulado)}\n  ⛽ Gasolina: -${fmt(descGAcumulado)}\n  🎟️ Agencias/Bonos: -${fmt(descAAcumulado)}\n  ➕ Extras: -${fmt(descEAcumulado)}\n💰 *Total Descuentos:* -${fmt(totalDescontarAcumulado)}\n\n💵 *NETO A ENTREGAR:*\n👉 *${fmt(totalNetoAcumulado)}* 👈${formatLiquidacionNotasText()}`;
+```
+
+#### Por qué se cambió
+El texto copiado debía coincidir con la liquidación visible y dejar de incluir la línea informativa de nulos acumulados.
+
+### Cambio 3 - Pie informativo del ticket digital
+
+#### Código anterior
+```tsx
+            {/* Informativos (Pie del ticket) */}
+            <div style={{
+              borderTop: "1px dashed rgba(255, 255, 255, 0.15)",
+              paddingTop: 14,
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              fontSize: 15,
+              color: "rgba(255, 255, 255, 0.35)",
+              fontStyle: "italic"
+            }}>
+              <span>Total Nulos acumulados:</span>
+              <span style={{ fontFamily: "monospace" }}>{fmt(totalNulosAcumulado)}</span>
+            </div>
+
+            {turnosConNotas.length > 0 && (
+```
+
+#### Código nuevo
+```tsx
+            {turnosConNotas.length > 0 && (
+```
+
+#### Por qué se cambió
+La pantalla de liquidación no necesita mostrar el dato de nulos acumulados y queda más limpia sin ese pie informativo.
+
+### Cambio 4 - Ticket de impresora
+
+#### Código anterior
+```tsx
+            <div style={{ textAlign: "center", fontWeight: 700, fontSize: 18, color: "#000000", margin: "8px 0" }}>
+              NETO A ENTREGAR: {fmt(totalNetoAcumulado)}
+            </div>
+            <div style={{ borderTop: "1px dashed #000000", margin: "8px 0" }} />
+            <div style={{ fontSize: 12, color: "#000000", marginBottom: 4 }}>Nulos acumulados: {fmt(totalNulosAcumulado)}</div>
+            {turnosConNotas.length > 0 && (
+```
+
+#### Código nuevo
+```tsx
+            <div style={{ textAlign: "center", fontWeight: 700, fontSize: 18, color: "#000000", margin: "8px 0" }}>
+              NETO A ENTREGAR: {fmt(totalNetoAcumulado)}
+            </div>
+            {turnosConNotas.length > 0 && (
+```
+
+#### Por qué se cambió
+El ticket de impresora también debía dejar de incluir la línea de nulos acumulados para mantener el mismo contenido que la liquidación.
+
+### Cambio 5 - Test de liquidación
+
+#### Código anterior
+```ts
+    expect(source).toContain("NETO A ENTREGAR:");
+    expect(source).toContain("Nulos acumulados:");
+```
+
+#### Código nuevo
+```ts
+    expect(source).toContain("NETO A ENTREGAR:");
+    expect(source).not.toContain("Nulos acumulados:");
+    expect(source).not.toContain("Total Nulos acumulados:");
+    expect(source).not.toContain("totalNulosAcumulado");
+```
+
+#### Por qué se cambió
+La prueba ahora protege que el dato de nulos acumulados no vuelva a aparecer en liquidación ni quede como variable local sin uso.
+
+
+## 2026-05-20 22:28 - Extender alignItems start a notas detalladas de otras pantallas
+
+**Archivos modificados:** `src/main.tsx`
+
+### Cambio 1 - Notas detalladas en Ver Turno (modal)
+
+#### Código anterior
+```tsx
+<div key={e.id} style={{ fontSize: 13, background: 'rgba(255,255,255,0.02)', padding: '10px 12px', borderRadius: 12, border: '1px solid rgba(255,255,255,0.04)', display: 'grid', gridTemplateColumns: 'auto auto minmax(0, 1fr) auto', alignItems: 'center', gap: 8, minWidth: 0 }}>
+```
+
+#### Código nuevo
+```tsx
+<div key={e.id} style={{ fontSize: 13, background: 'rgba(255,255,255,0.02)', padding: '10px 12px', borderRadius: 12, border: '1px solid rgba(255,255,255,0.04)', display: 'grid', gridTemplateColumns: 'auto auto minmax(0, 1fr) auto', alignItems: 'start', gap: 8, minWidth: 0 }}>
+```
+
+#### Por qué se cambió
+En la pantalla de Ver Turno, las notas detalladas con texto largo quedaban desalineadas verticalmente con la hora y el importe. Se unifica el comportamiento con liquidacionSemana.
+
+### Cambio 1b - Hora e importe anclados arriba en Ver Turno
+
+#### Código anterior
+```tsx
+<span style={{ fontSize: 12, color: "rgba(255,255,255,0.5)", fontWeight: 600, flexShrink: 0 }}>{e.time}</span>
+<span style={{ fontSize: 15, fontWeight: 700, color: meta.color, whiteSpace: 'nowrap', flexShrink: 0 }}>{fmt(e.amount)}</span>
+```
+
+#### Código nuevo
+```tsx
+<span style={{ fontSize: 12, color: "rgba(255,255,255,0.5)", fontWeight: 600, flexShrink: 0, alignSelf: "start" }}>{e.time}</span>
+<span style={{ fontSize: 15, fontWeight: 700, color: meta.color, whiteSpace: 'nowrap', flexShrink: 0, alignSelf: "start" }}>{fmt(e.amount)}</span>
+```
+
+#### Por qué se cambió
+alignSelf: "start" ancla hora e importe arriba sin depender de la altura que tome la nota al fluir hacia abajo.
+
+### Cambio 2 - Notas detalladas en Terminar Turno (modal)
+
+#### Código anterior
+```tsx
+<div key={e.id} style={{ fontSize: 13, background: "rgba(255,255,255,0.03)", padding: "10px 12px", borderRadius: 12, border: "1px solid rgba(255,255,255,0.05)", display: "grid", gridTemplateColumns: "auto auto minmax(0, 1fr) auto", alignItems: "center", gap: 8, minWidth: 0 }}>
+```
+
+#### Código nuevo
+```tsx
+<div key={e.id} style={{ fontSize: 13, background: "rgba(255,255,255,0.03)", padding: "10px 12px", borderRadius: 12, border: "1px solid rgba(255,255,255,0.05)", display: "grid", gridTemplateColumns: "auto auto minmax(0, 1fr) auto", alignItems: "start", gap: 8, minWidth: 0 }}>
+```
+
+#### Por qué se cambió
+En la pantalla de Terminar Turno ocurría lo mismo: notas largas desalineadas con hora e importe. Se aplica el mismo ajuste.
+
+### Cambio 3 - Hora e importe anclados arriba en Terminar Turno
+
+#### Código anterior
+```tsx
+<span style={{ fontSize: 12, color: "rgba(255,255,255,0.5)", fontWeight: 600, flexShrink: 0 }}>{e.time}</span>
+<span style={{ fontSize: 15, fontWeight: 700, color: meta.color, whiteSpace: "nowrap", flexShrink: 0 }}>{fmt(e.amount)}</span>
+```
+
+#### Código nuevo
+```tsx
+<span style={{ fontSize: 12, color: "rgba(255,255,255,0.5)", fontWeight: 600, flexShrink: 0, alignSelf: "start" }}>{e.time}</span>
+<span style={{ fontSize: 15, fontWeight: 700, color: meta.color, whiteSpace: "nowrap", flexShrink: 0, alignSelf: "start" }}>{fmt(e.amount)}</span>
+```
+
+#### Por qué se cambió
+Con alignItems: "start" la nota fluye hacia abajo pero hora e importe flotaban a media altura. alignSelf: "start" los ancla arriba.
+
+### Cambio 4 - Notas detalladas en tarjeta de turno del historial
+
+#### Código anterior
+```tsx
+<div key={entry.id} style={{ fontSize: 13, background: "rgba(255,255,255,0.025)", padding: "8px 10px", borderRadius: 10, display: "grid", gridTemplateColumns: "auto auto minmax(0, 1fr) auto", alignItems: "center", gap: 7, minWidth: 0 }}>
+```
+
+#### Código nuevo
+```tsx
+<div key={entry.id} style={{ fontSize: 13, background: "rgba(255,255,255,0.025)", padding: "8px 10px", borderRadius: 10, display: "grid", gridTemplateColumns: "auto auto minmax(0, 1fr) auto", alignItems: "start", gap: 7, minWidth: 0 }}>
+```
+
+#### Por qué se cambió
+La tarjeta de turno visible en el historial mensual también mostraba notas detalladas desalineadas. Se extiende el cambio a esa vista.
+
+### Cambio 4b - Hora e importe anclados arriba en historial
+
+#### Código anterior
+```tsx
+<span style={{ fontSize: 12, color: "rgba(255,255,255,0.45)", fontWeight: 700, flexShrink: 0 }}>{entry.time}</span>
+<span style={{ fontSize: 15, fontWeight: 700, color: meta.color, whiteSpace: "nowrap", flexShrink: 0 }}>{fmt(entry.amount)}</span>
+```
+
+#### Código nuevo
+```tsx
+<span style={{ fontSize: 12, color: "rgba(255,255,255,0.45)", fontWeight: 700, flexShrink: 0, alignSelf: "start" }}>{entry.time}</span>
+<span style={{ fontSize: 15, fontWeight: 700, color: meta.color, whiteSpace: "nowrap", flexShrink: 0, alignSelf: "start" }}>{fmt(entry.amount)}</span>
+```
+
+#### Por qué se cambió
+Mismo problema: con alignItems: "start" la nota fluye y deja hora e importe flotando. alignSelf: "start" los ancla arriba.
+
+### Cambio 5 - Entradas en pantalla de turno activo (main)
+
+#### Código anterior
+```tsx
+display: "grid",
+gridTemplateColumns: "auto minmax(0, 1fr) auto auto",
+alignItems: "center",
+```
+
+#### Código nuevo
+```tsx
+display: "grid",
+gridTemplateColumns: "auto minmax(0, 1fr) auto auto",
+alignItems: "start",
+```
+
+#### Por qué se cambió
+En la pantalla principal mientras el turno está activo, las filas de entradas con nota larga quedaban desalineadas verticalmente. Ahora hora e importe se alinean con la primera línea de la nota.
+
+### Cambio 5b - Hora e importe anclados arriba en entradas de turno activo
+
+#### Código anterior
+```tsx
+<span style={{
+  fontSize: 12,
+  color: "rgba(255,255,255,0.5)",
+  flexShrink: 0,
+}}>
+  {e.time}
+</span>
+<span style={{ fontSize: 14, fontWeight: 700, color: meta.color, flexShrink: 0 }}>
+  {e.type !== "nota" && `+${fmt(e.amount)}`}
+</span>
+```
+
+#### Código nuevo
+```tsx
+<span style={{
+  fontSize: 12,
+  color: "rgba(255,255,255,0.5)",
+  flexShrink: 0,
+  alignSelf: "start",
+}}>
+  {e.time}
+</span>
+<span style={{ fontSize: 14, fontWeight: 700, color: meta.color, flexShrink: 0, alignSelf: "start" }}>
+  {e.type !== "nota" && `+${fmt(e.amount)}`}
+</span>
+```
+
+#### Por qué se cambió
+Con alignItems: "start" la nota fluye hacia abajo, pero la columna del importe queda flotando a media altura si la nota tiene varias líneas. alignSelf: "start" en hora e importe los ancla arriba independientemente de la altura de la nota.
+
+
+## 2026-05-20 22:23 - Alinear arriba hora y categoría en notas detalladas largas
+
+
+**Archivos modificados:** `src/main.tsx`
+
+### Cambio 1 - Estado procesandoTicket
+
+#### Código anterior
+```tsx
+  const [copiado, setCopiado] = useState(false);
+```
+
+#### Código nuevo
+```tsx
+  const [copiado, setCopiado] = useState(false);
+  const [procesandoTicket, setProcesandoTicket] = useState(false);
+```
+
+#### Por qué se cambió
+Se necesita un estado dedicado para deshabilitar el botón "Imprimir Ticket" mientras se genera la imagen y evitar doble pulsación.
+
+### Cambio 2 - Función sharePrinterTicket
+
+#### Código anterior
+`No existía la función sharePrinterTicket en src/main.tsx.`
+
+#### Código nuevo
+```tsx
+    const sharePrinterTicket = async () => {
+      const element = document.getElementById("ticket-impresora");
+      if (!element) return;
+      setProcesandoTicket(true);
+      // ... captura con html2canvas fondo blanco, escala 3x
+      // ... guarda con Filesystem.writeFile y comparte con Share.share en Android
+      // ... descarga PNG en web
+    };
+```
+
+#### Por qué se cambió
+Se necesita una función separada de `copyToClipboard` que capture el ticket de impresora (fondo blanco, fuente Courier) y lo comparta via `@capacitor/share` en Android o lo descargue en web.
+
+### Cambio 3 - Ticket HTML oculto (id="ticket-impresora")
+
+#### Código anterior
+`No existía el elemento con id="ticket-impresora" en src/main.tsx.`
+
+#### Código nuevo
+```tsx
+          <div
+            id="ticket-impresora"
+            style={{ position: "absolute", left: "-9999px", top: 0, width: 384,
+              backgroundColor: "#ffffff", color: "#000000",
+              fontFamily: "'Courier New', Courier, monospace", fontSize: 14,
+              padding: "20px 16px", lineHeight: 1.5 }}
+          >
+            {/* Cabecera, totales, descuentos, neto, notas en negro puro sobre blanco */}
+          </div>
+```
+
+#### Por qué se cambió
+La impresora térmica espera PNG de fondo blanco con texto negro puro. El elemento se oculta fuera de pantalla (`left: -9999px`) para no interferir con el tema oscuro. Ancho 384px = papel estándar de 58mm.
+
+### Cambio 4 - Botón "Imprimir Ticket"
+
+#### Código anterior
+`No existía el botón id="btn-imprimir-ticket" en src/main.tsx.`
+
+#### Código nuevo
+```tsx
+            <button id="btn-imprimir-ticket" onClick={sharePrinterTicket} disabled={procesandoTicket}
+              style={{ padding: "16px 0", borderRadius: 16,
+                background: procesandoTicket ? "rgba(255,255,255,0.04)" : "rgba(37, 210, 252, 0.1)",
+                border: procesandoTicket ? "..." : "1px solid rgba(37, 210, 252, 0.3)",
+                color: procesandoTicket ? "rgba(255,255,255,0.35)" : "#25d2fc", ... }}>
+              {procesandoTicket ? "Generando ticket..." : "Imprimir Ticket"}
+            </button>
+```
+
+#### Por qué se cambió
+El plan pedía añadir el botón encima de "Copiar Liquidación". Se usa color cian (`#25d2fc`) para diferenciarlo, se deshabilita mientras procesa y muestra feedback con "Generando ticket...".
+
+
+## 2026-05-20 21:27 - Igualar horas de notas
+
+
+**Archivos modificados:** `src/main.tsx`, `src/__tests__/liquidacion-semana.test.ts`, `CAMBIOS_AGENT.md`
+
+### Cambio 1 - Tamaño de hora detallada
+
+#### Código anterior
+```tsx
+                                      <span style={{ fontSize: 12, color: "rgba(255,255,255,0.5)", fontWeight: 600, flexShrink: 0 }}>{entry.time}</span>
+```
+
+#### Código nuevo
+```tsx
+                                      <span style={{ fontSize: 11, color: "rgba(255,255,255,0.5)", fontWeight: 600, flexShrink: 0 }}>{entry.time}</span>
+```
+
+#### Por qué se cambió
+La hora de las notas detalladas quedaba un punto más grande que la hora de las notas generales. Se igualó a `11` para probar todas las horas con el mismo tamaño.
+
+### Cambio 2 - Prueba de hora detallada
+
+#### Código anterior
+```ts
+No existía la expectativa de hora detallada en 11 en src/__tests__/liquidacion-semana.test.ts.
+```
+
+#### Código nuevo
+```ts
+    expect(liquidacionBlock).toContain('fontSize: 11, color: "rgba(255,255,255,0.5)", fontWeight: 600');
+```
+
+#### Por qué se cambió
+La prueba debía cubrir que la hora plana de las notas detalladas también usa tamaño `11`, igual que la hora compacta de las notas generales.
+
+## 2026-05-20 21:17 - Resaltar fechas de notas semanales
+
+**Archivos modificados:** `src/main.tsx`, `src/__tests__/liquidacion-semana.test.ts`, `CAMBIOS_AGENT.md`
+
+### Cambio 1 - Separación de grupos por fecha
+
+#### Código anterior
+```tsx
+                {turnosConNotas.map(({ turno, notasGenerales, notasDetalladas }) => (
+                  <div key={`ticket-notas-${turno.id}`} style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                    <div style={{ fontSize: 13, fontWeight: 800, color: "rgba(255,255,255,0.72)" }}>
+                      {fmtDate(turno.date)}
+                    </div>
+```
+
+#### Código nuevo
+```tsx
+                {turnosConNotas.map(({ turno, notasGenerales, notasDetalladas }, index) => (
+                  <div key={`ticket-notas-${turno.id}`} style={{ display: "flex", flexDirection: "column", gap: 8, paddingTop: index === 0 ? 2 : 12, borderTop: index === 0 ? "none" : "1px dashed rgba(255,255,255,0.10)" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, fontWeight: 800, color: "rgba(255,255,255,0.72)" }}>
+                      <span style={{ width: 12, height: 1, background: "rgba(255,255,255,0.24)", flexShrink: 0 }} />
+                      {fmtDate(turno.date)}
+                    </div>
+```
+
+#### Por qué se cambió
+Las fechas quedaban demasiado integradas entre las notas y se pasaban por alto. La separación por grupo y la línea previa hacen que cada día se lea como cabecera sin volver a usar cajas.
+
+### Cambio 2 - Indentación de notas
+
+#### Código anterior
+```tsx
+                      <div key={`ticket-nota-general-${entry.id}`} style={{ display: "grid", gridTemplateColumns: "auto minmax(0, 1fr)", alignItems: "start", gap: 9, color: "rgba(255,255,255,0.8)", fontSize: 13, lineHeight: 1.4, minWidth: 0 }}>
+```
+
+```tsx
+                        <div key={`ticket-nota-detallada-${entry.id}`} style={{ fontSize: 13, display: "grid", gridTemplateColumns: "auto auto minmax(0, 1fr) auto", alignItems: "center", gap: 8, minWidth: 0 }}>
+```
+
+#### Código nuevo
+```tsx
+                      <div key={`ticket-nota-general-${entry.id}`} style={{ display: "grid", gridTemplateColumns: "auto minmax(0, 1fr)", alignItems: "start", gap: 9, color: "rgba(255,255,255,0.8)", fontSize: 13, lineHeight: 1.4, minWidth: 0, marginLeft: 14 }}>
+```
+
+```tsx
+                        <div key={`ticket-nota-detallada-${entry.id}`} style={{ fontSize: 13, display: "grid", gridTemplateColumns: "auto auto minmax(0, 1fr) auto", alignItems: "center", gap: 8, minWidth: 0, marginLeft: 14 }}>
+```
+
+#### Por qué se cambió
+Las filas de notas quedaban demasiado pegadas al borde del grupo. El desplazamiento leve ordena visualmente el contenido bajo cada fecha.
+
+### Cambio 3 - Cobertura de fechas visibles
+
+#### Código anterior
+```ts
+    expect(liquidacionBlock).toContain('fontSize: 13, fontWeight: 800, color: "rgba(255,255,255,0.72)"');
+    expect(liquidacionBlock).toContain('gridTemplateColumns: "auto auto minmax(0, 1fr) auto"');
+```
+
+#### Código nuevo
+```ts
+    expect(liquidacionBlock).toContain('fontSize: 13, fontWeight: 800, color: "rgba(255,255,255,0.72)"');
+    expect(liquidacionBlock).toContain("turnosConNotas.map(({ turno, notasGenerales, notasDetalladas }, index)");
+    expect(liquidacionBlock).toContain('paddingTop: index === 0 ? 2 : 12');
+    expect(liquidacionBlock).toContain('borderTop: index === 0 ? "none" : "1px dashed rgba(255,255,255,0.10)"');
+    expect(liquidacionBlock).toContain('width: 12, height: 1, background: "rgba(255,255,255,0.24)"');
+    expect(liquidacionBlock).toContain("marginLeft: 14");
+    expect(liquidacionBlock).toContain('gridTemplateColumns: "auto auto minmax(0, 1fr) auto"');
+```
+
+#### Por qué se cambió
+La prueba ahora fija que las fechas de notas semanales tengan separación entre grupos y un marcador visual propio dentro del ticket.
+
+
+## 2026-05-20 21:13 - Pulir notas del ticket semanal
+
+**Archivos modificados:** `src/main.tsx`, `src/__tests__/liquidacion-semana.test.ts`, `CAMBIOS_AGENT.md`
+
+### Cambio 1 - Título y fecha de notas
+
+#### Código anterior
+```tsx
+                <div style={{ fontSize: 12, fontWeight: 800, color: "rgba(255, 255, 255, 0.45)", textTransform: "uppercase", letterSpacing: "0.6px" }}>
+                  Notas de la semana
+                </div>
+                {turnosConNotas.map(({ turno, notasGenerales, notasDetalladas }) => (
+                  <div key={`ticket-notas-${turno.id}`} style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                    <div style={{ fontSize: 12, fontWeight: 800, color: "rgba(255,255,255,0.56)" }}>
+                      {fmtDate(turno.date)}
+                    </div>
+```
+
+#### Código nuevo
+```tsx
+                <div style={{ fontSize: 15, fontWeight: 800, color: "white", textAlign: "center", textTransform: "uppercase", letterSpacing: "0.6px", textShadow: "0 0 10px rgba(255,255,255,0.18)" }}>
+                  Notas de la semana
+                </div>
+                {turnosConNotas.map(({ turno, notasGenerales, notasDetalladas }) => (
+                  <div key={`ticket-notas-${turno.id}`} style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                    <div style={{ fontSize: 13, fontWeight: 800, color: "rgba(255,255,255,0.72)" }}>
+                      {fmtDate(turno.date)}
+                    </div>
+```
+
+#### Por qué se cambió
+El título debía conservar el texto `Notas de la semana`, pero ganar presencia de recibo: centrado, blanco, tamaño de sección y con neón sutil. La fecha queda en su posición, más legible y discreta.
+
+### Cambio 2 - Notas sin cajas pesadas
+
+#### Código anterior
+```tsx
+                      <div key={`ticket-nota-general-${entry.id}`} style={{ display: "grid", gridTemplateColumns: "auto minmax(0, 1fr)", alignItems: "start", gap: 9, color: "rgba(255,255,255,0.8)", fontSize: 13, lineHeight: 1.4, background: "rgba(255,255,255,0.025)", padding: "8px 10px", borderRadius: 9, minWidth: 0 }}>
+```
+
+```tsx
+                        <div key={`ticket-nota-detallada-${entry.id}`} style={{ fontSize: 13, background: "rgba(255,255,255,0.03)", padding: "10px 12px", borderRadius: 12, border: "1px solid rgba(255,255,255,0.05)", display: "grid", gridTemplateColumns: "auto auto minmax(0, 1fr) auto", alignItems: "center", gap: 8, minWidth: 0 }}>
+```
+
+#### Código nuevo
+```tsx
+                      <div key={`ticket-nota-general-${entry.id}`} style={{ display: "grid", gridTemplateColumns: "auto minmax(0, 1fr)", alignItems: "start", gap: 9, color: "rgba(255,255,255,0.8)", fontSize: 13, lineHeight: 1.4, minWidth: 0 }}>
+```
+
+```tsx
+                        <div key={`ticket-nota-detallada-${entry.id}`} style={{ fontSize: 13, display: "grid", gridTemplateColumns: "auto auto minmax(0, 1fr) auto", alignItems: "center", gap: 8, minWidth: 0 }}>
+```
+
+#### Por qué se cambió
+Las notas debían mantener hora, categoría, colores, importe y ajuste de texto largo, pero dejar de verse como tarjetas dentro del ticket.
+
+### Cambio 3 - Cobertura del acabado informativo
+
+#### Código anterior
+```ts
+    expect(liquidacionBlock).toContain("getEntryTypeMeta(entry.type)");
+    expect(liquidacionBlock).toContain('gridTemplateColumns: "auto auto minmax(0, 1fr) auto"');
+    expect(liquidacionBlock).toContain('overflowWrap: "anywhere"');
+```
+
+#### Código nuevo
+```ts
+    expect(liquidacionBlock).toContain("getEntryTypeMeta(entry.type)");
+    expect(liquidacionBlock).toContain('fontSize: 15, fontWeight: 800, color: "white", textAlign: "center"');
+    expect(liquidacionBlock).toContain('textShadow: "0 0 10px rgba(255,255,255,0.18)"');
+    expect(liquidacionBlock).toContain('fontSize: 13, fontWeight: 800, color: "rgba(255,255,255,0.72)"');
+    expect(liquidacionBlock).toContain('gridTemplateColumns: "auto auto minmax(0, 1fr) auto"');
+    expect(liquidacionBlock).toContain('overflowWrap: "anywhere"');
+    expect(liquidacionBlock).not.toContain('background: "rgba(255,255,255,0.025)", padding: "8px 10px", borderRadius: 9');
+    expect(liquidacionBlock).not.toContain('background: "rgba(255,255,255,0.03)", padding: "10px 12px", borderRadius: 12');
+```
+
+#### Por qué se cambió
+La prueba ahora protege que el título conserve el texto y adopte el estilo centrado/neón, que la fecha sea blanca discreta y que las notas pierdan las cajas tipo card.
+
+
+## 2026-05-20 20:55 - Restaurar notas y revertir exportación
+
+**Archivos modificados:** `src/main.tsx`, `src/__tests__/liquidacion-semana.test.ts`, `CAMBIOS_AGENT.md`
+
+### Cambio 1 - Revertir microcalibración de exportación
+
+#### Código anterior
+```tsx
+              .replace(/rgba\(\s*255\s*,\s*255\s*,\s*255\s*,\s*0\.015\s*\)/gi, "#101015")
+              .replace(/rgba\(\s*255\s*,\s*255\s*,\s*255\s*,\s*0\.025\s*\)/gi, "#15151a")
+              .replace(/rgba\(\s*255\s*,\s*255\s*,\s*255\s*,\s*0\.05\s*\)/gi, "rgba(255, 255, 255, 0.06)")
+              .replace(/rgba\(\s*255\s*,\s*255\s*,\s*255\s*,\s*0\.08\s*\)/gi, "rgba(255, 255, 255, 0.09)")
+              .replace(/rgba\(\s*255\s*,\s*255\s*,\s*255\s*,\s*0\.15\s*\)/gi, "rgba(255, 255, 255, 0.16)")
+              .replace(/rgba\(\s*255\s*,\s*255\s*,\s*255\s*,\s*0\.35\s*\)/gi, "rgba(255, 255, 255, 0.38)")
+              .replace(/rgba\(\s*255\s*,\s*255\s*,\s*255\s*,\s*0\.45\s*\)/gi, "rgba(255, 255, 255, 0.46)")
+              .replace(/rgba\(\s*255\s*,\s*255\s*,\s*255\s*,\s*0\.5\s*\)/gi, "rgba(255, 255, 255, 0.50)")
+              .replace(/rgba\(\s*255\s*,\s*255\s*,\s*255\s*,\s*0\.6\s*\)/gi, "rgba(255, 255, 255, 0.62)")
+              .replace(/rgba\(\s*255\s*,\s*255\s*,\s*255\s*,\s*0\.7\s*\)/gi, "rgba(255, 255, 255, 0.72)")
+              .replace(/rgba\(\s*80\s*,\s*220\s*,\s*140\s*,\s*0\.25\s*\)/gi, "rgba(38, 182, 61, 0.22)");
+```
+
+#### Código nuevo
+```tsx
+              .replace(/rgba\(\s*255\s*,\s*255\s*,\s*255\s*,\s*0\.015\s*\)/gi, "#111116")
+              .replace(/rgba\(\s*255\s*,\s*255\s*,\s*255\s*,\s*0\.025\s*\)/gi, "#17171c")
+              .replace(/rgba\(\s*255\s*,\s*255\s*,\s*255\s*,\s*0\.05\s*\)/gi, "rgba(255, 255, 255, 0.07)")
+              .replace(/rgba\(\s*255\s*,\s*255\s*,\s*255\s*,\s*0\.08\s*\)/gi, "rgba(255, 255, 255, 0.10)")
+              .replace(/rgba\(\s*255\s*,\s*255\s*,\s*255\s*,\s*0\.15\s*\)/gi, "rgba(255, 255, 255, 0.18)")
+              .replace(/rgba\(\s*255\s*,\s*255\s*,\s*255\s*,\s*0\.35\s*\)/gi, "rgba(255, 255, 255, 0.42)")
+              .replace(/rgba\(\s*255\s*,\s*255\s*,\s*255\s*,\s*0\.45\s*\)/gi, "rgba(255, 255, 255, 0.50)")
+              .replace(/rgba\(\s*255\s*,\s*255\s*,\s*255\s*,\s*0\.5\s*\)/gi, "rgba(255, 255, 255, 0.54)")
+              .replace(/rgba\(\s*255\s*,\s*255\s*,\s*255\s*,\s*0\.6\s*\)/gi, "rgba(255, 255, 255, 0.66)")
+              .replace(/rgba\(\s*255\s*,\s*255\s*,\s*255\s*,\s*0\.7\s*\)/gi, "rgba(255, 255, 255, 0.74)")
+              .replace(/rgba\(\s*80\s*,\s*220\s*,\s*140\s*,\s*0\.25\s*\)/gi, "rgba(38, 182, 61, 0.28)");
+```
+
+#### Por qué se cambió
+El último intento de afinar la imagen copiada dejaba peor el resultado visual. Se restauran los valores anteriores de exportación, que eran el punto más equilibrado.
+
+### Cambio 2 - Restaurar notas semanales
+
+#### Código anterior
+```tsx
+    const taximetroLimpio = roundMoney(resumen.dineroBase);
+
+    const copyTextFallback = () => {
+```
+
+#### Código nuevo
+```tsx
+    const taximetroLimpio = roundMoney(resumen.dineroBase);
+    const turnosConNotas = getTurnosNotasSemana(turnosSemana);
+
+    const formatLiquidacionNotasText = () => {
+      if (turnosConNotas.length === 0) return "";
+
+      return `\n\n📝 *NOTAS DE LA SEMANA:*\n${turnosConNotas.map(({ turno, notasGenerales, notasDetalladas }) => {
+        const lineasGenerales = notasGenerales.map((entry) => `  ${entry.time} Nota: ${entry.note.trim()}`);
+        const lineasDetalladas = notasDetalladas.map((entry) => {
+          const meta = getEntryTypeMeta(entry.type);
+          return `  ${entry.time} ${meta.label}: ${entry.note.trim()} (${fmt(entry.amount)})`;
+        });
+        return `*${fmtDate(turno.date)}*\n${[...lineasGenerales, ...lineasDetalladas].join("\n")}`;
+      }).join("\n\n")}`;
+    };
+
+    const copyTextFallback = () => {
+```
+
+#### Por qué se cambió
+La reversión anterior quitó por error las notas del ticket. Se restauran porque la petición real era revertir el último ajuste de copiado de liquidación.
+
+### Cambio 3 - Restaurar sección visual de notas
+
+#### Código anterior
+```tsx
+          </div>
+
+          {/* Botones de acción */}
+```
+
+#### Código nuevo
+```tsx
+            {turnosConNotas.length > 0 && (
+              <div style={{ borderTop: "1px dashed rgba(255, 255, 255, 0.15)", paddingTop: 14, display: "flex", flexDirection: "column", gap: 10 }}>
+                <div style={{ fontSize: 12, fontWeight: 800, color: "rgba(255, 255, 255, 0.45)", textTransform: "uppercase", letterSpacing: "0.6px" }}>
+                  Notas de la semana
+                </div>
+                {turnosConNotas.map(({ turno, notasGenerales, notasDetalladas }) => (
+                  <div key={`ticket-notas-${turno.id}`} style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                    <div style={{ fontSize: 12, fontWeight: 800, color: "rgba(255,255,255,0.56)" }}>
+                      {fmtDate(turno.date)}
+                    </div>
+                    {notasGenerales.map((entry) => (
+                      <div key={`ticket-nota-general-${entry.id}`} style={{ display: "grid", gridTemplateColumns: "auto minmax(0, 1fr)", alignItems: "start", gap: 9, color: "rgba(255,255,255,0.8)", fontSize: 13, lineHeight: 1.4, background: "rgba(255,255,255,0.025)", padding: "8px 10px", borderRadius: 9, minWidth: 0 }}>
+                        <span style={{ color: "rgba(255,255,255,0.58)", fontSize: 11, fontWeight: 700, lineHeight: 1, whiteSpace: "nowrap", background: "rgba(150,130,255,0.10)", border: "1px solid rgba(150,130,255,0.14)", borderRadius: 7, padding: "4px 5px", marginTop: 1 }}>{entry.time}</span>
+                        <span style={{ color: "rgba(255,255,255,0.82)", fontSize: 12, lineHeight: 1.38, minWidth: 0, overflowWrap: "anywhere" }}>{entry.note}</span>
+                      </div>
+                    ))}
+                    {notasDetalladas.map((entry) => {
+                      const meta = getEntryTypeMeta(entry.type);
+                      return (
+                        <div key={`ticket-nota-detallada-${entry.id}`} style={{ fontSize: 13, background: "rgba(255,255,255,0.03)", padding: "10px 12px", borderRadius: 12, border: "1px solid rgba(255,255,255,0.05)", display: "grid", gridTemplateColumns: "auto auto minmax(0, 1fr) auto", alignItems: "center", gap: 8, minWidth: 0 }}>
+                          <span style={{ fontSize: 12, color: "rgba(255,255,255,0.5)", fontWeight: 600, flexShrink: 0 }}>{entry.time}</span>
+                          <span style={{ fontWeight: 700, color: meta.color, fontSize: 14, whiteSpace: "nowrap", flexShrink: 0 }}>{meta.label}</span>
+                          <span style={{ color: "rgba(255,255,255,0.8)", fontSize: 12, lineHeight: 1.4, flex: 1, minWidth: 0, overflowWrap: "anywhere" }}>{entry.note}</span>
+                          <span style={{ fontSize: 15, fontWeight: 700, color: meta.color, whiteSpace: "nowrap", flexShrink: 0 }}>{fmt(entry.amount)}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+```
+
+#### Por qué se cambió
+Se devuelve la sección de notas que se había eliminado por una interpretación incorrecta de la reversión solicitada.
+
+### Cambio 4 - Restaurar expectativas de prueba
+
+#### Código anterior
+```ts
+    expect(copyBlock).toContain('"#101015"');
+    expect(copyBlock).toContain('"#15151a"');
+    expect(copyBlock).toContain('rgba(255, 255, 255, 0.16)');
+    expect(copyBlock).toContain('rgba(255, 255, 255, 0.46)');
+    expect(copyBlock).toContain('rgba(38, 182, 61, 0.22)');
+```
+
+#### Código nuevo
+```ts
+    expect(copyBlock).toContain('"#111116"');
+    expect(copyBlock).toContain('"#17171c"');
+    expect(copyBlock).toContain('rgba(255, 255, 255, 0.18)');
+    expect(copyBlock).toContain('rgba(255, 255, 255, 0.50)');
+    expect(copyBlock).toContain('rgba(38, 182, 61, 0.28)');
+```
+
+#### Por qué se cambió
+La prueba vuelve a fijar los valores de exportación anteriores al último retoque, que son los que se quieren conservar.
+
+
+## 2026-05-20 20:50 - Revertir notas del ticket semanal
+
+**Archivos modificados:** `src/main.tsx`, `src/__tests__/liquidacion-semana.test.ts`, `CAMBIOS_AGENT.md`
+
+### Cambio 1 - Quitar notas calculadas en liquidación
+
+#### Código anterior
+```tsx
+    const taximetroLimpio = roundMoney(resumen.dineroBase);
+    const turnosConNotas = getTurnosNotasSemana(turnosSemana);
+
+    const formatLiquidacionNotasText = () => {
+      if (turnosConNotas.length === 0) return "";
+
+      return `\n\n📝 *NOTAS DE LA SEMANA:*\n${turnosConNotas.map(({ turno, notasGenerales, notasDetalladas }) => {
+        const lineasGenerales = notasGenerales.map((entry) => `  ${entry.time} Nota: ${entry.note.trim()}`);
+        const lineasDetalladas = notasDetalladas.map((entry) => {
+          const meta = getEntryTypeMeta(entry.type);
+          return `  ${entry.time} ${meta.label}: ${entry.note.trim()} (${fmt(entry.amount)})`;
+        });
+        return `*${fmtDate(turno.date)}*\n${[...lineasGenerales, ...lineasDetalladas].join("\n")}`;
+      }).join("\n\n")}`;
+    };
+
+    const copyTextFallback = () => {
+```
+
+#### Código nuevo
+```tsx
+    const taximetroLimpio = roundMoney(resumen.dineroBase);
+
+    const copyTextFallback = () => {
+```
+
+#### Por qué se cambió
+La sección de notas añadía peso visual al ticket y hacía que la liquidación se viera menos limpia y profesional que el estado anterior.
+
+### Cambio 2 - Restaurar fallback sin notas semanales
+
+#### Código anterior
+```tsx
+      const text = `📋 *LIQUIDACIÓN SEMANAL*\n📅 *Semana:* ${dates}\n\n🚕 *Total Taxímetro:* ${fmt(taximetroLimpio)}\n🚗 *Total KM:* ${fmtKmNumber(totalKMAcumulado)} KM\n👤 *Comisión Bruta Jefe:* ${fmt(brutoJefeAcumulado)}\n\n⛔ *DESCONTAR:*\n  💳 Datáfonos: -${fmt(descDAcumulado)}\n  ⛽ Gasolina: -${fmt(descGAcumulado)}\n  🎟️ Agencias/Bonos: -${fmt(descAAcumulado)}\n  ➕ Extras: -${fmt(descEAcumulado)}\n💰 *Total Descuentos:* -${fmt(totalDescontarAcumulado)}\n\n💵 *NETO A ENTREGAR:*\n👉 *${fmt(totalNetoAcumulado)}* 👈\n\nℹ️ _Nulos acumulados: ${fmt(totalNulosAcumulado)}_${formatLiquidacionNotasText()}`;
+```
+
+#### Código nuevo
+```tsx
+      const text = `📋 *LIQUIDACIÓN SEMANAL*\n📅 *Semana:* ${dates}\n\n🚕 *Total Taxímetro:* ${fmt(taximetroLimpio)}\n🚗 *Total KM:* ${fmtKmNumber(totalKMAcumulado)} KM\n👤 *Comisión Bruta Jefe:* ${fmt(brutoJefeAcumulado)}\n\n⛔ *DESCONTAR:*\n  💳 Datáfonos: -${fmt(descDAcumulado)}\n  ⛽ Gasolina: -${fmt(descGAcumulado)}\n  🎟️ Agencias/Bonos: -${fmt(descAAcumulado)}\n  ➕ Extras: -${fmt(descEAcumulado)}\n💰 *Total Descuentos:* -${fmt(totalDescontarAcumulado)}\n\n💵 *NETO A ENTREGAR:*\n👉 *${fmt(totalNetoAcumulado)}* 👈\n\nℹ️ _Nulos acumulados: ${fmt(totalNulosAcumulado)}_`;
+```
+
+#### Por qué se cambió
+El texto de liquidación debe volver a copiar solo el resumen económico del ticket, sin añadir notas semanales.
+
+### Cambio 3 - Eliminar sección visual de notas
+
+#### Código anterior
+```tsx
+            {turnosConNotas.length > 0 && (
+              <div style={{ borderTop: "1px dashed rgba(255, 255, 255, 0.15)", paddingTop: 14, display: "flex", flexDirection: "column", gap: 10 }}>
+                <div style={{ fontSize: 12, fontWeight: 800, color: "rgba(255, 255, 255, 0.45)", textTransform: "uppercase", letterSpacing: "0.6px" }}>
+                  Notas de la semana
+                </div>
+                {turnosConNotas.map(({ turno, notasGenerales, notasDetalladas }) => (
+                  <div key={`ticket-notas-${turno.id}`} style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                    <div style={{ fontSize: 12, fontWeight: 800, color: "rgba(255,255,255,0.56)" }}>
+                      {fmtDate(turno.date)}
+                    </div>
+                    {notasGenerales.map((entry) => (
+                      <div key={`ticket-nota-general-${entry.id}`} style={{ display: "grid", gridTemplateColumns: "auto minmax(0, 1fr)", alignItems: "start", gap: 9, color: "rgba(255,255,255,0.8)", fontSize: 13, lineHeight: 1.4, background: "rgba(255,255,255,0.025)", padding: "8px 10px", borderRadius: 9, minWidth: 0 }}>
+                        <span style={{ color: "rgba(255,255,255,0.58)", fontSize: 11, fontWeight: 700, lineHeight: 1, whiteSpace: "nowrap", background: "rgba(150,130,255,0.10)", border: "1px solid rgba(150,130,255,0.14)", borderRadius: 7, padding: "4px 5px", marginTop: 1 }}>{entry.time}</span>
+                        <span style={{ color: "rgba(255,255,255,0.82)", fontSize: 12, lineHeight: 1.38, minWidth: 0, overflowWrap: "anywhere" }}>{entry.note}</span>
+                      </div>
+                    ))}
+                    {notasDetalladas.map((entry) => {
+                      const meta = getEntryTypeMeta(entry.type);
+                      return (
+                        <div key={`ticket-nota-detallada-${entry.id}`} style={{ fontSize: 13, background: "rgba(255,255,255,0.03)", padding: "10px 12px", borderRadius: 12, border: "1px solid rgba(255,255,255,0.05)", display: "grid", gridTemplateColumns: "auto auto minmax(0, 1fr) auto", alignItems: "center", gap: 8, minWidth: 0 }}>
+                          <span style={{ fontSize: 12, color: "rgba(255,255,255,0.5)", fontWeight: 600, flexShrink: 0 }}>{entry.time}</span>
+                          <span style={{ fontWeight: 700, color: meta.color, fontSize: 14, whiteSpace: "nowrap", flexShrink: 0 }}>{meta.label}</span>
+                          <span style={{ color: "rgba(255,255,255,0.8)", fontSize: 12, lineHeight: 1.4, flex: 1, minWidth: 0, overflowWrap: "anywhere" }}>{entry.note}</span>
+                          <span style={{ fontSize: 15, fontWeight: 700, color: meta.color, whiteSpace: "nowrap", flexShrink: 0 }}>{fmt(entry.amount)}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                ))}
+              </div>
+            )}
+```
+
+#### Código nuevo
+```tsx
+          </div>
+
+          {/* Botones de acción */}
+```
+
+#### Por qué se cambió
+El ticket recupera su cierre visual justo después de `Total Nulos acumulados`, evitando que la liquidación crezca con una sección informativa que perjudicaba la composición.
+
+### Cambio 4 - Prueba de regresión sin notas
+
+#### Código anterior
+```ts
+  it("adds weekly notes to the liquidation ticket and text fallback", () => {
+    const liquidacionBlock = source.match(
+      /if \(screen === "liquidacionSemana" && selectedWeekId\) \{[\s\S]*?if \(screen === "PantallaTurnos"\)/
+    )?.[0] || "";
+
+    expect(liquidacionBlock).toContain("const turnosConNotas = getTurnosNotasSemana(turnosSemana);");
+    expect(liquidacionBlock).toContain("*NOTAS DE LA SEMANA:*");
+    expect(liquidacionBlock).toContain("turnosConNotas.length > 0 &&");
+    expect(liquidacionBlock).toContain("Notas de la semana");
+    expect(liquidacionBlock).toContain("notasGenerales.map");
+    expect(liquidacionBlock).toContain("notasDetalladas.map");
+    expect(liquidacionBlock).toContain("getEntryTypeMeta(entry.type)");
+    expect(liquidacionBlock).toContain('gridTemplateColumns: "auto auto minmax(0, 1fr) auto"');
+    expect(liquidacionBlock).toContain('overflowWrap: "anywhere"');
+  });
+```
+
+#### Código nuevo
+```ts
+  it("keeps weekly notes out of the liquidation ticket", () => {
+    const liquidacionBlock = source.match(
+      /if \(screen === "liquidacionSemana" && selectedWeekId\) \{[\s\S]*?if \(screen === "PantallaTurnos"\)/
+    )?.[0] || "";
+
+    expect(liquidacionBlock).not.toContain("const turnosConNotas = getTurnosNotasSemana(turnosSemana);");
+    expect(liquidacionBlock).not.toContain("*NOTAS DE LA SEMANA:*");
+    expect(liquidacionBlock).not.toContain("turnosConNotas.length > 0 &&");
+    expect(liquidacionBlock).not.toContain("Notas de la semana");
+    expect(liquidacionBlock).not.toContain("notasGenerales.map");
+    expect(liquidacionBlock).not.toContain("notasDetalladas.map");
+  });
+```
+
+#### Por qué se cambió
+La cobertura ahora protege el diseño decidido: las notas semanales deben quedarse fuera de la pantalla de liquidación para conservar el ticket limpio.
+
+
+## 2026-05-20 20:45 - Añadir notas al ticket semanal
+
+**Archivos modificados:** `src/main.tsx`, `src/__tests__/liquidacion-semana.test.ts`, `CAMBIOS_AGENT.md`
+
+### Cambio 1 - Notas disponibles para liquidación
+
+#### Código anterior
+```tsx
+    const taximetroLimpio = roundMoney(resumen.dineroBase);
+
+    const copyTextFallback = () => {
+```
+
+#### Código nuevo
+```tsx
+    const taximetroLimpio = roundMoney(resumen.dineroBase);
+    const turnosConNotas = getTurnosNotasSemana(turnosSemana);
+
+    const formatLiquidacionNotasText = () => {
+      if (turnosConNotas.length === 0) return "";
+
+      return `\n\n📝 *NOTAS DE LA SEMANA:*\n${turnosConNotas.map(({ turno, notasGenerales, notasDetalladas }) => {
+        const lineasGenerales = notasGenerales.map((entry) => `  ${entry.time} Nota: ${entry.note.trim()}`);
+        const lineasDetalladas = notasDetalladas.map((entry) => {
+          const meta = getEntryTypeMeta(entry.type);
+          return `  ${entry.time} ${meta.label}: ${entry.note.trim()} (${fmt(entry.amount)})`;
+        });
+        return `*${fmtDate(turno.date)}*\n${[...lineasGenerales, ...lineasDetalladas].join("\n")}`;
+      }).join("\n\n")}`;
+    };
+
+    const copyTextFallback = () => {
+```
+
+#### Por qué se cambió
+La liquidación semanal necesitaba reutilizar las notas guardadas en los turnos de esa semana y tener un formateador específico para añadirlas al fallback de texto solo cuando existan.
+
+### Cambio 2 - Fallback de texto con notas
+
+#### Código anterior
+```tsx
+      const text = `📋 *LIQUIDACIÓN SEMANAL*\n📅 *Semana:* ${dates}\n\n🚕 *Total Taxímetro:* ${fmt(taximetroLimpio)}\n🚗 *Total KM:* ${fmtKmNumber(totalKMAcumulado)} KM\n👤 *Comisión Bruta Jefe:* ${fmt(brutoJefeAcumulado)}\n\n⛔ *DESCONTAR:*\n  💳 Datáfonos: -${fmt(descDAcumulado)}\n  ⛽ Gasolina: -${fmt(descGAcumulado)}\n  🎟️ Agencias/Bonos: -${fmt(descAAcumulado)}\n  ➕ Extras: -${fmt(descEAcumulado)}\n💰 *Total Descuentos:* -${fmt(totalDescontarAcumulado)}\n\n💵 *NETO A ENTREGAR:*\n👉 *${fmt(totalNetoAcumulado)}* 👈\n\nℹ️ _Nulos acumulados: ${fmt(totalNulosAcumulado)}_`;
+```
+
+#### Código nuevo
+```tsx
+      const text = `📋 *LIQUIDACIÓN SEMANAL*\n📅 *Semana:* ${dates}\n\n🚕 *Total Taxímetro:* ${fmt(taximetroLimpio)}\n🚗 *Total KM:* ${fmtKmNumber(totalKMAcumulado)} KM\n👤 *Comisión Bruta Jefe:* ${fmt(brutoJefeAcumulado)}\n\n⛔ *DESCONTAR:*\n  💳 Datáfonos: -${fmt(descDAcumulado)}\n  ⛽ Gasolina: -${fmt(descGAcumulado)}\n  🎟️ Agencias/Bonos: -${fmt(descAAcumulado)}\n  ➕ Extras: -${fmt(descEAcumulado)}\n💰 *Total Descuentos:* -${fmt(totalDescontarAcumulado)}\n\n💵 *NETO A ENTREGAR:*\n👉 *${fmt(totalNetoAcumulado)}* 👈\n\nℹ️ _Nulos acumulados: ${fmt(totalNulosAcumulado)}_${formatLiquidacionNotasText()}`;
+```
+
+#### Por qué se cambió
+El texto copiado cuando no se puede generar imagen debía incluir también las notas semanales, manteniendo intacto el resto de la liquidación.
+
+### Cambio 3 - Sección de notas en el ticket
+
+#### Código anterior
+`No existía la sección de notas semanales en src/main.tsx.`
+
+#### Código nuevo
+```tsx
+            {turnosConNotas.length > 0 && (
+              <div style={{ borderTop: "1px dashed rgba(255, 255, 255, 0.15)", paddingTop: 14, display: "flex", flexDirection: "column", gap: 10 }}>
+                <div style={{ fontSize: 12, fontWeight: 800, color: "rgba(255, 255, 255, 0.45)", textTransform: "uppercase", letterSpacing: "0.6px" }}>
+                  Notas de la semana
+                </div>
+                {turnosConNotas.map(({ turno, notasGenerales, notasDetalladas }) => (
+                  <div key={`ticket-notas-${turno.id}`} style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                    <div style={{ fontSize: 12, fontWeight: 800, color: "rgba(255,255,255,0.56)" }}>
+                      {fmtDate(turno.date)}
+                    </div>
+                    {notasGenerales.map((entry) => (
+                      <div key={`ticket-nota-general-${entry.id}`} style={{ display: "grid", gridTemplateColumns: "auto minmax(0, 1fr)", alignItems: "start", gap: 9, color: "rgba(255,255,255,0.8)", fontSize: 13, lineHeight: 1.4, background: "rgba(255,255,255,0.025)", padding: "8px 10px", borderRadius: 9, minWidth: 0 }}>
+                        <span style={{ color: "rgba(255,255,255,0.58)", fontSize: 11, fontWeight: 700, lineHeight: 1, whiteSpace: "nowrap", background: "rgba(150,130,255,0.10)", border: "1px solid rgba(150,130,255,0.14)", borderRadius: 7, padding: "4px 5px", marginTop: 1 }}>{entry.time}</span>
+                        <span style={{ color: "rgba(255,255,255,0.82)", fontSize: 12, lineHeight: 1.38, minWidth: 0, overflowWrap: "anywhere" }}>{entry.note}</span>
+                      </div>
+                    ))}
+                    {notasDetalladas.map((entry) => {
+                      const meta = getEntryTypeMeta(entry.type);
+                      return (
+                        <div key={`ticket-nota-detallada-${entry.id}`} style={{ fontSize: 13, background: "rgba(255,255,255,0.03)", padding: "10px 12px", borderRadius: 12, border: "1px solid rgba(255,255,255,0.05)", display: "grid", gridTemplateColumns: "auto auto minmax(0, 1fr) auto", alignItems: "center", gap: 8, minWidth: 0 }}>
+                          <span style={{ fontSize: 12, color: "rgba(255,255,255,0.5)", fontWeight: 600, flexShrink: 0 }}>{entry.time}</span>
+                          <span style={{ fontWeight: 700, color: meta.color, fontSize: 14, whiteSpace: "nowrap", flexShrink: 0 }}>{meta.label}</span>
+                          <span style={{ color: "rgba(255,255,255,0.8)", fontSize: 12, lineHeight: 1.4, flex: 1, minWidth: 0, overflowWrap: "anywhere" }}>{entry.note}</span>
+                          <span style={{ fontSize: 15, fontWeight: 700, color: meta.color, whiteSpace: "nowrap", flexShrink: 0 }}>{fmt(entry.amount)}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                ))}
+              </div>
+            )}
+```
+
+#### Por qué se cambió
+El ticket de liquidación necesitaba mostrar las notas de la semana como una parte más del recibo, con separador dashed, densidad compacta, notas generales y notas detalladas alineadas sin desbordar.
+
+### Cambio 4 - Cobertura de notas semanales
+
+#### Código anterior
+`No existía la prueba "adds weekly notes to the liquidation ticket and text fallback" en src/__tests__/liquidacion-semana.test.ts.`
+
+#### Código nuevo
+```ts
+  it("adds weekly notes to the liquidation ticket and text fallback", () => {
+    const liquidacionBlock = source.match(
+      /if \(screen === "liquidacionSemana" && selectedWeekId\) \{[\s\S]*?if \(screen === "PantallaTurnos"\)/
+    )?.[0] || "";
+
+    expect(liquidacionBlock).toContain("const turnosConNotas = getTurnosNotasSemana(turnosSemana);");
+    expect(liquidacionBlock).toContain("*NOTAS DE LA SEMANA:*");
+    expect(liquidacionBlock).toContain("turnosConNotas.length > 0 &&");
+    expect(liquidacionBlock).toContain("Notas de la semana");
+    expect(liquidacionBlock).toContain("notasGenerales.map");
+    expect(liquidacionBlock).toContain("notasDetalladas.map");
+    expect(liquidacionBlock).toContain("getEntryTypeMeta(entry.type)");
+    expect(liquidacionBlock).toContain('gridTemplateColumns: "auto auto minmax(0, 1fr) auto"');
+    expect(liquidacionBlock).toContain('overflowWrap: "anywhere"');
+  });
+```
+
+#### Por qué se cambió
+La prueba fija que la liquidación calcula notas de la semana, pinta la sección condicional en el ticket, conserva estilos compactos para notas generales y detalladas, y añade las notas al fallback de texto.
+
+
+## 2026-05-20 20:32 - Afinar contraste de exportación
+
+**Archivos modificados:** `src/main.tsx`, `src/__tests__/liquidacion-semana.test.ts`, `CAMBIOS_AGENT.md`
+
+### Cambio 1 - Neutros menos marcados en imagen copiada
+
+#### Código anterior
+```tsx
+              .replace(/rgba\(\s*255\s*,\s*255\s*,\s*255\s*,\s*0\.015\s*\)/gi, "#111116")
+              .replace(/rgba\(\s*255\s*,\s*255\s*,\s*255\s*,\s*0\.025\s*\)/gi, "#17171c")
+              .replace(/rgba\(\s*255\s*,\s*255\s*,\s*255\s*,\s*0\.05\s*\)/gi, "rgba(255, 255, 255, 0.07)")
+              .replace(/rgba\(\s*255\s*,\s*255\s*,\s*255\s*,\s*0\.08\s*\)/gi, "rgba(255, 255, 255, 0.10)")
+              .replace(/rgba\(\s*255\s*,\s*255\s*,\s*255\s*,\s*0\.15\s*\)/gi, "rgba(255, 255, 255, 0.18)")
+              .replace(/rgba\(\s*255\s*,\s*255\s*,\s*255\s*,\s*0\.35\s*\)/gi, "rgba(255, 255, 255, 0.42)")
+              .replace(/rgba\(\s*255\s*,\s*255\s*,\s*255\s*,\s*0\.45\s*\)/gi, "rgba(255, 255, 255, 0.50)")
+              .replace(/rgba\(\s*255\s*,\s*255\s*,\s*255\s*,\s*0\.5\s*\)/gi, "rgba(255, 255, 255, 0.54)")
+              .replace(/rgba\(\s*255\s*,\s*255\s*,\s*255\s*,\s*0\.6\s*\)/gi, "rgba(255, 255, 255, 0.66)")
+              .replace(/rgba\(\s*255\s*,\s*255\s*,\s*255\s*,\s*0\.7\s*\)/gi, "rgba(255, 255, 255, 0.74)")
+              .replace(/rgba\(\s*80\s*,\s*220\s*,\s*140\s*,\s*0\.25\s*\)/gi, "rgba(38, 182, 61, 0.28)");
+```
+
+#### Código nuevo
+```tsx
+              .replace(/rgba\(\s*255\s*,\s*255\s*,\s*255\s*,\s*0\.015\s*\)/gi, "#101015")
+              .replace(/rgba\(\s*255\s*,\s*255\s*,\s*255\s*,\s*0\.025\s*\)/gi, "#15151a")
+              .replace(/rgba\(\s*255\s*,\s*255\s*,\s*255\s*,\s*0\.05\s*\)/gi, "rgba(255, 255, 255, 0.06)")
+              .replace(/rgba\(\s*255\s*,\s*255\s*,\s*255\s*,\s*0\.08\s*\)/gi, "rgba(255, 255, 255, 0.09)")
+              .replace(/rgba\(\s*255\s*,\s*255\s*,\s*255\s*,\s*0\.15\s*\)/gi, "rgba(255, 255, 255, 0.16)")
+              .replace(/rgba\(\s*255\s*,\s*255\s*,\s*255\s*,\s*0\.35\s*\)/gi, "rgba(255, 255, 255, 0.38)")
+              .replace(/rgba\(\s*255\s*,\s*255\s*,\s*255\s*,\s*0\.45\s*\)/gi, "rgba(255, 255, 255, 0.46)")
+              .replace(/rgba\(\s*255\s*,\s*255\s*,\s*255\s*,\s*0\.5\s*\)/gi, "rgba(255, 255, 255, 0.50)")
+              .replace(/rgba\(\s*255\s*,\s*255\s*,\s*255\s*,\s*0\.6\s*\)/gi, "rgba(255, 255, 255, 0.62)")
+              .replace(/rgba\(\s*255\s*,\s*255\s*,\s*255\s*,\s*0\.7\s*\)/gi, "rgba(255, 255, 255, 0.72)")
+              .replace(/rgba\(\s*80\s*,\s*220\s*,\s*140\s*,\s*0\.25\s*\)/gi, "rgba(38, 182, 61, 0.22)");
+```
+
+#### Por qué se cambió
+La exportación anterior quedaba algo más contrastada que la UI: grises, bordes y glow verde se veían demasiado marcados. Estos valores reducen el contraste solo en la imagen copiada.
+
+### Cambio 2 - Expectativas de microcalibración
+
+#### Código anterior
+```ts
+    expect(copyBlock).toContain('rgba(38, 182, 61, 0.28)');
+```
+
+#### Código nuevo
+```ts
+    expect(copyBlock).toContain('"#101015"');
+    expect(copyBlock).toContain('"#15151a"');
+    expect(copyBlock).toContain('rgba(255, 255, 255, 0.16)');
+    expect(copyBlock).toContain('rgba(255, 255, 255, 0.46)');
+    expect(copyBlock).toContain('rgba(38, 182, 61, 0.22)');
+```
+
+#### Por qué se cambió
+La prueba debía fijar la nueva calibración de fondos, líneas, textos secundarios y glow para evitar volver a los neutros demasiado intensos.
+
+## 2026-05-20 20:27 - Pulir exportación de liquidación
+
+**Archivos modificados:** `src/main.tsx`, `src/__tests__/liquidacion-semana.test.ts`, `CAMBIOS_AGENT.md`
+
+### Cambio 1 - Captura con fuentes y mayor nitidez
+
+#### Código anterior
+```tsx
+    const copyToClipboard = () => {
+      const element = document.getElementById("ticket-digital");
+      if (!element) {
+        copyTextFallback();
+        return;
+      }
+
+      html2canvas(element, {
+        backgroundColor: "#121212",
+        scale: 2,
+        useCORS: true,
+        logging: false,
+```
+
+#### Código nuevo
+```tsx
+    const copyToClipboard = async () => {
+      const element = document.getElementById("ticket-digital");
+      if (!element) {
+        copyTextFallback();
+        return;
+      }
+
+      try {
+        await document.fonts?.ready;
+      } catch {
+      }
+
+      html2canvas(element, {
+        backgroundColor: "#0d0d14",
+        scale: 3,
+        useCORS: true,
+        logging: false,
+```
+
+#### Por qué se cambió
+La captura necesitaba esperar a que la fuente estuviera lista, usar el fondo real de la app y subir la escala para que la imagen copiada tenga texto e iconos más nítidos.
+
+### Cambio 2 - Normalización export-only de tonos neutros
+
+#### Código anterior
+```tsx
+          const elements = ticket.getElementsByTagName("*");
+          const replaceOklch = (str: string) => {
+            return str.replace(/oklch\(\s*([\d.]+)\s+([\d.]+)\s+([\d.]+)\s*\)/gi, (match, l, c, h) => {
+              const lightness = parseFloat(l);
+              const chroma = parseFloat(c);
+              const hue = parseFloat(h);
+              if (Math.abs(lightness - 0.85) < 0.05 && Math.abs(chroma - 0.18) < 0.05 && Math.abs(hue - 85) < 5) return "#ffc200";
+              if (Math.abs(lightness - 0.80) < 0.05 && Math.abs(chroma - 0.14) < 0.05 && Math.abs(hue - 220) < 5) return "#25d2fc";
+              if (Math.abs(lightness - 0.70) < 0.05 && Math.abs(chroma - 0.18) < 0.05 && Math.abs(hue - 25) < 5) return "#fa6863";
+              if (Math.abs(lightness - 0.68) < 0.05 && Math.abs(chroma - 0.20) < 0.05 && Math.abs(hue - 145) < 5) return "#26b63d";
+              if (Math.abs(lightness - 0.65) < 0.05 && Math.abs(chroma - 0.20) < 0.05 && Math.abs(hue - 280) < 5) return "#7c79ff";
+              if (Math.abs(lightness - 0.75) < 0.05 && Math.abs(chroma - 0.16) < 0.05 && Math.abs(hue - 70) < 5) return "#ed990e";
+              if (Math.abs(lightness - 0.72) < 0.05 && Math.abs(chroma - 0.14) < 0.05 && Math.abs(hue - 200) < 5) return "#00bec7";
+              return match;
+            });
+          };
+
+          for (let i = 0; i < elements.length; i++) {
+            const el = elements[i] as HTMLElement;
+
+            const styleAttr = el.getAttribute("style");
+            if (styleAttr) {
+              el.setAttribute("style", replaceOklch(styleAttr));
+            }
+```
+
+#### Código nuevo
+```tsx
+          const elements = [ticket, ...Array.from(ticket.getElementsByTagName("*"))] as HTMLElement[];
+          const replaceOklch = (str: string) => {
+            return str.replace(/oklch\(\s*([\d.]+)\s+([\d.]+)\s+([\d.]+)\s*\)/gi, (match, l, c, h) => {
+              const lightness = parseFloat(l);
+              const chroma = parseFloat(c);
+              const hue = parseFloat(h);
+              if (Math.abs(lightness - 0.85) < 0.05 && Math.abs(chroma - 0.18) < 0.05 && Math.abs(hue - 85) < 5) return "#ffc200";
+              if (Math.abs(lightness - 0.80) < 0.05 && Math.abs(chroma - 0.14) < 0.05 && Math.abs(hue - 220) < 5) return "#25d2fc";
+              if (Math.abs(lightness - 0.70) < 0.05 && Math.abs(chroma - 0.18) < 0.05 && Math.abs(hue - 25) < 5) return "#fa6863";
+              if (Math.abs(lightness - 0.68) < 0.05 && Math.abs(chroma - 0.20) < 0.05 && Math.abs(hue - 145) < 5) return "#26b63d";
+              if (Math.abs(lightness - 0.65) < 0.05 && Math.abs(chroma - 0.20) < 0.05 && Math.abs(hue - 280) < 5) return "#7c79ff";
+              if (Math.abs(lightness - 0.75) < 0.05 && Math.abs(chroma - 0.16) < 0.05 && Math.abs(hue - 70) < 5) return "#ed990e";
+              if (Math.abs(lightness - 0.72) < 0.05 && Math.abs(chroma - 0.14) < 0.05 && Math.abs(hue - 200) < 5) return "#00bec7";
+              return match;
+            });
+          };
+          const replaceExportNeutrals = (str: string) => {
+            return str
+              .replace(/rgba\(\s*255\s*,\s*255\s*,\s*255\s*,\s*0\.015\s*\)/gi, "#111116")
+              .replace(/rgba\(\s*255\s*,\s*255\s*,\s*255\s*,\s*0\.025\s*\)/gi, "#17171c")
+              .replace(/rgba\(\s*255\s*,\s*255\s*,\s*255\s*,\s*0\.05\s*\)/gi, "rgba(255, 255, 255, 0.07)")
+              .replace(/rgba\(\s*255\s*,\s*255\s*,\s*255\s*,\s*0\.08\s*\)/gi, "rgba(255, 255, 255, 0.10)")
+              .replace(/rgba\(\s*255\s*,\s*255\s*,\s*255\s*,\s*0\.15\s*\)/gi, "rgba(255, 255, 255, 0.18)")
+              .replace(/rgba\(\s*255\s*,\s*255\s*,\s*255\s*,\s*0\.35\s*\)/gi, "rgba(255, 255, 255, 0.42)")
+              .replace(/rgba\(\s*255\s*,\s*255\s*,\s*255\s*,\s*0\.45\s*\)/gi, "rgba(255, 255, 255, 0.50)")
+              .replace(/rgba\(\s*255\s*,\s*255\s*,\s*255\s*,\s*0\.5\s*\)/gi, "rgba(255, 255, 255, 0.54)")
+              .replace(/rgba\(\s*255\s*,\s*255\s*,\s*255\s*,\s*0\.6\s*\)/gi, "rgba(255, 255, 255, 0.66)")
+              .replace(/rgba\(\s*255\s*,\s*255\s*,\s*255\s*,\s*0\.7\s*\)/gi, "rgba(255, 255, 255, 0.74)")
+              .replace(/rgba\(\s*80\s*,\s*220\s*,\s*140\s*,\s*0\.25\s*\)/gi, "rgba(38, 182, 61, 0.28)");
+          };
+          const normalizeExportColors = (str: string) => replaceExportNeutrals(replaceOklch(str));
+
+          for (const el of elements) {
+            const styleAttr = el.getAttribute("style");
+            if (styleAttr) {
+              el.setAttribute("style", normalizeExportColors(styleAttr));
+            }
+```
+
+#### Por qué se cambió
+La imagen copiada seguía perdiendo fidelidad en fondos, grises, bordes y glow; la normalización se aplica solo al DOM clonado para no cambiar la UI visible.
+
+### Cambio 3 - Prueba de pulido de exportación
+
+#### Código anterior
+```ts
+No existía la prueba "sharpens copied liquidation image without changing the visible UI styles" en src/__tests__/liquidacion-semana.test.ts.
+```
+
+#### Código nuevo
+```ts
+  it("sharpens copied liquidation image without changing the visible UI styles", () => {
+    const copyBlock = source.match(
+      /const copyToClipboard = async \(\) => \{[\s\S]*?html2canvas\(element, \{[\s\S]*?\}\)\.then/
+    )?.[0] || "";
+
+    expect(copyBlock).toContain("await document.fonts?.ready");
+    expect(copyBlock).toContain('backgroundColor: "#0d0d14"');
+    expect(copyBlock).toContain("scale: 3");
+    expect(copyBlock).toContain("const normalizeExportColors = (str: string)");
+    expect(copyBlock).toContain("replaceExportNeutrals");
+    expect(copyBlock).toContain('rgba(38, 182, 61, 0.28)');
+
+    expect(source).toContain('background: "rgba(255, 255, 255, 0.015)"');
+    expect(source).toContain('textShadow: "0 0 12px rgba(80, 220, 140, 0.25)"');
+  });
+```
+
+#### Por qué se cambió
+La exportación necesitaba una prueba que fijara espera de fuentes, fondo real, escala alta, normalización export-only y conservación de los estilos visibles originales.
+
+## 2026-05-20 20:19 - Ajustar colores de exportación
+
+**Archivos modificados:** `src/main.tsx`, `src/__tests__/liquidacion-semana.test.ts`, `CAMBIOS_AGENT.md`
+
+### Cambio 1 - Paleta sRGB de la imagen copiada
+
+#### Código anterior
+```tsx
+              if (Math.abs(lightness - 0.85) < 0.05 && Math.abs(chroma - 0.18) < 0.05 && Math.abs(hue - 85) < 5) return "#f8c654";
+              if (Math.abs(lightness - 0.80) < 0.05 && Math.abs(chroma - 0.14) < 0.05 && Math.abs(hue - 220) < 5) return "#7e9ff9";
+              if (Math.abs(lightness - 0.70) < 0.05 && Math.abs(chroma - 0.18) < 0.05 && Math.abs(hue - 25) < 5) return "#c95a43";
+              if (Math.abs(lightness - 0.68) < 0.05 && Math.abs(chroma - 0.20) < 0.05 && Math.abs(hue - 145) < 5) return "#00b178";
+              if (Math.abs(lightness - 0.65) < 0.05 && Math.abs(chroma - 0.20) < 0.05 && Math.abs(hue - 280) < 5) return "#8d63f9";
+              if (Math.abs(lightness - 0.75) < 0.05 && Math.abs(chroma - 0.16) < 0.05 && Math.abs(hue - 70) < 5) return "#d69c2d";
+              if (Math.abs(lightness - 0.72) < 0.05 && Math.abs(chroma - 0.14) < 0.05 && Math.abs(hue - 200) < 5) return "#79a9c4";
+```
+
+#### Código nuevo
+```tsx
+              if (Math.abs(lightness - 0.85) < 0.05 && Math.abs(chroma - 0.18) < 0.05 && Math.abs(hue - 85) < 5) return "#ffc200";
+              if (Math.abs(lightness - 0.80) < 0.05 && Math.abs(chroma - 0.14) < 0.05 && Math.abs(hue - 220) < 5) return "#25d2fc";
+              if (Math.abs(lightness - 0.70) < 0.05 && Math.abs(chroma - 0.18) < 0.05 && Math.abs(hue - 25) < 5) return "#fa6863";
+              if (Math.abs(lightness - 0.68) < 0.05 && Math.abs(chroma - 0.20) < 0.05 && Math.abs(hue - 145) < 5) return "#26b63d";
+              if (Math.abs(lightness - 0.65) < 0.05 && Math.abs(chroma - 0.20) < 0.05 && Math.abs(hue - 280) < 5) return "#7c79ff";
+              if (Math.abs(lightness - 0.75) < 0.05 && Math.abs(chroma - 0.16) < 0.05 && Math.abs(hue - 70) < 5) return "#ed990e";
+              if (Math.abs(lightness - 0.72) < 0.05 && Math.abs(chroma - 0.14) < 0.05 && Math.abs(hue - 200) < 5) return "#00bec7";
+```
+
+#### Por qué se cambió
+Los colores anteriores eran aproximaciones apagadas para `html2canvas`; los nuevos hex son conversiones sRGB más fieles a los `oklch(...)` visibles sin tocar cómo se muestra la app.
+
+### Cambio 2 - Prueba de paleta de exportación
+
+#### Código anterior
+```ts
+No existía la prueba "uses faithful sRGB colors only for the copied liquidation image" en src/__tests__/liquidacion-semana.test.ts.
+```
+
+#### Código nuevo
+```ts
+  it("uses faithful sRGB colors only for the copied liquidation image", () => {
+    expect(source).toContain('const G = "oklch(0.68 0.20 145)"');
+    expect(source).toContain('oklch(0.70 0.18 25)');
+    expect(source).toContain('oklch(0.72 0.14 200)');
+
+    const exportColorBlock = source.match(
+      /const replaceOklch = \(str: string\) => \{[\s\S]*?return match;/
+    )?.[0] || "";
+
+    expect(exportColorBlock).toContain('return "#ffc200"');
+    expect(exportColorBlock).toContain('return "#25d2fc"');
+    expect(exportColorBlock).toContain('return "#fa6863"');
+    expect(exportColorBlock).toContain('return "#26b63d"');
+    expect(exportColorBlock).toContain('return "#7c79ff"');
+    expect(exportColorBlock).toContain('return "#ed990e"');
+    expect(exportColorBlock).toContain('return "#00bec7"');
+
+    expect(exportColorBlock).not.toContain('return "#f8c654"');
+    expect(exportColorBlock).not.toContain('return "#7e9ff9"');
+    expect(exportColorBlock).not.toContain('return "#c95a43"');
+    expect(exportColorBlock).not.toContain('return "#00b178"');
+    expect(exportColorBlock).not.toContain('return "#8d63f9"');
+    expect(exportColorBlock).not.toContain('return "#d69c2d"');
+    expect(exportColorBlock).not.toContain('return "#79a9c4"');
+  });
+```
+
+#### Por qué se cambió
+La exportación necesitaba cobertura que garantice que la imagen copiada usa la paleta sRGB fiel y que los colores visibles de la UI permanecen como `oklch(...)`.
+
+## 2026-05-20 19:52 - Corregir scroll de liquidación
+
+**Archivos modificados:** `src/main.tsx`, `src/__tests__/liquidacion-semana.test.ts`, `CAMBIOS_AGENT.md`
+
+### Cambio 1 - Contenedor scrolleable de liquidación
+
+#### Código anterior
+```tsx
+        <div style={{ flex: 1, padding: "16px 20px 32px", display: "flex", flexDirection: "column", gap: 14, overflowY: "auto" }}>
+```
+
+#### Código nuevo
+```tsx
+        <div style={{ flex: 1, padding: "16px 20px 32px", minHeight: 0, display: "flex", flexDirection: "column", gap: 14, overflowY: "auto" }}>
+```
+
+#### Por qué se cambió
+El contenedor scrolleable necesitaba `minHeight: 0` para que el scroll vertical funcione correctamente dentro del `Shell` con alto fijo y no fuerce compresión de sus hijos.
+
+### Cambio 2 - Altura natural del ticket digital
+
+#### Código anterior
+```tsx
+            gap: 16,
+            position: "relative",
+            boxShadow: "0 8px 32px rgba(0, 0, 0, 0.24)",
+            overflow: "hidden"
+```
+
+#### Código nuevo
+```tsx
+            gap: 16,
+            position: "relative",
+            boxShadow: "0 8px 32px rgba(0, 0, 0, 0.24)",
+            flexShrink: 0,
+            overflow: "hidden"
+```
+
+#### Por qué se cambió
+El ticket digital se comprimía cuando faltaba alto en pantallas de portátil; `flexShrink: 0` mantiene su altura natural y deja que el contenedor padre haga scroll.
+
+### Cambio 3 - Altura natural de botones de acción
+
+#### Código anterior
+```tsx
+          <div style={{ display: "flex", flexDirection: "column", gap: 10, marginTop: 4 }}>
+```
+
+#### Código nuevo
+```tsx
+          <div style={{ flexShrink: 0, display: "flex", flexDirection: "column", gap: 10, marginTop: 4 }}>
+```
+
+#### Por qué se cambió
+Los botones de acción también debían conservar su altura natural para que `Copiar Liquidación` y `Volver` sigan accesibles mediante scroll en viewports bajos.
+
+### Cambio 4 - Cobertura del contrato responsive
+
+#### Código anterior
+```ts
+No existía la prueba "keeps the liquidation ticket and actions scrollable on short desktop viewports" en src/__tests__/liquidacion-semana.test.ts.
+```
+
+#### Código nuevo
+```ts
+  it("keeps the liquidation ticket and actions scrollable on short desktop viewports", () => {
+    const liquidacionBlock = source.match(
+      /if \(screen === "liquidacionSemana" && selectedWeekId\) \{[\s\S]*?if \(screen === "PantallaTurnos"\)/
+    )?.[0] || "";
+
+    expect(liquidacionBlock).toMatch(
+      /padding: "16px 20px 32px"[\s\S]*?minHeight: 0[\s\S]*?overflowY: "auto"/
+    );
+    expect(liquidacionBlock).toMatch(
+      /id="ticket-digital"[\s\S]*?flexShrink: 0[\s\S]*?overflow: "hidden"/
+    );
+    expect(liquidacionBlock).toMatch(
+      /<div style=\{\{ flexShrink: 0, display: "flex", flexDirection: "column", gap: 10, marginTop: 4 \}\}>/
+    );
+  });
+```
+
+#### Por qué se cambió
+La pantalla necesitaba una prueba que fije el contrato de layout para viewports bajos: contenedor con scroll, ticket sin compresión y botones sin compresión.
+
+## 2026-05-19 23:25 - Ajustar diseño de pantalla cuentasSemana
+
+**Archivos modificados:** `src/main.tsx`
+
+### Cambio 1 - Tarjetas de rendimiento y desglose del ticket cuentasSemana
+
+#### Código anterior
+```tsx
+    return (
+      <Shell burst={false}>
+        <div style={{ flex: 1, padding: "16px 20px 32px", display: "flex", flexDirection: "column", gap: 14, overflowY: "auto" }}>
+          {/* Cabecera */}
+          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+            <button style={S.iconBtn} onClick={() => setScreen("detalleSemana")}>
+              <IconBack />
+            </button>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontSize: 22, fontWeight: 900, color: "white" }}>
+                Cuentas
+              </div>
+            </div>
+          </div>
+
+          {/* Ticket Digital */}
+          <div style={{
+            background: "rgba(255,255,255,0.02)",
+            borderRadius: 24,
+            padding: "24px 20px",
+            border: "1px solid rgba(255,255,255,0.07)",
+            boxShadow: "0 8px 32px rgba(0,0,0,0.2)",
+            display: "flex",
+            flexDirection: "column",
+            gap: 16
+          }}>
+            {/* Fechas de la semana */}
+            <div style={{ textAlign: "center", marginBottom: 4 }}>
+              <span style={{ fontSize: 13, fontWeight: 700, color: "rgba(255,255,255,0.4)", textTransform: "uppercase", letterSpacing: "1px" }}>
+                Resumen Semanal
+              </span>
+              <div style={{ fontSize: "clamp(14px, 4vw, 17px)", fontWeight: 800, color: "white", marginTop: 4 }}>
+                {formatWeekRangeFull(weekId)}
+              </div>
+            </div>
+
+            <div style={{ borderTop: "1px dashed rgba(255,255,255,0.12)", margin: "4px 0" }} />
+
+            {/* Kilometraje */}
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <span style={{ fontSize: 13, fontWeight: 700, color: "rgba(255,255,255,0.5)", display: "flex", alignItems: "center", gap: 6 }}>
+                <IconRoad s={18} c="rgba(255,255,255,0.5)" /> Kil?metros Totales
+              </span>
+              <span style={{ fontSize: 16, fontWeight: 800, color: "white" }}>
+                {fmtKmNumber(totales.km || 0)} KM
+              </span>
+            </div>
+
+            <div style={{ borderTop: "1px dashed rgba(255,255,255,0.12)", margin: "4px 0" }} />
+
+            {/* Datos Contables */}
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <span style={{ fontSize: 14, fontWeight: 700, color: "rgba(255,255,255,0.8)" }}>
+                Total Tax?metro
+              </span>
+              <span style={{ fontSize: 16, fontWeight: 800, color: "white" }}>
+                {fmt(resumenContableSemana.dineroBase)}
+              </span>
+            </div>
+
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <span style={{ fontSize: 14, fontWeight: 700, color: "rgba(255,255,255,0.8)" }}>
+                Comisi?n Jefe
+              </span>
+              <span style={{ fontSize: 16, fontWeight: 800, color: "white" }}>
+                {fmt(comisionBrutaJefeTotal)}
+              </span>
+            </div>
+
+            {/* Descuentos si hay alguno */}
+            {(descDTotal > 0 || descFTotal > 0 || descATotal > 0 || descETotal > 0) && (
+              <>
+                <div style={{ borderTop: "1px dashed rgba(255,255,255,0.12)", margin: "4px 0" }} />
+                <div style={{ fontSize: 11, fontWeight: 800, color: "rgba(255,255,255,0.4)", textTransform: "uppercase", letterSpacing: "0.5px" }}>
+                  Descuentos
+                </div>
+                {descDTotal > 0 && (
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", paddingLeft: 8 }}>
+                    <span style={{ fontSize: 13, color: "rgba(255,255,255,0.6)" }}>Dat?fonos</span>
+                    <span style={{ fontSize: 14, fontWeight: 700, color: "oklch(0.70 0.18 25)" }}>- {fmt(descDTotal)}</span>
+                  </div>
+                )}
+                {descFTotal > 0 && (
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", paddingLeft: 8 }}>
+                    <span style={{ fontSize: 13, color: "rgba(255,255,255,0.6)" }}>Gasolina</span>
+                    <span style={{ fontSize: 14, fontWeight: 700, color: "oklch(0.70 0.18 25)" }}>- {fmt(descFTotal)}</span>
+                  </div>
+                )}
+                {descATotal > 0 && (
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", paddingLeft: 8 }}>
+                    <span style={{ fontSize: 13, color: "rgba(255,255,255,0.6)" }}>Agencias / Bonos</span>
+                    <span style={{ fontSize: 14, fontWeight: 700, color: "oklch(0.70 0.18 25)" }}>- {fmt(descATotal)}</span>
+                  </div>
+                )}
+                {descETotal > 0 && (
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", paddingLeft: 8 }}>
+                    <span style={{ fontSize: 13, color: "rgba(255,255,255,0.6)" }}>Extras</span>
+                    <span style={{ fontSize: 14, fontWeight: 700, color: "oklch(0.70 0.18 25)" }}>- {fmt(descETotal)}</span>
+                  </div>
+                )}
+              </>
+            )}
+
+            {/* Nulos Informativos */}
+            {totales.totalN > 0 && (
+              <>
+                <div style={{ borderTop: "1px dashed rgba(255,255,255,0.12)", margin: "4px 0" }} />
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <span style={{ fontSize: 13, color: "rgba(255,255,255,0.5)" }}>Nulos (Informativo)</span>
+                  <span style={{ fontSize: 14, fontWeight: 700, color: "rgba(255,255,255,0.5)" }}>{fmt(totales.totalN)}</span>
+                </div>
+              </>
+            )}
+
+            {/* Total Neto a Dar */}
+            <div style={{ borderTop: "2px double rgba(255,255,255,0.2)", margin: "4px 0" }} />
+            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 6, padding: "10px 0" }}>
+              <span style={{ fontSize: 12, fontWeight: 800, color: "rgba(255,255,255,0.5)", textTransform: "uppercase", letterSpacing: "1px" }}>
+                Total a Entregar al Jefe
+              </span>
+              <span style={{ fontSize: 32, fontWeight: 900, color: "oklch(0.68 0.20 145)", letterSpacing: "-0.5px" }}>
+                {fmt(resumenContableSemana.totalADar)}
+              </span>
+            </div>
+          </div>
+
+          {/* Bot?n de Copiar */}
+          <button
+            onClick={() => {
+              let txt = `?? *CUENTAS DE LA SEMANA* ??
+?? Semana: ${formatWeekRangeFull(weekId)}
+
+?? *Rendimiento:*
+? Kil?metros: ${fmtKmNumber(totales.km || 0)} KM
+? Total Tax?metro: ${fmt(resumenContableSemana.dineroBase)}
+
+?? *C?lculo:*
+? Comisi?n Jefe: ${fmt(comisionBrutaJefeTotal)}
+`;
+
+              if (descDTotal > 0 || descFTotal > 0 || descATotal > 0 || descETotal > 0) {
+                txt += `
+?? *Descuentos:*
+`;
+                if (descDTotal > 0) txt += `? Dat?fonos: - ${fmt(descDTotal)}
+`;
+                if (descFTotal > 0) txt += `? Gasolina: - ${fmt(descFTotal)}
+`;
+                if (descATotal > 0) txt += `? Agencias/Bonos: - ${fmt(descATotal)}
+`;
+                if (descETotal > 0) txt += `? Extras: - ${fmt(descETotal)}
+`;
+              }
+
+              if (totales.totalN > 0) {
+                txt += `
+? *Nulos (Informativo):* ${fmt(totales.totalN)}
+`;
+              }
+
+              txt += `
+?? *Total a Entregar:* ${fmt(resumenContableSemana.totalADar)}`;
+
+              navigator.clipboard.writeText(txt);
+              alert("Cuentas copiadas al portapapeles. ?Ya puedes pegarlas en WhatsApp!");
+            }}
+            style={{
+              width: "100%",
+              padding: "16px 0",
+              borderRadius: 16,
+              background: "rgba(80, 220, 140, 0.15)",
+              border: "1px solid rgba(80, 220, 140, 0.3)",
+              color: "#50dc8c",
+              fontSize: 16,
+              fontWeight: 800,
+              cursor: "pointer",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: 8,
+              marginTop: 10,
+              transition: "all 0.2s"
+            }}
+          >
+            <IconCopy s={20} c="#50dc8c" />
+            Copiar cuentas para WhatsApp
+          </button>
+
+          {/* Bot?n Volver */}
+          <button
+            onClick={() => setScreen("detalleSemana")}
+            style={{
+              width: "100%",
+              padding: "16px 0",
+              borderRadius: 16,
+              border: "none",
+              background: "rgba(255, 255, 255, 0.08)",
+              color: "rgba(255, 255, 255, 0.7)",
+              fontSize: 16,
+              fontWeight: 800,
+              cursor: "pointer",
+              marginTop: 4,
+              transition: "all 0.2s"
+            }}
+          >
+            Volver al detalle
+          </button>
+        </div>
+      </Shell>
+    );
+```
+
+#### Código nuevo
+```tsx
+    const dineroV = (totales.dinero || 0) - (totales.totalN || 0);
+
+    return (
+      <Shell burst={false}>
+        <div style={{ flex: 1, padding: "16px 20px 32px", display: "flex", flexDirection: "column", gap: 14, overflowY: "auto" }}>
+          {/* Cabecera */}
+          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+            <button style={S.iconBtn} onClick={() => setScreen("detalleSemana")}>
+              <IconBack />
+            </button>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontSize: 22, fontWeight: 900, color: "white" }}>
+                Cuentas
+              </div>
+            </div>
+          </div>
+
+          {/* Contenedor Superior Agrupado (Dos tarjetas de estilo visual original) */}
+          <div style={{ display: 'flex', gap: 10 }}>
+            {/* Columna Izquierda: Taxímetro Neto */}
+            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', textAlign: 'center', background: 'rgba(255, 180, 0, 0.06)', borderRadius: 16, padding: '14px 8px', border: '1px solid rgba(255, 180, 0, 0.2)' }}>
+              <div style={{ fontSize: 10, fontWeight: 700, color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', letterSpacing: '0.3px', marginBottom: 6, display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 4, whiteSpace: 'nowrap' }}>
+                <IconTaxiBadgeNeon s={28} c="oklch(0.85 0.18 85)" /> Total Taxímetro
+              </div>
+              <div style={{ fontSize: "clamp(16px, 4.5vw, 22px)", fontWeight: 900, color: 'oklch(0.85 0.18 85)', letterSpacing: '-0.5px' }}>
+                {fmt(dineroV)}
+              </div>
+            </div>
+            {/* Columna Derecha: Kilómetros */}
+            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', textAlign: 'center', background: 'oklch(0.19 0.05 220)', borderRadius: 16, padding: '14px 8px', border: '1px solid oklch(0.65 0.14 220 / 0.35)' }}>
+              <div style={{ fontSize: 10, fontWeight: 700, color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', letterSpacing: '0.3px', marginBottom: 6, display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 4, whiteSpace: 'nowrap' }}>
+                <IconRoad s={24} c="oklch(0.80 0.14 220)" /> Total KM
+              </div>
+              <div style={{ fontSize: "clamp(16px, 4.5vw, 22px)", fontWeight: 900, color: 'oklch(0.80 0.14 220)', letterSpacing: '-0.5px' }}>
+                {fmtKmNumber(totales.km || 0)} <span style={{ fontSize: 11, fontWeight: 700, opacity: 0.7 }}>KM</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Ticket Digital */}
+          <div style={{
+            background: "rgba(255,255,255,0.02)",
+            borderRadius: 24,
+            padding: "24px 20px",
+            border: "1px solid rgba(255,255,255,0.07)",
+            boxShadow: "0 8px 32px rgba(0,0,0,0.2)",
+            display: "flex",
+            flexDirection: "column",
+            gap: 16
+          }}>
+            {/* Rango de fechas de la semana */}
+            <div style={{ textAlign: "center", marginBottom: 4 }}>
+              <span style={{ fontSize: 13, fontWeight: 700, color: "rgba(255,255,255,0.4)", textTransform: "uppercase", letterSpacing: "1px" }}>
+                Resumen Semanal
+              </span>
+              <div style={{ fontSize: "clamp(14px, 4vw, 17px)", fontWeight: 800, color: "white", marginTop: 4 }}>
+                {formatWeekRangeFull(weekId)}
+              </div>
+            </div>
+
+            <div style={{ borderTop: "1px dashed rgba(255,255,255,0.12)", margin: "4px 0" }} />
+
+            {/* Datos Contables */}
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <span style={{ fontSize: 14, fontWeight: 700, color: "rgba(255,255,255,0.8)" }}>
+                Total Taxímetro (Bruto)
+              </span>
+              <span style={{ fontSize: 16, fontWeight: 800, color: "white" }}>
+                {fmt(totales.dinero || 0)}
+              </span>
+            </div>
+
+            {totales.totalN > 0 && (
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <span style={{ fontSize: 14, fontWeight: 700, color: "rgba(255,255,255,0.6)" }}>
+                  Nulos
+                </span>
+                <span style={{ fontSize: 16, fontWeight: 800, color: "rgba(255,255,255,0.6)" }}>
+                  - {fmt(totales.totalN)}
+                </span>
+              </div>
+            )}
+
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <span style={{ fontSize: 14, fontWeight: 700, color: "rgba(255,255,255,0.8)" }}>
+                Comisión Jefe
+              </span>
+              <span style={{ fontSize: 16, fontWeight: 800, color: "white" }}>
+                {fmt(comisionBrutaJefeTotal)}
+              </span>
+            </div>
+
+            {/* A Descontar si hay alguno */}
+            {(descDTotal > 0 || descFTotal > 0 || descATotal > 0 || descETotal > 0) && (
+              <>
+                <div style={{ borderTop: "1px dashed rgba(255,255,255,0.12)", margin: "4px 0" }} />
+                <div style={{ fontSize: 11, fontWeight: 800, color: "rgba(255,255,255,0.4)", textTransform: "uppercase", letterSpacing: "0.5px" }}>
+                  A Descontar
+                </div>
+                {descDTotal > 0 && (
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", paddingLeft: 8 }}>
+                    <span style={{ fontSize: 13, color: "rgba(255,255,255,0.6)" }}>Datáfonos</span>
+                    <span style={{ fontSize: 14, fontWeight: 700, color: "oklch(0.70 0.18 25)" }}>- {fmt(descDTotal)}</span>
+                  </div>
+                )}
+                {descFTotal > 0 && (
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", paddingLeft: 8 }}>
+                    <span style={{ fontSize: 13, color: "rgba(255,255,255,0.6)" }}>Gasolina</span>
+                    <span style={{ fontSize: 14, fontWeight: 700, color: "oklch(0.70 0.18 25)" }}>- {fmt(descFTotal)}</span>
+                  </div>
+                )}
+                {descATotal > 0 && (
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", paddingLeft: 8 }}>
+                    <span style={{ fontSize: 13, color: "rgba(255,255,255,0.6)" }}>Agencias / Bonos</span>
+                    <span style={{ fontSize: 14, fontWeight: 700, color: "oklch(0.70 0.18 25)" }}>- {fmt(descATotal)}</span>
+                  </div>
+                )}
+                {descETotal > 0 && (
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", paddingLeft: 8 }}>
+                    <span style={{ fontSize: 13, color: "rgba(255,255,255,0.6)" }}>Extras</span>
+                    <span style={{ fontSize: 14, fontWeight: 700, color: "oklch(0.70 0.18 25)" }}>- {fmt(descETotal)}</span>
+                  </div>
+                )}
+              </>
+            )}
+
+            {/* Total Neto a Dar */}
+            <div style={{ borderTop: "2px double rgba(255,255,255,0.2)", margin: "4px 0" }} />
+            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 6, padding: "10px 0" }}>
+              <span style={{ fontSize: 12, fontWeight: 800, color: "rgba(255,255,255,0.5)", textTransform: "uppercase", letterSpacing: "1px" }}>
+                Total a Entregar al Jefe
+              </span>
+              <span style={{ fontSize: 32, fontWeight: 900, color: "oklch(0.68 0.20 145)", letterSpacing: "-0.5px" }}>
+                {fmt(resumenContableSemana.totalADar)}
+              </span>
+            </div>
+          </div>
+
+          {/* Botón de Copiar */}
+          <button
+            onClick={() => {
+              let txt = `🚕 *CUENTAS DE LA SEMANA* 🚕
+📅 Semana: ${formatWeekRangeFull(weekId)}
+
+📈 *Rendimiento:*
+• Kilómetros: ${fmtKmNumber(totales.km || 0)} KM
+• Total Taxímetro (Bruto): ${fmt(totales.dinero || 0)}
+`;
+
+              if (totales.totalN > 0) {
+                txt += `• Nulos: - ${fmt(totales.totalN)}
+`;
+              }
+
+              txt += `
+💰 *Cálculo:*
+• Comisión Jefe: ${fmt(comisionBrutaJefeTotal)}
+`;
+
+              if (descDTotal > 0 || descFTotal > 0 || descATotal > 0 || descETotal > 0) {
+                txt += `
+📉 *A Descontar:*
+`;
+                if (descDTotal > 0) txt += `• Datáfonos: - ${fmt(descDTotal)}
+`;
+                if (descFTotal > 0) txt += `• Gasolina: - ${fmt(descFTotal)}
+`;
+                if (descATotal > 0) txt += `• Agencias/Bonos: - ${fmt(descATotal)}
+`;
+                if (descETotal > 0) txt += `• Extras: - ${fmt(descETotal)}
+`;
+              }
+
+              txt += `
+💵 *Total a Entregar:* ${fmt(resumenContableSemana.totalADar)}`;
+
+              navigator.clipboard.writeText(txt);
+              alert("Cuentas copiadas al portapapeles. ¡Ya puedes pegarlas en WhatsApp!");
+            }}
+            style={{
+              width: "100%",
+              padding: "16px 0",
+              borderRadius: 16,
+              background: "rgba(80, 220, 140, 0.15)",
+              border: "1px solid rgba(80, 220, 140, 0.3)",
+              color: "#50dc8c",
+              fontSize: 16,
+              fontWeight: 800,
+              cursor: "pointer",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: 8,
+              marginTop: 10,
+              transition: "all 0.2s"
+            }}
+          >
+            <IconCopy s={20} c="#50dc8c" />
+            Copiar cuentas para WhatsApp
+          </button>
+
+          {/* Botón Volver */}
+          <button
+            onClick={() => setScreen("detalleSemana")}
+            style={{
+              width: "100%",
+              padding: "16px 0",
+              borderRadius: 16,
+              border: "none",
+              background: "rgba(255, 255, 255, 0.08)",
+              color: "rgba(255, 255, 255, 0.7)",
+              fontSize: 16,
+              fontWeight: 800,
+              cursor: "pointer",
+              marginTop: 4,
+              transition: "all 0.2s"
+            }}
+          >
+            Volver al detalle
+          </button>
+        </div>
+      </Shell>
+    );
+```
+
+#### Por qué se cambió
+Se alinea la visualización al estilo de la app original agregando tarjetas de rendimiento para Taxímetro Neto y Kilómetros en la cabecera. Se renombra la sección de 'Descuentos' a 'A Descontar', y se clarifican las cuentas en el ticket distinguiendo entre Taxímetro (Bruto), Nulos (restados explícitamente) y Comisión Jefe, evitando números negativos inesperados debido a datos incoherentes del usuario.
+\n\n## 2026-05-19 22:50 - Añadir pantalla Cuentas Semanal
+
+**Archivos modificados:** `src/main.tsx`
+
+### Cambio 1 - Icono de copiar
+
+#### Código anterior
+```tsx
+const IconDel = () => (
+```
+
+#### Código nuevo
+```tsx
+const IconCopy = ({ s = 20, c = "white" }: { s?: number; c?: string }) => (
+  <svg width={s} height={s} viewBox="0 0 24 24" fill="none">
+    <path
+      d="M8 4V16C8 17.1046 8.89543 18 10 18H20C21.1046 18 22 17.1046 22 16V4C22 2.89543 21.1046 2 20 2H10C8.89543 2 8 2.89543 8 4Z"
+      stroke={c}
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+    <path
+      d="M16 18V20C16 21.1046 15.1046 22 14 22H4C2.89543 22 2 21.1046 2 20V8C2 6.89543 2.89543 6 4 6H6"
+      stroke={c}
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+  </svg>
+);
+
+const IconDel = () => (
+```
+
+#### Por qué se cambió
+Se añade un nuevo icono SVG reutilizable para que el usuario pueda pulsar el botón de copiar y enviar las cuentas por WhatsApp de forma profesional.
+
+### Cambio 2 - Título y botón en cabecera
+
+#### Código anterior
+```tsx
+          {/* Cabecera */}
+          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+            <button style={S.iconBtn} onClick={() => { setScreen("contabilidad"); setSelectedWeekId(null); }}>
+              <IconBack />
+            </button>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontSize: 20, fontWeight: 800, color: "white" }}>
+                Detalle de Semana
+              </div>
+            </div>
+          </div>
+```
+
+#### Código nuevo
+```tsx
+          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+            <button style={S.iconBtn} onClick={() => { setScreen("contabilidad"); setSelectedWeekId(null); }}>
+              <IconBack />
+            </button>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontSize: "clamp(15px, 4vw, 20px)", fontWeight: 800, color: "white" }}>
+                Detalle de Semana
+              </div>
+            </div>
+            <button onClick={() => setScreen('cuentasSemana')} style={{ background: 'rgba(80, 220, 140, 0.15)', border: '1px solid rgba(80, 220, 140, 0.3)', borderRadius: 12, padding: '6px 12px', color: '#50dc8c', fontSize: 14, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, transition: 'all 0.2s' }}><IconGive s={16} c="#50dc8c" />Cuentas</button>
+          </div>
+```
+
+#### Por qué se cambió
+Se reemplaza el tamaño de fuente estático de la cabecera por clamp responsivo para evitar desbordamientos y se inserta el botón "Cuentas" para acceder a la nueva pantalla de cuentas de la semana.
+
+### Cambio 3 - Pantalla Cuentas Semanal
+
+#### Código anterior
+```tsx
+`No existía el bloque de la pantalla cuentasSemana en src/main.tsx.`
+```
+
+#### Código nuevo
+```tsx
+  if (screen === "cuentasSemana" && selectedWeekId) {
+    const weekId = selectedWeekId;
+    const grupos = groupTurnosByWeek(history, settings.diaLibre);
+    const turnosSemana = grupos.get(weekId) || [];
+    const totales = calcularTotalesTurnos(turnosSemana);
+    const resumenContableSemana = calcularResumenContableTurnos(turnosSemana, settings);
+
+    let comisionBrutaJefeTotal = 0;
+    let descDTotal = 0;
+    let descATotal = 0;
+    let descETotal = 0;
+    let descFTotal = 0;
+    for (const t of turnosSemana) {
+      const c = calcularTurnoContable(t, settings);
+      const dineroBaseTurno = (t.dinero || 0) - (t.totalN || 0);
+      comisionBrutaJefeTotal += dineroBaseTurno * (c.config.porcentajeJefe / 100);
+      descDTotal += c.descD;
+      descATotal += c.descA;
+      descETotal += c.descE;
+      descFTotal += c.descF;
+    }
+
+    return (
+      <Shell burst={false}>
+        <div style={{ flex: 1, padding: "16px 20px 32px", display: "flex", flexDirection: "column", gap: 14, overflowY: "auto" }}>
+          {/* Cabecera */}
+          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+            <button style={S.iconBtn} onClick={() => setScreen("detalleSemana")}>
+              <IconBack />
+            </button>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontSize: 22, fontWeight: 900, color: "white" }}>
+                Cuentas
+              </div>
+            </div>
+          </div>
+
+          {/* Ticket Digital */}
+          <div style={{
+            background: "rgba(255,255,255,0.02)",
+            borderRadius: 24,
+            padding: "24px 20px",
+            border: "1px solid rgba(255,255,255,0.07)",
+            boxShadow: "0 8px 32px rgba(0,0,0,0.2)",
+            display: "flex",
+            flexDirection: "column",
+            gap: 16
+          }}>
+            {/* Fechas de la semana */}
+            <div style={{ textAlign: "center", marginBottom: 4 }}>
+              <span style={{ fontSize: 13, fontWeight: 700, color: "rgba(255,255,255,0.4)", textTransform: "uppercase", letterSpacing: "1px" }}>
+                Resumen Semanal
+              </span>
+              <div style={{ fontSize: "clamp(14px, 4vw, 17px)", fontWeight: 800, color: "white", marginTop: 4 }}>
+                {formatWeekRangeFull(weekId)}
+              </div>
+            </div>
+
+            <div style={{ borderTop: "1px dashed rgba(255,255,255,0.12)", margin: "4px 0" }} />
+
+            {/* Kilometraje */}
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <span style={{ fontSize: 13, fontWeight: 700, color: "rgba(255,255,255,0.5)", display: "flex", alignItems: "center", gap: 6 }}>
+                <IconRoad s={18} c="rgba(255,255,255,0.5)" /> Kilómetros Totales
+              </span>
+              <span style={{ fontSize: 16, fontWeight: 800, color: "white" }}>
+                {fmtKmNumber(totales.km || 0)} KM
+              </span>
+            </div>
+
+            <div style={{ borderTop: "1px dashed rgba(255,255,255,0.12)", margin: "4px 0" }} />
+
+            {/* Datos Contables */}
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <span style={{ fontSize: 14, fontWeight: 700, color: "rgba(255,255,255,0.8)" }}>
+                Total Taxímetro
+              </span>
+              <span style={{ fontSize: 16, fontWeight: 800, color: "white" }}>
+                {fmt(resumenContableSemana.dineroBase)}
+              </span>
+            </div>
+
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <span style={{ fontSize: 14, fontWeight: 700, color: "rgba(255,255,255,0.8)" }}>
+                Comisión Jefe
+              </span>
+              <span style={{ fontSize: 16, fontWeight: 800, color: "white" }}>
+                {fmt(comisionBrutaJefeTotal)}
+              </span>
+            </div>
+
+            {/* Descuentos si hay alguno */}
+            {(descDTotal > 0 || descFTotal > 0 || descATotal > 0 || descETotal > 0) && (
+              <>
+                <div style={{ borderTop: "1px dashed rgba(255,255,255,0.12)", margin: "4px 0" }} />
+                <div style={{ fontSize: 11, fontWeight: 800, color: "rgba(255,255,255,0.4)", textTransform: "uppercase", letterSpacing: "0.5px" }}>
+                  Descuentos
+                </div>
+                {descDTotal > 0 && (
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", paddingLeft: 8 }}>
+                    <span style={{ fontSize: 13, color: "rgba(255,255,255,0.6)" }}>Datáfonos</span>
+                    <span style={{ fontSize: 14, fontWeight: 700, color: "oklch(0.70 0.18 25)" }}>- {fmt(descDTotal)}</span>
+                  </div>
+                )}
+                {descFTotal > 0 && (
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", paddingLeft: 8 }}>
+                    <span style={{ fontSize: 13, color: "rgba(255,255,255,0.6)" }}>Gasolina</span>
+                    <span style={{ fontSize: 14, fontWeight: 700, color: "oklch(0.70 0.18 25)" }}>- {fmt(descFTotal)}</span>
+                  </div>
+                )}
+                {descATotal > 0 && (
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", paddingLeft: 8 }}>
+                    <span style={{ fontSize: 13, color: "rgba(255,255,255,0.6)" }}>Agencias / Bonos</span>
+                    <span style={{ fontSize: 14, fontWeight: 700, color: "oklch(0.70 0.18 25)" }}>- {fmt(descATotal)}</span>
+                  </div>
+                )}
+                {descETotal > 0 && (
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", paddingLeft: 8 }}>
+                    <span style={{ fontSize: 13, color: "rgba(255,255,255,0.6)" }}>Extras</span>
+                    <span style={{ fontSize: 14, fontWeight: 700, color: "oklch(0.70 0.18 25)" }}>- {fmt(descETotal)}</span>
+                  </div>
+                )}
+              </>
+            )}
+
+            {/* Nulos Informativos */}
+            {totales.totalN > 0 && (
+              <>
+                <div style={{ borderTop: "1px dashed rgba(255,255,255,0.12)", margin: "4px 0" }} />
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <span style={{ fontSize: 13, color: "rgba(255,255,255,0.5)" }}>Nulos (Informativo)</span>
+                  <span style={{ fontSize: 14, fontWeight: 700, color: "rgba(255,255,255,0.5)" }}>{fmt(totales.totalN)}</span>
+                </div>
+              </>
+            )}
+
+            {/* Total Neto a Dar */}
+            <div style={{ borderTop: "2px double rgba(255,255,255,0.2)", margin: "4px 0" }} />
+            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 6, padding: "10px 0" }}>
+              <span style={{ fontSize: 12, fontWeight: 800, color: "rgba(255,255,255,0.5)", textTransform: "uppercase", letterSpacing: "1px" }}>
+                Total a Entregar al Jefe
+              </span>
+              <span style={{ fontSize: 32, fontWeight: 900, color: "oklch(0.68 0.20 145)", letterSpacing: "-0.5px" }}>
+                {fmt(resumenContableSemana.totalADar)}
+              </span>
+            </div>
+          </div>
+
+          {/* Botón de Copiar */}
+          <button
+            onClick={() => {
+              let txt = `🚕 *CUENTAS DE LA SEMANA* 🚕\n📅 Semana: ${formatWeekRangeFull(weekId)}\n\n📈 *Rendimiento:*\n• Kilómetros: ${fmtKmNumber(totales.km || 0)} KM\n• Total Taxímetro: ${fmt(resumenContableSemana.dineroBase)}\n\n💰 *Cálculo:*\n• Comisión Jefe: ${fmt(comisionBrutaJefeTotal)}\n`;
+
+              if (descDTotal > 0 || descFTotal > 0 || descATotal > 0 || descETotal > 0) {
+                txt += `\n📉 *Descuentos:*\n`;
+                if (descDTotal > 0) txt += `• Datáfonos: - ${fmt(descDTotal)}\n`;
+                if (descFTotal > 0) txt += `• Gasolina: - ${fmt(descFTotal)}\n`;
+                if (descATotal > 0) txt += `• Agencias/Bonos: - ${fmt(descATotal)}\n`;
+                if (descETotal > 0) txt += `• Extras: - ${fmt(descETotal)}\n`;
+              }
+
+              if (totales.totalN > 0) {
+                txt += `\n❌ *Nulos (Informativo):* ${fmt(totales.totalN)}\n`;
+              }
+
+              txt += `\n💵 *Total a Entregar:* ${fmt(resumenContableSemana.totalADar)}`;
+
               navigator.clipboard.writeText(txt);
               alert("Cuentas copiadas al portapapeles. ¡Ya puedes pegarlas en WhatsApp!");
             }}
