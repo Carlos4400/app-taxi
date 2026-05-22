@@ -1,8 +1,10 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
 import { Filesystem, Directory, Encoding } from "@capacitor/filesystem";
-import { Share } from "@capacitor/share";
-import { Capacitor } from "@capacitor/core";
+import { Share } from "@capacitor/share";
+
+import { Capacitor } from "@capacitor/core";
+
 import html2canvas from "html2canvas";
 import { onAuthStateChanged, signOut, type User } from "firebase/auth";
 import {
@@ -1752,6 +1754,7 @@ function App() {
   const [selectedAccountingYear, setSelectedAccountingYear] = useState<number>(() => new Date().getFullYear());
   const [selectedAccountingMonth, setSelectedAccountingMonth] = useState<number>(() => new Date().getMonth() + 1);
   const [copiado, setCopiado] = useState(false);
+  const [procesandoTicket, setProcesandoTicket] = useState(false);
   const [tieResolutions, setTieResolutions] = useState<Map<string, string>>(new Map());
   const [pendingTie, setPendingTie] = useState<{
     weekId: string;
@@ -4355,11 +4358,11 @@ function App() {
                   {entriesWithNotes.map((e: any) => {
                     const meta = getEntryTypeMeta(e.type);
                     return (
-                      <div key={e.id} style={{ fontSize: 13, background: 'rgba(255,255,255,0.02)', padding: '10px 12px', borderRadius: 12, border: '1px solid rgba(255,255,255,0.04)', display: 'grid', gridTemplateColumns: 'auto auto minmax(0, 1fr) auto', alignItems: 'center', gap: 8, minWidth: 0 }}>
-                        <span style={{ fontSize: 12, color: "rgba(255,255,255,0.5)", fontWeight: 600, flexShrink: 0 }}>{e.time}</span>
+                      <div key={e.id} style={{ fontSize: 13, background: 'rgba(255,255,255,0.02)', padding: '10px 12px', borderRadius: 12, border: '1px solid rgba(255,255,255,0.04)', display: 'grid', gridTemplateColumns: 'auto auto minmax(0, 1fr) auto', alignItems: 'start', gap: 8, minWidth: 0 }}>
+                        <span style={{ fontSize: 12, color: "rgba(255,255,255,0.5)", fontWeight: 600, flexShrink: 0, alignSelf: "start" }}>{e.time}</span>
                         <span style={{ fontWeight: 700, color: meta.color, fontSize: 14, whiteSpace: 'nowrap', flexShrink: 0 }}>{meta.label}</span>
                         <span style={{ color: 'rgba(255,255,255,0.85)', fontSize: 12, lineHeight: 1.4, flex: 1, minWidth: 0, overflowWrap: "anywhere" }}>{e.note}</span>
-                        <span style={{ fontSize: 15, fontWeight: 700, color: meta.color, whiteSpace: 'nowrap', flexShrink: 0 }}>{fmt(e.amount)}</span>
+                        <span style={{ fontSize: 15, fontWeight: 700, color: meta.color, whiteSpace: 'nowrap', flexShrink: 0, alignSelf: "start" }}>{fmt(e.amount)}</span>
                       </div>
                     );
                   })}
@@ -6460,7 +6463,6 @@ function App() {
     let descEAcumulado = 0;
     let totalDescontarAcumulado = 0;
     let totalNetoAcumulado = 0;
-    let totalNulosAcumulado = 0;
     let totalKMAcumulado = 0;
 
     for (const t of turnosSemana) {
@@ -6472,7 +6474,6 @@ function App() {
       descEAcumulado += calc.descE;
       totalDescontarAcumulado += calc.totalDescontar;
       totalNetoAcumulado += calc.totalADar;
-      totalNulosAcumulado += (t.totalN || 0);
       totalKMAcumulado += (t.km || 0);
     }
 
@@ -6483,13 +6484,26 @@ function App() {
     descEAcumulado = roundMoney(descEAcumulado);
     totalDescontarAcumulado = roundMoney(totalDescontarAcumulado);
     totalNetoAcumulado = roundMoney(totalNetoAcumulado);
-    totalNulosAcumulado = roundMoney(totalNulosAcumulado);
 
     const taximetroLimpio = roundMoney(resumen.dineroBase);
+    const turnosConNotas = getTurnosNotasSemana(turnosSemana);
+
+    const formatLiquidacionNotasText = () => {
+      if (turnosConNotas.length === 0) return "";
+
+      return `\n\n📝 *NOTAS DE LA SEMANA:*\n${turnosConNotas.map(({ turno, notasGenerales, notasDetalladas }) => {
+        const lineasGenerales = notasGenerales.map((entry) => `  ${entry.time} Nota: ${entry.note.trim()}`);
+        const lineasDetalladas = notasDetalladas.map((entry) => {
+          const meta = getEntryTypeMeta(entry.type);
+          return `  ${entry.time} ${meta.label}: ${entry.note.trim()} (${fmt(entry.amount)})`;
+        });
+        return `*${fmtDate(turno.date)}*\n${[...lineasGenerales, ...lineasDetalladas].join("\n")}`;
+      }).join("\n\n")}`;
+    };
 
     const copyTextFallback = () => {
       const dates = formatWeekRangeFull(weekId);
-      const text = `📋 *LIQUIDACIÓN SEMANAL*\n📅 *Semana:* ${dates}\n\n🚕 *Total Taxímetro:* ${fmt(taximetroLimpio)}\n🚗 *Total KM:* ${fmtKmNumber(totalKMAcumulado)} KM\n👤 *Comisión Bruta Jefe:* ${fmt(brutoJefeAcumulado)}\n\n⛔ *DESCONTAR:*\n  💳 Datáfonos: -${fmt(descDAcumulado)}\n  ⛽ Gasolina: -${fmt(descGAcumulado)}\n  🎟️ Agencias/Bonos: -${fmt(descAAcumulado)}\n  ➕ Extras: -${fmt(descEAcumulado)}\n💰 *Total Descuentos:* -${fmt(totalDescontarAcumulado)}\n\n💵 *NETO A ENTREGAR:*\n👉 *${fmt(totalNetoAcumulado)}* 👈\n\nℹ️ _Nulos acumulados: ${fmt(totalNulosAcumulado)}_`;
+      const text = `📋 *LIQUIDACIÓN SEMANAL*\n📅 *Semana:* ${dates}\n\n🚕 *Total Taxímetro:* ${fmt(taximetroLimpio)}\n🚗 *Total KM:* ${fmtKmNumber(totalKMAcumulado)} KM\n👤 *Comisión Bruta Jefe:* ${fmt(brutoJefeAcumulado)}\n\n⛔ *DESCONTAR:*\n  💳 Datáfonos: -${fmt(descDAcumulado)}\n  ⛽ Gasolina: -${fmt(descGAcumulado)}\n  🎟️ Agencias/Bonos: -${fmt(descAAcumulado)}\n  ➕ Extras: -${fmt(descEAcumulado)}\n💰 *Total Descuentos:* -${fmt(totalDescontarAcumulado)}\n\n💵 *NETO A ENTREGAR:*\n👉 *${fmt(totalNetoAcumulado)}* 👈${formatLiquidacionNotasText()}`;
 
       navigator.clipboard.writeText(text).then(() => {
         setCopiado(true);
@@ -6499,55 +6513,73 @@ function App() {
       });
     };
 
-    const copyToClipboard = () => {
+    const copyToClipboard = async () => {
       const element = document.getElementById("ticket-digital");
       if (!element) {
         copyTextFallback();
         return;
       }
 
+      try {
+        await document.fonts?.ready;
+      } catch {
+      }
+
       html2canvas(element, {
-        backgroundColor: "#121212",
-        scale: 2,
+        backgroundColor: "#0d0d14",
+        scale: 3,
         useCORS: true,
         logging: false,
         onclone: (clonedDoc) => {
           const ticket = clonedDoc.getElementById("ticket-digital");
           if (!ticket) return;
 
-          const elements = ticket.getElementsByTagName("*");
+          const elements = [ticket, ...Array.from(ticket.getElementsByTagName("*"))] as HTMLElement[];
           const replaceOklch = (str: string) => {
             return str.replace(/oklch\(\s*([\d.]+)\s+([\d.]+)\s+([\d.]+)\s*\)/gi, (match, l, c, h) => {
               const lightness = parseFloat(l);
               const chroma = parseFloat(c);
               const hue = parseFloat(h);
-              if (Math.abs(lightness - 0.85) < 0.05 && Math.abs(chroma - 0.18) < 0.05 && Math.abs(hue - 85) < 5) return "#f8c654";
-              if (Math.abs(lightness - 0.80) < 0.05 && Math.abs(chroma - 0.14) < 0.05 && Math.abs(hue - 220) < 5) return "#7e9ff9";
-              if (Math.abs(lightness - 0.70) < 0.05 && Math.abs(chroma - 0.18) < 0.05 && Math.abs(hue - 25) < 5) return "#c95a43";
-              if (Math.abs(lightness - 0.68) < 0.05 && Math.abs(chroma - 0.20) < 0.05 && Math.abs(hue - 145) < 5) return "#00b178";
-              if (Math.abs(lightness - 0.65) < 0.05 && Math.abs(chroma - 0.20) < 0.05 && Math.abs(hue - 280) < 5) return "#8d63f9";
-              if (Math.abs(lightness - 0.75) < 0.05 && Math.abs(chroma - 0.16) < 0.05 && Math.abs(hue - 70) < 5) return "#d69c2d";
-              if (Math.abs(lightness - 0.72) < 0.05 && Math.abs(chroma - 0.14) < 0.05 && Math.abs(hue - 200) < 5) return "#79a9c4";
+              if (Math.abs(lightness - 0.85) < 0.05 && Math.abs(chroma - 0.18) < 0.05 && Math.abs(hue - 85) < 5) return "#ffc200";
+              if (Math.abs(lightness - 0.80) < 0.05 && Math.abs(chroma - 0.14) < 0.05 && Math.abs(hue - 220) < 5) return "#25d2fc";
+              if (Math.abs(lightness - 0.70) < 0.05 && Math.abs(chroma - 0.18) < 0.05 && Math.abs(hue - 25) < 5) return "#fa6863";
+              if (Math.abs(lightness - 0.68) < 0.05 && Math.abs(chroma - 0.20) < 0.05 && Math.abs(hue - 145) < 5) return "#26b63d";
+              if (Math.abs(lightness - 0.65) < 0.05 && Math.abs(chroma - 0.20) < 0.05 && Math.abs(hue - 280) < 5) return "#7c79ff";
+              if (Math.abs(lightness - 0.75) < 0.05 && Math.abs(chroma - 0.16) < 0.05 && Math.abs(hue - 70) < 5) return "#ed990e";
+              if (Math.abs(lightness - 0.72) < 0.05 && Math.abs(chroma - 0.14) < 0.05 && Math.abs(hue - 200) < 5) return "#00bec7";
               return match;
             });
           };
+          const replaceExportNeutrals = (str: string) => {
+            return str
+              .replace(/rgba\(\s*255\s*,\s*255\s*,\s*255\s*,\s*0\.015\s*\)/gi, "#111116")
+              .replace(/rgba\(\s*255\s*,\s*255\s*,\s*255\s*,\s*0\.025\s*\)/gi, "#17171c")
+              .replace(/rgba\(\s*255\s*,\s*255\s*,\s*255\s*,\s*0\.05\s*\)/gi, "rgba(255, 255, 255, 0.07)")
+              .replace(/rgba\(\s*255\s*,\s*255\s*,\s*255\s*,\s*0\.08\s*\)/gi, "rgba(255, 255, 255, 0.10)")
+              .replace(/rgba\(\s*255\s*,\s*255\s*,\s*255\s*,\s*0\.15\s*\)/gi, "rgba(255, 255, 255, 0.18)")
+              .replace(/rgba\(\s*255\s*,\s*255\s*,\s*255\s*,\s*0\.35\s*\)/gi, "rgba(255, 255, 255, 0.42)")
+              .replace(/rgba\(\s*255\s*,\s*255\s*,\s*255\s*,\s*0\.45\s*\)/gi, "rgba(255, 255, 255, 0.50)")
+              .replace(/rgba\(\s*255\s*,\s*255\s*,\s*255\s*,\s*0\.5\s*\)/gi, "rgba(255, 255, 255, 0.54)")
+              .replace(/rgba\(\s*255\s*,\s*255\s*,\s*255\s*,\s*0\.6\s*\)/gi, "rgba(255, 255, 255, 0.66)")
+              .replace(/rgba\(\s*255\s*,\s*255\s*,\s*255\s*,\s*0\.7\s*\)/gi, "rgba(255, 255, 255, 0.74)")
+              .replace(/rgba\(\s*80\s*,\s*220\s*,\s*140\s*,\s*0\.25\s*\)/gi, "rgba(38, 182, 61, 0.28)");
+          };
+          const normalizeExportColors = (str: string) => replaceExportNeutrals(replaceOklch(str));
 
-          for (let i = 0; i < elements.length; i++) {
-            const el = elements[i] as HTMLElement;
-
+          for (const el of elements) {
             const styleAttr = el.getAttribute("style");
             if (styleAttr) {
-              el.setAttribute("style", replaceOklch(styleAttr));
+              el.setAttribute("style", normalizeExportColors(styleAttr));
             }
 
             const stroke = el.getAttribute("stroke");
             if (stroke) {
-              el.setAttribute("stroke", replaceOklch(stroke));
+              el.setAttribute("stroke", normalizeExportColors(stroke));
             }
 
             const fill = el.getAttribute("fill");
             if (fill) {
-              el.setAttribute("fill", replaceOklch(fill));
+              el.setAttribute("fill", normalizeExportColors(fill));
             }
           }
         }
@@ -6603,9 +6635,66 @@ function App() {
       });
     };
 
+
+    const sharePrinterTicket = async () => {
+      const element = document.getElementById("ticket-impresora");
+      if (!element) return;
+      setProcesandoTicket(true);
+      try {
+        await document.fonts?.ready;
+      } catch {}
+      html2canvas(element, {
+        backgroundColor: "#ffffff",
+        scale: 3,
+        useCORS: true,
+        logging: false,
+      }).then((canvas) => {
+        canvas.toBlob((blob) => {
+          if (!blob) { setProcesandoTicket(false); return; }
+          if (Capacitor.isNativePlatform()) {
+            const reader = new FileReader();
+            reader.readAsDataURL(blob);
+            reader.onloadend = async () => {
+              const base64data = reader.result as string;
+              const base64 = base64data.split(",")[1];
+              try {
+                const fileName = `ticket_impresora_${weekId}.png`;
+                const result = await Filesystem.writeFile({
+                  path: fileName,
+                  data: base64,
+                  directory: Directory.Cache,
+                });
+                await Share.share({
+                  title: "Ticket Impresora",
+                  text: `Liquidacion semana ${formatWeekRangeFull(weekId)}`,
+                  url: result.uri,
+                  dialogTitle: "Enviar a Impresora",
+                });
+              } catch (e) {
+                console.error("Error al compartir ticket:", e);
+              } finally {
+                setProcesandoTicket(false);
+              }
+            };
+          } else {
+            const link = document.createElement("a");
+            link.download = `ticket_impresora_${weekId}.png`;
+            link.href = canvas.toDataURL("image/png");
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            setProcesandoTicket(false);
+          }
+        }, "image/png");
+      }).catch((err) => {
+        console.error("html2canvas ticket failed:", err);
+        setProcesandoTicket(false);
+      });
+    };
+
     return (
       <Shell burst={false}>
-        <div style={{ flex: 1, padding: "16px 20px 32px", display: "flex", flexDirection: "column", gap: 14, overflowY: "auto" }}>
+        <div style={{ flex: 1, padding: "16px 20px 32px", minHeight: 0, display: "flex", flexDirection: "column", gap: 14, overflowY: "auto" }}>
           {/* Cabecera */}
           <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
             <button style={S.iconBtn} onClick={() => setScreen("detalleSemana")}>
@@ -6632,6 +6721,7 @@ function App() {
             gap: 16,
             position: "relative",
             boxShadow: "0 8px 32px rgba(0, 0, 0, 0.24)",
+            flexShrink: 0,
             overflow: "hidden"
           }}>
             {/* Adorno de ticket (corte superior) */}
@@ -6749,24 +6839,146 @@ function App() {
               </div>
             </div>
 
-            {/* Informativos (Pie del ticket) */}
-            <div style={{
-              borderTop: "1px dashed rgba(255, 255, 255, 0.15)",
-              paddingTop: 14,
-              display: "flex",
-              justifyContent: "space-between",
-              alignItems: "center",
-              fontSize: 15,
-              color: "rgba(255, 255, 255, 0.35)",
-              fontStyle: "italic"
-            }}>
-              <span>Total Nulos acumulados:</span>
-              <span style={{ fontFamily: "monospace" }}>{fmt(totalNulosAcumulado)}</span>
+            {turnosConNotas.length > 0 && (
+              <div style={{ borderTop: "1px dashed rgba(255, 255, 255, 0.15)", paddingTop: 14, display: "flex", flexDirection: "column", gap: 18 }}>
+                <div style={{ fontSize: 20, fontWeight: 800, color: "white", textAlign: "center", textTransform: "uppercase", letterSpacing: "0.6px", textShadow: "0 0 10px rgba(255,255,255,0.18)" }}>
+                  Notas de la semana
+                </div>
+                {turnosConNotas.map(({ turno, notasGenerales, notasDetalladas }, index) => (
+                  <div key={`ticket-notas-${turno.id}`} style={{ display: "flex", flexDirection: "column", gap: 8, paddingTop: index === 0 ? 2 : 12, borderTop: index === 0 ? "none" : "1px dashed rgba(255,255,255,0.10)" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, fontWeight: 800, color: "rgba(255,255,255,0.72)" }}>
+                      <span style={{ width: 12, height: 1, background: "rgba(255,255,255,0.24)", flexShrink: 0 }} />
+                      {fmtDate(turno.date)}
+                    </div>
+                    {notasGenerales.map((entry) => (
+                      <div key={`ticket-nota-general-${entry.id}`} style={{ display: "grid", gridTemplateColumns: "auto minmax(0, 1fr)", alignItems: "start", gap: 9, color: "rgba(255,255,255,0.8)", fontSize: 13, lineHeight: 1.4, minWidth: 0, marginLeft: 14 }}>
+                        <span style={{ color: "rgba(255,255,255,0.58)", fontSize: 11, fontWeight: 700, lineHeight: 1, whiteSpace: "nowrap", background: "rgba(150,130,255,0.10)", border: "1px solid rgba(150,130,255,0.14)", borderRadius: 7, padding: "4px 5px", marginTop: 1 }}>{entry.time}</span>
+                        <span style={{ color: "rgba(255,255,255,0.82)", fontSize: 12, lineHeight: 1.38, minWidth: 0, overflowWrap: "anywhere" }}>{entry.note}</span>
+                      </div>
+                    ))}
+                    {notasDetalladas.map((entry) => {
+                      const meta = getEntryTypeMeta(entry.type);
+                      return (
+                        <div key={`ticket-nota-detallada-${entry.id}`} style={{ fontSize: 13, display: "grid", gridTemplateColumns: "auto auto minmax(0, 1fr) auto", alignItems: "start", gap: 8, minWidth: 0, marginLeft: 14 }}>
+                                      <span style={{ fontSize: 11, color: "rgba(255,255,255,0.5)", fontWeight: 600, flexShrink: 0 }}>{entry.time}</span>
+                          <span style={{ fontWeight: 700, color: meta.color, fontSize: 14, whiteSpace: "nowrap", flexShrink: 0 }}>{meta.label}</span>
+                          <span style={{ color: "rgba(255,255,255,0.8)", fontSize: 12, lineHeight: 1.4, flex: 1, minWidth: 0, overflowWrap: "anywhere" }}>{entry.note}</span>
+                          <span style={{ fontSize: 15, fontWeight: 700, color: meta.color, whiteSpace: "nowrap", flexShrink: 0 }}>{fmt(entry.amount)}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+            <button
+              id="btn-imprimir-ticket"
+              onClick={sharePrinterTicket}
+              disabled={procesandoTicket}
+              style={{
+                padding: "16px 0",
+                borderRadius: 16,
+                background: procesandoTicket ? "rgba(255,255,255,0.04)" : "rgba(37, 210, 252, 0.1)",
+                border: procesandoTicket ? "1px solid rgba(255,255,255,0.08)" : "1px solid rgba(37, 210, 252, 0.3)",
+                color: procesandoTicket ? "rgba(255,255,255,0.35)" : "#25d2fc",
+                fontSize: 19,
+                fontWeight: 700,
+                cursor: procesandoTicket ? "not-allowed" : "pointer",
+                display: "flex",
+                justifyContent: "center",
+                alignItems: "center",
+                gap: 8,
+                transition: "all 0.2s"
+              }}
+            >
+              {procesandoTicket ? "Generando ticket..." : "Imprimir Ticket"}
+            </button>
+
+          {/* Ticket termico oculto para impresora */}
+          <div
+            id="ticket-impresora"
+            style={{
+              position: "absolute",
+              left: "-9999px",
+              top: 0,
+              width: 384,
+              backgroundColor: "#ffffff",
+              color: "#000000",
+              fontFamily: "'Courier New', Courier, monospace",
+              fontSize: 14,
+              padding: "20px 16px",
+              lineHeight: 1.5,
+            }}
+          >
+            <div style={{ textAlign: "center", fontSize: 16, marginBottom: 4, color: "#000000" }}>LIQUIDACION SEMANAL</div>
+            <div style={{ textAlign: "center", fontSize: 15, fontWeight: 700, marginBottom: 12, color: "#000000" }}>{formatWeekRangeFull(weekId)}</div>
+            <div style={{ borderTop: "1px dashed #000000", marginBottom: 10 }} />
+            <div style={{ display: "flex", justifyContent: "space-between", fontWeight: 700, color: "#000000", marginBottom: 4 }}>
+              <span>Total Taximetro</span><span>{fmt(taximetroLimpio)}</span>
             </div>
+            <div style={{ display: "flex", justifyContent: "space-between", color: "#000000", marginBottom: 4 }}>
+              <span>Total KM</span><span>{fmtKmNumber(totalKMAcumulado)} KM</span>
+            </div>
+            <div style={{ borderTop: "1px dashed #000000", margin: "6px 0" }} />
+            <div style={{ display: "flex", justifyContent: "space-between", color: "#000000", marginBottom: 4 }}>
+              <span>Comision Bruta Jefe</span><span>{fmt(brutoJefeAcumulado)}</span>
+            </div>
+            <div style={{ borderTop: "1px dashed #000000", margin: "8px 0" }} />
+            <div style={{ fontWeight: 700, color: "#000000", marginBottom: 4 }}>DESCUENTOS:</div>
+            <div style={{ display: "flex", justifyContent: "space-between", color: "#000000", marginBottom: 2, paddingLeft: 8 }}>
+              <span>Datafonos</span><span>-{fmt(descDAcumulado)}</span>
+            </div>
+            <div style={{ display: "flex", justifyContent: "space-between", color: "#000000", marginBottom: 2, paddingLeft: 8 }}>
+              <span>Gasolina</span><span>-{fmt(descGAcumulado)}</span>
+            </div>
+            <div style={{ display: "flex", justifyContent: "space-between", color: "#000000", marginBottom: 2, paddingLeft: 8 }}>
+              <span>Agencias/Bonos</span><span>-{fmt(descAAcumulado)}</span>
+            </div>
+            <div style={{ display: "flex", justifyContent: "space-between", color: "#000000", marginBottom: 2, paddingLeft: 8 }}>
+              <span>Extras</span><span>-{fmt(descEAcumulado)}</span>
+            </div>
+            <div style={{ display: "flex", justifyContent: "space-between", fontWeight: 700, color: "#000000", marginTop: 4 }}>
+              <span>Total Descuentos</span><span>-{fmt(totalDescontarAcumulado)}</span>
+            </div>
+            <div style={{ borderTop: "1px dashed #000000", margin: "8px 0" }} />
+            <div style={{ textAlign: "center", fontWeight: 700, fontSize: 18, color: "#000000", margin: "8px 0" }}>
+              NETO A ENTREGAR: {fmt(totalNetoAcumulado)}
+            </div>
+            {turnosConNotas.length > 0 && (
+              <>
+                <div style={{ borderTop: "1px dashed #000000", margin: "8px 0" }} />
+                <div style={{ fontWeight: 700, color: "#000000", marginBottom: 4 }}>NOTAS DE LA SEMANA:</div>
+                {turnosConNotas.map(({ turno, notasGenerales, notasDetalladas }) => (
+                  <div key={turno.id} style={{ marginBottom: 6 }}>
+                    <div style={{ fontWeight: 700, color: "#000000", fontSize: 12 }}>{fmtDate(turno.date)}</div>
+                    {notasGenerales.map((entry) => (
+                      <div key={entry.id} style={{ fontSize: 12, color: "#000000", paddingLeft: 8, display: "grid", gridTemplateColumns: "46px auto minmax(0, 1fr)", gap: 4, alignItems: "start", marginBottom: 2 }}>
+                        <span>{entry.time}</span>
+                        <span>Nota:</span>
+                        <span style={{ minWidth: 0, overflowWrap: "anywhere", wordBreak: "break-word", whiteSpace: "normal", lineHeight: 1.35 }}>{entry.note.trim()}</span>
+                      </div>
+                    ))}
+                    {notasDetalladas.map((entry) => {
+                      const meta = getEntryTypeMeta(entry.type);
+                      return (
+                        <div key={entry.id} style={{ fontSize: 12, color: "#000000", paddingLeft: 8, display: "grid", gridTemplateColumns: "46px auto auto minmax(0, 1fr)", gap: 4, alignItems: "start", marginBottom: 2 }}>
+                          <span>{entry.time}</span>
+                          <span>{meta.label}:</span>
+                          <span>({fmt(entry.amount)})</span>
+                          <span style={{ minWidth: 0, overflowWrap: "anywhere", wordBreak: "break-word", whiteSpace: "normal", lineHeight: 1.35 }}>{entry.note.trim()}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                ))}
+              </>
+            )}
           </div>
 
           {/* Botones de acción */}
-          <div style={{ display: "flex", flexDirection: "column", gap: 10, marginTop: 4 }}>
+          <div style={{ flexShrink: 0, display: "flex", flexDirection: "column", gap: 10, marginTop: 4 }}>
             <button
               onClick={copyToClipboard}
               style={{
@@ -7158,11 +7370,11 @@ function App() {
                 {entriesWithNotes.map(e => {
                   const meta = getEntryTypeMeta(e.type);
                   return (
-                    <div key={e.id} style={{ fontSize: 13, background: "rgba(255,255,255,0.03)", padding: "10px 12px", borderRadius: 12, border: "1px solid rgba(255,255,255,0.05)", display: "grid", gridTemplateColumns: "auto auto minmax(0, 1fr) auto", alignItems: "center", gap: 8, minWidth: 0 }}>
-                      <span style={{ fontSize: 12, color: "rgba(255,255,255,0.5)", fontWeight: 600, flexShrink: 0 }}>{e.time}</span>
+                    <div key={e.id} style={{ fontSize: 13, background: "rgba(255,255,255,0.03)", padding: "10px 12px", borderRadius: 12, border: "1px solid rgba(255,255,255,0.05)", display: "grid", gridTemplateColumns: "auto auto minmax(0, 1fr) auto", alignItems: "start", gap: 8, minWidth: 0 }}>
+                      <span style={{ fontSize: 12, color: "rgba(255,255,255,0.5)", fontWeight: 600, flexShrink: 0, alignSelf: "start" }}>{e.time}</span>
                       <span style={{ fontWeight: 700, color: meta.color, fontSize: 14, whiteSpace: "nowrap", flexShrink: 0 }}>{meta.label}</span>
                       <span style={{ color: "rgba(255,255,255,0.8)", fontSize: 12, lineHeight: 1.4, flex: 1, minWidth: 0, overflowWrap: "anywhere" }}>{e.note}</span>
-                      <span style={{ fontSize: 15, fontWeight: 700, color: meta.color, whiteSpace: "nowrap", flexShrink: 0 }}>{fmt(e.amount)}</span>
+                      <span style={{ fontSize: 15, fontWeight: 700, color: meta.color, whiteSpace: "nowrap", flexShrink: 0, alignSelf: "start" }}>{fmt(e.amount)}</span>
                     </div>
                   );
                 })}
@@ -7583,7 +7795,7 @@ function App() {
                       style={{
                         display: "grid",
                         gridTemplateColumns: "auto minmax(0, 1fr) auto auto",
-                        alignItems: "center",
+                        alignItems: "start",
                         gap: 10,
                         background: "rgba(255,255,255,0.04)",
                         borderRadius: 13,
@@ -7601,12 +7813,13 @@ function App() {
                           fontSize: 12,
                           color: "rgba(255,255,255,0.5)",
                           flexShrink: 0,
+                          alignSelf: "start",
                         }}
                       >
                         {e.time}
                       </span>
                       <span
-                        style={{ fontSize: 14, fontWeight: 700, color: meta.color, flexShrink: 0 }}
+                        style={{ fontSize: 14, fontWeight: 700, color: meta.color, flexShrink: 0, alignSelf: "start" }}
                       >
                         {e.type !== "nota" && `+${fmt(e.amount)}`}
                       </span>
@@ -8188,11 +8401,11 @@ function TurnoNotasCard({
           {notasDetalladas.map((entry) => {
             const meta = getEntryTypeMeta(entry.type);
             return (
-              <div key={entry.id} style={{ fontSize: 13, background: "rgba(255,255,255,0.025)", padding: "8px 10px", borderRadius: 10, display: "grid", gridTemplateColumns: "auto auto minmax(0, 1fr) auto", alignItems: "center", gap: 7, minWidth: 0 }}>
-                <span style={{ fontSize: 12, color: "rgba(255,255,255,0.45)", fontWeight: 700, flexShrink: 0 }}>{entry.time}</span>
+              <div key={entry.id} style={{ fontSize: 13, background: "rgba(255,255,255,0.025)", padding: "8px 10px", borderRadius: 10, display: "grid", gridTemplateColumns: "auto auto minmax(0, 1fr) auto", alignItems: "start", gap: 7, minWidth: 0 }}>
+                <span style={{ fontSize: 12, color: "rgba(255,255,255,0.45)", fontWeight: 700, flexShrink: 0, alignSelf: "start" }}>{entry.time}</span>
                 <span style={{ fontWeight: 700, color: meta.color, fontSize: 14, whiteSpace: "nowrap", flexShrink: 0 }}>{meta.label}</span>
                 <span style={{ color: "rgba(255,255,255,0.82)", fontSize: 12, lineHeight: 1.35, flex: 1, minWidth: 0, overflowWrap: "anywhere" }}>{entry.note}</span>
-                <span style={{ fontSize: 15, fontWeight: 700, color: meta.color, whiteSpace: "nowrap", flexShrink: 0 }}>{fmt(entry.amount)}</span>
+                <span style={{ fontSize: 15, fontWeight: 700, color: meta.color, whiteSpace: "nowrap", flexShrink: 0, alignSelf: "start" }}>{fmt(entry.amount)}</span>
               </div>
             );
           })}
