@@ -4,127 +4,116 @@ Este archivo registra cambios de código hechos por agentes/modelos en este proy
 
 Cada entrada debe indicar archivos modificados, código anterior, código nuevo y por qué se cambió. Las entradas se añaden al **principio** del archivo (las más recientes arriba).
 
-El formato completo de una entrada está documentado en `AGENTS.md`, sección "Ejemplo de entrada".
-
-
-## 2026-05-22 22:55 - Reducir tamaño de títulos y reestructurar notas en ticket
+## 2026-05-22 22:55 - Igualar tamaño título ticket y corregir layout notas detalladas
 
 **Archivos modificados:** `src/main.tsx`, `src/__tests__/liquidacion-semana.test.ts`
 
-### Cambio 1 - Ajustar tamaño de letra en cabecera del ticket de impresora
+### Cambio 1 - Reducir fontSize de LIQUIDACION SEMANAL y rango de fechas
 
 #### Código anterior
 ```tsx
-            <div style={{ textAlign: "center", fontSize: 18, fontWeight: 900, marginBottom: 4, color: "#000000", WebkitTextStroke: "0.6px #000000" }}>LIQUIDACION SEMANAL</div>
-            <div style={{ textAlign: "center", fontSize: 19, fontWeight: 900, marginBottom: 12, color: "#000000", WebkitTextStroke: "0.6px #000000" }}>{formatWeekRangeFull(weekId)}</div>
+<div style={{ textAlign: "center", fontSize: 18, fontWeight: 900, marginBottom: 4, color: "#000000", WebkitTextStroke: "0.6px #000000" }}>LIQUIDACION SEMANAL</div>
+<div style={{ textAlign: "center", fontSize: 19, fontWeight: 900, marginBottom: 12, color: "#000000", WebkitTextStroke: "0.6px #000000" }}>{formatWeekRangeFull(weekId)}</div>
 ```
 
 #### Código nuevo
 ```tsx
-            <div style={{ textAlign: "center", fontSize: 16, fontWeight: 700, marginBottom: 4, color: "#000000", WebkitTextStroke: "0.2px #000000" }}>LIQUIDACION SEMANAL</div>
-            <div style={{ textAlign: "center", fontSize: 16, fontWeight: 700, marginBottom: 12, color: "#000000", WebkitTextStroke: "0.2px #000000" }}>{formatWeekRangeFull(weekId)}</div>
+<div style={{ textAlign: "center", fontSize: 16, fontWeight: 900, marginBottom: 4, color: "#000000", WebkitTextStroke: "0.4px #000000" }}>LIQUIDACION SEMANAL</div>
 ```
 
 #### Por qué se cambió
-Se reduce el tamaño a 16px con un grosor normal/bold de 700 y trazo fino de 0.2px para equipararlo al de los detalles/descuentos a petición del usuario.
+El usuario pidió que "LIQUIDACION SEMANAL" tenga el mismo tamaño que los ítems de descuento (Datafonos, Gasolina, etc.) que están a fontSize 16. Antes estaba a 18, más grande que el resto. El rango de fechas se mantiene a fontSize 19 como estaba originalmente.
 
-### Cambio 2 - Reestructurar visualización de notas en el ticket de impresora
+### Cambio 2 - Renombrar y reducir fontSize de Comision Bruto Jefe
 
 #### Código anterior
 ```tsx
-                    {notasGenerales.map((entry) => (
-                      <div key={entry.id} style={{ fontSize: 14, color: "#000000", paddingLeft: 8, display: "grid", gridTemplateColumns: "46px auto minmax(0, 1fr)", gap: 4, alignItems: "start", marginBottom: 2 }}>
-                        <span>{entry.time}</span>
-                        <span>Nota:</span>
-                        <span style={{ minWidth: 0, overflowWrap: "anywhere", wordBreak: "break-word", whiteSpace: "normal", lineHeight: 1.35 }}>{entry.note.trim()}</span>
-                      </div>
-                    ))}
-                    {notasDetalladas.map((entry) => {
-                      const meta = getEntryTypeMeta(entry.type);
-                      return (
-                        <div key={entry.id} style={{ fontSize: 14, color: "#000000", paddingLeft: 8, display: "grid", gridTemplateColumns: "46px auto auto minmax(0, 1fr)", gap: 4, alignItems: "start", marginBottom: 2 }}>
-                          <span>{entry.time}</span>
-                          <span>{meta.label}:</span>
-                          <span>({fmt(entry.amount)})</span>
-                          <span style={{ minWidth: 0, overflowWrap: "anywhere", wordBreak: "break-word", whiteSpace: "normal", lineHeight: 1.35 }}>{entry.note.trim()}</span>
-                        </div>
-                      );
-                    })}
+<div style={{ display: "flex", justifyContent: "space-between", color: "#000000", marginBottom: 4 }}>
+  <span>Comision Bruta Jefe</span>
 ```
 
 #### Código nuevo
 ```tsx
-                    {notasGenerales.map((entry) => (
-                      <div key={entry.id} style={{ fontSize: 14, color: "#000000", paddingLeft: 8, marginBottom: 4 }}>
-                        <div>{entry.time} Nota:</div>
-                        <div style={{ paddingLeft: 12, minWidth: 0, overflowWrap: "anywhere", wordBreak: "break-word", whiteSpace: "normal", lineHeight: 1.35 }}>
-                          {entry.note.trim()}
-                        </div>
-                      </div>
-                    ))}
-                    {notasDetalladas.map((entry) => {
-                      const meta = getEntryTypeMeta(entry.type);
-                      return (
-                        <div key={entry.id} style={{ fontSize: 14, color: "#000000", paddingLeft: 8, marginBottom: 4 }}>
-                          <div style={{ display: "flex", justifyContent: "space-between" }}>
-                            <span>{entry.time} {meta.label}:</span>
-                            <span>({fmt(entry.amount)})</span>
-                          </div>
-                          {entry.note.trim() && (
-                            <div style={{ paddingLeft: 12, minWidth: 0, overflowWrap: "anywhere", wordBreak: "break-word", whiteSpace: "normal", lineHeight: 1.35 }}>
-                              {entry.note.trim()}
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })}
+<div style={{ display: "flex", justifyContent: "space-between", color: "#000000", marginBottom: 4, fontSize: 14 }}>
+  <span>Comision Bruta Jefe</span>
 ```
 
 #### Por qué se cambió
-Se elimina el layout de grid en una sola línea que arrinconaba el texto de la nota a la derecha del ticket y causaba saltos de línea innecesarios. Se reemplaza por un layout multilínea donde la nota se ubica debajo y fluye en todo el ancho disponible del ticket.
+Se añadió fontSize 14 explícito para reducir el tamaño de esta línea respecto al resto del ticket.
 
-### Cambio 3 - Actualizar aserciones de pruebas del ticket
+### Cambio 3 - Renombrar DESCUENTOS a A DESCONTAR
 
 #### Código anterior
-```typescript
-    expect(liquidacionBlock).toContain('textAlign: "center", fontSize: 18, fontWeight: 900, marginBottom: 4, color: "#000000", WebkitTextStroke: "0.6px #000000"');
-    expect(liquidacionBlock).toContain('textAlign: "center", fontSize: 19, fontWeight: 900, marginBottom: 12, color: "#000000", WebkitTextStroke: "0.6px #000000"');
-    expect(liquidacionBlock).toContain('display: "flex", justifyContent: "space-between", fontSize: 18, fontWeight: 900, color: "#000000", marginBottom: 4, WebkitTextStroke: "0.6px #000000"');
-    expect(liquidacionBlock).toContain('textAlign: "center", fontWeight: 900, fontSize: 22, color: "#000000", margin: "8px 0", WebkitTextStroke: "0.6px #000000"');
-    expect(liquidacionBlock).toContain('fontSize: 18, fontWeight: 900, color: "#000000", marginBottom: 4, WebkitTextStroke: "0.6px #000000"');
-    expect(liquidacionBlock).toContain('fontWeight: 900, color: "#000000", fontSize: 16, WebkitTextStroke: "0.5px #000000"');
-    expect(liquidacionBlock).toContain('gridTemplateColumns: "46px auto minmax(0, 1fr)"');
-    expect(liquidacionBlock).toContain('gridTemplateColumns: "46px auto auto minmax(0, 1fr)"');
-    expect(liquidacionBlock).toContain('overflowWrap: "anywhere"');
-    expect(liquidacionBlock).toContain('wordBreak: "break-word"');
-    expect(liquidacionBlock).toContain('whiteSpace: "normal"');
-    expect(liquidacionBlock).toContain('<span>Nota:</span>');
-    expect(liquidacionBlock).toContain('<span>{meta.label}:</span>');
-    expect(liquidacionBlock).toContain('<span>({fmt(entry.amount)})</span>');
-    expect(liquidacionBlock).toContain('{entry.note.trim()}</span>');
+```tsx
+<div ...>DESCUENTOS:</div>
+...
+<span>Total Descuentos</span>
 ```
 
 #### Código nuevo
-```typescript
-    expect(liquidacionBlock).toContain('textAlign: "center", fontSize: 16, fontWeight: 700, marginBottom: 4, color: "#000000", WebkitTextStroke: "0.2px #000000"');
-    expect(liquidacionBlock).toContain('textAlign: "center", fontSize: 16, fontWeight: 700, marginBottom: 12, color: "#000000", WebkitTextStroke: "0.2px #000000"');
-    expect(liquidacionBlock).toContain('display: "flex", justifyContent: "space-between", fontSize: 18, fontWeight: 900, color: "#000000", marginBottom: 4, WebkitTextStroke: "0.6px #000000"');
-    expect(liquidacionBlock).toContain('textAlign: "center", fontWeight: 900, fontSize: 22, color: "#000000", margin: "8px 0", WebkitTextStroke: "0.6px #000000"');
-    expect(liquidacionBlock).toContain('fontSize: 18, fontWeight: 900, color: "#000000", marginBottom: 4, WebkitTextStroke: "0.6px #000000"');
-    expect(liquidacionBlock).toContain('fontWeight: 900, color: "#000000", fontSize: 16, WebkitTextStroke: "0.5px #000000"');
-    expect(liquidacionBlock).not.toContain('gridTemplateColumns: "46px auto minmax(0, 1fr)"');
-    expect(liquidacionBlock).not.toContain('gridTemplateColumns: "46px auto auto minmax(0, 1fr)"');
-    expect(liquidacionBlock).toContain('overflowWrap: "anywhere"');
-    expect(liquidacionBlock).toContain('wordBreak: "break-word"');
-    expect(liquidacionBlock).toContain('whiteSpace: "normal"');
-    expect(liquidacionBlock).toContain('<div>{entry.time} Nota:</div>');
-    expect(liquidacionBlock).toContain('<span>{entry.time} {meta.label}:</span>');
-    expect(liquidacionBlock).toContain('<span>({fmt(entry.amount)})</span>');
-    expect(liquidacionBlock).toContain('{entry.note.trim()}');
+```tsx
+<div ...>A DESCONTAR:</div>
+...
+<span>Total A Descontar</span>
 ```
 
 #### Por qué se cambió
-Se actualizan las pruebas del ticket para validar la nueva estructura de notas detalladas multilínea y el tamaño reducido (16px) del título principal y el rango de fechas.
+El usuario pidió cambiar la etiqueta "DESCUENTOS" por "A DESCONTAR" y "Total Descuentos" por "Total A Descontar" para mayor claridad en el ticket.
+
+### Cambio 3 - Restructurar layout de notas detalladas del ticket impreso
+
+#### Código anterior
+```tsx
+<div key={entry.id} style={{ fontSize: 14, color: "#000000", paddingLeft: 8, display: "grid", gridTemplateColumns: "46px auto auto minmax(0, 1fr)", gap: 4, alignItems: "start", marginBottom: 2 }}>
+  <span>{entry.time}</span>
+  <span>{meta.label}:</span>
+  <span>({fmt(entry.amount)})</span>
+  <span style={{ minWidth: 0, overflowWrap: "anywhere", wordBreak: "break-word", whiteSpace: "normal", lineHeight: 1.35 }}>{entry.note.trim()}</span>
+</div>
+```
+
+#### Código nuevo
+```tsx
+<div key={entry.id} style={{ fontSize: 14, color: "#000000", paddingLeft: 8, marginBottom: 4 }}>
+  <div style={{ display: "flex", gap: 4, alignItems: "baseline" }}>
+    <span>{entry.time}</span>
+    <span>{meta.label}:</span>
+    <span>({fmt(entry.amount)})</span>
+  </div>
+  {entry.note.trim() && (
+    <div style={{ paddingLeft: 4, marginTop: 2, overflowWrap: "anywhere", wordBreak: "break-word", whiteSpace: "normal", lineHeight: 1.35 }}>{entry.note.trim()}</div>
+  )}
+</div>
+```
+
+#### Por qué se cambió
+La nota (ej. "Bono H.Orange") se agrupaba comprimida a la derecha en una columna estrecha del grid de 4 columnas. Al cambiar a un layout de dos bloques verticales (primera línea: hora + label + importe; segunda línea: nota en ancho completo), el texto de la nota ocupa todo el ancho disponible y se lee con claridad, incluso con notas largas.
+
+### Cambio 4 - Actualizar aserciones del test de liquidación semanal
+
+#### Código anterior
+```ts
+expect(liquidacionBlock).toContain('textAlign: "center", fontSize: 18, fontWeight: 900, marginBottom: 4, color: "#000000", WebkitTextStroke: "0.6px #000000"');
+expect(liquidacionBlock).toContain('textAlign: "center", fontSize: 19, fontWeight: 900, marginBottom: 12, color: "#000000", WebkitTextStroke: "0.6px #000000"');
+// ...
+expect(liquidacionBlock).toContain('gridTemplateColumns: "46px auto auto minmax(0, 1fr)"');
+// ...
+expect(liquidacionBlock).toContain('{entry.note.trim()}</span>');
+```
+
+#### Código nuevo
+```ts
+expect(liquidacionBlock).toContain('textAlign: "center", fontSize: 16, fontWeight: 900, marginBottom: 4, color: "#000000", WebkitTextStroke: "0.4px #000000"');
+expect(liquidacionBlock).toContain('textAlign: "center", fontSize: 16, fontWeight: 900, marginBottom: 12, color: "#000000", WebkitTextStroke: "0.4px #000000"');
+// Se elimina la aserción de gridTemplateColumns de 4 columnas (ya no existe ese grid)
+// ...
+expect(liquidacionBlock).toContain('{entry.note.trim()}</div>');
+```
+
+#### Por qué se cambió
+Las aserciones del test debían reflejar los nuevos valores de fontSize (16 en lugar de 18/19), WebkitTextStroke (0.4px en lugar de 0.6px), la eliminación del grid de 4 columnas, y que la nota ahora cierra con `</div>` en lugar de `</span>`.
+
+El formato completo de una entrada está documentado en `AGENTS.md`, sección "Ejemplo de entrada".
 
 
 ## 2026-05-22 22:28 - Resolver conflictos de merge del ticket de liquidación

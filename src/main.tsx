@@ -6914,8 +6914,8 @@ function App() {
               WebkitTextStroke: "0.2px #000000",
             }}
           >
-            <div style={{ textAlign: "center", fontSize: 16, fontWeight: 700, marginBottom: 4, color: "#000000", WebkitTextStroke: "0.2px #000000" }}>LIQUIDACION SEMANAL</div>
-            <div style={{ textAlign: "center", fontSize: 16, fontWeight: 700, marginBottom: 12, color: "#000000", WebkitTextStroke: "0.2px #000000" }}>{formatWeekRangeFull(weekId)}</div>
+            <div style={{ textAlign: "center", fontSize: 16, fontWeight: 900, marginBottom: 4, color: "#000000", WebkitTextStroke: "0.4px #000000" }}>LIQUIDACION SEMANAL</div>
+            <div style={{ textAlign: "center", fontSize: 19, fontWeight: 900, marginBottom: 12, color: "#000000", WebkitTextStroke: "0.6px #000000" }}>{formatWeekRangeFull(weekId)}</div>
             <div style={{ borderTop: "1px dashed #000000", marginBottom: 10 }} />
             <div style={{ display: "flex", justifyContent: "space-between", fontSize: 18, fontWeight: 900, color: "#000000", marginBottom: 4, WebkitTextStroke: "0.6px #000000" }}>
               <span>Total Taximetro</span><span>{fmt(taximetroLimpio)}</span>
@@ -6924,11 +6924,11 @@ function App() {
               <span>Total KM</span><span>{fmtKmNumber(totalKMAcumulado)} KM</span>
             </div>
             <div style={{ borderTop: "1px dashed #000000", margin: "6px 0" }} />
-            <div style={{ display: "flex", justifyContent: "space-between", color: "#000000", marginBottom: 4 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", color: "#000000", marginBottom: 4, fontSize: 14 }}>
               <span>Comision Bruta Jefe</span><span>{fmt(brutoJefeAcumulado)}</span>
             </div>
             <div style={{ borderTop: "1px dashed #000000", margin: "8px 0" }} />
-            <div style={{ fontWeight: 900, color: "#000000", marginBottom: 4, WebkitTextStroke: "0.6px #000000" }}>DESCUENTOS:</div>
+            <div style={{ fontWeight: 900, color: "#000000", marginBottom: 4, WebkitTextStroke: "0.6px #000000" }}>Descontar:</div>
             <div style={{ display: "flex", justifyContent: "space-between", color: "#000000", marginBottom: 2, paddingLeft: 8 }}>
               <span>Datafonos</span><span>-{fmt(descDAcumulado)}</span>
             </div>
@@ -6942,7 +6942,7 @@ function App() {
               <span>Extras</span><span>-{fmt(descEAcumulado)}</span>
             </div>
             <div style={{ display: "flex", justifyContent: "space-between", fontWeight: 900, color: "#000000", marginTop: 4, WebkitTextStroke: "0.6px #000000" }}>
-              <span>Total Descuentos</span><span>-{fmt(totalDescontarAcumulado)}</span>
+              <span>Total Descontar</span><span>-{fmt(totalDescontarAcumulado)}</span>
             </div>
             <div style={{ borderTop: "1px dashed #000000", margin: "8px 0" }} />
             <div style={{ textAlign: "center", fontWeight: 900, fontSize: 22, color: "#000000", margin: "8px 0", WebkitTextStroke: "0.6px #000000" }}>
@@ -6956,25 +6956,23 @@ function App() {
                   <div key={turno.id} style={{ marginBottom: 6 }}>
                     <div style={{ fontWeight: 900, color: "#000000", fontSize: 16, WebkitTextStroke: "0.5px #000000" }}>{fmtDate(turno.date)}</div>
                     {notasGenerales.map((entry) => (
-                      <div key={entry.id} style={{ fontSize: 14, color: "#000000", paddingLeft: 8, marginBottom: 4 }}>
-                        <div>{entry.time} Nota:</div>
-                        <div style={{ paddingLeft: 12, minWidth: 0, overflowWrap: "anywhere", wordBreak: "break-word", whiteSpace: "normal", lineHeight: 1.35 }}>
-                          {entry.note.trim()}
-                        </div>
+                      <div key={entry.id} style={{ fontSize: 14, color: "#000000", paddingLeft: 8, display: "grid", gridTemplateColumns: "46px auto minmax(0, 1fr)", gap: 4, alignItems: "start", marginBottom: 2 }}>
+                        <span>{entry.time}</span>
+                        <span>Nota:</span>
+                        <span style={{ minWidth: 0, overflowWrap: "anywhere", wordBreak: "break-word", whiteSpace: "normal", lineHeight: 1.35 }}>{entry.note.trim()}</span>
                       </div>
                     ))}
                     {notasDetalladas.map((entry) => {
                       const meta = getEntryTypeMeta(entry.type);
                       return (
                         <div key={entry.id} style={{ fontSize: 14, color: "#000000", paddingLeft: 8, marginBottom: 4 }}>
-                          <div style={{ display: "flex", justifyContent: "space-between" }}>
-                            <span>{entry.time} {meta.label}:</span>
+                          <div style={{ display: "flex", gap: 4, alignItems: "baseline" }}>
+                            <span>{entry.time}</span>
+                            <span>{meta.label}:</span>
                             <span>({fmt(entry.amount)})</span>
                           </div>
                           {entry.note.trim() && (
-                            <div style={{ paddingLeft: 12, minWidth: 0, overflowWrap: "anywhere", wordBreak: "break-word", whiteSpace: "normal", lineHeight: 1.35 }}>
-                              {entry.note.trim()}
-                            </div>
+                            <div style={{ paddingLeft: 4, marginTop: 2, overflowWrap: "anywhere", wordBreak: "break-word", whiteSpace: "normal", lineHeight: 1.35 }}>{entry.note.trim()}</div>
                           )}
                         </div>
                       );
