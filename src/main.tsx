@@ -6965,11 +6965,11 @@ function App() {
                     {notasDetalladas.map((entry) => {
                       const meta = getEntryTypeMeta(entry.type);
                       return (
-                        <div key={entry.id} style={{ fontSize: 14, color: "#000000", paddingLeft: 8, display: "grid", gridTemplateColumns: "46px auto auto minmax(0, 1fr)", gap: 4, alignItems: "start", marginBottom: 2 }}>
+                        <div key={entry.id} style={{ fontSize: 14, color: "#000000", paddingLeft: 8, display: "grid", gridTemplateColumns: "46px auto minmax(0, 1fr) auto", gap: 4, alignItems: "start", marginBottom: 2 }}>
                           <span>{entry.time}</span>
                           <span>{meta.label}:</span>
-                          <span>({fmt(entry.amount)})</span>
                           <span style={{ minWidth: 0, overflowWrap: "anywhere", wordBreak: "break-word", whiteSpace: "normal", lineHeight: 1.35 }}>{entry.note.trim()}</span>
+                          <span style={{ whiteSpace: "nowrap" }}>({fmt(entry.amount)})</span>
                         </div>
                       );
                     })}

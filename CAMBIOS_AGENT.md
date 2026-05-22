@@ -7,6 +7,74 @@ Cada entrada debe indicar archivos modificados, código anterior, código nuevo 
 El formato completo de una entrada está documentado en `AGENTS.md`, sección "Ejemplo de entrada".
 
 
+## 2026-05-22 22:45 - Corregir alineación de notas en ticket térmico
+
+**Archivos modificados:** `src/main.tsx`, `src/__tests__/liquidacion-semana.test.ts`
+
+### Cambio 1 - Mover nota a la columna central e importe a la derecha en ticket térmico
+
+#### Código anterior
+```tsx
+                    {notasDetalladas.map((entry) => {
+                      const meta = getEntryTypeMeta(entry.type);
+                      return (
+                        <div key={entry.id} style={{ fontSize: 14, color: "#000000", paddingLeft: 8, display: "grid", gridTemplateColumns: "46px auto auto minmax(0, 1fr)", gap: 4, alignItems: "start", marginBottom: 2 }}>
+                          <span>{entry.time}</span>
+                          <span>{meta.label}:</span>
+                          <span>({fmt(entry.amount)})</span>
+                          <span style={{ minWidth: 0, overflowWrap: "anywhere", wordBreak: "break-word", whiteSpace: "normal", lineHeight: 1.35 }}>{entry.note.trim()}</span>
+                        </div>
+                      );
+                    })}
+```
+
+#### Código nuevo
+```tsx
+                    {notasDetalladas.map((entry) => {
+                      const meta = getEntryTypeMeta(entry.type);
+                      return (
+                        <div key={entry.id} style={{ fontSize: 14, color: "#000000", paddingLeft: 8, display: "grid", gridTemplateColumns: "46px auto minmax(0, 1fr) auto", gap: 4, alignItems: "start", marginBottom: 2 }}>
+                          <span>{entry.time}</span>
+                          <span>{meta.label}:</span>
+                          <span style={{ minWidth: 0, overflowWrap: "anywhere", wordBreak: "break-word", whiteSpace: "normal", lineHeight: 1.35 }}>{entry.note.trim()}</span>
+                          <span style={{ whiteSpace: "nowrap" }}>({fmt(entry.amount)})</span>
+                        </div>
+                      );
+                    })}
+```
+
+#### Por qué se cambió
+El texto de las notas detalladas del ticket de impresora térmica se quedaba sin espacio horizontal y se alineaba de forma extraña en la cuarta columna del grid. Al mover la nota al centro (`minmax(0, 1fr)`) y el importe a la derecha (`auto`), la nota tiene más espacio y el ticket queda ordenado.
+
+### Cambio 2 - Actualizar comprobaciones del grid y del importe en pruebas unitarias
+
+#### Código anterior
+```typescript
+    expect(liquidacionBlock).toContain('gridTemplateColumns: "46px auto minmax(0, 1fr)"');
+    expect(liquidacionBlock).toContain('gridTemplateColumns: "46px auto auto minmax(0, 1fr)"');
+    expect(liquidacionBlock).toContain('overflowWrap: "anywhere"');
+    expect(liquidacionBlock).toContain('wordBreak: "break-word"');
+    expect(liquidacionBlock).toContain('whiteSpace: "normal"');
+    expect(liquidacionBlock).toContain('<span>Nota:</span>');
+    expect(liquidacionBlock).toContain('<span>{meta.label}:</span>');
+    expect(liquidacionBlock).toContain('<span>({fmt(entry.amount)})</span>');
+```
+
+#### Código nuevo
+```typescript
+    expect(liquidacionBlock).toContain('gridTemplateColumns: "46px auto minmax(0, 1fr)"');
+    expect(liquidacionBlock).toContain('gridTemplateColumns: "46px auto minmax(0, 1fr) auto"');
+    expect(liquidacionBlock).toContain('overflowWrap: "anywhere"');
+    expect(liquidacionBlock).toContain('wordBreak: "break-word"');
+    expect(liquidacionBlock).toContain('whiteSpace: "normal"');
+    expect(liquidacionBlock).toContain('<span>Nota:</span>');
+    expect(liquidacionBlock).toContain('<span>{meta.label}:</span>');
+    expect(liquidacionBlock).toContain('<span style={{ whiteSpace: "nowrap" }}>({fmt(entry.amount)})</span>');
+```
+
+#### Por qué se cambió
+Se adaptaron las aserciones de la prueba de liquidación semanal para verificar el nuevo grid de columnas (`46px auto minmax(0, 1fr) auto`) y la estructura del elemento span que envuelve el importe.
+
 ## 2026-05-22 22:28 - Resolver conflictos de merge del ticket de liquidación
 
 **Archivos modificados:** `src/__tests__/liquidacion-semana.test.ts`

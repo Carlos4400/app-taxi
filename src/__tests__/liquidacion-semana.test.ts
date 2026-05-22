@@ -156,13 +156,13 @@ describe("Liquidación Semanal screen and typography", () => {
     expect(liquidacionBlock).toContain('fontSize: 18, fontWeight: 900, color: "#000000", marginBottom: 4, WebkitTextStroke: "0.6px #000000"');
     expect(liquidacionBlock).toContain('fontWeight: 900, color: "#000000", fontSize: 16, WebkitTextStroke: "0.5px #000000"');
     expect(liquidacionBlock).toContain('gridTemplateColumns: "46px auto minmax(0, 1fr)"');
-    expect(liquidacionBlock).toContain('gridTemplateColumns: "46px auto auto minmax(0, 1fr)"');
+    expect(liquidacionBlock).toContain('gridTemplateColumns: "46px auto minmax(0, 1fr) auto"');
     expect(liquidacionBlock).toContain('overflowWrap: "anywhere"');
     expect(liquidacionBlock).toContain('wordBreak: "break-word"');
     expect(liquidacionBlock).toContain('whiteSpace: "normal"');
     expect(liquidacionBlock).toContain('<span>Nota:</span>');
     expect(liquidacionBlock).toContain('<span>{meta.label}:</span>');
-    expect(liquidacionBlock).toContain('<span>({fmt(entry.amount)})</span>');
+    expect(liquidacionBlock).toContain('<span style={{ whiteSpace: "nowrap" }}>({fmt(entry.amount)})</span>');
     expect(liquidacionBlock).toContain('{entry.note.trim()}</span>');
   });
 });
