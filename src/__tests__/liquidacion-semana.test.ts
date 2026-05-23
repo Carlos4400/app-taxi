@@ -161,7 +161,9 @@ describe("Liquidación Semanal screen and typography", () => {
     expect(liquidacionBlock).toContain('whiteSpace: "normal"');
     expect(liquidacionBlock).toContain('<span>Nota:</span>');
     expect(liquidacionBlock).toContain('<span>{meta.label}:</span>');
-    expect(liquidacionBlock).toContain('<span>({fmt(entry.amount)})</span>');
-    expect(liquidacionBlock).toContain('{entry.note.trim()}</div>');
+    expect(liquidacionBlock).not.toContain('display: "flex", gap: 4, alignItems: "baseline"');
+    expect(liquidacionBlock).not.toContain('<span>({fmt(entry.amount)})</span>');
+    expect(liquidacionBlock).toContain('wordBreak: "break-all"');
+    expect(liquidacionBlock).toContain('{`(${fmt(entry.amount)})${entry.note.trim() ? ` ${entry.note.trim()}` : ""}`}');
   });
 });

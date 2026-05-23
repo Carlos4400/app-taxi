@@ -4,6 +4,74 @@ Este archivo registra cambios de código hechos por agentes/modelos en este proy
 
 Cada entrada debe indicar archivos modificados, código anterior, código nuevo y por qué se cambió. Las entradas se añaden al **principio** del archivo (las más recientes arriba).
 
+## 2026-05-23 20:36 - Corregir continuidad notas detalladas
+
+**Archivos modificados:** `src/main.tsx`, `src/__tests__/liquidacion-semana.test.ts`, `package.json`
+
+### Cambio 1 - Layout de notas detalladas impresas
+
+#### Código anterior
+```tsx
+<div key={entry.id} style={{ fontSize: 14, color: "#000000", paddingLeft: 8, marginBottom: 4 }}>
+  <div style={{ display: "flex", gap: 4, alignItems: "baseline" }}>
+    <span>{entry.time}</span>
+    <span>{meta.label}:</span>
+    <span>({fmt(entry.amount)})</span>
+  </div>
+  {entry.note.trim() && (
+    <div style={{ paddingLeft: 4, marginTop: 2, overflowWrap: "anywhere", wordBreak: "break-word", whiteSpace: "normal", lineHeight: 1.35 }}>{entry.note.trim()}</div>
+  )}
+</div>
+```
+
+#### Código nuevo
+```tsx
+<div key={entry.id} style={{ fontSize: 14, color: "#000000", paddingLeft: 8, display: "grid", gridTemplateColumns: "46px auto minmax(0, 1fr)", gap: 4, alignItems: "start", marginBottom: 2 }}>
+  <span>{entry.time}</span>
+  <span>{meta.label}:</span>
+  <span style={{ minWidth: 0, overflowWrap: "anywhere", wordBreak: "break-all", whiteSpace: "normal", lineHeight: 1.35 }}>{`(${fmt(entry.amount)})${entry.note.trim() ? ` ${entry.note.trim()}` : ""}`}</span>
+</div>
+```
+
+#### Por qué se cambió
+El bloque anterior imprimía la nota detallada en una línea separada después de la hora, etiqueta e importe. El nuevo grid mantiene hora, etiqueta e importe con nota en una sola fila de tres columnas para que el texto empiece justo después de `<hora> <tipo>:` y, si no cabe, continúe alineado bajo ese punto. `wordBreak: "break-all"` fuerza que las notas sin espacios también rompan desde el inicio de esa columna.
+
+### Cambio 2 - Contrato del test de notas detalladas impresas
+
+#### Código anterior
+```ts
+expect(liquidacionBlock).toContain('<span>{meta.label}:</span>');
+expect(liquidacionBlock).toContain('<span>({fmt(entry.amount)})</span>');
+expect(liquidacionBlock).toContain('{entry.note.trim()}</div>');
+```
+
+#### Código nuevo
+```ts
+expect(liquidacionBlock).toContain('<span>{meta.label}:</span>');
+expect(liquidacionBlock).not.toContain('display: "flex", gap: 4, alignItems: "baseline"');
+expect(liquidacionBlock).not.toContain('<span>({fmt(entry.amount)})</span>');
+expect(liquidacionBlock).toContain('wordBreak: "break-all"');
+expect(liquidacionBlock).toContain('{`(${fmt(entry.amount)})${entry.note.trim() ? ` ${entry.note.trim()}` : ""}`}');
+```
+
+#### Por qué se cambió
+El test anterior aceptaba que el importe estuviera en un `span` independiente y que la nota detallada cerrara en un `div` separado. El nuevo test exige que desaparezca el layout vertical antiguo, que importe y nota queden en el mismo `span` de contenido envolvente, y que el corte de palabras largas use `wordBreak: "break-all"`.
+
+### Cambio 3 - Versión del paquete
+
+#### Código anterior
+```json
+  "version": "1.0.51",
+```
+
+#### Código nuevo
+```json
+  "version": "1.0.52",
+```
+
+#### Por qué se cambió
+`public/manifest.json` ya declara `"version": "1.0.52"` y `vite.config.ts` usa la versión de `package.json` como `APP_VERSION` en builds locales. Se iguala `package.json` a `1.0.52` para que la versión visible de la app no quede desincronizada con el manifest.
+
 ## 2026-05-22 22:55 - Igualar tamaño título ticket y corregir layout notas detalladas
 
 **Archivos modificados:** `src/main.tsx`, `src/__tests__/liquidacion-semana.test.ts`
