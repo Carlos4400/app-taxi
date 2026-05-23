@@ -147,6 +147,15 @@ export const TIME_CARD_HOUR_UNIT_STYLE = {
   marginRight: 6,
 } as const;
 
+const NOTE_TIME_STYLE = {
+  fontSize: 12,
+  color: "rgba(255,255,255,0.45)",
+  fontWeight: 700,
+  whiteSpace: "nowrap",
+  flexShrink: 0,
+  alignSelf: "baseline",
+} as const;
+
 const KEY_CURRENT = "taxi_current_v3";
 const KEY_HISTORY = "taxi_history_v3";
 const KEY_SETTINGS = "taxi_settings_v3";
@@ -4333,12 +4342,16 @@ function App() {
                     <IconNoteAdd s={17} showPlus={false} /> Notas del Turno
                   </div>
                   <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                    {generalNotes.map((e: any) => (
-                      <div key={e.id} style={{ display: "grid", gridTemplateColumns: "auto minmax(0, 1fr)", alignItems: "start", gap: 9, color: "rgba(255,255,255,0.8)", fontSize: 13, lineHeight: 1.4, background: "rgba(255,255,255,0.025)", padding: "8px 10px", borderRadius: 9, minWidth: 0 }}>
-                        <span style={{ color: "rgba(255,255,255,0.58)", fontSize: 11, fontWeight: 700, lineHeight: 1, whiteSpace: "nowrap", background: "rgba(150,130,255,0.10)", border: "1px solid rgba(150,130,255,0.14)", borderRadius: 7, padding: "4px 5px", marginTop: 1 }}>{e.time}</span>
-                        <span style={{ color: "rgba(255,255,255,0.82)", fontSize: 12, lineHeight: 1.38, minWidth: 0, overflowWrap: "anywhere" }}>{e.note}</span>
-                      </div>
-                    ))}
+                    {generalNotes.map((e: any) => {
+                      const meta = getEntryTypeMeta(e.type);
+                      return (
+                        <div key={e.id} style={{ display: "grid", gridTemplateColumns: "auto auto minmax(0, 1fr)", alignItems: "baseline", gap: 9, color: "rgba(255,255,255,0.8)", fontSize: 13, lineHeight: 1.4, background: "rgba(255,255,255,0.025)", padding: "8px 10px", borderRadius: 9, minWidth: 0 }}>
+                          <span style={NOTE_TIME_STYLE}>{e.time}</span>
+                          <span style={{ fontWeight: 700, color: meta.color, fontSize: 14, whiteSpace: "nowrap", flexShrink: 0 }}>{meta.label}</span>
+                          <span style={{ color: "rgba(255,255,255,0.82)", fontSize: 12, lineHeight: 1.38, minWidth: 0, overflowWrap: "anywhere" }}>{e.note}</span>
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
               );
@@ -4358,11 +4371,11 @@ function App() {
                   {entriesWithNotes.map((e: any) => {
                     const meta = getEntryTypeMeta(e.type);
                     return (
-                      <div key={e.id} style={{ fontSize: 13, background: 'rgba(255,255,255,0.02)', padding: '10px 12px', borderRadius: 12, border: '1px solid rgba(255,255,255,0.04)', display: 'grid', gridTemplateColumns: 'auto auto minmax(0, 1fr) auto', alignItems: 'start', gap: 8, minWidth: 0 }}>
-                        <span style={{ fontSize: 12, color: "rgba(255,255,255,0.5)", fontWeight: 600, flexShrink: 0, alignSelf: "start" }}>{e.time}</span>
+                      <div key={e.id} style={{ fontSize: 13, background: 'rgba(255,255,255,0.02)', padding: '10px 12px', borderRadius: 12, border: '1px solid rgba(255,255,255,0.04)', display: 'grid', gridTemplateColumns: 'auto auto minmax(0, 1fr) auto', alignItems: 'baseline', gap: 8, minWidth: 0 }}>
+                        <span style={NOTE_TIME_STYLE}>{e.time}</span>
                         <span style={{ fontWeight: 700, color: meta.color, fontSize: 14, whiteSpace: 'nowrap', flexShrink: 0 }}>{meta.label}</span>
                         <span style={{ color: 'rgba(255,255,255,0.85)', fontSize: 12, lineHeight: 1.4, flex: 1, minWidth: 0, overflowWrap: "anywhere" }}>{e.note}</span>
-                        <span style={{ fontSize: 15, fontWeight: 700, color: meta.color, whiteSpace: 'nowrap', flexShrink: 0, alignSelf: "start" }}>{fmt(e.amount)}</span>
+                        <span style={{ fontSize: 15, fontWeight: 700, color: meta.color, whiteSpace: 'nowrap', flexShrink: 0, alignSelf: "baseline" }}>{fmt(e.amount)}</span>
                       </div>
                     );
                   })}
@@ -6850,17 +6863,21 @@ function App() {
                       <span style={{ width: 12, height: 1, background: "rgba(255,255,255,0.24)", flexShrink: 0 }} />
                       {fmtDate(turno.date)}
                     </div>
-                    {notasGenerales.map((entry) => (
-                      <div key={`ticket-nota-general-${entry.id}`} style={{ display: "grid", gridTemplateColumns: "auto minmax(0, 1fr)", alignItems: "start", gap: 9, color: "rgba(255,255,255,0.8)", fontSize: 13, lineHeight: 1.4, minWidth: 0, marginLeft: 14 }}>
-                        <span style={{ color: "rgba(255,255,255,0.58)", fontSize: 11, fontWeight: 700, lineHeight: 1, whiteSpace: "nowrap", background: "rgba(150,130,255,0.10)", border: "1px solid rgba(150,130,255,0.14)", borderRadius: 7, padding: "4px 5px", marginTop: 1 }}>{entry.time}</span>
-                        <span style={{ color: "rgba(255,255,255,0.82)", fontSize: 12, lineHeight: 1.38, minWidth: 0, overflowWrap: "anywhere" }}>{entry.note}</span>
-                      </div>
-                    ))}
+                    {notasGenerales.map((entry) => {
+                      const meta = getEntryTypeMeta(entry.type);
+                      return (
+                        <div key={`ticket-nota-general-${entry.id}`} style={{ display: "grid", gridTemplateColumns: "auto auto minmax(0, 1fr)", alignItems: "baseline", gap: 9, color: "rgba(255,255,255,0.8)", fontSize: 13, lineHeight: 1.4, minWidth: 0, marginLeft: 14 }}>
+                          <span style={NOTE_TIME_STYLE}>{entry.time}</span>
+                          <span style={{ fontWeight: 700, color: meta.color, fontSize: 14, whiteSpace: "nowrap", flexShrink: 0 }}>{meta.label}</span>
+                          <span style={{ color: "rgba(255,255,255,0.82)", fontSize: 12, lineHeight: 1.38, minWidth: 0, overflowWrap: "anywhere" }}>{entry.note}</span>
+                        </div>
+                      );
+                    })}
                     {notasDetalladas.map((entry) => {
                       const meta = getEntryTypeMeta(entry.type);
                       return (
-                        <div key={`ticket-nota-detallada-${entry.id}`} style={{ fontSize: 13, display: "grid", gridTemplateColumns: "auto auto minmax(0, 1fr) auto", alignItems: "start", gap: 8, minWidth: 0, marginLeft: 14 }}>
-                                      <span style={{ fontSize: 11, color: "rgba(255,255,255,0.5)", fontWeight: 600, flexShrink: 0 }}>{entry.time}</span>
+                        <div key={`ticket-nota-detallada-${entry.id}`} style={{ fontSize: 13, display: "grid", gridTemplateColumns: "auto auto minmax(0, 1fr) auto", alignItems: "baseline", gap: 8, minWidth: 0, marginLeft: 14 }}>
+                          <span style={NOTE_TIME_STYLE}>{entry.time}</span>
                           <span style={{ fontWeight: 700, color: meta.color, fontSize: 14, whiteSpace: "nowrap", flexShrink: 0 }}>{meta.label}</span>
                           <span style={{ color: "rgba(255,255,255,0.8)", fontSize: 12, lineHeight: 1.4, flex: 1, minWidth: 0, overflowWrap: "anywhere" }}>{entry.note}</span>
                           <span style={{ fontSize: 15, fontWeight: 700, color: meta.color, whiteSpace: "nowrap", flexShrink: 0 }}>{fmt(entry.amount)}</span>
@@ -7341,12 +7358,16 @@ function App() {
                       <IconNoteAdd s={17} showPlus={false} /> Notas del Turno
                     </div>
                     <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                      {gNotes.map(e => (
-                        <div key={e.id} style={{ display: "grid", gridTemplateColumns: "auto minmax(0, 1fr)", alignItems: "start", gap: 9, color: "rgba(255,255,255,0.8)", fontSize: 13, lineHeight: 1.4, background: "rgba(255,255,255,0.025)", padding: "8px 10px", borderRadius: 9, minWidth: 0 }}>
-                          <span style={{ color: "rgba(255,255,255,0.58)", fontSize: 11, fontWeight: 700, lineHeight: 1, whiteSpace: "nowrap", background: "rgba(150,130,255,0.10)", border: "1px solid rgba(150,130,255,0.14)", borderRadius: 7, padding: "4px 5px", marginTop: 1 }}>{e.time}</span>
-                          <span style={{ color: "rgba(255,255,255,0.82)", fontSize: 12, lineHeight: 1.38, minWidth: 0, overflowWrap: "anywhere" }}>{e.note}</span>
-                        </div>
-                      ))}
+                      {gNotes.map(e => {
+                        const meta = getEntryTypeMeta(e.type);
+                        return (
+                          <div key={e.id} style={{ display: "grid", gridTemplateColumns: "auto auto minmax(0, 1fr)", alignItems: "baseline", gap: 9, color: "rgba(255,255,255,0.8)", fontSize: 13, lineHeight: 1.4, background: "rgba(255,255,255,0.025)", padding: "8px 10px", borderRadius: 9, minWidth: 0 }}>
+                            <span style={NOTE_TIME_STYLE}>{e.time}</span>
+                            <span style={{ fontWeight: 700, color: meta.color, fontSize: 14, whiteSpace: "nowrap", flexShrink: 0 }}>{meta.label}</span>
+                            <span style={{ color: "rgba(255,255,255,0.82)", fontSize: 12, lineHeight: 1.38, minWidth: 0, overflowWrap: "anywhere" }}>{e.note}</span>
+                          </div>
+                        );
+                      })}
                     </div>
                   </div>
                 );
@@ -7371,11 +7392,11 @@ function App() {
                 {entriesWithNotes.map(e => {
                   const meta = getEntryTypeMeta(e.type);
                   return (
-                    <div key={e.id} style={{ fontSize: 13, background: "rgba(255,255,255,0.03)", padding: "10px 12px", borderRadius: 12, border: "1px solid rgba(255,255,255,0.05)", display: "grid", gridTemplateColumns: "auto auto minmax(0, 1fr) auto", alignItems: "start", gap: 8, minWidth: 0 }}>
-                      <span style={{ fontSize: 12, color: "rgba(255,255,255,0.5)", fontWeight: 600, flexShrink: 0, alignSelf: "start" }}>{e.time}</span>
+                    <div key={e.id} style={{ fontSize: 13, background: "rgba(255,255,255,0.03)", padding: "10px 12px", borderRadius: 12, border: "1px solid rgba(255,255,255,0.05)", display: "grid", gridTemplateColumns: "auto auto minmax(0, 1fr) auto", alignItems: "baseline", gap: 8, minWidth: 0 }}>
+                      <span style={NOTE_TIME_STYLE}>{e.time}</span>
                       <span style={{ fontWeight: 700, color: meta.color, fontSize: 14, whiteSpace: "nowrap", flexShrink: 0 }}>{meta.label}</span>
                       <span style={{ color: "rgba(255,255,255,0.8)", fontSize: 12, lineHeight: 1.4, flex: 1, minWidth: 0, overflowWrap: "anywhere" }}>{e.note}</span>
-                      <span style={{ fontSize: 15, fontWeight: 700, color: meta.color, whiteSpace: "nowrap", flexShrink: 0, alignSelf: "start" }}>{fmt(e.amount)}</span>
+                      <span style={{ fontSize: 15, fontWeight: 700, color: meta.color, whiteSpace: "nowrap", flexShrink: 0, alignSelf: "baseline" }}>{fmt(e.amount)}</span>
                     </div>
                   );
                 })}
@@ -8385,12 +8406,16 @@ function TurnoNotasCard({
           <div style={{ fontSize: 10, fontWeight: 800, color: "rgba(255,255,255,0.38)", textTransform: "uppercase", letterSpacing: "0.6px" }}>
             Notas del turno
           </div>
-          {notasGenerales.map((entry) => (
-            <div key={entry.id} style={{ fontSize: 13, color: "rgba(255,255,255,0.82)", background: "rgba(255,255,255,0.025)", borderRadius: 10, padding: "8px 10px", lineHeight: 1.35, overflowWrap: "anywhere" }}>
-              <span style={{ fontSize: 11, fontWeight: 700, color: "rgba(255,255,255,0.45)", marginRight: 6 }}>{entry.time}</span>
-              {entry.note}
-            </div>
-          ))}
+          {notasGenerales.map((entry) => {
+            const meta = getEntryTypeMeta(entry.type);
+            return (
+              <div key={entry.id} style={{ fontSize: 13, color: "rgba(255,255,255,0.82)", background: "rgba(255,255,255,0.025)", borderRadius: 10, padding: "8px 10px", lineHeight: 1.35, display: "grid", gridTemplateColumns: "auto auto minmax(0, 1fr)", alignItems: "baseline", gap: 7, minWidth: 0 }}>
+                <span style={NOTE_TIME_STYLE}>{entry.time}</span>
+                <span style={{ fontWeight: 700, color: meta.color, fontSize: 14, whiteSpace: "nowrap", flexShrink: 0 }}>{meta.label}</span>
+                <span style={{ color: "rgba(255,255,255,0.82)", fontSize: 12, lineHeight: 1.35, minWidth: 0, overflowWrap: "anywhere" }}>{entry.note}</span>
+              </div>
+            );
+          })}
         </div>
       )}
 
@@ -8402,11 +8427,11 @@ function TurnoNotasCard({
           {notasDetalladas.map((entry) => {
             const meta = getEntryTypeMeta(entry.type);
             return (
-              <div key={entry.id} style={{ fontSize: 13, background: "rgba(255,255,255,0.025)", padding: "8px 10px", borderRadius: 10, display: "grid", gridTemplateColumns: "auto auto minmax(0, 1fr) auto", alignItems: "start", gap: 7, minWidth: 0 }}>
-                <span style={{ fontSize: 12, color: "rgba(255,255,255,0.45)", fontWeight: 700, flexShrink: 0, alignSelf: "start" }}>{entry.time}</span>
+              <div key={entry.id} style={{ fontSize: 13, background: "rgba(255,255,255,0.025)", padding: "8px 10px", borderRadius: 10, display: "grid", gridTemplateColumns: "auto auto minmax(0, 1fr) auto", alignItems: "baseline", gap: 7, minWidth: 0 }}>
+                <span style={NOTE_TIME_STYLE}>{entry.time}</span>
                 <span style={{ fontWeight: 700, color: meta.color, fontSize: 14, whiteSpace: "nowrap", flexShrink: 0 }}>{meta.label}</span>
                 <span style={{ color: "rgba(255,255,255,0.82)", fontSize: 12, lineHeight: 1.35, flex: 1, minWidth: 0, overflowWrap: "anywhere" }}>{entry.note}</span>
-                <span style={{ fontSize: 15, fontWeight: 700, color: meta.color, whiteSpace: "nowrap", flexShrink: 0, alignSelf: "start" }}>{fmt(entry.amount)}</span>
+                <span style={{ fontSize: 15, fontWeight: 700, color: meta.color, whiteSpace: "nowrap", flexShrink: 0, alignSelf: "baseline" }}>{fmt(entry.amount)}</span>
               </div>
             );
           })}

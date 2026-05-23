@@ -107,6 +107,12 @@ describe("Liquidación Semanal screen and typography", () => {
     expect(liquidacionBlock).toContain("notasGenerales.map");
     expect(liquidacionBlock).toContain("notasDetalladas.map");
     expect(liquidacionBlock).toContain("getEntryTypeMeta(entry.type)");
+    expect(liquidacionBlock).toContain('gridTemplateColumns: "auto auto minmax(0, 1fr)", alignItems: "baseline"');
+    expect(liquidacionBlock).toContain('{meta.label}</span>');
+    expect(source).toMatch(/const NOTE_TIME_STYLE = \{[\s\S]*?fontSize: 12,[\s\S]*?color: "rgba\(255,255,255,0\.45\)",[\s\S]*?fontWeight: 700,[\s\S]*?whiteSpace: "nowrap",[\s\S]*?flexShrink: 0,[\s\S]*?alignSelf: "baseline",[\s\S]*?\} as const;/);
+    expect(liquidacionBlock).toMatch(/notasGenerales\.map[\s\S]*?<span style=\{NOTE_TIME_STYLE\}>\{entry\.time\}<\/span>/);
+    expect(liquidacionBlock).toMatch(/notasDetalladas\.map[\s\S]*?<span style=\{NOTE_TIME_STYLE\}>\{entry\.time\}<\/span>/);
+    expect(liquidacionBlock).not.toMatch(/ticket-nota-general[\s\S]*?background: "rgba\(150,130,255,0\.10\)"/);
     expect(liquidacionBlock).toContain('paddingTop: 14, display: "flex", flexDirection: "column", gap: 18');
     expect(liquidacionBlock).toContain('fontSize: 20, fontWeight: 800, color: "white", textAlign: "center"');
     expect(liquidacionBlock).toContain('textShadow: "0 0 10px rgba(255,255,255,0.18)"');
@@ -116,8 +122,7 @@ describe("Liquidación Semanal screen and typography", () => {
     expect(liquidacionBlock).toContain('borderTop: index === 0 ? "none" : "1px dashed rgba(255,255,255,0.10)"');
     expect(liquidacionBlock).toContain('width: 12, height: 1, background: "rgba(255,255,255,0.24)"');
     expect(liquidacionBlock).toContain("marginLeft: 14");
-    expect(liquidacionBlock).toContain('fontSize: 11, color: "rgba(255,255,255,0.5)", fontWeight: 600');
-    expect(liquidacionBlock).toContain('gridTemplateColumns: "auto auto minmax(0, 1fr) auto"');
+    expect(liquidacionBlock).toContain('gridTemplateColumns: "auto auto minmax(0, 1fr) auto", alignItems: "baseline"');
     expect(liquidacionBlock).toContain('overflowWrap: "anywhere"');
     expect(liquidacionBlock).not.toContain('background: "rgba(255,255,255,0.025)", padding: "8px 10px", borderRadius: 9');
     expect(liquidacionBlock).not.toContain('background: "rgba(255,255,255,0.03)", padding: "10px 12px", borderRadius: 12');

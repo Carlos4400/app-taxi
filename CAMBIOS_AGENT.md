@@ -4,6 +4,351 @@ Este archivo registra cambios de código hechos por agentes/modelos en este proy
 
 Cada entrada debe indicar archivos modificados, código anterior, código nuevo y por qué se cambió. Las entradas se añaden al **principio** del archivo (las más recientes arriba).
 
+## 2026-05-23 22:17 - Alinear notas por baseline
+
+**Archivos modificados:** `src/main.tsx`, `src/__tests__/detailed-notes-layout.test.ts`, `src/__tests__/liquidacion-semana.test.ts`
+
+### Cambio 1 - Baseline en hora de notas
+
+#### Código anterior
+```tsx
+const NOTE_TIME_STYLE = {
+  fontSize: 12,
+  color: "rgba(255,255,255,0.45)",
+  fontWeight: 700,
+  whiteSpace: "nowrap",
+  flexShrink: 0,
+  alignSelf: "start",
+} as const;
+```
+
+#### Código nuevo
+```tsx
+const NOTE_TIME_STYLE = {
+  fontSize: 12,
+  color: "rgba(255,255,255,0.45)",
+  fontWeight: 700,
+  whiteSpace: "nowrap",
+  flexShrink: 0,
+  alignSelf: "baseline",
+} as const;
+```
+
+#### Por qué se cambió
+`alignSelf: "start"` alineaba la hora por la parte superior del grid. `alignSelf: "baseline"` hace que la hora se apoye en la misma línea visual que la etiqueta, el texto de la nota y el importe.
+
+### Cambio 2 - Baseline en filas de notas
+
+#### Código anterior
+```tsx
+alignItems: "start"
+alignItems: 'start'
+alignSelf: "start"
+```
+
+#### Código nuevo
+```tsx
+alignItems: "baseline"
+alignItems: 'baseline'
+alignSelf: "baseline"
+```
+
+#### Por qué se cambió
+Las filas de notas generales y notas detalladas usaban alineación superior, por eso la hora, la etiqueta, el texto y el importe no quedaban sobre la misma línea de lectura. Se cambia a baseline en las filas visuales de resumen, terminar turno, liquidación digital y tarjetas de notas.
+
+### Cambio 3 - Tests de alineación baseline
+
+#### Código anterior
+```ts
+expect(source).toMatch(/const NOTE_TIME_STYLE = \{[\s\S]*?fontSize: 12,[\s\S]*?color: "rgba\(255,255,255,0\.45\)",[\s\S]*?fontWeight: 700,[\s\S]*?whiteSpace: "nowrap",[\s\S]*?flexShrink: 0,[\s\S]*?alignSelf: "start",[\s\S]*?\} as const;/);
+expect(liquidacionBlock).toContain('gridTemplateColumns: "auto auto minmax(0, 1fr)"');
+expect(liquidacionBlock).toContain('gridTemplateColumns: "auto auto minmax(0, 1fr) auto"');
+```
+
+#### Código nuevo
+```ts
+expect(source).toMatch(/const NOTE_TIME_STYLE = \{[\s\S]*?fontSize: 12,[\s\S]*?color: "rgba\(255,255,255,0\.45\)",[\s\S]*?fontWeight: 700,[\s\S]*?whiteSpace: "nowrap",[\s\S]*?flexShrink: 0,[\s\S]*?alignSelf: "baseline",[\s\S]*?\} as const;/);
+expect(liquidacionBlock).toContain('gridTemplateColumns: "auto auto minmax(0, 1fr)", alignItems: "baseline"');
+expect(liquidacionBlock).toContain('gridTemplateColumns: "auto auto minmax(0, 1fr) auto", alignItems: "baseline"');
+```
+
+#### Por qué se cambió
+Los tests aún exigían `start` o solo comprobaban las columnas del grid. Se actualizan para verificar que la alineación visible de notas generales y notas detalladas sea por baseline.
+
+## 2026-05-23 22:01 - Unificar hora de notas generales
+
+**Archivos modificados:** `src/main.tsx`, `src/__tests__/detailed-notes-layout.test.ts`, `src/__tests__/liquidacion-semana.test.ts`
+
+### Cambio 1 - Estilo común de hora de notas
+
+#### Código anterior
+`No existía NOTE_TIME_STYLE en src/main.tsx.`
+
+#### Código nuevo
+```tsx
+const NOTE_TIME_STYLE = {
+  fontSize: 12,
+  color: "rgba(255,255,255,0.45)",
+  fontWeight: 700,
+  whiteSpace: "nowrap",
+  flexShrink: 0,
+  alignSelf: "start",
+} as const;
+```
+
+#### Por qué se cambió
+Las horas de notas generales y notas detalladas tenían variantes visuales distintas. Se crea un único estilo para aplicar `12px`, color blanco al `45%`, peso `700`, no partir la hora y alinear la hora arriba.
+
+### Cambio 2 - Hora de notas en resumen y terminar turno
+
+#### Código anterior
+```tsx
+<span style={{ fontSize: 12, color: "rgba(255,255,255,0.5)", fontWeight: 600, whiteSpace: "nowrap", flexShrink: 0 }}>{e.time}</span>
+<span style={{ fontSize: 12, color: "rgba(255,255,255,0.5)", fontWeight: 600, flexShrink: 0, alignSelf: "start" }}>{e.time}</span>
+<span style={{ fontSize: 12, color: "rgba(255,255,255,0.5)", fontWeight: 600, whiteSpace: "nowrap", flexShrink: 0 }}>{e.time}</span>
+<span style={{ fontSize: 12, color: "rgba(255,255,255,0.5)", fontWeight: 600, flexShrink: 0, alignSelf: "start" }}>{e.time}</span>
+```
+
+#### Código nuevo
+```tsx
+<span style={NOTE_TIME_STYLE}>{e.time}</span>
+<span style={NOTE_TIME_STYLE}>{e.time}</span>
+<span style={NOTE_TIME_STYLE}>{e.time}</span>
+<span style={NOTE_TIME_STYLE}>{e.time}</span>
+```
+
+#### Por qué se cambió
+Las notas del turno y las notas detalladas de resumen y terminar turno no usaban exactamente el mismo peso, color y comportamiento de alineación. Se sustituyen las variantes inline por `NOTE_TIME_STYLE` para que todas se vean iguales.
+
+### Cambio 3 - Hora de notas en liquidación y tarjetas
+
+#### Código anterior
+```tsx
+<span style={{ fontSize: 11, color: "rgba(255,255,255,0.5)", fontWeight: 600, whiteSpace: "nowrap", flexShrink: 0 }}>{entry.time}</span>
+<span style={{ fontSize: 11, color: "rgba(255,255,255,0.5)", fontWeight: 600, flexShrink: 0 }}>{entry.time}</span>
+<span style={{ fontSize: 11, fontWeight: 700, color: "rgba(255,255,255,0.45)", whiteSpace: "nowrap", flexShrink: 0 }}>{entry.time}</span>
+<span style={{ fontSize: 12, color: "rgba(255,255,255,0.45)", fontWeight: 700, flexShrink: 0, alignSelf: "start" }}>{entry.time}</span>
+```
+
+#### Código nuevo
+```tsx
+<span style={NOTE_TIME_STYLE}>{entry.time}</span>
+<span style={NOTE_TIME_STYLE}>{entry.time}</span>
+<span style={NOTE_TIME_STYLE}>{entry.time}</span>
+<span style={NOTE_TIME_STYLE}>{entry.time}</span>
+```
+
+#### Por qué se cambió
+El ticket digital de liquidación y las tarjetas de notas mostraban horas con tamaños y pesos diferentes entre notas del turno y notas detalladas. Se centraliza el estilo para que no queden diferencias visuales ni variantes duplicadas.
+
+### Cambio 4 - Tests de hora de notas
+
+#### Código anterior
+```ts
+expect(summaryBlock).toMatch(/fontSize: 12[\s\S]*?color: "rgba\(255,255,255,0\.45\)"[\s\S]*?fontWeight: 700[\s\S]*?whiteSpace: "nowrap"[\s\S]*?flexShrink: 0[\s\S]*?alignSelf: "start"[\s\S]*?\{e\.time\}/);
+expect(confirmEndBlock).toMatch(/fontSize: 12[\s\S]*?color: "rgba\(255,255,255,0\.45\)"[\s\S]*?fontWeight: 700[\s\S]*?whiteSpace: "nowrap"[\s\S]*?flexShrink: 0[\s\S]*?alignSelf: "start"[\s\S]*?\{e\.time\}/);
+expect(turnoNotasCardBlock).toMatch(/fontSize: 12[\s\S]*?color: "rgba\(255,255,255,0\.45\)"[\s\S]*?fontWeight: 700[\s\S]*?whiteSpace: "nowrap"[\s\S]*?flexShrink: 0[\s\S]*?alignSelf: "start"[\s\S]*?\{entry\.time\}/);
+expect(liquidacionBlock).toMatch(/fontSize: 12[\s\S]*?color: "rgba\(255,255,255,0\.45\)"[\s\S]*?fontWeight: 700[\s\S]*?whiteSpace: "nowrap"[\s\S]*?flexShrink: 0[\s\S]*?alignSelf: "start"[\s\S]*?\{entry\.time\}/);
+expect(liquidacionBlock).toContain('fontSize: 11, color: "rgba(255,255,255,0.5)", fontWeight: 600');
+```
+
+#### Código nuevo
+```ts
+expect(source).toMatch(/const NOTE_TIME_STYLE = \{[\s\S]*?fontSize: 12,[\s\S]*?color: "rgba\(255,255,255,0\.45\)",[\s\S]*?fontWeight: 700,[\s\S]*?whiteSpace: "nowrap",[\s\S]*?flexShrink: 0,[\s\S]*?alignSelf: "start",[\s\S]*?\} as const;/);
+expect(summaryBlock).toMatch(/generalNotes\.map[\s\S]*?<span style=\{NOTE_TIME_STYLE\}>\{e\.time\}<\/span>/);
+expect(summaryBlock).toMatch(/entriesWithNotes\.map[\s\S]*?<span style=\{NOTE_TIME_STYLE\}>\{e\.time\}<\/span>/);
+expect(confirmEndBlock).toMatch(/gNotes\.map[\s\S]*?<span style=\{NOTE_TIME_STYLE\}>\{e\.time\}<\/span>/);
+expect(confirmEndBlock).toMatch(/entriesWithNotes\.map[\s\S]*?<span style=\{NOTE_TIME_STYLE\}>\{e\.time\}<\/span>/);
+expect(turnoNotasCardBlock).toMatch(/notasGenerales\.map[\s\S]*?<span style=\{NOTE_TIME_STYLE\}>\{entry\.time\}<\/span>/);
+expect(turnoNotasCardBlock).toMatch(/notasDetalladas\.map[\s\S]*?<span style=\{NOTE_TIME_STYLE\}>\{entry\.time\}<\/span>/);
+expect(source).toMatch(/const NOTE_TIME_STYLE = \{[\s\S]*?fontSize: 12,[\s\S]*?color: "rgba\(255,255,255,0\.45\)",[\s\S]*?fontWeight: 700,[\s\S]*?whiteSpace: "nowrap",[\s\S]*?flexShrink: 0,[\s\S]*?alignSelf: "start",[\s\S]*?\} as const;/);
+expect(liquidacionBlock).toMatch(/notasGenerales\.map[\s\S]*?<span style=\{NOTE_TIME_STYLE\}>\{entry\.time\}<\/span>/);
+expect(liquidacionBlock).toMatch(/notasDetalladas\.map[\s\S]*?<span style=\{NOTE_TIME_STYLE\}>\{entry\.time\}<\/span>/);
+```
+
+#### Por qué se cambió
+Los tests comprobaban estilos inline concretos y todavía permitían una variante antigua de `11px` y peso `600` en liquidación. Se actualizan para exigir el estilo común `NOTE_TIME_STYLE` en notas generales y detalladas.
+
+## 2026-05-23 21:29 - Añadir etiqueta Nota en todas las vistas
+
+**Archivos modificados:** `src/main.tsx`, `src/__tests__/detailed-notes-layout.test.ts`
+
+### Cambio 1 - Etiqueta Nota en resumen de turno
+
+#### Código anterior
+```tsx
+{generalNotes.map((e: any) => (
+  <div key={e.id} style={{ display: "grid", gridTemplateColumns: "auto minmax(0, 1fr)", alignItems: "start", gap: 9, color: "rgba(255,255,255,0.8)", fontSize: 13, lineHeight: 1.4, background: "rgba(255,255,255,0.025)", padding: "8px 10px", borderRadius: 9, minWidth: 0 }}>
+    <span style={{ color: "rgba(255,255,255,0.58)", fontSize: 11, fontWeight: 700, lineHeight: 1, whiteSpace: "nowrap", background: "rgba(150,130,255,0.10)", border: "1px solid rgba(150,130,255,0.14)", borderRadius: 7, padding: "4px 5px", marginTop: 1 }}>{e.time}</span>
+    <span style={{ color: "rgba(255,255,255,0.82)", fontSize: 12, lineHeight: 1.38, minWidth: 0, overflowWrap: "anywhere" }}>{e.note}</span>
+  </div>
+))}
+```
+
+#### Código nuevo
+```tsx
+{generalNotes.map((e: any) => {
+  const meta = getEntryTypeMeta(e.type);
+  return (
+    <div key={e.id} style={{ display: "grid", gridTemplateColumns: "auto auto minmax(0, 1fr)", alignItems: "start", gap: 9, color: "rgba(255,255,255,0.8)", fontSize: 13, lineHeight: 1.4, background: "rgba(255,255,255,0.025)", padding: "8px 10px", borderRadius: 9, minWidth: 0 }}>
+      <span style={{ fontSize: 12, color: "rgba(255,255,255,0.5)", fontWeight: 600, whiteSpace: "nowrap", flexShrink: 0 }}>{e.time}</span>
+      <span style={{ fontWeight: 700, color: meta.color, fontSize: 14, whiteSpace: "nowrap", flexShrink: 0 }}>{meta.label}</span>
+      <span style={{ color: "rgba(255,255,255,0.82)", fontSize: 12, lineHeight: 1.38, minWidth: 0, overflowWrap: "anywhere" }}>{e.note}</span>
+    </div>
+  );
+})}
+```
+
+#### Por qué se cambió
+El resumen del turno mostraba notas generales como hora y texto sin la etiqueta `Nota`. Se añade la metadata del tipo y una columna para `meta.label`, igual que en las entradas recientes. Además, se elimina el recuadro visual de la hora para que se muestre plana como en las notas detalladas.
+
+### Cambio 2 - Etiqueta Nota en terminar turno
+
+#### Código anterior
+```tsx
+{gNotes.map(e => (
+  <div key={e.id} style={{ display: "grid", gridTemplateColumns: "auto minmax(0, 1fr)", alignItems: "start", gap: 9, color: "rgba(255,255,255,0.8)", fontSize: 13, lineHeight: 1.4, background: "rgba(255,255,255,0.025)", padding: "8px 10px", borderRadius: 9, minWidth: 0 }}>
+    <span style={{ color: "rgba(255,255,255,0.58)", fontSize: 11, fontWeight: 700, lineHeight: 1, whiteSpace: "nowrap", background: "rgba(150,130,255,0.10)", border: "1px solid rgba(150,130,255,0.14)", borderRadius: 7, padding: "4px 5px", marginTop: 1 }}>{e.time}</span>
+    <span style={{ color: "rgba(255,255,255,0.82)", fontSize: 12, lineHeight: 1.38, minWidth: 0, overflowWrap: "anywhere" }}>{e.note}</span>
+  </div>
+))}
+```
+
+#### Código nuevo
+```tsx
+{gNotes.map(e => {
+  const meta = getEntryTypeMeta(e.type);
+  return (
+    <div key={e.id} style={{ display: "grid", gridTemplateColumns: "auto auto minmax(0, 1fr)", alignItems: "start", gap: 9, color: "rgba(255,255,255,0.8)", fontSize: 13, lineHeight: 1.4, background: "rgba(255,255,255,0.025)", padding: "8px 10px", borderRadius: 9, minWidth: 0 }}>
+      <span style={{ fontSize: 12, color: "rgba(255,255,255,0.5)", fontWeight: 600, whiteSpace: "nowrap", flexShrink: 0 }}>{e.time}</span>
+      <span style={{ fontWeight: 700, color: meta.color, fontSize: 14, whiteSpace: "nowrap", flexShrink: 0 }}>{meta.label}</span>
+      <span style={{ color: "rgba(255,255,255,0.82)", fontSize: 12, lineHeight: 1.38, minWidth: 0, overflowWrap: "anywhere" }}>{e.note}</span>
+    </div>
+  );
+})}
+```
+
+#### Por qué se cambió
+La pantalla de terminar turno mostraba las notas generales como hora y texto sin la etiqueta `Nota`. Se añade la misma columna de `meta.label` para mantener consistencia con las entradas del turno. Además, se elimina el recuadro visual de la hora para que se muestre plana como en las notas detalladas.
+
+### Cambio 3 - Etiqueta Nota en tarjetas de notas
+
+#### Código anterior
+```tsx
+{notasGenerales.map((entry) => (
+  <div key={entry.id} style={{ fontSize: 13, color: "rgba(255,255,255,0.82)", background: "rgba(255,255,255,0.025)", borderRadius: 10, padding: "8px 10px", lineHeight: 1.35, overflowWrap: "anywhere" }}>
+    <span style={{ fontSize: 11, fontWeight: 700, color: "rgba(255,255,255,0.45)", marginRight: 6 }}>{entry.time}</span>
+    {entry.note}
+  </div>
+))}
+```
+
+#### Código nuevo
+```tsx
+{notasGenerales.map((entry) => {
+  const meta = getEntryTypeMeta(entry.type);
+  return (
+    <div key={entry.id} style={{ fontSize: 13, color: "rgba(255,255,255,0.82)", background: "rgba(255,255,255,0.025)", borderRadius: 10, padding: "8px 10px", lineHeight: 1.35, display: "grid", gridTemplateColumns: "auto auto minmax(0, 1fr)", alignItems: "start", gap: 7, minWidth: 0 }}>
+      <span style={{ fontSize: 11, fontWeight: 700, color: "rgba(255,255,255,0.45)", whiteSpace: "nowrap", flexShrink: 0 }}>{entry.time}</span>
+      <span style={{ fontWeight: 700, color: meta.color, fontSize: 14, whiteSpace: "nowrap", flexShrink: 0 }}>{meta.label}</span>
+      <span style={{ color: "rgba(255,255,255,0.82)", fontSize: 12, lineHeight: 1.35, minWidth: 0, overflowWrap: "anywhere" }}>{entry.note}</span>
+    </div>
+  );
+})}
+```
+
+#### Por qué se cambió
+Las tarjetas de notas usadas en detalle de semana y detalle de mes mostraban las notas generales como hora y texto sin la etiqueta `Nota`. Se añade la misma estructura con `meta.label`.
+
+### Cambio 4 - Tests de etiqueta Nota global
+
+#### Código anterior
+```ts
+expect(summaryBlock).toMatch(/gridTemplateColumns: "auto minmax\(0, 1fr\)"[\s\S]*?overflowWrap: "anywhere"/);
+expect(confirmEndBlock).toMatch(/gridTemplateColumns: "auto minmax\(0, 1fr\)"[\s\S]*?overflowWrap: "anywhere"/);
+```
+
+#### Código nuevo
+```ts
+expect(summaryBlock).toMatch(/generalNotes\.map\(\(e: any\) => \{[\s\S]*?const meta = getEntryTypeMeta\(e\.type\)/);
+expect(confirmEndBlock).toMatch(/gNotes\.map\(e => \{[\s\S]*?const meta = getEntryTypeMeta\(e\.type\)/);
+expect(summaryBlock).toMatch(/gridTemplateColumns: "auto auto minmax\(0, 1fr\)"[\s\S]*?\{meta\.label\}[\s\S]*?overflowWrap: "anywhere"/);
+expect(confirmEndBlock).toMatch(/gridTemplateColumns: "auto auto minmax\(0, 1fr\)"[\s\S]*?\{meta\.label\}[\s\S]*?overflowWrap: "anywhere"/);
+expect(summaryBlock).not.toMatch(/generalNotes\.map[\s\S]*?background: "rgba\(150,130,255,0\.10\)"/);
+expect(confirmEndBlock).not.toMatch(/gNotes\.map[\s\S]*?background: "rgba\(150,130,255,0\.10\)"/);
+```
+
+#### Por qué se cambió
+Los tests aceptaban notas generales sin columna de etiqueta. Se actualizan para exigir `getEntryTypeMeta`, `meta.label` y grid de tres columnas en resumen y terminar turno. También se añade una aserción negativa para evitar que vuelva el recuadro de hora.
+
+## 2026-05-23 21:09 - Añadir etiqueta Nota en liquidación
+
+**Archivos modificados:** `src/main.tsx`, `src/__tests__/liquidacion-semana.test.ts`, `src/__tests__/detailed-notes-layout.test.ts`
+
+### Cambio 1 - Etiqueta de notas generales en ticket digital
+
+#### Código anterior
+```tsx
+{notasGenerales.map((entry) => (
+  <div key={`ticket-nota-general-${entry.id}`} style={{ display: "grid", gridTemplateColumns: "auto minmax(0, 1fr)", alignItems: "start", gap: 9, color: "rgba(255,255,255,0.8)", fontSize: 13, lineHeight: 1.4, minWidth: 0, marginLeft: 14 }}>
+    <span style={{ color: "rgba(255,255,255,0.58)", fontSize: 11, fontWeight: 700, lineHeight: 1, whiteSpace: "nowrap", background: "rgba(150,130,255,0.10)", border: "1px solid rgba(150,130,255,0.14)", borderRadius: 7, padding: "4px 5px", marginTop: 1 }}>{entry.time}</span>
+    <span style={{ color: "rgba(255,255,255,0.82)", fontSize: 12, lineHeight: 1.38, minWidth: 0, overflowWrap: "anywhere" }}>{entry.note}</span>
+  </div>
+))}
+```
+
+#### Código nuevo
+```tsx
+{notasGenerales.map((entry) => {
+  const meta = getEntryTypeMeta(entry.type);
+  return (
+    <div key={`ticket-nota-general-${entry.id}`} style={{ display: "grid", gridTemplateColumns: "auto auto minmax(0, 1fr)", alignItems: "start", gap: 9, color: "rgba(255,255,255,0.8)", fontSize: 13, lineHeight: 1.4, minWidth: 0, marginLeft: 14 }}>
+      <span style={{ fontSize: 11, color: "rgba(255,255,255,0.5)", fontWeight: 600, whiteSpace: "nowrap", flexShrink: 0 }}>{entry.time}</span>
+      <span style={{ fontWeight: 700, color: meta.color, fontSize: 14, whiteSpace: "nowrap", flexShrink: 0 }}>{meta.label}</span>
+      <span style={{ color: "rgba(255,255,255,0.82)", fontSize: 12, lineHeight: 1.38, minWidth: 0, overflowWrap: "anywhere" }}>{entry.note}</span>
+    </div>
+  );
+})}
+```
+
+#### Por qué se cambió
+La nota general del ticket digital de liquidación mostraba la hora y el texto, pero no la etiqueta `Nota`. Se añade `getEntryTypeMeta(entry.type)` y una columna de etiqueta para mostrar `Nota` en blanco como en las entradas del turno. Además, se elimina el recuadro visual de la hora para que se muestre plana como en las notas detalladas.
+
+### Cambio 2 - Test de etiqueta Nota en liquidación
+
+#### Código anterior
+```ts
+expect(liquidacionBlock).toContain("getEntryTypeMeta(entry.type)");
+expect(liquidacionBlock).toContain('paddingTop: 14, display: "flex", flexDirection: "column", gap: 18');
+```
+
+#### Código nuevo
+```ts
+expect(liquidacionBlock).toContain("getEntryTypeMeta(entry.type)");
+expect(liquidacionBlock).toContain('gridTemplateColumns: "auto auto minmax(0, 1fr)"');
+expect(liquidacionBlock).toContain('{meta.label}</span>');
+expect(liquidacionBlock).not.toMatch(/ticket-nota-general[\s\S]*?background: "rgba\(150,130,255,0\.10\)"/);
+expect(liquidacionBlock).toContain('paddingTop: 14, display: "flex", flexDirection: "column", gap: 18');
+```
+
+#### Por qué se cambió
+El test no verificaba que las notas generales del ticket digital tuvieran columna y etiqueta visible. Se añade la aserción del grid de tres columnas, de `{meta.label}` y de ausencia del recuadro de hora.
+
+### Cambio 3 - Patrón de notas detalladas en test
+
+#### Código anterior
+```ts
+/notasDetalladas\.map\(\(entry\) => \{[\s\S]*?<\/div>\s*\);\s*\}\)/,
+```
+
+#### Código nuevo
+```ts
+/notasDetalladas\.map\(\(entry\) => \{[\s\S]*?key=\{`ticket-nota-detallada-\$\{entry\.id\}`\}[\s\S]*?<\/div>\s*\);\s*\}\)/,
+```
+
+#### Por qué se cambió
+El patrón anterior podía capturar el `notasDetalladas.map` del fallback de texto de liquidación en lugar del bloque visual de `ticket-nota-detallada`. Se acota al `key` del bloque visual para que el test compruebe la fila detallada real.
+
 ## 2026-05-23 20:36 - Corregir continuidad notas detalladas
 
 **Archivos modificados:** `src/main.tsx`, `src/__tests__/liquidacion-semana.test.ts`, `package.json`

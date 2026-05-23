@@ -52,7 +52,7 @@ describe("Detailed notes layout", () => {
     const detailedRows = [
       /entriesWithNotes\.map\(\(e: any\) => \{[\s\S]*?<\/div>\s*\);\s*\}\)/,
       /entriesWithNotes\.map\(e => \{[\s\S]*?<\/div>\s*\);\s*\}\)/,
-      /notasDetalladas\.map\(\(entry\) => \{[\s\S]*?<\/div>\s*\);\s*\}\)/,
+      /notasDetalladas\.map\(\(entry\) => \{[\s\S]*?key=\{`ticket-nota-detallada-\$\{entry\.id\}`\}[\s\S]*?<\/div>\s*\);\s*\}\)/,
     ];
 
     for (const rowPattern of detailedRows) {
@@ -84,8 +84,33 @@ describe("Detailed notes layout", () => {
     expect(confirmEndBlock).toContain(">Agencias/Bonos</span>");
     expect(summaryBlock).toMatch(/<IconNoteAdd s=\{17\} showPlus=\{false\} \/> Notas del Turno/);
     expect(confirmEndBlock).toMatch(/<IconNoteAdd s=\{17\} showPlus=\{false\} \/> Notas del Turno/);
-    expect(summaryBlock).toMatch(/gridTemplateColumns: "auto minmax\(0, 1fr\)"[\s\S]*?overflowWrap: "anywhere"/);
-    expect(confirmEndBlock).toMatch(/gridTemplateColumns: "auto minmax\(0, 1fr\)"[\s\S]*?overflowWrap: "anywhere"/);
+    expect(summaryBlock).toMatch(/generalNotes\.map\(\(e: any\) => \{[\s\S]*?const meta = getEntryTypeMeta\(e\.type\)/);
+    expect(confirmEndBlock).toMatch(/gNotes\.map\(e => \{[\s\S]*?const meta = getEntryTypeMeta\(e\.type\)/);
+    expect(summaryBlock).toMatch(/generalNotes\.map[\s\S]*?gridTemplateColumns: "auto auto minmax\(0, 1fr\)", alignItems: "baseline"[\s\S]*?\{meta\.label\}[\s\S]*?overflowWrap: "anywhere"/);
+    expect(confirmEndBlock).toMatch(/gNotes\.map[\s\S]*?gridTemplateColumns: "auto auto minmax\(0, 1fr\)", alignItems: "baseline"[\s\S]*?\{meta\.label\}[\s\S]*?overflowWrap: "anywhere"/);
+    expect(summaryBlock).toMatch(/entriesWithNotes\.map[\s\S]*?gridTemplateColumns: 'auto auto minmax\(0, 1fr\) auto', alignItems: 'baseline'/);
+    expect(confirmEndBlock).toMatch(/entriesWithNotes\.map[\s\S]*?gridTemplateColumns: "auto auto minmax\(0, 1fr\) auto", alignItems: "baseline"/);
+    expect(source).toMatch(/const NOTE_TIME_STYLE = \{[\s\S]*?fontSize: 12,[\s\S]*?color: "rgba\(255,255,255,0\.45\)",[\s\S]*?fontWeight: 700,[\s\S]*?whiteSpace: "nowrap",[\s\S]*?flexShrink: 0,[\s\S]*?alignSelf: "baseline",[\s\S]*?\} as const;/);
+    expect(summaryBlock).toMatch(/generalNotes\.map[\s\S]*?<span style=\{NOTE_TIME_STYLE\}>\{e\.time\}<\/span>/);
+    expect(summaryBlock).toMatch(/entriesWithNotes\.map[\s\S]*?<span style=\{NOTE_TIME_STYLE\}>\{e\.time\}<\/span>/);
+    expect(confirmEndBlock).toMatch(/gNotes\.map[\s\S]*?<span style=\{NOTE_TIME_STYLE\}>\{e\.time\}<\/span>/);
+    expect(confirmEndBlock).toMatch(/entriesWithNotes\.map[\s\S]*?<span style=\{NOTE_TIME_STYLE\}>\{e\.time\}<\/span>/);
+    expect(summaryBlock).not.toMatch(/generalNotes\.map[\s\S]*?background: "rgba\(150,130,255,0\.10\)"/);
+    expect(confirmEndBlock).not.toMatch(/gNotes\.map[\s\S]*?background: "rgba\(150,130,255,0\.10\)"/);
+  });
+
+  it("shows the Nota label on turn-note cards", () => {
+    const turnoNotasCardBlock = source.match(
+      /function TurnoNotasCard\([\s\S]*?\/\/ AuthGate:/
+    )?.[0];
+
+    expect(turnoNotasCardBlock).toBeDefined();
+    expect(turnoNotasCardBlock).toMatch(/notasGenerales\.map\(\(entry\) => \{[\s\S]*?const meta = getEntryTypeMeta\(entry\.type\)/);
+    expect(turnoNotasCardBlock).toMatch(/notasGenerales\.map[\s\S]*?gridTemplateColumns: "auto auto minmax\(0, 1fr\)", alignItems: "baseline"[\s\S]*?\{meta\.label\}[\s\S]*?\{entry\.note\}/);
+    expect(turnoNotasCardBlock).toMatch(/notasDetalladas\.map[\s\S]*?gridTemplateColumns: "auto auto minmax\(0, 1fr\) auto", alignItems: "baseline"[\s\S]*?\{meta\.label\}[\s\S]*?\{entry\.note\}/);
+    expect(turnoNotasCardBlock).toMatch(/notasGenerales\.map[\s\S]*?<span style=\{NOTE_TIME_STYLE\}>\{entry\.time\}<\/span>/);
+    expect(turnoNotasCardBlock).toMatch(/notasDetalladas\.map[\s\S]*?<span style=\{NOTE_TIME_STYLE\}>\{entry\.time\}<\/span>/);
+    expect(turnoNotasCardBlock).not.toMatch(/notasGenerales\.map[\s\S]*?background: "rgba\(150,130,255,0\.10\)"/);
   });
 
   it("keeps edit turn entries aligned with editable entries layout", () => {
