@@ -24,10 +24,11 @@ import {
 } from "firebase/firestore";
 import { auth, db } from "./firebase";
 import { LoginScreen } from "./login-screen";
-import { fmtDuration, fmtKm, fmtKmNumber, fmtMoney, fmtMoneyNumber, splitDurationLabel } from "./formatters";
+import { fmtDuration, fmtKm, fmtKmNumber, fmtMoney, fmtMoneyNumber } from "./formatters";
 import { ConfirmDialog, MainCard, SmallCard } from "./components/common";
 import { TurnoNotasCard } from "./components/turno-notas";
 import { EditEntryDialog } from "./components/edit-entry-dialog";
+import { DurationCardValue } from "./components/duration-card-value";
 import { resolveLatestApkUpdate, type UpdateState } from "./update-flow";
 import { buildBackupPayload, buildBackupPayloadFromState } from "./backup";
 import {
@@ -217,16 +218,6 @@ const APP_VERSION = __APP_VERSION__;
 
 function fmt(n: number): string {
   return fmtMoney(n);
-}
-
-function DurationCardValue({ value }: { value: string }) {
-  const parts = splitDurationLabel(value);
-  return (
-    <>
-      {parts.hours}<span style={TIME_CARD_HOUR_UNIT_STYLE}>h</span>
-      {parts.minutes}<span style={TIME_CARD_UNIT_STYLE}>m</span>
-    </>
-  );
 }
 
 function loadSettings(): AppSettings {

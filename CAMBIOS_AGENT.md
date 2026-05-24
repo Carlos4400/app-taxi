@@ -4,6 +4,112 @@ Este archivo registra cambios de código hechos por agentes/modelos en este proy
 
 Cada entrada debe indicar archivos modificados, código anterior, código nuevo y por qué se cambió. Las entradas se añaden al **principio** del archivo (las más recientes arriba).
 
+## 2026-05-24 23:44 - Extraer valor de duracion
+
+**Archivos modificados:** `src/main.tsx`, `src/components/duration-card-value.tsx`, `src/__tests__/duration-card-value-extraction.test.ts`
+
+### Cambio 1 - Importar componente de duracion
+
+#### Código anterior
+```tsx
+import { fmtDuration, fmtKm, fmtKmNumber, fmtMoney, fmtMoneyNumber, splitDurationLabel } from "./formatters";
+import { ConfirmDialog, MainCard, SmallCard } from "./components/common";
+import { TurnoNotasCard } from "./components/turno-notas";
+import { EditEntryDialog } from "./components/edit-entry-dialog";
+```
+
+#### Código nuevo
+```tsx
+import { fmtDuration, fmtKm, fmtKmNumber, fmtMoney, fmtMoneyNumber } from "./formatters";
+import { ConfirmDialog, MainCard, SmallCard } from "./components/common";
+import { TurnoNotasCard } from "./components/turno-notas";
+import { EditEntryDialog } from "./components/edit-entry-dialog";
+import { DurationCardValue } from "./components/duration-card-value";
+```
+
+#### Por qué se cambió
+`DurationCardValue` se usa desde un componente propio y `main.tsx` ya no necesita importar `splitDurationLabel` para renderizarlo.
+
+### Cambio 2 - Eliminar componente local
+
+#### Código anterior
+```tsx
+function DurationCardValue({ value }: { value: string }) {
+  const parts = splitDurationLabel(value);
+  return (
+    <>
+      {parts.hours}<span style={TIME_CARD_HOUR_UNIT_STYLE}>h</span>
+      {parts.minutes}<span style={TIME_CARD_UNIT_STYLE}>m</span>
+    </>
+  );
+}
+
+function loadSettings(): AppSettings {
+```
+
+#### Código nuevo
+```tsx
+function loadSettings(): AppSettings {
+```
+
+#### Por qué se cambió
+El renderizado de duración se separa de `main.tsx` sin cambiar el marcado de horas/minutos.
+
+### Cambio 3 - Crear componente de duracion
+
+#### Código anterior
+`No existía el componente de duración en src/components/duration-card-value.tsx.`
+
+#### Código nuevo
+```tsx
+import { TIME_CARD_HOUR_UNIT_STYLE, TIME_CARD_UNIT_STYLE } from "../card-styles";
+import { splitDurationLabel } from "../formatters";
+
+export function DurationCardValue({ value }: { value: string }) {
+  const parts = splitDurationLabel(value);
+  return (
+    <>
+      {parts.hours}<span style={TIME_CARD_HOUR_UNIT_STYLE}>h</span>
+      {parts.minutes}<span style={TIME_CARD_UNIT_STYLE}>m</span>
+    </>
+  );
+}
+```
+
+#### Por qué se cambió
+El componente nuevo concentra la presentación de duración y reutiliza los módulos de estilos y formateadores.
+
+### Cambio 4 - Proteger extracción de duracion
+
+#### Código anterior
+`No existía el test de extracción de duración en src/__tests__/duration-card-value-extraction.test.ts.`
+
+#### Código nuevo
+```ts
+import { existsSync, readFileSync } from "node:fs";
+import { resolve } from "node:path";
+import { describe, expect, it } from "vitest";
+
+describe("DurationCardValue extraction", () => {
+  const componentPath = resolve("src/components/duration-card-value.tsx");
+  const mainSource = readFileSync(resolve("src/main.tsx"), "utf8");
+
+  it("keeps duration unit rendering outside main.tsx", () => {
+    expect(existsSync(componentPath)).toBe(true);
+
+    const componentSource = readFileSync(componentPath, "utf8");
+    expect(componentSource).toContain("export function DurationCardValue");
+    expect(componentSource).toContain("splitDurationLabel(value)");
+    expect(componentSource).toContain("TIME_CARD_HOUR_UNIT_STYLE");
+    expect(mainSource).toContain('from "./components/duration-card-value"');
+    expect(mainSource).not.toMatch(/^function DurationCardValue\(/m);
+  });
+});
+```
+
+#### Por qué se cambió
+El test fija que el renderizado de duración permanezca fuera de `main.tsx`.
+
 ## 2026-05-24 23:42 - Extraer claves de almacenamiento
 
 **Archivos modificados:** `src/main.tsx`, `src/storage-keys.ts`, `src/__tests__/storage-keys-extraction.test.ts`
