@@ -1,4 +1,9 @@
 const CACHE = 'mi-turno-v5';
+// Versión real de esta build. El marcador __BUILD_VERSION__ lo sustituye el
+// plugin de Vite (ver vite.config.ts) por la versión de la app en cada build.
+// En desarrollo sin build queda el marcador y checkVersion() omite la
+// comparación para no lanzar avisos de actualización en falso.
+const VERSION = '__BUILD_VERSION__';
 const ASSETS = [
   './',
   './index.html',
@@ -15,7 +20,7 @@ async function checkVersion() {
     const manifestReq = await fetch('./manifest.json?t=' + Date.now());
     if (manifestReq.ok) {
       const manifest = await manifestReq.json();
-      if (manifest.version && manifest.version !== VERSION) {
+      if (manifest.version && VERSION.indexOf('__') === -1 && manifest.version !== VERSION) {
         newVersion = manifest.version;
         const clients = await self.clients.matchAll();
         clients.forEach(client => {

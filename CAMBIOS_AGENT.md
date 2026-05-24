@@ -4,6 +4,1486 @@ Este archivo registra cambios de código hechos por agentes/modelos en este proy
 
 Cada entrada debe indicar archivos modificados, código anterior, código nuevo y por qué se cambió. Las entradas se añaden al **principio** del archivo (las más recientes arriba).
 
+## 2026-05-24 22:21 - Actualizar documentación de Firebase
+
+**Archivos modificados:** `README.md`
+
+### Cambio 1 - Descripción inicial
+
+#### Código anterior
+```md
+App progresiva (PWA) para gestionar tu Turno laboral como taxista. Registra propinas, datáfonos, agencias, extras, gasolina y nulos, y guarda el historial de Turnos en el dispositivo.
+```
+
+#### Código nuevo
+```md
+App para gestionar tu Turno laboral como taxista, disponible como APK de Android y como app web progresiva (PWA). Registra propinas, datáfonos, agencias, extras, gasolina y nulos. Cada usuario entra con su cuenta y sus datos se guardan en la nube (Firebase) y se sincronizan entre dispositivos.
+```
+
+#### Por qué se cambió
+La descripción anterior decía que los turnos se guardaban solo en el dispositivo. La app actual usa cuentas de usuario, Firebase y sincronización entre dispositivos, así que la descripción debía reflejar la arquitectura real.
+
+### Cambio 2 - Funcionalidades de cuenta, liquidación y sincronización
+
+#### Código anterior
+```md
+- Registro de entradas por categoría: Propinas, Datáfono, Agencias, Extras, Gasolina y Nulos.
+- Resumen diario con totales y desglose.
+- Historial de Turnos anteriores con edición posterior.
+- Exportación del historial completo a CSV (compatible con Excel).
+- Modo offline (PWA con Service Worker).
+- Teclado numérico adaptado.
+- Tema oscuro y diseño optimizado para móvil.
+- Persistencia local en el dispositivo (localStorage), sin servidor.
+```
+
+#### Código nuevo
+```md
+- Cuentas de usuario con inicio de sesión por email o nombre de usuario (Firebase Auth).
+- Registro de entradas por categoría: Propinas, Datáfono, Agencias, Extras, Gasolina y Nulos.
+- Resumen diario con totales y desglose.
+- Historial de Turnos anteriores con edición posterior.
+- Liquidación semanal con el cálculo de las cuentas a entregar.
+- Exportación del historial completo a CSV (compatible con Excel).
+- Datos guardados en la nube (Cloud Firestore) y sincronizados entre dispositivos.
+- Funcionamiento offline: la app sigue usable sin conexión y sincroniza al recuperarla.
+- Teclado numérico adaptado.
+- Tema oscuro y diseño optimizado para móvil.
+```
+
+#### Por qué se cambió
+La lista anterior omitía Firebase Auth, Firestore y la liquidación semanal, y todavía afirmaba que la app funcionaba sin servidor con `localStorage`. La nueva lista describe las funcionalidades actuales sin presentar `localStorage` como persistencia principal.
+
+### Cambio 3 - Texto posterior a la instalación PWA
+
+#### Código anterior
+```md
+Una vez instalada funciona offline y guarda los datos localmente, igual que el APK.
+```
+
+#### Código nuevo
+```md
+Una vez instalada, inicia sesión con tu cuenta. Los datos se guardan en tu cuenta (Firebase) y la app sigue funcionando sin conexión, igual que el APK.
+```
+
+#### Por qué se cambió
+El texto anterior reforzaba la idea desactualizada de almacenamiento local como destino principal. El nuevo texto explica que el usuario debe iniciar sesión y que sus datos viven en su cuenta de Firebase, manteniendo la capacidad offline.
+
+### Cambio 4 - Pasos de uso con inicio de sesión
+
+#### Código anterior
+```md
+1. **Iniciar Turno** — Pulsa "Iniciar Turno" en la pantalla de inicio.
+2. **Añadir entradas** — Usa los botones de cada categoría para registrar importes.
+3. **Terminar Turno** — Rellena el resumen (dinero total y km recorridos).
+4. **Historial** — Accede a Turnos anteriores, edítalas o expórtalas a CSV.
+```
+
+#### Código nuevo
+```md
+1. **Iniciar sesión** — Entra con tu email o nombre de usuario, o crea una cuenta nueva.
+2. **Iniciar Turno** — Pulsa "Iniciar Turno" en la pantalla de inicio.
+3. **Añadir entradas** — Usa los botones de cada categoría para registrar importes.
+4. **Terminar Turno** — Rellena el resumen (dinero total y km recorridos).
+5. **Historial** — Accede a Turnos anteriores, edítalas o expórtalas a CSV.
+```
+
+#### Por qué se cambió
+La app actual tiene pantalla de login y registro antes del uso normal. El README debía incluir ese primer paso para no describir un flujo antiguo sin autenticación.
+
+### Cambio 5 - Sección de datos y sincronización
+
+#### Código anterior
+`No existía la sección "Datos y sincronización" en README.md.`
+
+#### Código nuevo
+```md
+## Datos y sincronización
+
+Cada usuario inicia sesión con su cuenta (Firebase Auth) y sus datos —turnos, ajustes, reservas, notas y semanas— se guardan en Cloud Firestore, organizados bajo `users/{uid}`. Esto permite usar la misma cuenta desde varios dispositivos con los datos sincronizados.
+
+Firestore mantiene una caché local persistente en el dispositivo, así que la app sigue siendo usable sin conexión: los cambios hechos offline se sincronizan automáticamente al recuperar la conexión. El Service Worker, además, cachea la propia app para que abra sin red.
+
+`localStorage` ya no es el sistema de almacenamiento principal. Se conserva únicamente como caché y como vía de migración: si un dispositivo tiene datos guardados localmente de una versión anterior a Firebase, esos datos se suben una sola vez a la cuenta del usuario.
+```
+
+#### Por qué se cambió
+El README no explicaba cómo se guardan ni sincronizan los datos tras la introducción de Firebase. La nueva sección aclara el modelo real: Auth, Firestore bajo `users/{uid}`, caché offline y uso residual de `localStorage` para caché/migración.
+
+### Cambio 6 - Tecnologías usadas
+
+#### Código anterior
+```md
+- React 18 + TypeScript
+- Vite (build)
+- Capacitor (empaquetado Android)
+- PWA con Service Worker
+- localStorage (persistencia)
+```
+
+#### Código nuevo
+```md
+- React 18 + TypeScript
+- Vite (build)
+- Capacitor (empaquetado Android)
+- Firebase Auth (cuentas de usuario)
+- Cloud Firestore (base de datos en la nube, con caché local persistente)
+- PWA con Service Worker
+```
+
+#### Por qué se cambió
+La lista anterior no mencionaba Firebase y presentaba `localStorage` como persistencia principal. La nueva lista describe las tecnologías que realmente sostienen autenticación y datos.
+
+### Cambio 7 - Comando de tests en desarrollo
+
+#### Código anterior
+```md
+# Build de producción
+npm run build
+
+# Sincronizar web con Android (tras un build)
+npx cap sync android
+```
+
+#### Código nuevo
+```md
+# Build de producción
+npm run build
+
+# Ejecutar los tests
+npm test
+
+# Sincronizar web con Android (tras un build)
+npx cap sync android
+```
+
+#### Por qué se cambió
+El README no indicaba cómo ejecutar la suite de Vitest. Se añade el comando de tests para que la validación del proyecto quede documentada junto al resto de comandos de desarrollo.
+
+### Cambio 8 - Estructura del proyecto
+
+#### Código anterior
+```md
+app-taxi/
+├── src/
+│   └── main.tsx              # Componente React principal
+├── public/                   # Assets estáticos (icons, manifest, sw)
+├── android/                  # Proyecto Android (Capacitor)
+├── package.json
+├── vite.config.ts
+├── capacitor.config.ts
+└── .github/workflows/        # CI/CD
+```
+
+#### Código nuevo
+```md
+app-taxi/
+├── src/
+│   ├── main.tsx              # Componente React principal
+│   ├── login-screen.tsx      # Pantalla de login, registro y recuperación
+│   ├── admin-screens.tsx     # Vistas del modo administrador
+│   ├── firebase.ts           # Inicialización de Firebase (Auth + Firestore)
+│   ├── firestore-sync.ts     # Sincronización del estado con Firestore
+│   ├── formatters.ts         # Utilidades de formato
+│   └── __tests__/            # Tests (Vitest)
+├── public/                   # Assets estáticos (icons, manifest, sw)
+├── android/                  # Proyecto Android (Capacitor)
+├── firestore.rules           # Reglas de seguridad de Firestore
+├── package.json
+├── vite.config.ts
+├── capacitor.config.ts
+└── .github/workflows/        # CI/CD
+```
+
+#### Por qué se cambió
+La estructura anterior solo mostraba `main.tsx` dentro de `src` y no reflejaba los módulos actuales de login, administración, Firebase, sincronización, formatos, tests ni reglas de Firestore.
+
+## 2026-05-24 20:13 - Sustituir los mensajes DEBUG de copiar/compartir liquidación
+
+**Archivos modificados:** `src/main.tsx`
+
+### Cambio 1 - Fallo del copiado de texto (fallo terminal)
+
+#### Código anterior
+```tsx
+      }).catch((e) => {
+        alert("DEBUG: El copiado de texto falló.");
+        console.error("Text copy failed: ", e);
+      });
+```
+
+#### Código nuevo
+```tsx
+      }).catch((e) => {
+        console.error("Text copy failed: ", e);
+        alert("No se pudo copiar la liquidación. Inténtalo de nuevo.");
+      });
+```
+
+#### Por qué se cambió
+Es el último recurso del copiado: si falla, no hay más alternativas. Se sustituye el `alert` técnico (`DEBUG: ...`) por un mensaje entendible para el usuario; el detalle del error queda solo en `console.error`.
+
+### Cambio 2 - Elemento ticket-digital no encontrado
+
+#### Código anterior
+```tsx
+      if (!element) {
+        alert("DEBUG: No se encontró el elemento ticket-digital.");
+        copyTextFallback();
+        return;
+      }
+```
+
+#### Código nuevo
+```tsx
+      if (!element) {
+        console.error("No se encontró el elemento ticket-digital; se copia como texto.");
+        copyTextFallback();
+        return;
+      }
+```
+
+#### Por qué se cambió
+Existe un fallback (`copyTextFallback` copia la liquidación como texto), así que no hace falta alarmar al usuario con un `alert` técnico. El detalle pasa a `console.error` y el fallback actúa en silencio.
+
+### Cambio 3 - Fallo al crear la imagen (blob nulo)
+
+#### Código anterior
+```tsx
+          if (!blob) {
+            alert("DEBUG: Falló la creación del blob de la imagen.");
+            copyTextFallback();
+            return;
+          }
+```
+
+#### Código nuevo
+```tsx
+          if (!blob) {
+            console.error("Falló la creación de la imagen; se copia como texto.");
+            copyTextFallback();
+            return;
+          }
+```
+
+#### Por qué se cambió
+Hay fallback a copiar texto. Se elimina el `alert` técnico y el detalle queda en `console.error`; el fallback actúa en silencio.
+
+### Cambio 4 - Error al compartir la imagen en Android nativo
+
+#### Código anterior
+```tsx
+              } catch (e: any) {
+                alert("DEBUG: Error en Share.share nativo: " + (e?.message || JSON.stringify(e)));
+                console.error("Error sharing image, fallback to text:", e);
+                copyTextFallback();
+              }
+```
+
+#### Código nuevo
+```tsx
+              } catch (e: any) {
+                console.error("Error sharing image, fallback to text:", e);
+                copyTextFallback();
+              }
+```
+
+#### Por qué se cambió
+El `alert` mostraba el mensaje de error técnico crudo. Hay fallback a copiar texto, así que se elimina el `alert` y se conserva el `console.error` que ya existía con el detalle.
+
+### Cambio 5 - Fallo al copiar la imagen al portapapeles
+
+#### Código anterior
+```tsx
+              }).catch((err: any) => {
+                alert("DEBUG: navigator.clipboard.write falló. " + (err?.message || JSON.stringify(err)));
+                console.error("ClipboardItem write failed, fallback to text:", err);
+                copyTextFallback();
+              });
+```
+
+#### Código nuevo
+```tsx
+              }).catch((err: any) => {
+                console.error("ClipboardItem write failed, fallback to text:", err);
+                copyTextFallback();
+              });
+```
+
+#### Por qué se cambió
+El `alert` mostraba el error técnico crudo. Hay fallback a copiar texto, así que se elimina el `alert` y se conserva el `console.error` que ya existía con el detalle.
+
+### Cambio 6 - Portapapeles de imagen no disponible en el navegador
+
+#### Código anterior
+```tsx
+            } else {
+              alert("DEBUG: navigator.clipboard o window.ClipboardItem no están disponibles. El navegador no lo soporta o no hay HTTPS.");
+              copyTextFallback();
+            }
+```
+
+#### Código nuevo
+```tsx
+            } else {
+              console.error("navigator.clipboard / ClipboardItem no disponibles; se copia como texto.");
+              copyTextFallback();
+            }
+```
+
+#### Por qué se cambió
+Cuando el navegador no soporta copiar imágenes, hay fallback a copiar texto. Se elimina el `alert` técnico y el detalle queda en `console.error`; el fallback actúa en silencio.
+
+## 2026-05-24 20:04 - Endurecer reglas de Firestore sin romper el login
+
+**Archivos modificados:** `firestore.rules`
+
+### Cambio 1 - Restringir la lectura de la colección admins
+
+#### Código anterior
+```
+    // Colección de admins.
+    //   - Lectura permitida (la usa isAdmin()).
+    //   - Escritura desde código DENEGADA. Solo se gestiona desde Firebase Console.
+    match /admins/{uid} {
+      allow read: if request.auth != null;
+      allow write: if false;
+    }
+```
+
+#### Código nuevo
+```
+    // Colección de admins.
+    //   - Lectura restringida: cada usuario solo puede leer admins/{su_uid}.
+    //     isAdmin() sigue funcionando porque exists() no depende de allow read.
+    //   - Escritura desde código DENEGADA. Solo se gestiona desde Firebase Console.
+    match /admins/{uid} {
+      allow read: if request.auth != null && request.auth.uid == uid;
+      allow write: if false;
+    }
+```
+
+#### Por qué se cambió
+La regla anterior permitía que cualquier usuario autenticado leyera el documento admin de cualquier otro usuario. Ahora cada usuario solo puede leer `admins/{su_uid}`. La detección de administrador no se ve afectada: `isAdmin()` usa `exists()`, que en las reglas de Firestore funciona al margen de la regla `allow read`; y el código de la app solo lee `admins/{uid_propio}`.
+
+### Cambio 2 - Endurecer la actualización de usernames
+
+#### Código anterior
+```
+    //   - Actualizar o borrar: solo el dueño actual.
+    match /usernames/{username} {
+      allow read: if true;
+      allow create: if request.auth != null
+                    && request.resource.data.uid == request.auth.uid;
+      allow update, delete: if request.auth != null
+                            && resource.data.uid == request.auth.uid;
+    }
+```
+
+#### Código nuevo
+```
+    //   - Actualizar: solo el dueño actual, y el uid resultante debe seguir
+    //     siendo el suyo (no se puede reapuntar el username a otro usuario).
+    //   - Borrar: solo el dueño actual.
+    match /usernames/{username} {
+      allow read: if true;
+      allow create: if request.auth != null
+                    && request.resource.data.uid == request.auth.uid;
+      allow update: if request.auth != null
+                    && resource.data.uid == request.auth.uid
+                    && request.resource.data.uid == request.auth.uid;
+      allow delete: if request.auth != null
+                    && resource.data.uid == request.auth.uid;
+    }
+```
+
+#### Por qué se cambió
+La regla `update, delete` anterior solo comprobaba el `uid` del documento existente (`resource.data.uid`), no el del documento nuevo. Eso permitía que el dueño de un username modificara su propio documento y reapuntara el campo `uid` a otro usuario. Se separan `update` y `delete`: `update` exige además que el `uid` resultante (`request.resource.data.uid`) siga siendo el del propio usuario. La creación ya exigía esa comprobación y no se modifica.
+
+## 2026-05-24 19:58 - Unificar versionado y blindar el aviso de actualización
+
+**Archivos modificados:** `public/sw.js`, `vite.config.ts`, `public/manifest.json`, `package.json`, `android/app/build.gradle`, `.github/workflows/android.yml`, `src/__tests__/sw-version.test.ts`
+
+### Cambio 1 - Declarar la constante VERSION en el Service Worker
+
+#### Código anterior
+```js
+const CACHE = 'mi-turno-v5';
+const ASSETS = [
+```
+
+#### Código nuevo
+```js
+const CACHE = 'mi-turno-v5';
+// Versión real de esta build. El marcador __BUILD_VERSION__ lo sustituye el
+// plugin de Vite (ver vite.config.ts) por la versión de la app en cada build.
+// En desarrollo sin build queda el marcador y checkVersion() omite la
+// comparación para no lanzar avisos de actualización en falso.
+const VERSION = '__BUILD_VERSION__';
+const ASSETS = [
+```
+
+#### Por qué se cambió
+`checkVersion()` comparaba `manifest.version` contra una variable `VERSION` que nunca se declaraba en `sw.js`. Eso lanzaba un `ReferenceError` que el `try/catch` vacío se tragaba en silencio, de modo que el Service Worker no detectaba nunca una versión nueva y el aviso de actualización de la PWA no funcionaba.
+
+### Cambio 2 - Proteger la comparación de versión en checkVersion
+
+#### Código anterior
+```js
+      const manifest = await manifestReq.json();
+      if (manifest.version && manifest.version !== VERSION) {
+```
+
+#### Código nuevo
+```js
+      const manifest = await manifestReq.json();
+      if (manifest.version && VERSION.indexOf('__') === -1 && manifest.version !== VERSION) {
+```
+
+#### Por qué se cambió
+En desarrollo sin build, `VERSION` conserva el marcador `__BUILD_VERSION__`. La condición `VERSION.indexOf('__') === -1` omite la comparación mientras el marcador no se haya sustituido, evitando avisos de actualización en falso.
+
+### Cambio 3 - Plugin de Vite que inyecta la versión en manifest y sw
+
+#### Código anterior
+```ts
+import { defineConfig } from 'vite';
+import react from '@vitejs/plugin-react';
+import { readFileSync } from 'node:fs';
+
+const pkg = JSON.parse(readFileSync('./package.json', 'utf-8'));
+// La versión que verá la app:
+//  - En CI: "1.0.<run_number>" (coincide con el tag de la release).
+//  - En local: la versión que pone package.json.
+const appVersion = process.env.APP_VERSION || pkg.version;
+
+export default defineConfig({
+  plugins: [react()],
+```
+
+#### Código nuevo
+```ts
+import { defineConfig } from 'vite';
+import react from '@vitejs/plugin-react';
+import { readFileSync, writeFileSync, existsSync } from 'node:fs';
+
+const pkg = JSON.parse(readFileSync('./package.json', 'utf-8'));
+// La versión que verá la app:
+//  - En CI: "1.0.<run_number>" (coincide con el tag de la release).
+//  - En local: la versión que pone package.json.
+const appVersion = process.env.APP_VERSION || pkg.version;
+
+// Plugin: tras el build, sustituye el marcador __BUILD_VERSION__ por la versión
+// real (appVersion) en dist/manifest.json y dist/sw.js. Así la app
+// (__APP_VERSION__), el manifest y el Service Worker comparten exactamente la
+// misma versión y el aviso de actualización de la PWA funciona de forma fiable.
+function inyectarVersion(version: string) {
+  return {
+    name: 'inyectar-version',
+    apply: 'build' as const,
+    closeBundle() {
+      for (const archivo of ['dist/manifest.json', 'dist/sw.js']) {
+        if (existsSync(archivo)) {
+          const contenido = readFileSync(archivo, 'utf-8');
+          writeFileSync(archivo, contenido.split('__BUILD_VERSION__').join(version));
+        }
+      }
+    },
+  };
+}
+
+export default defineConfig({
+  plugins: [react(), inyectarVersion(appVersion)],
+```
+
+#### Por qué se cambió
+`manifest.json` y `sw.js` son archivos estáticos de `public/` que el build copia tal cual, por lo que no podían recoger la versión de forma dinámica. El plugin sustituye el marcador `__BUILD_VERSION__` en `dist/` por la misma versión que usa la app, eliminando la desincronización entre versión de la app, del manifest y del Service Worker.
+
+### Cambio 4 - Versión del manifest como marcador sustituible
+
+#### Código anterior
+```json
+  "version": "1.0.52",
+```
+
+#### Código nuevo
+```json
+  "version": "__BUILD_VERSION__",
+```
+
+#### Por qué se cambió
+La versión del manifest era un número fijo escrito a mano que se desincronizaba de la versión real de la app. Pasa a ser un marcador que el plugin de Vite sustituye en cada build.
+
+### Cambio 5 - Unificar la versión local en package.json
+
+#### Código anterior
+```json
+  "version": "1.0.51",
+```
+
+#### Código nuevo
+```json
+  "version": "1.0.52",
+```
+
+#### Por qué se cambió
+`package.json` (1.0.51) y `manifest.json` (1.0.52) declaraban versiones distintas. Se unifican en 1.0.52 para que la app y el APK en builds locales partan del mismo número.
+
+### Cambio 6 - Bloque de versionado derivado en build.gradle
+
+#### Código anterior
+`No existía el bloque de versionado derivado en android/app/build.gradle.`
+
+#### Código nuevo
+```gradle
+apply plugin: 'com.android.application'
+
+// Versionado del APK derivado de package.json (raíz del repo), con prioridad
+// para la variable de entorno APP_VERSION que CI inyecta. Así versionName y
+// versionCode dejan de quedar fijos en valores antiguos y acompañan a la
+// versión real de la app. versionCode se calcula con el último segmento de la
+// versión (1.0.52 -> 52), por lo que aumenta en cada release de CI.
+def packageJson = new groovy.json.JsonSlurper().parse(file('../../package.json'))
+def packageVersionName = packageJson.version ?: "1.0.0"
+def packageVersionCode = packageVersionName.tokenize('.').last().isInteger() ? packageVersionName.tokenize('.').last().toInteger() : 1
+def ciVersionName = System.getenv("APP_VERSION")
+def resolvedVersionName = ciVersionName ?: packageVersionName
+def resolvedVersionCode = (ciVersionName != null && ciVersionName.tokenize('.').last().isInteger()) ? ciVersionName.tokenize('.').last().toInteger() : packageVersionCode
+```
+
+#### Por qué se cambió
+El APK necesitaba una fuente de versión dinámica. Este bloque deriva la versión de `package.json` (builds locales) o de la variable `APP_VERSION` que CI inyecta (builds de release), en lugar de depender de números escritos a mano.
+
+### Cambio 7 - versionCode y versionName dinámicos
+
+#### Código anterior
+```gradle
+        versionCode 20
+        versionName "1.0.19"
+```
+
+#### Código nuevo
+```gradle
+        versionCode resolvedVersionCode
+        versionName resolvedVersionName
+```
+
+#### Por qué se cambió
+`versionCode` y `versionName` estaban fijos en valores antiguos (20 / 1.0.19) que no acompañaban a la versión real de la app. Ahora se calculan a partir del bloque del Cambio 6, de modo que el `versionCode` aumenta en cada release de CI y Android acepta el APK como actualización.
+
+### Cambio 8 - Variable APP_VERSION en el paso de compilación del APK
+
+#### Código anterior
+```yaml
+      - name: Build Android APK
+        run: |
+          cd android
+          chmod +x gradlew
+          ./gradlew assembleDebug --no-daemon
+```
+
+#### Código nuevo
+```yaml
+      - name: Build Android APK
+        env:
+          APP_VERSION: 1.0.${{ github.run_number }}
+        run: |
+          cd android
+          chmod +x gradlew
+          ./gradlew assembleDebug --no-daemon
+```
+
+#### Por qué se cambió
+El paso de Gradle no recibía la variable `APP_VERSION`, así que el APK no podía conocer el número de release. Con la variable presente, el `versionName` y el `versionCode` del APK coinciden con el tag `v1.0.<run_number>` que publica la release.
+
+### Cambio 9 - Tests del Service Worker
+
+#### Código anterior
+`No existía el archivo src/__tests__/sw-version.test.ts.`
+
+#### Código nuevo
+```ts
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
+import { describe, expect, it } from "vitest";
+
+describe("Service Worker version handling", () => {
+  const swSource = readFileSync(resolve("public/sw.js"), "utf8");
+
+  it("declara la constante VERSION para que checkVersion no lance ReferenceError", () => {
+    expect(swSource).toMatch(/const VERSION\s*=/);
+  });
+
+  it("usa el marcador __BUILD_VERSION__ que el build sustituye por la version real", () => {
+    expect(swSource).toContain("__BUILD_VERSION__");
+  });
+
+  it("compara manifest.version contra la constante VERSION ya definida", () => {
+    expect(swSource).toContain("manifest.version !== VERSION");
+  });
+
+  it("omite la comparacion mientras VERSION conserve el marcador (modo dev)", () => {
+    expect(swSource).toContain("VERSION.indexOf('__') === -1");
+  });
+});
+```
+
+#### Por qué se cambió
+Para blindar la corrección del Service Worker con tests estáticos que verifican que `VERSION` está declarada, que el marcador existe y que la comparación de versión es la correcta, evitando que el bug reaparezca en el futuro.
+
+## 2026-05-24 19:15 - Implementar descarga e instalación nativa de APK en Android
+
+**Archivos modificados:** `android/app/src/main/AndroidManifest.xml`, `android/app/src/main/java/com/mijornada/app/MainActivity.java`, `android/app/src/main/java/com/mijornada/app/ApkInstallerPlugin.java`, `android/app/build.gradle`, `.github/workflows/android.yml`, `src/main.tsx`, `src/__tests__/logic.test.ts`, `src/__tests__/apk-update-flow.test.ts`
+
+### Cambio 1 - Permiso de instalación de paquetes
+
+#### Código anterior
+```xml
+    <!-- Permissions -->
+
+    <uses-permission android:name="android.permission.INTERNET" />
+</manifest>
+```
+
+#### Código nuevo
+```xml
+    <!-- Permissions -->
+
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
+</manifest>
+```
+
+#### Por qué se cambió
+Se requiere el permiso de Android REQUEST_INSTALL_PACKAGES para abrir e iniciar el instalador oficial de Android para las descargas de APK in-app.
+
+### Cambio 2 - Crear plugin local ApkInstaller
+
+#### Código anterior
+`No existía el bloque ApkInstallerPlugin.java en android/app/src/main/java/com/mijornada/app/ApkInstallerPlugin.java.`
+
+#### Código nuevo
+```java
+package com.mijornada.app;
+
+import android.content.Intent;
+import android.net.Uri;
+import android.os.Build;
+import android.provider.Settings;
+import androidx.core.content.FileProvider;
+import com.getcapacitor.JSObject;
+import com.getcapacitor.Plugin;
+import com.getcapacitor.PluginCall;
+import com.getcapacitor.PluginMethod;
+import com.getcapacitor.annotation.CapacitorPlugin;
+
+import java.io.BufferedInputStream;
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.InputStream;
+import java.net.HttpURLConnection;
+import java.net.URL;
+
+@CapacitorPlugin(name = "ApkInstaller")
+public class ApkInstallerPlugin extends Plugin {
+
+    @PluginMethod
+    public void canInstallPackages(PluginCall call) {
+        JSObject ret = new JSObject();
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                ret.put("value", getContext().getPackageManager().canRequestPackageInstalls());
+            } else {
+                ret.put("value", true);
+            }
+        } else {
+            ret.put("value", true);
+        }
+        call.resolve(ret);
+    }
+
+    @PluginMethod
+    public void openInstallPermissionSettings(PluginCall call) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            Intent intent = new Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES);
+            intent.setData(Uri.parse("package:" + getContext().getPackageName()));
+            getActivity().startActivity(intent);
+            call.resolve();
+        } else {
+            call.reject("Not required on this Android version");
+        }
+    }
+
+    @PluginMethod
+    public void downloadAndInstall(PluginCall call) {
+        String urlString = call.getString("url");
+        String fileName = call.getString("fileName");
+
+        if (urlString == null || fileName == null) {
+            call.reject("URL and fileName are required");
+            return;
+        }
+
+        new Thread(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    File file = new File(getContext().getCacheDir(), fileName);
+                    if (file.exists()) {
+                        file.delete();
+                    }
+
+                    URL url = new URL(urlString);
+                    HttpURLConnection connection = (HttpURLConnection) url.openConnection();
+                    connection.setInstanceFollowRedirects(true);
+
+                    int status = connection.getResponseCode();
+                    int redirectCount = 0;
+                    while (status == HttpURLConnection.HTTP_MOVED_TEMP || status == HttpURLConnection.HTTP_MOVED_PERM || status == 307 || status == 308) {
+                        if (redirectCount > 5) {
+                            throw new Exception("Too many redirects");
+                        }
+                        String newUrl = connection.getHeaderField("Location");
+                        connection = (HttpURLConnection) new URL(newUrl).openConnection();
+                        status = connection.getResponseCode();
+                        redirectCount++;
+                    }
+
+                    if (status != HttpURLConnection.HTTP_OK) {
+                        call.reject("Server returned HTTP " + status);
+                        return;
+                    }
+
+                    try (InputStream input = new BufferedInputStream(connection.getInputStream());
+                         FileOutputStream output = new FileOutputStream(file)) {
+
+                        byte[] data = new byte[8192];
+                        int count;
+                        while ((count = input.read(data)) != -1) {
+                            output.write(data, 0, count);
+                        }
+                    }
+
+                    Uri apkUri = FileProvider.getUriForFile(getContext(), getContext().getPackageName() + ".fileprovider", file);
+                    Intent intent = new Intent(Intent.ACTION_VIEW);
+                    intent.setDataAndType(apkUri, "application/vnd.android.package-archive");
+                    intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+                    intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                    getContext().startActivity(intent);
+
+                    JSObject ret = new JSObject();
+                    ret.put("success", true);
+                    call.resolve(ret);
+
+                } catch (Exception e) {
+                    call.reject("Error downloading or installing APK: " + e.getMessage(), e);
+                }
+            }
+        }).start();
+    }
+}
+```
+
+#### Por qué se cambió
+Se crea el plugin local ApkInstaller para verificar permisos de fuentes desconocidas, abrir los Ajustes de Android si falta dicho permiso, y descargar la APK en segundo plano lanzando la interfaz de instalación nativa.
+
+### Cambio 3 - Registro de ApkInstaller en MainActivity
+
+#### Código anterior
+```java
+import com.getcapacitor.BridgeActivity;
+
+public class MainActivity extends BridgeActivity {}
+```
+
+#### Código nuevo
+```java
+import android.os.Bundle;
+import com.getcapacitor.BridgeActivity;
+
+public class MainActivity extends BridgeActivity {
+    @Override
+    public void onCreate(Bundle savedInstanceState) {
+        registerPlugin(ApkInstallerPlugin.class);
+        super.onCreate(savedInstanceState);
+    }
+}
+```
+
+#### Por qué se cambió
+Se registra explícitamente el plugin ApkInstaller en la clase MainActivity para garantizar que el puente de Capacitor lo reconozca e inicialice durante el inicio de la app.
+
+### Cambio 4 - Versionado dinámico en Gradle
+
+#### Código anterior
+```groovy
+        versionCode 20
+        versionName "1.0.19"
+        testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
+```
+
+#### Código nuevo
+```groovy
+def packageJson = new groovy.json.JsonSlurper().parse(file('../../package.json'))
+def packageVersionName = packageJson.version ?: "1.0.0"
+def packageVersionCode = packageVersionName.tokenize('.').last().isInteger()
+        ? packageVersionName.tokenize('.').last().toInteger()
+        : 1
+
+android {
+    namespace "com.mijornada.app"
+    compileSdk rootProject.ext.compileSdkVersion
+    defaultConfig {
+        applicationId "com.mijornada.app"
+        minSdkVersion rootProject.ext.minSdkVersion
+        targetSdkVersion rootProject.ext.targetSdkVersion
+        def appVersionCode = System.getenv("ANDROID_VERSION_CODE") ? System.getenv("ANDROID_VERSION_CODE").toInteger() : packageVersionCode
+        def appVersionName = System.getenv("ANDROID_VERSION_NAME") ?: packageVersionName
+
+        versionCode appVersionCode
+        versionName appVersionName
+        testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
+    }
+}
+```
+
+#### Por qué se cambió
+Permite inyectar los códigos y nombres de versión de forma incremental en base a las ejecuciones del flujo de CI en GitHub Actions, y evita que una compilación local vuelva al `versionCode 20` y `versionName "1.0.19"` antiguos.
+
+### Cambio 5 - Inyección de variables en Actions de GitHub
+
+#### Código anterior
+```yaml
+      - name: Build Android APK
+        run: |
+          cd android
+          chmod +x gradlew
+          ./gradlew assembleDebug --no-daemon
+```
+
+#### Código nuevo
+```yaml
+      - name: Build Android APK
+        env:
+          ANDROID_VERSION_CODE: ${{ github.run_number }}
+          ANDROID_VERSION_NAME: 1.0.${{ github.run_number }}
+        run: |
+          cd android
+          chmod +x gradlew
+          ./gradlew assembleDebug --no-daemon
+```
+
+#### Por qué se cambió
+Para pasar de manera segura e incremental el número de build del pipeline a Gradle en cada compilación automática.
+
+### Cambio 6 - Lógica y UI de actualización en main.tsx
+
+#### Código anterior
+```tsx
+      if (latestVersion && latestVersion !== APP_VERSION) {
+        setUpdateMsg(`¡Nueva versión ${latestVersion} disponible!`);
+        if (data.assets && data.assets.length > 0) {
+          setDownloadUrl(data.assets[0].browser_download_url);
+        } else {
+          setDownloadUrl(data.html_url);
+        }
+      } else {
+        setUpdateMsg("Tienes la última versión instalada.");
+      }
+```
+
+#### Código nuevo
+```tsx
+      if (latestVersion && latestVersion !== APP_VERSION) {
+        let apkAsset = data.assets?.find((asset: any) => asset.name && asset.name.endsWith(".apk"));
+        if (apkAsset) {
+          setDownloadUrl(apkAsset.browser_download_url);
+          setUpdateState("available");
+          setUpdateMsg(`¡Nueva versión ${latestVersion} disponible!`);
+        } else {
+          setDownloadUrl("");
+          setReleaseUrl(data.html_url || "https://github.com/Carlos4400/app-taxi/releases/latest");
+          setUpdateState("error");
+          setUpdateMsg("No se encontró APK en el último release.");
+        }
+      } else {
+        setUpdateState("idle");
+        setUpdateMsg("Tienes la última versión instalada.");
+      }
+```
+
+```tsx
+            {(() => {
+              const hasApkDownload = downloadUrl.endsWith(".apk");
+              return hasApkDownload && updateState !== "downloading" && updateState !== "checking" && (
+              <button
+                onClick={handleInstallUpdate}
+```
+
+#### Por qué se cambió
+Reemplaza el flujo anterior por un flujo nativo e interactivo de descarga e instalación local de la APK de forma integrada en Android, e impide exponer como instalable una URL que no termine en `.apk`.
+
+### Cambio 7 - Arreglar errores de tipado de Turno en los mocks de tests
+
+#### Código anterior
+Los objetos mocks de `Turno` en `src/__tests__/logic.test.ts` carecían de los atributos obligatorios como `notes`, `startTime` o `endTime` tras adiciones del modelo de datos.
+
+#### Código nuevo
+Se añaden las propiedades por defecto correspondientes para que `npx tsc --noEmit` pase el chequeo sin errores de tipado en compilación estática.
+
+### Cambio 8 - Tests del flujo de actualización APK
+
+#### Código anterior
+`No existía apk-update-flow.test.ts en src/__tests__/apk-update-flow.test.ts.`
+
+#### Código nuevo
+```ts
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
+import { describe, expect, it } from "vitest";
+
+describe("APK update flow hardening", () => {
+  const mainSource = readFileSync(resolve("src/main.tsx"), "utf8");
+  const gradleSource = readFileSync(resolve("android/app/build.gradle"), "utf8");
+
+  it("does not expose an installable Android URL when the latest release has no APK asset", () => {
+    expect(mainSource).toContain('asset.name.endsWith(".apk")');
+    expect(mainSource).toMatch(/setUpdateMsg\("No se encontr\S+ APK en el \S+ltimo release\."\)/);
+    expect(mainSource).not.toContain("Sin APK directo");
+    expect(mainSource).not.toContain("const fallbackUrl = data.assets?.[0]?.browser_download_url || data.html_url");
+  });
+
+  it("only shows the native install button for APK URLs", () => {
+    expect(mainSource).toContain("const hasApkDownload = downloadUrl.endsWith(\".apk\")");
+    expect(mainSource).toMatch(/hasApkDownload && updateState !== "downloading" && updateState !== "checking"/);
+  });
+
+  it("derives local Android version values from package.json when CI variables are absent", () => {
+    expect(gradleSource).toContain("def packageJson = new groovy.json.JsonSlurper().parse(file('../../package.json'))");
+    expect(gradleSource).toContain('def packageVersionName = packageJson.version ?: "1.0.0"');
+    expect(gradleSource).toContain("def packageVersionCode = packageVersionName.tokenize('.').last().isInteger()");
+    expect(gradleSource).not.toContain('?: "1.0.19"');
+    expect(gradleSource).not.toContain(": 20");
+  });
+});
+```
+
+#### Por qué se cambió
+Se añaden pruebas específicas para impedir regresiones en la validación estricta de APK, la visibilidad del botón nativo de instalación y el fallback local de versionado Android desde `package.json`.
+
+## 2026-05-24 18:38 - Solucionar timeout de ClipboardItem en iOS/Web
+
+**Archivos modificados:** `src/main.tsx`
+
+### Cambio 1 - Usar ClipboardItem con Promesa para evitar bloqueos
+
+#### Código anterior
+```tsx
+      html2canvas(element, {
+        backgroundColor: "#0d0d14",
+        scale: 3,
+        useCORS: true,
+        logging: false,
+        onclone: (clonedDoc) => {
+          // ... (configuración de html2canvas)
+        }
+      }).then((canvas) => {
+        canvas.toBlob((blob) => {
+          if (!blob) {
+            copyTextFallback();
+            return;
+          }
+
+          if (Capacitor.isNativePlatform()) {
+            // ... exportación nativa
+          } else {
+            if (navigator.clipboard && window.ClipboardItem) {
+              const item = new ClipboardItem({ "image/png": blob });
+              navigator.clipboard.write([item]).then(() => {
+                setCopiado(true);
+                setTimeout(() => setCopiado(false), 2000);
+              }).catch((err) => {
+                console.error("ClipboardItem write failed, fallback to text:", err);
+                copyTextFallback();
+              });
+            } else {
+              copyTextFallback();
+            }
+          }
+        }, "image/png");
+      }).catch((err) => {
+        console.error("html2canvas failed, fallback to text:", err);
+        copyTextFallback();
+      });
+```
+
+#### Código nuevo
+```tsx
+      const h2cOptions = {
+        backgroundColor: "#0d0d14",
+        scale: 3,
+        useCORS: true,
+        logging: false,
+        onclone: (clonedDoc: any) => {
+          // ... (configuración de html2canvas)
+        }
+      };
+
+      if (!Capacitor.isNativePlatform() && navigator.clipboard && window.ClipboardItem) {
+        try {
+          const blobPromise = html2canvas(element, h2cOptions as any).then((canvas) => {
+            return new Promise<Blob>((resolve, reject) => {
+              canvas.toBlob((blob) => {
+                if (blob) resolve(blob);
+                else reject(new Error("Error al crear blob"));
+              }, "image/png");
+            });
+          });
+
+          const item = new ClipboardItem({ "image/png": blobPromise });
+          await navigator.clipboard.write([item]);
+          setCopiado(true);
+          setTimeout(() => setCopiado(false), 2000);
+        } catch (err) {
+          console.error("ClipboardItem write failed, fallback to text:", err);
+          copyTextFallback();
+        }
+      } else {
+        html2canvas(element, h2cOptions as any).then((canvas) => {
+          canvas.toBlob((blob) => {
+            if (!blob) {
+              copyTextFallback();
+              return;
+            }
+
+            if (Capacitor.isNativePlatform()) {
+              // ... exportación nativa
+            } else {
+              copyTextFallback();
+            }
+          }, "image/png");
+        }).catch((err) => {
+          console.error("html2canvas failed, fallback to text:", err);
+          copyTextFallback();
+        });
+      }
+```
+
+#### Por qué se cambió
+El código anterior generaba el canvas y luego intentaba escribir en el portapapeles dentro de `.then()`. Navegadores como Safari/iOS bloquean escrituras asíncronas en el portapapeles si toman demasiado tiempo después del evento del usuario. La solución moderna (y la única soportada en iOS web) consiste en instanciar el `ClipboardItem` sincrónicamente y pasarle una Promesa que se resolverá con el Blob. Se separa el flujo de web y de Capacitor para asegurar que la web respete este estándar.
+## 2026-05-23 22:17 - Alinear notas por baseline
+
+**Archivos modificados:** `src/main.tsx`, `src/__tests__/detailed-notes-layout.test.ts`, `src/__tests__/liquidacion-semana.test.ts`
+
+### Cambio 1 - Baseline en hora de notas
+
+#### Código anterior
+```tsx
+const NOTE_TIME_STYLE = {
+  fontSize: 12,
+  color: "rgba(255,255,255,0.45)",
+  fontWeight: 700,
+  whiteSpace: "nowrap",
+  flexShrink: 0,
+  alignSelf: "start",
+} as const;
+```
+
+#### Código nuevo
+```tsx
+const NOTE_TIME_STYLE = {
+  fontSize: 12,
+  color: "rgba(255,255,255,0.45)",
+  fontWeight: 700,
+  whiteSpace: "nowrap",
+  flexShrink: 0,
+  alignSelf: "baseline",
+} as const;
+```
+
+#### Por qué se cambió
+`alignSelf: "start"` alineaba la hora por la parte superior del grid. `alignSelf: "baseline"` hace que la hora se apoye en la misma línea visual que la etiqueta, el texto de la nota y el importe.
+
+### Cambio 2 - Baseline en filas de notas
+
+#### Código anterior
+```tsx
+alignItems: "start"
+alignItems: 'start'
+alignSelf: "start"
+```
+
+#### Código nuevo
+```tsx
+alignItems: "baseline"
+alignItems: 'baseline'
+alignSelf: "baseline"
+```
+
+#### Por qué se cambió
+Las filas de notas generales y notas detalladas usaban alineación superior, por eso la hora, la etiqueta, el texto y el importe no quedaban sobre la misma línea de lectura. Se cambia a baseline en las filas visuales de resumen, terminar turno, liquidación digital y tarjetas de notas.
+
+### Cambio 3 - Tests de alineación baseline
+
+#### Código anterior
+```ts
+expect(source).toMatch(/const NOTE_TIME_STYLE = \{[\s\S]*?fontSize: 12,[\s\S]*?color: "rgba\(255,255,255,0\.45\)",[\s\S]*?fontWeight: 700,[\s\S]*?whiteSpace: "nowrap",[\s\S]*?flexShrink: 0,[\s\S]*?alignSelf: "start",[\s\S]*?\} as const;/);
+expect(liquidacionBlock).toContain('gridTemplateColumns: "auto auto minmax(0, 1fr)"');
+expect(liquidacionBlock).toContain('gridTemplateColumns: "auto auto minmax(0, 1fr) auto"');
+```
+
+#### Código nuevo
+```ts
+expect(source).toMatch(/const NOTE_TIME_STYLE = \{[\s\S]*?fontSize: 12,[\s\S]*?color: "rgba\(255,255,255,0\.45\)",[\s\S]*?fontWeight: 700,[\s\S]*?whiteSpace: "nowrap",[\s\S]*?flexShrink: 0,[\s\S]*?alignSelf: "baseline",[\s\S]*?\} as const;/);
+expect(liquidacionBlock).toContain('gridTemplateColumns: "auto auto minmax(0, 1fr)", alignItems: "baseline"');
+expect(liquidacionBlock).toContain('gridTemplateColumns: "auto auto minmax(0, 1fr) auto", alignItems: "baseline"');
+```
+
+#### Por qué se cambió
+Los tests aún exigían `start` o solo comprobaban las columnas del grid. Se actualizan para verificar que la alineación visible de notas generales y notas detalladas sea por baseline.
+
+## 2026-05-23 22:01 - Unificar hora de notas generales
+
+**Archivos modificados:** `src/main.tsx`, `src/__tests__/detailed-notes-layout.test.ts`, `src/__tests__/liquidacion-semana.test.ts`
+
+### Cambio 1 - Estilo común de hora de notas
+
+#### Código anterior
+`No existía NOTE_TIME_STYLE en src/main.tsx.`
+
+#### Código nuevo
+```tsx
+const NOTE_TIME_STYLE = {
+  fontSize: 12,
+  color: "rgba(255,255,255,0.45)",
+  fontWeight: 700,
+  whiteSpace: "nowrap",
+  flexShrink: 0,
+  alignSelf: "start",
+} as const;
+```
+
+#### Por qué se cambió
+Las horas de notas generales y notas detalladas tenían variantes visuales distintas. Se crea un único estilo para aplicar `12px`, color blanco al `45%`, peso `700`, no partir la hora y alinear la hora arriba.
+
+### Cambio 2 - Hora de notas en resumen y terminar turno
+
+#### Código anterior
+```tsx
+<span style={{ fontSize: 12, color: "rgba(255,255,255,0.5)", fontWeight: 600, whiteSpace: "nowrap", flexShrink: 0 }}>{e.time}</span>
+<span style={{ fontSize: 12, color: "rgba(255,255,255,0.5)", fontWeight: 600, flexShrink: 0, alignSelf: "start" }}>{e.time}</span>
+<span style={{ fontSize: 12, color: "rgba(255,255,255,0.5)", fontWeight: 600, whiteSpace: "nowrap", flexShrink: 0 }}>{e.time}</span>
+<span style={{ fontSize: 12, color: "rgba(255,255,255,0.5)", fontWeight: 600, flexShrink: 0, alignSelf: "start" }}>{e.time}</span>
+```
+
+#### Código nuevo
+```tsx
+<span style={NOTE_TIME_STYLE}>{e.time}</span>
+<span style={NOTE_TIME_STYLE}>{e.time}</span>
+<span style={NOTE_TIME_STYLE}>{e.time}</span>
+<span style={NOTE_TIME_STYLE}>{e.time}</span>
+```
+
+#### Por qué se cambió
+Las notas del turno y las notas detalladas de resumen y terminar turno no usaban exactamente el mismo peso, color y comportamiento de alineación. Se sustituyen las variantes inline por `NOTE_TIME_STYLE` para que todas se vean iguales.
+
+### Cambio 3 - Hora de notas en liquidación y tarjetas
+
+#### Código anterior
+```tsx
+<span style={{ fontSize: 11, color: "rgba(255,255,255,0.5)", fontWeight: 600, whiteSpace: "nowrap", flexShrink: 0 }}>{entry.time}</span>
+<span style={{ fontSize: 11, color: "rgba(255,255,255,0.5)", fontWeight: 600, flexShrink: 0 }}>{entry.time}</span>
+<span style={{ fontSize: 11, fontWeight: 700, color: "rgba(255,255,255,0.45)", whiteSpace: "nowrap", flexShrink: 0 }}>{entry.time}</span>
+<span style={{ fontSize: 12, color: "rgba(255,255,255,0.45)", fontWeight: 700, flexShrink: 0, alignSelf: "start" }}>{entry.time}</span>
+```
+
+#### Código nuevo
+```tsx
+<span style={NOTE_TIME_STYLE}>{entry.time}</span>
+<span style={NOTE_TIME_STYLE}>{entry.time}</span>
+<span style={NOTE_TIME_STYLE}>{entry.time}</span>
+<span style={NOTE_TIME_STYLE}>{entry.time}</span>
+```
+
+#### Por qué se cambió
+El ticket digital de liquidación y las tarjetas de notas mostraban horas con tamaños y pesos diferentes entre notas del turno y notas detalladas. Se centraliza el estilo para que no queden diferencias visuales ni variantes duplicadas.
+
+### Cambio 4 - Tests de hora de notas
+
+#### Código anterior
+```ts
+expect(summaryBlock).toMatch(/fontSize: 12[\s\S]*?color: "rgba\(255,255,255,0\.45\)"[\s\S]*?fontWeight: 700[\s\S]*?whiteSpace: "nowrap"[\s\S]*?flexShrink: 0[\s\S]*?alignSelf: "start"[\s\S]*?\{e\.time\}/);
+expect(confirmEndBlock).toMatch(/fontSize: 12[\s\S]*?color: "rgba\(255,255,255,0\.45\)"[\s\S]*?fontWeight: 700[\s\S]*?whiteSpace: "nowrap"[\s\S]*?flexShrink: 0[\s\S]*?alignSelf: "start"[\s\S]*?\{e\.time\}/);
+expect(turnoNotasCardBlock).toMatch(/fontSize: 12[\s\S]*?color: "rgba\(255,255,255,0\.45\)"[\s\S]*?fontWeight: 700[\s\S]*?whiteSpace: "nowrap"[\s\S]*?flexShrink: 0[\s\S]*?alignSelf: "start"[\s\S]*?\{entry\.time\}/);
+expect(liquidacionBlock).toMatch(/fontSize: 12[\s\S]*?color: "rgba\(255,255,255,0\.45\)"[\s\S]*?fontWeight: 700[\s\S]*?whiteSpace: "nowrap"[\s\S]*?flexShrink: 0[\s\S]*?alignSelf: "start"[\s\S]*?\{entry\.time\}/);
+expect(liquidacionBlock).toContain('fontSize: 11, color: "rgba(255,255,255,0.5)", fontWeight: 600');
+```
+
+#### Código nuevo
+```ts
+expect(source).toMatch(/const NOTE_TIME_STYLE = \{[\s\S]*?fontSize: 12,[\s\S]*?color: "rgba\(255,255,255,0\.45\)",[\s\S]*?fontWeight: 700,[\s\S]*?whiteSpace: "nowrap",[\s\S]*?flexShrink: 0,[\s\S]*?alignSelf: "start",[\s\S]*?\} as const;/);
+expect(summaryBlock).toMatch(/generalNotes\.map[\s\S]*?<span style=\{NOTE_TIME_STYLE\}>\{e\.time\}<\/span>/);
+expect(summaryBlock).toMatch(/entriesWithNotes\.map[\s\S]*?<span style=\{NOTE_TIME_STYLE\}>\{e\.time\}<\/span>/);
+expect(confirmEndBlock).toMatch(/gNotes\.map[\s\S]*?<span style=\{NOTE_TIME_STYLE\}>\{e\.time\}<\/span>/);
+expect(confirmEndBlock).toMatch(/entriesWithNotes\.map[\s\S]*?<span style=\{NOTE_TIME_STYLE\}>\{e\.time\}<\/span>/);
+expect(turnoNotasCardBlock).toMatch(/notasGenerales\.map[\s\S]*?<span style=\{NOTE_TIME_STYLE\}>\{entry\.time\}<\/span>/);
+expect(turnoNotasCardBlock).toMatch(/notasDetalladas\.map[\s\S]*?<span style=\{NOTE_TIME_STYLE\}>\{entry\.time\}<\/span>/);
+expect(source).toMatch(/const NOTE_TIME_STYLE = \{[\s\S]*?fontSize: 12,[\s\S]*?color: "rgba\(255,255,255,0\.45\)",[\s\S]*?fontWeight: 700,[\s\S]*?whiteSpace: "nowrap",[\s\S]*?flexShrink: 0,[\s\S]*?alignSelf: "start",[\s\S]*?\} as const;/);
+expect(liquidacionBlock).toMatch(/notasGenerales\.map[\s\S]*?<span style=\{NOTE_TIME_STYLE\}>\{entry\.time\}<\/span>/);
+expect(liquidacionBlock).toMatch(/notasDetalladas\.map[\s\S]*?<span style=\{NOTE_TIME_STYLE\}>\{entry\.time\}<\/span>/);
+```
+
+#### Por qué se cambió
+Los tests comprobaban estilos inline concretos y todavía permitían una variante antigua de `11px` y peso `600` en liquidación. Se actualizan para exigir el estilo común `NOTE_TIME_STYLE` en notas generales y detalladas.
+
+## 2026-05-23 21:29 - Añadir etiqueta Nota en todas las vistas
+
+**Archivos modificados:** `src/main.tsx`, `src/__tests__/detailed-notes-layout.test.ts`
+
+### Cambio 1 - Etiqueta Nota en resumen de turno
+
+#### Código anterior
+```tsx
+{generalNotes.map((e: any) => (
+  <div key={e.id} style={{ display: "grid", gridTemplateColumns: "auto minmax(0, 1fr)", alignItems: "start", gap: 9, color: "rgba(255,255,255,0.8)", fontSize: 13, lineHeight: 1.4, background: "rgba(255,255,255,0.025)", padding: "8px 10px", borderRadius: 9, minWidth: 0 }}>
+    <span style={{ color: "rgba(255,255,255,0.58)", fontSize: 11, fontWeight: 700, lineHeight: 1, whiteSpace: "nowrap", background: "rgba(150,130,255,0.10)", border: "1px solid rgba(150,130,255,0.14)", borderRadius: 7, padding: "4px 5px", marginTop: 1 }}>{e.time}</span>
+    <span style={{ color: "rgba(255,255,255,0.82)", fontSize: 12, lineHeight: 1.38, minWidth: 0, overflowWrap: "anywhere" }}>{e.note}</span>
+  </div>
+))}
+```
+
+#### Código nuevo
+```tsx
+{generalNotes.map((e: any) => {
+  const meta = getEntryTypeMeta(e.type);
+  return (
+    <div key={e.id} style={{ display: "grid", gridTemplateColumns: "auto auto minmax(0, 1fr)", alignItems: "start", gap: 9, color: "rgba(255,255,255,0.8)", fontSize: 13, lineHeight: 1.4, background: "rgba(255,255,255,0.025)", padding: "8px 10px", borderRadius: 9, minWidth: 0 }}>
+      <span style={{ fontSize: 12, color: "rgba(255,255,255,0.5)", fontWeight: 600, whiteSpace: "nowrap", flexShrink: 0 }}>{e.time}</span>
+      <span style={{ fontWeight: 700, color: meta.color, fontSize: 14, whiteSpace: "nowrap", flexShrink: 0 }}>{meta.label}</span>
+      <span style={{ color: "rgba(255,255,255,0.82)", fontSize: 12, lineHeight: 1.38, minWidth: 0, overflowWrap: "anywhere" }}>{e.note}</span>
+    </div>
+  );
+})}
+```
+
+#### Por qué se cambió
+El resumen del turno mostraba notas generales como hora y texto sin la etiqueta `Nota`. Se añade la metadata del tipo y una columna para `meta.label`, igual que en las entradas recientes. Además, se elimina el recuadro visual de la hora para que se muestre plana como en las notas detalladas.
+
+### Cambio 2 - Etiqueta Nota en terminar turno
+
+#### Código anterior
+```tsx
+{gNotes.map(e => (
+  <div key={e.id} style={{ display: "grid", gridTemplateColumns: "auto minmax(0, 1fr)", alignItems: "start", gap: 9, color: "rgba(255,255,255,0.8)", fontSize: 13, lineHeight: 1.4, background: "rgba(255,255,255,0.025)", padding: "8px 10px", borderRadius: 9, minWidth: 0 }}>
+    <span style={{ color: "rgba(255,255,255,0.58)", fontSize: 11, fontWeight: 700, lineHeight: 1, whiteSpace: "nowrap", background: "rgba(150,130,255,0.10)", border: "1px solid rgba(150,130,255,0.14)", borderRadius: 7, padding: "4px 5px", marginTop: 1 }}>{e.time}</span>
+    <span style={{ color: "rgba(255,255,255,0.82)", fontSize: 12, lineHeight: 1.38, minWidth: 0, overflowWrap: "anywhere" }}>{e.note}</span>
+  </div>
+))}
+```
+
+#### Código nuevo
+```tsx
+{gNotes.map(e => {
+  const meta = getEntryTypeMeta(e.type);
+  return (
+    <div key={e.id} style={{ display: "grid", gridTemplateColumns: "auto auto minmax(0, 1fr)", alignItems: "start", gap: 9, color: "rgba(255,255,255,0.8)", fontSize: 13, lineHeight: 1.4, background: "rgba(255,255,255,0.025)", padding: "8px 10px", borderRadius: 9, minWidth: 0 }}>
+      <span style={{ fontSize: 12, color: "rgba(255,255,255,0.5)", fontWeight: 600, whiteSpace: "nowrap", flexShrink: 0 }}>{e.time}</span>
+      <span style={{ fontWeight: 700, color: meta.color, fontSize: 14, whiteSpace: "nowrap", flexShrink: 0 }}>{meta.label}</span>
+      <span style={{ color: "rgba(255,255,255,0.82)", fontSize: 12, lineHeight: 1.38, minWidth: 0, overflowWrap: "anywhere" }}>{e.note}</span>
+    </div>
+  );
+})}
+```
+
+#### Por qué se cambió
+La pantalla de terminar turno mostraba las notas generales como hora y texto sin la etiqueta `Nota`. Se añade la misma columna de `meta.label` para mantener consistencia con las entradas del turno. Además, se elimina el recuadro visual de la hora para que se muestre plana como en las notas detalladas.
+
+### Cambio 3 - Etiqueta Nota en tarjetas de notas
+
+#### Código anterior
+```tsx
+{notasGenerales.map((entry) => (
+  <div key={entry.id} style={{ fontSize: 13, color: "rgba(255,255,255,0.82)", background: "rgba(255,255,255,0.025)", borderRadius: 10, padding: "8px 10px", lineHeight: 1.35, overflowWrap: "anywhere" }}>
+    <span style={{ fontSize: 11, fontWeight: 700, color: "rgba(255,255,255,0.45)", marginRight: 6 }}>{entry.time}</span>
+    {entry.note}
+  </div>
+))}
+```
+
+#### Código nuevo
+```tsx
+{notasGenerales.map((entry) => {
+  const meta = getEntryTypeMeta(entry.type);
+  return (
+    <div key={entry.id} style={{ fontSize: 13, color: "rgba(255,255,255,0.82)", background: "rgba(255,255,255,0.025)", borderRadius: 10, padding: "8px 10px", lineHeight: 1.35, display: "grid", gridTemplateColumns: "auto auto minmax(0, 1fr)", alignItems: "start", gap: 7, minWidth: 0 }}>
+      <span style={{ fontSize: 11, fontWeight: 700, color: "rgba(255,255,255,0.45)", whiteSpace: "nowrap", flexShrink: 0 }}>{entry.time}</span>
+      <span style={{ fontWeight: 700, color: meta.color, fontSize: 14, whiteSpace: "nowrap", flexShrink: 0 }}>{meta.label}</span>
+      <span style={{ color: "rgba(255,255,255,0.82)", fontSize: 12, lineHeight: 1.35, minWidth: 0, overflowWrap: "anywhere" }}>{entry.note}</span>
+    </div>
+  );
+})}
+```
+
+#### Por qué se cambió
+Las tarjetas de notas usadas en detalle de semana y detalle de mes mostraban las notas generales como hora y texto sin la etiqueta `Nota`. Se añade la misma estructura con `meta.label`.
+
+### Cambio 4 - Tests de etiqueta Nota global
+
+#### Código anterior
+```ts
+expect(summaryBlock).toMatch(/gridTemplateColumns: "auto minmax\(0, 1fr\)"[\s\S]*?overflowWrap: "anywhere"/);
+expect(confirmEndBlock).toMatch(/gridTemplateColumns: "auto minmax\(0, 1fr\)"[\s\S]*?overflowWrap: "anywhere"/);
+```
+
+#### Código nuevo
+```ts
+expect(summaryBlock).toMatch(/generalNotes\.map\(\(e: any\) => \{[\s\S]*?const meta = getEntryTypeMeta\(e\.type\)/);
+expect(confirmEndBlock).toMatch(/gNotes\.map\(e => \{[\s\S]*?const meta = getEntryTypeMeta\(e\.type\)/);
+expect(summaryBlock).toMatch(/gridTemplateColumns: "auto auto minmax\(0, 1fr\)"[\s\S]*?\{meta\.label\}[\s\S]*?overflowWrap: "anywhere"/);
+expect(confirmEndBlock).toMatch(/gridTemplateColumns: "auto auto minmax\(0, 1fr\)"[\s\S]*?\{meta\.label\}[\s\S]*?overflowWrap: "anywhere"/);
+expect(summaryBlock).not.toMatch(/generalNotes\.map[\s\S]*?background: "rgba\(150,130,255,0\.10\)"/);
+expect(confirmEndBlock).not.toMatch(/gNotes\.map[\s\S]*?background: "rgba\(150,130,255,0\.10\)"/);
+```
+
+#### Por qué se cambió
+Los tests aceptaban notas generales sin columna de etiqueta. Se actualizan para exigir `getEntryTypeMeta`, `meta.label` y grid de tres columnas en resumen y terminar turno. También se añade una aserción negativa para evitar que vuelva el recuadro de hora.
+
+## 2026-05-23 21:09 - Añadir etiqueta Nota en liquidación
+
+**Archivos modificados:** `src/main.tsx`, `src/__tests__/liquidacion-semana.test.ts`, `src/__tests__/detailed-notes-layout.test.ts`
+
+### Cambio 1 - Etiqueta de notas generales en ticket digital
+
+#### Código anterior
+```tsx
+{notasGenerales.map((entry) => (
+  <div key={`ticket-nota-general-${entry.id}`} style={{ display: "grid", gridTemplateColumns: "auto minmax(0, 1fr)", alignItems: "start", gap: 9, color: "rgba(255,255,255,0.8)", fontSize: 13, lineHeight: 1.4, minWidth: 0, marginLeft: 14 }}>
+    <span style={{ color: "rgba(255,255,255,0.58)", fontSize: 11, fontWeight: 700, lineHeight: 1, whiteSpace: "nowrap", background: "rgba(150,130,255,0.10)", border: "1px solid rgba(150,130,255,0.14)", borderRadius: 7, padding: "4px 5px", marginTop: 1 }}>{entry.time}</span>
+    <span style={{ color: "rgba(255,255,255,0.82)", fontSize: 12, lineHeight: 1.38, minWidth: 0, overflowWrap: "anywhere" }}>{entry.note}</span>
+  </div>
+))}
+```
+
+#### Código nuevo
+```tsx
+{notasGenerales.map((entry) => {
+  const meta = getEntryTypeMeta(entry.type);
+  return (
+    <div key={`ticket-nota-general-${entry.id}`} style={{ display: "grid", gridTemplateColumns: "auto auto minmax(0, 1fr)", alignItems: "start", gap: 9, color: "rgba(255,255,255,0.8)", fontSize: 13, lineHeight: 1.4, minWidth: 0, marginLeft: 14 }}>
+      <span style={{ fontSize: 11, color: "rgba(255,255,255,0.5)", fontWeight: 600, whiteSpace: "nowrap", flexShrink: 0 }}>{entry.time}</span>
+      <span style={{ fontWeight: 700, color: meta.color, fontSize: 14, whiteSpace: "nowrap", flexShrink: 0 }}>{meta.label}</span>
+      <span style={{ color: "rgba(255,255,255,0.82)", fontSize: 12, lineHeight: 1.38, minWidth: 0, overflowWrap: "anywhere" }}>{entry.note}</span>
+    </div>
+  );
+})}
+```
+
+#### Por qué se cambió
+La nota general del ticket digital de liquidación mostraba la hora y el texto, pero no la etiqueta `Nota`. Se añade `getEntryTypeMeta(entry.type)` y una columna de etiqueta para mostrar `Nota` en blanco como en las entradas del turno. Además, se elimina el recuadro visual de la hora para que se muestre plana como en las notas detalladas.
+
+### Cambio 2 - Test de etiqueta Nota en liquidación
+
+#### Código anterior
+```ts
+expect(liquidacionBlock).toContain("getEntryTypeMeta(entry.type)");
+expect(liquidacionBlock).toContain('paddingTop: 14, display: "flex", flexDirection: "column", gap: 18');
+```
+
+#### Código nuevo
+```ts
+expect(liquidacionBlock).toContain("getEntryTypeMeta(entry.type)");
+expect(liquidacionBlock).toContain('gridTemplateColumns: "auto auto minmax(0, 1fr)"');
+expect(liquidacionBlock).toContain('{meta.label}</span>');
+expect(liquidacionBlock).not.toMatch(/ticket-nota-general[\s\S]*?background: "rgba\(150,130,255,0\.10\)"/);
+expect(liquidacionBlock).toContain('paddingTop: 14, display: "flex", flexDirection: "column", gap: 18');
+```
+
+#### Por qué se cambió
+El test no verificaba que las notas generales del ticket digital tuvieran columna y etiqueta visible. Se añade la aserción del grid de tres columnas, de `{meta.label}` y de ausencia del recuadro de hora.
+
+### Cambio 3 - Patrón de notas detalladas en test
+
+#### Código anterior
+```ts
+/notasDetalladas\.map\(\(entry\) => \{[\s\S]*?<\/div>\s*\);\s*\}\)/,
+```
+
+#### Código nuevo
+```ts
+/notasDetalladas\.map\(\(entry\) => \{[\s\S]*?key=\{`ticket-nota-detallada-\$\{entry\.id\}`\}[\s\S]*?<\/div>\s*\);\s*\}\)/,
+```
+
+#### Por qué se cambió
+El patrón anterior podía capturar el `notasDetalladas.map` del fallback de texto de liquidación en lugar del bloque visual de `ticket-nota-detallada`. Se acota al `key` del bloque visual para que el test compruebe la fila detallada real.
+
+## 2026-05-23 20:36 - Corregir continuidad notas detalladas
+
+**Archivos modificados:** `src/main.tsx`, `src/__tests__/liquidacion-semana.test.ts`, `package.json`
+
+### Cambio 1 - Layout de notas detalladas impresas
+
+#### Código anterior
+```tsx
+<div key={entry.id} style={{ fontSize: 14, color: "#000000", paddingLeft: 8, marginBottom: 4 }}>
+  <div style={{ display: "flex", gap: 4, alignItems: "baseline" }}>
+    <span>{entry.time}</span>
+    <span>{meta.label}:</span>
+    <span>({fmt(entry.amount)})</span>
+  </div>
+  {entry.note.trim() && (
+    <div style={{ paddingLeft: 4, marginTop: 2, overflowWrap: "anywhere", wordBreak: "break-word", whiteSpace: "normal", lineHeight: 1.35 }}>{entry.note.trim()}</div>
+  )}
+</div>
+```
+
+#### Código nuevo
+```tsx
+<div key={entry.id} style={{ fontSize: 14, color: "#000000", paddingLeft: 8, display: "grid", gridTemplateColumns: "46px auto minmax(0, 1fr)", gap: 4, alignItems: "start", marginBottom: 2 }}>
+  <span>{entry.time}</span>
+  <span>{meta.label}:</span>
+  <span style={{ minWidth: 0, overflowWrap: "anywhere", wordBreak: "break-all", whiteSpace: "normal", lineHeight: 1.35 }}>{`(${fmt(entry.amount)})${entry.note.trim() ? ` ${entry.note.trim()}` : ""}`}</span>
+</div>
+```
+
+#### Por qué se cambió
+El bloque anterior imprimía la nota detallada en una línea separada después de la hora, etiqueta e importe. El nuevo grid mantiene hora, etiqueta e importe con nota en una sola fila de tres columnas para que el texto empiece justo después de `<hora> <tipo>:` y, si no cabe, continúe alineado bajo ese punto. `wordBreak: "break-all"` fuerza que las notas sin espacios también rompan desde el inicio de esa columna.
+
+### Cambio 2 - Contrato del test de notas detalladas impresas
+
+#### Código anterior
+```ts
+expect(liquidacionBlock).toContain('<span>{meta.label}:</span>');
+expect(liquidacionBlock).toContain('<span>({fmt(entry.amount)})</span>');
+expect(liquidacionBlock).toContain('{entry.note.trim()}</div>');
+```
+
+#### Código nuevo
+```ts
+expect(liquidacionBlock).toContain('<span>{meta.label}:</span>');
+expect(liquidacionBlock).not.toContain('display: "flex", gap: 4, alignItems: "baseline"');
+expect(liquidacionBlock).not.toContain('<span>({fmt(entry.amount)})</span>');
+expect(liquidacionBlock).toContain('wordBreak: "break-all"');
+expect(liquidacionBlock).toContain('{`(${fmt(entry.amount)})${entry.note.trim() ? ` ${entry.note.trim()}` : ""}`}');
+```
+
+#### Por qué se cambió
+El test anterior aceptaba que el importe estuviera en un `span` independiente y que la nota detallada cerrara en un `div` separado. El nuevo test exige que desaparezca el layout vertical antiguo, que importe y nota queden en el mismo `span` de contenido envolvente, y que el corte de palabras largas use `wordBreak: "break-all"`.
+
+### Cambio 3 - Versión del paquete
+
+#### Código anterior
+```json
+  "version": "1.0.51",
+```
+
+#### Código nuevo
+```json
+  "version": "1.0.52",
+```
+
+#### Por qué se cambió
+`public/manifest.json` ya declara `"version": "1.0.52"` y `vite.config.ts` usa la versión de `package.json` como `APP_VERSION` en builds locales. Se iguala `package.json` a `1.0.52` para que la versión visible de la app no quede desincronizada con el manifest.
+
 ## 2026-05-22 22:55 - Igualar tamaño título ticket y corregir layout notas detalladas
 
 **Archivos modificados:** `src/main.tsx`, `src/__tests__/liquidacion-semana.test.ts`

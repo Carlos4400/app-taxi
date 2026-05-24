@@ -1,0 +1,28 @@
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
+import { describe, expect, it } from "vitest";
+
+describe("APK update flow hardening", () => {
+  const mainSource = readFileSync(resolve("src/main.tsx"), "utf8");
+  const gradleSource = readFileSync(resolve("android/app/build.gradle"), "utf8");
+
+  it("does not expose an installable Android URL when the latest release has no APK asset", () => {
+    expect(mainSource).toContain('asset.name.endsWith(".apk")');
+    expect(mainSource).toMatch(/setUpdateMsg\("No se encontr\S+ APK en el \S+ltimo release\."\)/);
+    expect(mainSource).not.toContain("Sin APK directo");
+    expect(mainSource).not.toContain("const fallbackUrl = data.assets?.[0]?.browser_download_url || data.html_url");
+  });
+
+  it("only shows the native install button for APK URLs", () => {
+    expect(mainSource).toContain("const hasApkDownload = downloadUrl.endsWith(\".apk\")");
+    expect(mainSource).toMatch(/hasApkDownload && updateState !== "downloading" && updateState !== "checking"/);
+  });
+
+  it("derives local Android version values from package.json when CI variables are absent", () => {
+    expect(gradleSource).toContain("def packageJson = new groovy.json.JsonSlurper().parse(file('../../package.json'))");
+    expect(gradleSource).toContain('def packageVersionName = packageJson.version ?: "1.0.0"');
+    expect(gradleSource).toContain("def packageVersionCode = packageVersionName.tokenize('.').last().isInteger()");
+    expect(gradleSource).not.toContain('?: "1.0.19"');
+    expect(gradleSource).not.toContain(": 20");
+  });
+});

@@ -1,5 +1,17 @@
 apply plugin: 'com.android.application'
 
+// Versionado del APK derivado de package.json (raíz del repo), con prioridad
+// para la variable de entorno APP_VERSION que CI inyecta. Así versionName y
+// versionCode dejan de quedar fijos en valores antiguos y acompañan a la
+// versión real de la app. versionCode se calcula con el último segmento de la
+// versión (1.0.52 -> 52), por lo que aumenta en cada release de CI.
+def packageJson = new groovy.json.JsonSlurper().parse(file('../../package.json'))
+def packageVersionName = packageJson.version ?: "1.0.0"
+def packageVersionCode = packageVersionName.tokenize('.').last().isInteger() ? packageVersionName.tokenize('.').last().toInteger() : 1
+def ciVersionName = System.getenv("APP_VERSION")
+def resolvedVersionName = ciVersionName ?: packageVersionName
+def resolvedVersionCode = (ciVersionName != null && ciVersionName.tokenize('.').last().isInteger()) ? ciVersionName.tokenize('.').last().toInteger() : packageVersionCode
+
 android {
     namespace "com.mijornada.app"
     compileSdk rootProject.ext.compileSdkVersion
@@ -7,8 +19,8 @@ android {
         applicationId "com.mijornada.app"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 20
-        versionName "1.0.19"
+        versionCode resolvedVersionCode
+        versionName resolvedVersionName
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.

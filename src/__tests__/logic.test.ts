@@ -570,6 +570,7 @@ describe('🔒 Accounting Card Safety Lock — calcularTurnoContable', () => {
     totalF: 22.00,
     totalN: 15.00,
     entries: [],
+    notes: "",
   } as Turno;
 
   it('🔒 dineroBase = dinero - nulos (245.80 - 15.00 = 230.80)', () => {
@@ -649,12 +650,14 @@ describe('🔒 Accounting Card Safety Lock — calcularResumenContableTurnos (Se
 
   const turno1 = {
     id: 1, date: '2026-05-06', startDate: '2026-05-06',
+    startTime: '08:00', endTime: '16:00', notes: '',
     dinero: 200, km: 120, totalP: 10, totalD: 20, totalA: 5,
     totalE: 3, totalF: 8, totalN: 10, entries: [],
   } as Turno;
 
   const turno2 = {
     id: 2, date: '2026-05-07', startDate: '2026-05-07',
+    startTime: '08:00', endTime: '16:00', notes: '',
     dinero: 300, km: 180, totalP: 15, totalD: 30, totalA: 10,
     totalE: 5, totalF: 12, totalN: 20, entries: [],
   } as Turno;
@@ -709,6 +712,7 @@ describe('🔒 Accounting Card Safety Lock — calcularResumenContableTurnos (Se
     // Turno con decimales que podrían causar errores de punto flotante
     const turnoDecimal = {
       id: 3, date: '2026-05-08', startDate: '2026-05-08',
+      startTime: '08:00', endTime: '16:00', notes: '',
       dinero: 133.33, km: 95, totalP: 7.77, totalD: 11.11,
       totalA: 0, totalE: 0, totalF: 0, totalN: 3.33, entries: [],
     } as Turno;

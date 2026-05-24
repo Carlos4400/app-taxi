@@ -46,6 +46,8 @@ jobs:
         uses: gradle/actions/setup-gradle@v3
 
       - name: Build Android APK
+        env:
+          APP_VERSION: 1.0.${{ github.run_number }}
         run: |
           cd android
           chmod +x gradlew
