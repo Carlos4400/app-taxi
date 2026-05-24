@@ -32,6 +32,7 @@ import { resolveLatestApkUpdate, type UpdateState } from "./update-flow";
 import { buildBackupPayload, buildBackupPayloadFromState } from "./backup";
 import { mergeTurnos, sortTurnosByDateDesc } from "./turnos";
 import { parseCSVToHistory } from "./csv";
+import { getBackupMenuActionIds, getHomeQuickActionIds } from "./action-ids";
 import {
   userMetaDocRef,
   userSubcollectionRef,
@@ -45,6 +46,8 @@ export { fmtDuration, fmtKm, fmtKmNumber, fmtMoney, fmtMoneyNumber, splitDuratio
 export { buildBackupPayload, buildBackupPayloadFromState };
 export { mergeTurnos, sortTurnosByDateDesc };
 export { parseCSVLine, parseCSVToHistory } from "./csv";
+export { getBackupMenuActionIds, getHomeQuickActionIds };
+export type { BackupMenuActionId, HomeQuickActionId } from "./action-ids";
 
 const { useState, useEffect, useRef } = React;
 
@@ -325,20 +328,6 @@ export function ensureTurnosDiaLibreContable(turnos: Turno[], diaLibre: number):
       ? turno
       : { ...turno, diaLibreContable: diaLibre }
   );
-}
-
-export type HomeQuickActionId = "new-reservation" | "agenda" | "admin-users" | "logout" | "settings";
-export type BackupMenuActionId = "export-json" | "restore-json";
-
-export function getHomeQuickActionIds(isAdmin: boolean): HomeQuickActionId[] {
-  const actions: HomeQuickActionId[] = ["new-reservation", "agenda"];
-  if (isAdmin) actions.push("admin-users");
-  actions.push("logout", "settings");
-  return actions;
-}
-
-export function getBackupMenuActionIds(_isAdmin: boolean): BackupMenuActionId[] {
-  return ["export-json", "restore-json"];
 }
 
 // El payload se construye en el call site con buildBackupPayloadFromState

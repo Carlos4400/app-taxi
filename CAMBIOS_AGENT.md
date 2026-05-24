@@ -4,6 +4,125 @@ Este archivo registra cambios de código hechos por agentes/modelos en este proy
 
 Cada entrada debe indicar archivos modificados, código anterior, código nuevo y por qué se cambió. Las entradas se añaden al **principio** del archivo (las más recientes arriba).
 
+## 2026-05-24 23:15 - Extraer acciones de menu
+
+**Archivos modificados:** `src/main.tsx`, `src/action-ids.ts`, `src/__tests__/action-ids-extraction.test.ts`
+
+### Cambio 1 - Importar acciones de menu
+
+#### Código anterior
+```tsx
+import { mergeTurnos, sortTurnosByDateDesc } from "./turnos";
+import { parseCSVToHistory } from "./csv";
+```
+
+```tsx
+export { mergeTurnos, sortTurnosByDateDesc };
+export { parseCSVLine, parseCSVToHistory } from "./csv";
+```
+
+#### Código nuevo
+```tsx
+import { mergeTurnos, sortTurnosByDateDesc } from "./turnos";
+import { parseCSVToHistory } from "./csv";
+import { getBackupMenuActionIds, getHomeQuickActionIds } from "./action-ids";
+```
+
+```tsx
+export { mergeTurnos, sortTurnosByDateDesc };
+export { parseCSVLine, parseCSVToHistory } from "./csv";
+export { getBackupMenuActionIds, getHomeQuickActionIds };
+export type { BackupMenuActionId, HomeQuickActionId } from "./action-ids";
+```
+
+#### Por qué se cambió
+`main.tsx` usa los ids de acciones desde el nuevo módulo y conserva sus exports públicos para los tests.
+
+### Cambio 2 - Eliminar acciones locales
+
+#### Código anterior
+```tsx
+export type HomeQuickActionId = "new-reservation" | "agenda" | "admin-users" | "logout" | "settings";
+export type BackupMenuActionId = "export-json" | "restore-json";
+
+export function getHomeQuickActionIds(isAdmin: boolean): HomeQuickActionId[] {
+  const actions: HomeQuickActionId[] = ["new-reservation", "agenda"];
+  if (isAdmin) actions.push("admin-users");
+  actions.push("logout", "settings");
+  return actions;
+}
+
+export function getBackupMenuActionIds(_isAdmin: boolean): BackupMenuActionId[] {
+  return ["export-json", "restore-json"];
+}
+
+// El payload se construye en el call site con buildBackupPayloadFromState
+```
+
+#### Código nuevo
+```tsx
+// El payload se construye en el call site con buildBackupPayloadFromState
+```
+
+#### Por qué se cambió
+Los tipos y funciones de ids de acciones no necesitan vivir en `main.tsx`; al extraerlos se reduce el archivo sin tocar las pantallas.
+
+### Cambio 3 - Crear módulo de acciones
+
+#### Código anterior
+`No existía el módulo de acciones en src/action-ids.ts.`
+
+#### Código nuevo
+```ts
+export type HomeQuickActionId = "new-reservation" | "agenda" | "admin-users" | "logout" | "settings";
+export type BackupMenuActionId = "export-json" | "restore-json";
+
+export function getHomeQuickActionIds(isAdmin: boolean): HomeQuickActionId[] {
+  const actions: HomeQuickActionId[] = ["new-reservation", "agenda"];
+  if (isAdmin) actions.push("admin-users");
+  actions.push("logout", "settings");
+  return actions;
+}
+
+export function getBackupMenuActionIds(_isAdmin: boolean): BackupMenuActionId[] {
+  return ["export-json", "restore-json"];
+}
+```
+
+#### Por qué se cambió
+El módulo nuevo centraliza las listas de acciones visibles para home y backup.
+
+### Cambio 4 - Proteger extracción de acciones
+
+#### Código anterior
+`No existía el test de extracción de acciones en src/__tests__/action-ids-extraction.test.ts.`
+
+#### Código nuevo
+```ts
+import { existsSync, readFileSync } from "node:fs";
+import { resolve } from "node:path";
+import { describe, expect, it } from "vitest";
+
+describe("Action id extraction", () => {
+  const actionIdsPath = resolve("src/action-ids.ts");
+  const mainSource = readFileSync(resolve("src/main.tsx"), "utf8");
+
+  it("keeps home and backup action ids outside main.tsx", () => {
+    expect(existsSync(actionIdsPath)).toBe(true);
+
+    const actionIdsSource = readFileSync(actionIdsPath, "utf8");
+    expect(actionIdsSource).toContain("export function getHomeQuickActionIds");
+    expect(actionIdsSource).toContain("export function getBackupMenuActionIds");
+    expect(mainSource).toContain('from "./action-ids"');
+    expect(mainSource).not.toMatch(/^export type HomeQuickActionId/m);
+    expect(mainSource).not.toMatch(/^export function getHomeQuickActionIds\(/m);
+  });
+});
+```
+
+#### Por qué se cambió
+El test fija que los ids de acciones no vuelvan a concentrarse dentro de `main.tsx`.
+
 ## 2026-05-24 23:12 - Extraer parser CSV
 
 **Archivos modificados:** `src/main.tsx`, `src/csv.ts`, `src/__tests__/csv-extraction.test.ts`
