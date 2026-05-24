@@ -4,6 +4,148 @@ Este archivo registra cambios de código hechos por agentes/modelos en este proy
 
 Cada entrada debe indicar archivos modificados, código anterior, código nuevo y por qué se cambió. Las entradas se añaden al **principio** del archivo (las más recientes arriba).
 
+## 2026-05-24 23:33 - Extraer estilos de tarjetas
+
+**Archivos modificados:** `src/main.tsx`, `src/card-styles.ts`, `src/__tests__/card-styles-extraction.test.ts`
+
+### Cambio 1 - Importar estilos de tarjetas
+
+#### Código anterior
+```tsx
+import { getDaysInMonth, getStartOffset } from "./calendar-date";
+import { MESES_ABREVIADOS, MESES_COMPLETOS, getAccountingPeriodLabel, getMesLabel } from "./date-labels";
+```
+
+```tsx
+export { updateTurnoEntrega };
+export { getAccountingPeriodLabel };
+```
+
+#### Código nuevo
+```tsx
+import { getDaysInMonth, getStartOffset } from "./calendar-date";
+import { MESES_ABREVIADOS, MESES_COMPLETOS, getAccountingPeriodLabel, getMesLabel } from "./date-labels";
+import { KM_CARD_UNIT_STYLE, TIME_CARD_HOUR_UNIT_STYLE, TIME_CARD_UNIT_STYLE, WEEK_LIST_CARD_TEXT_SIZES } from "./card-styles";
+```
+
+```tsx
+export { updateTurnoEntrega };
+export { getAccountingPeriodLabel };
+export { KM_CARD_UNIT_STYLE, TIME_CARD_HOUR_UNIT_STYLE, TIME_CARD_UNIT_STYLE, WEEK_LIST_CARD_TEXT_SIZES };
+```
+
+#### Por qué se cambió
+`main.tsx` usa las constantes visuales desde `card-styles.ts` y conserva sus exports públicos para los tests.
+
+### Cambio 2 - Eliminar estilos locales
+
+#### Código anterior
+```tsx
+export const WEEK_LIST_CARD_TEXT_SIZES = {
+  range: "clamp(13px, 4.2cqw, 16px)",
+  meta: "clamp(11px, 3.4cqw, 13px)",
+  metric: "clamp(14px, 4.5cqw, 17px)",
+} as const;
+
+export const KM_CARD_UNIT_STYLE = {
+  fontSize: "0.72em",
+  fontWeight: 900,
+  letterSpacing: "normal",
+} as const;
+
+export const TIME_CARD_UNIT_STYLE = {
+  fontSize: "1em",
+  fontWeight: KM_CARD_UNIT_STYLE.fontWeight,
+  marginLeft: 2,
+  letterSpacing: KM_CARD_UNIT_STYLE.letterSpacing,
+} as const;
+
+export const TIME_CARD_HOUR_UNIT_STYLE = {
+  ...TIME_CARD_UNIT_STYLE,
+  marginRight: 6,
+} as const;
+
+const NOTE_TIME_STYLE = {
+```
+
+#### Código nuevo
+```tsx
+const NOTE_TIME_STYLE = {
+```
+
+#### Por qué se cambió
+Las constantes reutilizables de tipografía de tarjetas se movieron fuera de `main.tsx`; `NOTE_TIME_STYLE` se mantiene local porque los tests visuales lo validan en esa pantalla.
+
+### Cambio 3 - Crear módulo de estilos
+
+#### Código anterior
+`No existía el módulo de estilos de tarjetas en src/card-styles.ts.`
+
+#### Código nuevo
+```ts
+export const WEEK_LIST_CARD_TEXT_SIZES = {
+  range: "clamp(13px, 4.2cqw, 16px)",
+  meta: "clamp(11px, 3.4cqw, 13px)",
+  metric: "clamp(14px, 4.5cqw, 17px)",
+} as const;
+
+export const KM_CARD_UNIT_STYLE = {
+  fontSize: "0.72em",
+  fontWeight: 900,
+  letterSpacing: "normal",
+} as const;
+
+export const TIME_CARD_UNIT_STYLE = {
+  fontSize: "1em",
+  fontWeight: KM_CARD_UNIT_STYLE.fontWeight,
+  marginLeft: 2,
+  letterSpacing: KM_CARD_UNIT_STYLE.letterSpacing,
+} as const;
+
+export const TIME_CARD_HOUR_UNIT_STYLE = {
+  ...TIME_CARD_UNIT_STYLE,
+  marginRight: 6,
+} as const;
+```
+
+#### Por qué se cambió
+El módulo nuevo agrupa constantes visuales compartidas por tarjetas y valores de tiempo/KM.
+
+### Cambio 4 - Proteger extracción de estilos
+
+#### Código anterior
+`No existía el test de extracción de estilos en src/__tests__/card-styles-extraction.test.ts.`
+
+#### Código nuevo
+```ts
+import { existsSync, readFileSync } from "node:fs";
+import { resolve } from "node:path";
+import { describe, expect, it } from "vitest";
+
+describe("Card styles extraction", () => {
+  const cardStylesPath = resolve("src/card-styles.ts");
+  const mainSource = readFileSync(resolve("src/main.tsx"), "utf8");
+
+  it("keeps reusable card typography constants outside main.tsx", async () => {
+    expect(existsSync(cardStylesPath)).toBe(true);
+
+    const modulePath = "../card-styles";
+    const { WEEK_LIST_CARD_TEXT_SIZES, KM_CARD_UNIT_STYLE, TIME_CARD_UNIT_STYLE, TIME_CARD_HOUR_UNIT_STYLE } = await import(modulePath);
+    expect(WEEK_LIST_CARD_TEXT_SIZES.range).toContain("cqw");
+    expect(KM_CARD_UNIT_STYLE.fontSize).toBe("0.72em");
+    expect(TIME_CARD_UNIT_STYLE.fontWeight).toBe(KM_CARD_UNIT_STYLE.fontWeight);
+    expect(TIME_CARD_HOUR_UNIT_STYLE.marginRight).toBe(6);
+
+    expect(mainSource).toContain('from "./card-styles"');
+    expect(mainSource).not.toMatch(/^export const WEEK_LIST_CARD_TEXT_SIZES/m);
+    expect(mainSource).not.toMatch(/^export const KM_CARD_UNIT_STYLE/m);
+  });
+});
+```
+
+#### Por qué se cambió
+El test fija la extracción y comprueba que los valores clave de tipografía no cambien.
+
 ## 2026-05-24 23:29 - Extraer etiquetas de fecha
 
 **Archivos modificados:** `src/main.tsx`, `src/date-labels.ts`, `src/__tests__/date-labels-extraction.test.ts`

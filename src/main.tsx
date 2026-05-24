@@ -43,6 +43,7 @@ import { getTurnosNotasSemana } from "./turno-notas-logic";
 import { updateTurnoEntrega } from "./turno-entrega";
 import { getDaysInMonth, getStartOffset } from "./calendar-date";
 import { MESES_ABREVIADOS, MESES_COMPLETOS, getAccountingPeriodLabel, getMesLabel } from "./date-labels";
+import { KM_CARD_UNIT_STYLE, TIME_CARD_HOUR_UNIT_STYLE, TIME_CARD_UNIT_STYLE, WEEK_LIST_CARD_TEXT_SIZES } from "./card-styles";
 import {
   userMetaDocRef,
   userSubcollectionRef,
@@ -67,6 +68,7 @@ export type { BackupMenuActionId, HomeQuickActionId } from "./action-ids";
 export { getTurnosNotasSemana };
 export { updateTurnoEntrega };
 export { getAccountingPeriodLabel };
+export { KM_CARD_UNIT_STYLE, TIME_CARD_HOUR_UNIT_STYLE, TIME_CARD_UNIT_STYLE, WEEK_LIST_CARD_TEXT_SIZES };
 
 const { useState, useEffect, useRef } = React;
 
@@ -159,30 +161,6 @@ type EntryTypeMeta = {
 function getEntryTypeMeta(type: string): EntryTypeMeta {
   return ENTRY_TYPE_META[type] || ENTRY_TYPE_META.nulo;
 }
-
-export const WEEK_LIST_CARD_TEXT_SIZES = {
-  range: "clamp(13px, 4.2cqw, 16px)",
-  meta: "clamp(11px, 3.4cqw, 13px)",
-  metric: "clamp(14px, 4.5cqw, 17px)",
-} as const;
-
-export const KM_CARD_UNIT_STYLE = {
-  fontSize: "0.72em",
-  fontWeight: 900,
-  letterSpacing: "normal",
-} as const;
-
-export const TIME_CARD_UNIT_STYLE = {
-  fontSize: "1em",
-  fontWeight: KM_CARD_UNIT_STYLE.fontWeight,
-  marginLeft: 2,
-  letterSpacing: KM_CARD_UNIT_STYLE.letterSpacing,
-} as const;
-
-export const TIME_CARD_HOUR_UNIT_STYLE = {
-  ...TIME_CARD_UNIT_STYLE,
-  marginRight: 6,
-} as const;
 
 const NOTE_TIME_STYLE = {
   fontSize: 12,
