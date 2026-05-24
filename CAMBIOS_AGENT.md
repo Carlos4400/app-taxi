@@ -4,6 +4,173 @@ Este archivo registra cambios de código hechos por agentes/modelos en este proy
 
 Cada entrada debe indicar archivos modificados, código anterior, código nuevo y por qué se cambió. Las entradas se añaden al **principio** del archivo (las más recientes arriba).
 
+## 2026-05-24 23:06 - Extraer builders de backup
+
+**Archivos modificados:** `src/main.tsx`, `src/backup.ts`, `src/__tests__/backup-extraction.test.ts`
+
+### Cambio 1 - Importar builders de backup
+
+#### Código anterior
+```tsx
+import { ConfirmDialog, MainCard, SmallCard } from "./components/common";
+import { TurnoNotasCard } from "./components/turno-notas";
+import { EditEntryDialog } from "./components/edit-entry-dialog";
+import { resolveLatestApkUpdate, type UpdateState } from "./update-flow";
+```
+
+```tsx
+export { fmtDuration, fmtKm, fmtKmNumber, fmtMoney, fmtMoneyNumber, splitDurationLabel } from "./formatters";
+```
+
+#### Código nuevo
+```tsx
+import { ConfirmDialog, MainCard, SmallCard } from "./components/common";
+import { TurnoNotasCard } from "./components/turno-notas";
+import { EditEntryDialog } from "./components/edit-entry-dialog";
+import { resolveLatestApkUpdate, type UpdateState } from "./update-flow";
+import { buildBackupPayload, buildBackupPayloadFromState } from "./backup";
+```
+
+```tsx
+export { fmtDuration, fmtKm, fmtKmNumber, fmtMoney, fmtMoneyNumber, splitDurationLabel } from "./formatters";
+export { buildBackupPayload, buildBackupPayloadFromState };
+```
+
+#### Por qué se cambió
+Los builders se importan desde el nuevo módulo `backup.ts` y se reexportan desde `main.tsx` para mantener la API usada por los tests y por el resto de la app.
+
+### Cambio 2 - Eliminar builders locales
+
+#### Código anterior
+```tsx
+export function buildBackupPayload(values: {
+  history: string | null;
+  settings: string | null;
+  current: string | null;
+  weekOverrides: string | null;
+  reservations: string | null;
+  notes: string | null;
+}) {
+  return {
+    history: values.history,
+    settings: values.settings,
+    current: values.current,
+    weekOverrides: values.weekOverrides,
+    reservations: values.reservations,
+    notes: values.notes,
+  };
+}
+
+export function buildBackupPayloadFromState(values: {
+  history: Turno[];
+  settings: AppSettings;
+  current: CurrentState;
+  weekOverrides: WeekOverride[];
+  reservations: Reserva[];
+  notes: NotaCalendario[];
+}) {
+  return buildBackupPayload({
+    history: JSON.stringify(values.history),
+    settings: JSON.stringify(values.settings),
+    current: JSON.stringify(values.current),
+    weekOverrides: JSON.stringify(values.weekOverrides),
+    reservations: JSON.stringify(values.reservations),
+    notes: JSON.stringify(values.notes),
+  });
+}
+
+export type HomeQuickActionId = "new-reservation" | "agenda" | "admin-users" | "logout" | "settings";
+```
+
+#### Código nuevo
+```tsx
+export type HomeQuickActionId = "new-reservation" | "agenda" | "admin-users" | "logout" | "settings";
+```
+
+#### Por qué se cambió
+La definición local duplicaba responsabilidad dentro de `main.tsx`; el comportamiento queda en `backup.ts` sin tocar las claves ni la serialización del payload.
+
+### Cambio 3 - Crear módulo de backup
+
+#### Código anterior
+`No existía el módulo de backup en src/backup.ts.`
+
+#### Código nuevo
+```ts
+export type BackupPayloadValues = {
+  history: string | null;
+  settings: string | null;
+  current: string | null;
+  weekOverrides: string | null;
+  reservations: string | null;
+  notes: string | null;
+};
+
+export type BackupStateValues = {
+  history: unknown;
+  settings: unknown;
+  current: unknown;
+  weekOverrides: unknown;
+  reservations: unknown;
+  notes: unknown;
+};
+
+export function buildBackupPayload(values: BackupPayloadValues) {
+  return {
+    history: values.history,
+    settings: values.settings,
+    current: values.current,
+    weekOverrides: values.weekOverrides,
+    reservations: values.reservations,
+    notes: values.notes,
+  };
+}
+
+export function buildBackupPayloadFromState(values: BackupStateValues) {
+  return buildBackupPayload({
+    history: JSON.stringify(values.history),
+    settings: JSON.stringify(values.settings),
+    current: JSON.stringify(values.current),
+    weekOverrides: JSON.stringify(values.weekOverrides),
+    reservations: JSON.stringify(values.reservations),
+    notes: JSON.stringify(values.notes),
+  });
+}
+```
+
+#### Por qué se cambió
+El módulo nuevo concentra la construcción pura del backup y evita importar tipos de `main.tsx`, reduciendo el riesgo de ciclos.
+
+### Cambio 4 - Proteger la extracción con test
+
+#### Código anterior
+`No existía el test de extracción de backup en src/__tests__/backup-extraction.test.ts.`
+
+#### Código nuevo
+```ts
+import { existsSync, readFileSync } from "node:fs";
+import { resolve } from "node:path";
+import { describe, expect, it } from "vitest";
+
+describe("Backup builder extraction", () => {
+  const backupPath = resolve("src/backup.ts");
+  const mainSource = readFileSync(resolve("src/main.tsx"), "utf8");
+
+  it("keeps backup payload builders outside main.tsx", () => {
+    expect(existsSync(backupPath)).toBe(true);
+
+    const backupSource = readFileSync(backupPath, "utf8");
+    expect(backupSource).toContain("export function buildBackupPayload");
+    expect(backupSource).toContain("export function buildBackupPayloadFromState");
+    expect(mainSource).toContain('from "./backup"');
+    expect(mainSource).not.toMatch(/^export function buildBackupPayload\(/m);
+  });
+});
+```
+
+#### Por qué se cambió
+El test fija que la extracción se mantiene y que `main.tsx` ya no vuelve a definir los builders de backup.
+
 ## 2026-05-24 23:01 - Extraer diálogo de edición
 
 **Archivos modificados:** `src/main.tsx`, `src/components/edit-entry-dialog.tsx`, `src/__tests__/edit-entry-dialog-extraction.test.ts`

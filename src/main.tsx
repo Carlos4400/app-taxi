@@ -29,6 +29,7 @@ import { ConfirmDialog, MainCard, SmallCard } from "./components/common";
 import { TurnoNotasCard } from "./components/turno-notas";
 import { EditEntryDialog } from "./components/edit-entry-dialog";
 import { resolveLatestApkUpdate, type UpdateState } from "./update-flow";
+import { buildBackupPayload, buildBackupPayloadFromState } from "./backup";
 import {
   userMetaDocRef,
   userSubcollectionRef,
@@ -39,6 +40,7 @@ import {
 import { AdminListScreen, AdminUserView } from "./admin-screens";
 
 export { fmtDuration, fmtKm, fmtKmNumber, fmtMoney, fmtMoneyNumber, splitDurationLabel } from "./formatters";
+export { buildBackupPayload, buildBackupPayloadFromState };
 
 const { useState, useEffect, useRef } = React;
 
@@ -407,42 +409,6 @@ export function parseCSVToHistory(csvText: string): Turno[] {
   }
 
   return sortTurnosByDateDesc(Array.from(newTurnosMap.values()));
-}
-
-export function buildBackupPayload(values: {
-  history: string | null;
-  settings: string | null;
-  current: string | null;
-  weekOverrides: string | null;
-  reservations: string | null;
-  notes: string | null;
-}) {
-  return {
-    history: values.history,
-    settings: values.settings,
-    current: values.current,
-    weekOverrides: values.weekOverrides,
-    reservations: values.reservations,
-    notes: values.notes,
-  };
-}
-
-export function buildBackupPayloadFromState(values: {
-  history: Turno[];
-  settings: AppSettings;
-  current: CurrentState;
-  weekOverrides: WeekOverride[];
-  reservations: Reserva[];
-  notes: NotaCalendario[];
-}) {
-  return buildBackupPayload({
-    history: JSON.stringify(values.history),
-    settings: JSON.stringify(values.settings),
-    current: JSON.stringify(values.current),
-    weekOverrides: JSON.stringify(values.weekOverrides),
-    reservations: JSON.stringify(values.reservations),
-    notes: JSON.stringify(values.notes),
-  });
 }
 
 export type HomeQuickActionId = "new-reservation" | "agenda" | "admin-users" | "logout" | "settings";
