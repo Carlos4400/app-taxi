@@ -45,6 +45,7 @@ import { getDaysInMonth, getStartOffset } from "./calendar-date";
 import { MESES_ABREVIADOS, MESES_COMPLETOS, getAccountingPeriodLabel, getMesLabel } from "./date-labels";
 import { KM_CARD_UNIT_STYLE, TIME_CARD_HOUR_UNIT_STYLE, TIME_CARD_UNIT_STYLE, WEEK_LIST_CARD_TEXT_SIZES } from "./card-styles";
 import { fmtDate, getDiffMins, timeNow, today } from "./date-time";
+import { readLocalJSON, userStorageKey, writeUserLocalJSON } from "./user-storage";
 import {
   userMetaDocRef,
   userSubcollectionRef,
@@ -178,22 +179,6 @@ const KEY_SETTINGS = "taxi_settings_v3";
 const KEY_WEEK_OVERRIDES = "taxi_week_overrides_v1";
 const KEY_RESERVATIONS = "taxi_reservations_v1";
 const KEY_NOTES = "taxi_notes_v1";
-
-function userStorageKey(baseKey: string, uid = auth.currentUser?.uid || ""): string {
-  return uid ? `${baseKey}__${uid}` : baseKey;
-}
-
-function readLocalJSON<T>(baseKey: string): T | null {
-  try {
-    return JSON.parse(localStorage.getItem(userStorageKey(baseKey)) || "null") as T | null;
-  } catch (e) {
-    return null;
-  }
-}
-
-function writeUserLocalJSON(uid: string, baseKey: string, value: unknown): void {
-  localStorage.setItem(userStorageKey(baseKey, uid), JSON.stringify(value));
-}
 
 export interface Reserva {
   id: string;

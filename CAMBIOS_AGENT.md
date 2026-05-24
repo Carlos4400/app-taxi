@@ -4,6 +4,129 @@ Este archivo registra cambios de código hechos por agentes/modelos en este proy
 
 Cada entrada debe indicar archivos modificados, código anterior, código nuevo y por qué se cambió. Las entradas se añaden al **principio** del archivo (las más recientes arriba).
 
+## 2026-05-24 23:39 - Extraer almacenamiento local
+
+**Archivos modificados:** `src/main.tsx`, `src/user-storage.ts`, `src/__tests__/user-storage-extraction.test.ts`
+
+### Cambio 1 - Importar almacenamiento local
+
+#### Código anterior
+```tsx
+import { KM_CARD_UNIT_STYLE, TIME_CARD_HOUR_UNIT_STYLE, TIME_CARD_UNIT_STYLE, WEEK_LIST_CARD_TEXT_SIZES } from "./card-styles";
+import { fmtDate, getDiffMins, timeNow, today } from "./date-time";
+```
+
+#### Código nuevo
+```tsx
+import { KM_CARD_UNIT_STYLE, TIME_CARD_HOUR_UNIT_STYLE, TIME_CARD_UNIT_STYLE, WEEK_LIST_CARD_TEXT_SIZES } from "./card-styles";
+import { fmtDate, getDiffMins, timeNow, today } from "./date-time";
+import { readLocalJSON, userStorageKey, writeUserLocalJSON } from "./user-storage";
+```
+
+#### Por qué se cambió
+`main.tsx` usa los helpers de localStorage desde el nuevo módulo y conserva el comportamiento de claves por usuario.
+
+### Cambio 2 - Eliminar helpers locales de almacenamiento
+
+#### Código anterior
+```tsx
+function userStorageKey(baseKey: string, uid = auth.currentUser?.uid || ""): string {
+  return uid ? `${baseKey}__${uid}` : baseKey;
+}
+
+function readLocalJSON<T>(baseKey: string): T | null {
+  try {
+    return JSON.parse(localStorage.getItem(userStorageKey(baseKey)) || "null") as T | null;
+  } catch (e) {
+    return null;
+  }
+}
+
+function writeUserLocalJSON(uid: string, baseKey: string, value: unknown): void {
+  localStorage.setItem(userStorageKey(baseKey, uid), JSON.stringify(value));
+}
+
+export interface Reserva {
+```
+
+#### Código nuevo
+```tsx
+export interface Reserva {
+```
+
+#### Por qué se cambió
+Los helpers de clave, lectura y escritura JSON se movieron fuera de `main.tsx` sin cambiar el fallback a clave global.
+
+### Cambio 3 - Crear módulo de almacenamiento
+
+#### Código anterior
+`No existía el módulo de almacenamiento local en src/user-storage.ts.`
+
+#### Código nuevo
+```ts
+import { auth } from "./firebase";
+
+export function userStorageKey(baseKey: string, uid = auth.currentUser?.uid || ""): string {
+  return uid ? `${baseKey}__${uid}` : baseKey;
+}
+
+export function readLocalJSON<T>(baseKey: string): T | null {
+  try {
+    return JSON.parse(localStorage.getItem(userStorageKey(baseKey)) || "null") as T | null;
+  } catch (e) {
+    return null;
+  }
+}
+
+export function writeUserLocalJSON(uid: string, baseKey: string, value: unknown): void {
+  localStorage.setItem(userStorageKey(baseKey, uid), JSON.stringify(value));
+}
+```
+
+#### Por qué se cambió
+El módulo nuevo concentra el acceso a localStorage por usuario y deja `main.tsx` con llamadas de más alto nivel.
+
+### Cambio 4 - Proteger extracción de almacenamiento
+
+#### Código anterior
+`No existía el test de extracción de almacenamiento en src/__tests__/user-storage-extraction.test.ts.`
+
+#### Código nuevo
+```ts
+import { existsSync, readFileSync } from "node:fs";
+import { resolve } from "node:path";
+import { describe, expect, it } from "vitest";
+
+describe("User storage extraction", () => {
+  const userStoragePath = resolve("src/user-storage.ts");
+  const mainSource = readFileSync(resolve("src/main.tsx"), "utf8");
+
+  it("keeps user-scoped localStorage helpers outside main.tsx", async () => {
+    expect(existsSync(userStoragePath)).toBe(true);
+
+    const modulePath = "../user-storage";
+    const { userStorageKey, readLocalJSON, writeUserLocalJSON } = await import(modulePath);
+    localStorage.clear();
+    localStorage.setItem("plain", "{\"ok\":true}");
+
+    expect(userStorageKey("plain", "uid-1")).toBe("plain__uid-1");
+    expect(userStorageKey("plain", "")).toBe("plain");
+    expect(readLocalJSON("plain")).toEqual({ ok: true });
+    expect(readLocalJSON("missing")).toBeNull();
+    writeUserLocalJSON("uid-1", "plain", { value: 2 });
+    expect(localStorage.getItem("plain__uid-1")).toBe("{\"value\":2}");
+
+    expect(mainSource).toContain('from "./user-storage"');
+    expect(mainSource).not.toMatch(/^function userStorageKey\(/m);
+    expect(mainSource).not.toMatch(/^function readLocalJSON/m);
+    expect(mainSource).not.toMatch(/^function writeUserLocalJSON/m);
+  });
+});
+```
+
+#### Por qué se cambió
+El test fija la extracción y valida claves por uid, lectura JSON y escritura serializada.
+
 ## 2026-05-24 23:36 - Extraer fecha y hora
 
 **Archivos modificados:** `src/main.tsx`, `src/date-time.ts`, `src/__tests__/date-time-extraction.test.ts`
