@@ -4,6 +4,297 @@ Este archivo registra cambios de código hechos por agentes/modelos en este proy
 
 Cada entrada debe indicar archivos modificados, código anterior, código nuevo y por qué se cambió. Las entradas se añaden al **principio** del archivo (las más recientes arriba).
 
+## 2026-05-24 23:12 - Extraer parser CSV
+
+**Archivos modificados:** `src/main.tsx`, `src/csv.ts`, `src/__tests__/csv-extraction.test.ts`
+
+### Cambio 1 - Importar parser CSV
+
+#### Código anterior
+```tsx
+import { buildBackupPayload, buildBackupPayloadFromState } from "./backup";
+import { mergeTurnos, sortTurnosByDateDesc } from "./turnos";
+```
+
+```tsx
+export { buildBackupPayload, buildBackupPayloadFromState };
+export { mergeTurnos, sortTurnosByDateDesc };
+```
+
+#### Código nuevo
+```tsx
+import { buildBackupPayload, buildBackupPayloadFromState } from "./backup";
+import { mergeTurnos, sortTurnosByDateDesc } from "./turnos";
+import { parseCSVToHistory } from "./csv";
+```
+
+```tsx
+export { buildBackupPayload, buildBackupPayloadFromState };
+export { mergeTurnos, sortTurnosByDateDesc };
+export { parseCSVLine, parseCSVToHistory } from "./csv";
+```
+
+#### Por qué se cambió
+`main.tsx` necesita usar `parseCSVToHistory` en la importación y mantener `parseCSVLine` y `parseCSVToHistory` como exports públicos para los tests existentes.
+
+### Cambio 2 - Eliminar parser de línea local
+
+#### Código anterior
+```tsx
+export function parseCSVLine(text: string): string[] {
+  const result: string[] = [];
+  let current = "";
+  let inQuotes = false;
+  for (let i = 0; i < text.length; i++) {
+    const char = text[i];
+    if (char === '"') {
+      if (inQuotes && text[i + 1] === '"') {
+        current += '"';
+        i++;
+      } else {
+        inQuotes = !inQuotes;
+      }
+    } else if (char === ';' && !inQuotes) {
+      result.push(current);
+      current = "";
+    } else {
+      current += char;
+    }
+  }
+  result.push(current);
+  return result;
+}
+
+export function getTurnosByCalendarMonth(turnos: Turno[], year: number, month: number): Turno[] {
+```
+
+#### Código nuevo
+```tsx
+export function getTurnosByCalendarMonth(turnos: Turno[], year: number, month: number): Turno[] {
+```
+
+#### Por qué se cambió
+El parser de una línea CSV se movió a `csv.ts` para que `main.tsx` deje de contener lógica de importación de archivos.
+
+### Cambio 3 - Eliminar conversión CSV local
+
+#### Código anterior
+```tsx
+export function parseCSVToHistory(csvText: string): Turno[] {
+  const lines = csvText.split(/\r?\n/).filter(l => l.trim() !== "");
+  if (lines.length < 2) return [];
+
+  const newTurnosMap = new Map<string, Turno>();
+  let timeBase = Date.now();
+
+  for (let i = 1; i < lines.length; i++) {
+    const cols = parseCSVLine(lines[i]);
+    if (cols.length < 10) continue;
+
+    const [date, startTime, endTime, type, amountStr, note, time, dineroStr, kmStr] = cols;
+
+    const key = `${date}|${startTime}|${endTime}`;
+    if (!newTurnosMap.has(key)) {
+      newTurnosMap.set(key, {
+        id: timeBase++,
+        date,
+        startTime: startTime || null,
+        endTime,
+        entries: [],
+        totalP: 0, totalD: 0, totalA: 0, totalE: 0, totalF: 0, totalN: 0,
+        dinero: parseFloat(dineroStr.replace(",", ".")) || 0,
+        km: parseFloat(kmStr.replace(",", ".")) || 0,
+        notes: "",
+        startDate: date,
+        totalPausedMinutes: 0
+      });
+    }
+
+    const turno = newTurnosMap.get(key)!;
+
+    if (type) {
+      const amount = parseFloat(amountStr.replace(",", ".")) || 0;
+      turno.entries.push({
+        id: timeBase++,
+        type,
+        amount,
+        note: note || "",
+        time
+      });
+
+      if (type === 'propina') turno.totalP += amount;
+      if (type === 'datafono') turno.totalD += amount;
+      if (type === 'agencia_bono') turno.totalA += amount;
+      if (type === 'extra') turno.totalE += amount;
+      if (type === 'gasolina') turno.totalF += amount;
+      if (type === 'nulo') turno.totalN += amount;
+    }
+  }
+
+  return sortTurnosByDateDesc(Array.from(newTurnosMap.values()));
+}
+
+export type HomeQuickActionId = "new-reservation" | "agenda" | "admin-users" | "logout" | "settings";
+```
+
+#### Código nuevo
+```tsx
+export type HomeQuickActionId = "new-reservation" | "agenda" | "admin-users" | "logout" | "settings";
+```
+
+#### Por qué se cambió
+La conversión de CSV a turnos se trasladó a `csv.ts`; se conserva la construcción de entradas, totales por tipo y ordenación final.
+
+### Cambio 4 - Crear módulo CSV
+
+#### Código anterior
+`No existía el módulo CSV en src/csv.ts.`
+
+#### Código nuevo
+```ts
+import { sortTurnosByDateDesc } from "./turnos";
+
+export type CSVEntry = {
+  id: number;
+  type: string;
+  amount: number;
+  note: string;
+  time: string;
+};
+
+export type CSVTurno = {
+  id: number;
+  date: string;
+  startTime: string | null;
+  endTime: string;
+  entries: CSVEntry[];
+  totalP: number;
+  totalD: number;
+  totalA: number;
+  totalE: number;
+  totalF: number;
+  totalN: number;
+  dinero: number;
+  km: number;
+  notes: string;
+  startDate: string;
+  totalPausedMinutes: number;
+};
+
+export function parseCSVLine(text: string): string[] {
+  const result: string[] = [];
+  let current = "";
+  let inQuotes = false;
+  for (let i = 0; i < text.length; i++) {
+    const char = text[i];
+    if (char === '"') {
+      if (inQuotes && text[i + 1] === '"') {
+        current += '"';
+        i++;
+      } else {
+        inQuotes = !inQuotes;
+      }
+    } else if (char === ";" && !inQuotes) {
+      result.push(current);
+      current = "";
+    } else {
+      current += char;
+    }
+  }
+  result.push(current);
+  return result;
+}
+
+export function parseCSVToHistory(csvText: string): CSVTurno[] {
+  const lines = csvText.split(/\r?\n/).filter((l) => l.trim() !== "");
+  if (lines.length < 2) return [];
+
+  const newTurnosMap = new Map<string, CSVTurno>();
+  let timeBase = Date.now();
+
+  for (let i = 1; i < lines.length; i++) {
+    const cols = parseCSVLine(lines[i]);
+    if (cols.length < 10) continue;
+
+    const [date, startTime, endTime, type, amountStr, note, time, dineroStr, kmStr] = cols;
+
+    const key = `${date}|${startTime}|${endTime}`;
+    if (!newTurnosMap.has(key)) {
+      newTurnosMap.set(key, {
+        id: timeBase++,
+        date,
+        startTime: startTime || null,
+        endTime,
+        entries: [],
+        totalP: 0, totalD: 0, totalA: 0, totalE: 0, totalF: 0, totalN: 0,
+        dinero: parseFloat(dineroStr.replace(",", ".")) || 0,
+        km: parseFloat(kmStr.replace(",", ".")) || 0,
+        notes: "",
+        startDate: date,
+        totalPausedMinutes: 0
+      });
+    }
+
+    const turno = newTurnosMap.get(key)!;
+
+    if (type) {
+      const amount = parseFloat(amountStr.replace(",", ".")) || 0;
+      turno.entries.push({
+        id: timeBase++,
+        type,
+        amount,
+        note: note || "",
+        time
+      });
+
+      if (type === "propina") turno.totalP += amount;
+      if (type === "datafono") turno.totalD += amount;
+      if (type === "agencia_bono") turno.totalA += amount;
+      if (type === "extra") turno.totalE += amount;
+      if (type === "gasolina") turno.totalF += amount;
+      if (type === "nulo") turno.totalN += amount;
+    }
+  }
+
+  return sortTurnosByDateDesc(Array.from(newTurnosMap.values()));
+}
+```
+
+#### Por qué se cambió
+El módulo nuevo encapsula el parsing CSV y reutiliza la ordenación de `turnos.ts`.
+
+### Cambio 5 - Proteger extracción CSV
+
+#### Código anterior
+`No existía el test de extracción CSV en src/__tests__/csv-extraction.test.ts.`
+
+#### Código nuevo
+```ts
+import { existsSync, readFileSync } from "node:fs";
+import { resolve } from "node:path";
+import { describe, expect, it } from "vitest";
+
+describe("CSV parsing extraction", () => {
+  const csvPath = resolve("src/csv.ts");
+  const mainSource = readFileSync(resolve("src/main.tsx"), "utf8");
+
+  it("keeps CSV parsing helpers outside main.tsx", () => {
+    expect(existsSync(csvPath)).toBe(true);
+
+    const csvSource = readFileSync(csvPath, "utf8");
+    expect(csvSource).toContain("export function parseCSVLine");
+    expect(csvSource).toContain("export function parseCSVToHistory");
+    expect(csvSource).toContain('from "./turnos"');
+    expect(mainSource).toContain('from "./csv"');
+    expect(mainSource).not.toMatch(/^export function parseCSVLine\(/m);
+    expect(mainSource).not.toMatch(/^export function parseCSVToHistory\(/m);
+  });
+});
+```
+
+#### Por qué se cambió
+El test fija que el parsing CSV permanece fuera de `main.tsx` y que usa el módulo compartido de turnos.
+
 ## 2026-05-24 23:09 - Extraer utilidades de turnos
 
 **Archivos modificados:** `src/main.tsx`, `src/turnos.ts`, `src/__tests__/turno-merge-extraction.test.ts`
