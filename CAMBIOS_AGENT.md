@@ -4,6 +4,317 @@ Este archivo registra cambios de código hechos por agentes/modelos en este proy
 
 Cada entrada debe indicar archivos modificados, código anterior, código nuevo y por qué se cambió. Las entradas se añaden al **principio** del archivo (las más recientes arriba).
 
+## 2026-05-24 23:53 - Extraer loaders de estado
+
+**Archivos modificados:** `src/main.tsx`, `src/state-loaders.ts`, `src/__tests__/state-loaders-extraction.test.ts`
+
+### Cambio 1 - Importar loaders de estado
+
+#### Código anterior
+```tsx
+import { fmtDate, getDiffMins, timeNow, today } from "./date-time";
+import { readLocalJSON, userStorageKey, writeUserLocalJSON } from "./user-storage";
+import { KEY_CURRENT, KEY_HISTORY, KEY_NOTES, KEY_RESERVATIONS, KEY_SETTINGS, KEY_WEEK_OVERRIDES } from "./storage-keys";
+```
+
+#### Código nuevo
+```tsx
+import { fmtDate, getDiffMins, timeNow, today } from "./date-time";
+import { userStorageKey, writeUserLocalJSON } from "./user-storage";
+import { KEY_CURRENT, KEY_HISTORY, KEY_NOTES, KEY_RESERVATIONS, KEY_SETTINGS, KEY_WEEK_OVERRIDES } from "./storage-keys";
+import { loadCurrent, loadHistory, loadNotes, loadReservations, loadSettings, loadWeekOverrides } from "./state-loaders";
+```
+
+#### Por qué se cambió
+`main.tsx` usa loaders iniciales desde `state-loaders.ts`; `readLocalJSON` deja de importarse directamente en la pantalla principal.
+
+### Cambio 2 - Eliminar loader local de ajustes
+
+#### Código anterior
+```tsx
+function loadSettings(): AppSettings {
+  const defaults: AppSettings = {
+    "porcentaje.jefe": 0,
+    "porcentaje.chofer": 0,
+    "descontar.datafono": true,
+    "descontar.agencia_bono": true,
+    "descontar.extra": true,
+    "descontar.gasolina": true,
+    diaLibre: 2,           // Martes por defecto (tu día libre actual)
+    diaLibreDesde: null,
+  };
+  try {
+    const d = readLocalJSON<Partial<AppSettings>>(KEY_SETTINGS);
+    if (d) {
+      return { ...defaults, ...d };
+    }
+  } catch (e) { }
+  return defaults;
+}
+
+// El payload se construye en el call site con buildBackupPayloadFromState
+```
+
+#### Código nuevo
+```tsx
+// El payload se construye en el call site con buildBackupPayloadFromState
+```
+
+#### Por qué se cambió
+El loader de ajustes se mueve a `state-loaders.ts` manteniendo defaults y merge con localStorage.
+
+### Cambio 3 - Eliminar loaders locales de estado base
+
+#### Código anterior
+```tsx
+function loadCurrent(): CurrentState {
+  try {
+    const d = readLocalJSON<CurrentState>(KEY_CURRENT);
+    if (d) {
+      return {
+        ...d,
+        isPaused: d.isPaused || false,
+        pauseStartTime: d.pauseStartTime || null,
+        totalPausedMinutes: d.totalPausedMinutes || 0,
+      };
+    }
+  } catch (e) { }
+  return { entries: [], startTime: null, startDate: null, isPaused: false, pauseStartTime: null, totalPausedMinutes: 0 };
+}
+function loadHistory(): Turno[] {
+  try {
+    const d = readLocalJSON<Turno[]>(KEY_HISTORY);
+    if (Array.isArray(d)) return sortTurnosByDateDesc(d);
+  } catch (e) { }
+  return [];
+}
+function loadReservations(): Reserva[] {
+  try {
+    const d = readLocalJSON<Reserva[]>(KEY_RESERVATIONS);
+    if (Array.isArray(d)) return d;
+  } catch (e) { }
+  return [];
+}
+function loadNotes(): NotaCalendario[] {
+  try {
+    const d = readLocalJSON<NotaCalendario[]>(KEY_NOTES);
+    if (Array.isArray(d)) return d;
+  } catch (e) { }
+  return [];
+}
+// ============================================================================
+// SEMANAS — Funciones lógicas (Fase 2)
+// ============================================================================
+```
+
+#### Código nuevo
+```tsx
+// ============================================================================
+// SEMANAS — Funciones lógicas (Fase 2)
+// ============================================================================
+```
+
+#### Por qué se cambió
+Los loaders de turno actual, historial, reservas y notas se trasladan a `state-loaders.ts` sin cambiar defaults ni ordenación del historial.
+
+### Cambio 4 - Eliminar loader local de overrides
+
+#### Código anterior
+```tsx
+function loadWeekOverrides(): WeekOverride[] {
+  try {
+    const d = readLocalJSON<WeekOverride[]>(KEY_WEEK_OVERRIDES);
+    if (Array.isArray(d)) return d;
+  } catch (e) { }
+  return [];
+}
+
+/**
+ * Crea un override por defecto (vacío) para un weekId dado.
+ */
+```
+
+#### Código nuevo
+```tsx
+/**
+ * Crea un override por defecto (vacío) para un weekId dado.
+ */
+```
+
+#### Por qué se cambió
+El loader de overrides semanales se mueve al módulo común de loaders.
+
+### Cambio 5 - Crear módulo de loaders
+
+#### Código anterior
+`No existía el módulo de loaders en src/state-loaders.ts.`
+
+#### Código nuevo
+```ts
+import type { AppSettings, Entry, NotaCalendario, Reserva, Turno } from "./main";
+import { readLocalJSON } from "./user-storage";
+import {
+  KEY_CURRENT,
+  KEY_HISTORY,
+  KEY_NOTES,
+  KEY_RESERVATIONS,
+  KEY_SETTINGS,
+  KEY_WEEK_OVERRIDES,
+} from "./storage-keys";
+import { sortTurnosByDateDesc } from "./turnos";
+
+type LoadedCurrentState = {
+  entries: Entry[];
+  startTime: string | null;
+  startDate: string | null;
+  isPaused?: boolean;
+  pauseStartTime?: string | null;
+  totalPausedMinutes?: number;
+};
+
+type LoadedWeekOverride = {
+  weekId: string;
+  notes: string;
+  entregada: boolean;
+  fechaEntrega: string | null;
+};
+
+export function loadSettings(): AppSettings {
+  const defaults: AppSettings = {
+    "porcentaje.jefe": 0,
+    "porcentaje.chofer": 0,
+    "descontar.datafono": true,
+    "descontar.agencia_bono": true,
+    "descontar.extra": true,
+    "descontar.gasolina": true,
+    diaLibre: 2,
+    diaLibreDesde: null,
+  };
+  try {
+    const d = readLocalJSON<Partial<AppSettings>>(KEY_SETTINGS);
+    if (d) {
+      return { ...defaults, ...d };
+    }
+  } catch (e) { }
+  return defaults;
+}
+
+export function loadCurrent(): LoadedCurrentState {
+  try {
+    const d = readLocalJSON<LoadedCurrentState>(KEY_CURRENT);
+    if (d) {
+      return {
+        ...d,
+        isPaused: d.isPaused || false,
+        pauseStartTime: d.pauseStartTime || null,
+        totalPausedMinutes: d.totalPausedMinutes || 0,
+      };
+    }
+  } catch (e) { }
+  return { entries: [], startTime: null, startDate: null, isPaused: false, pauseStartTime: null, totalPausedMinutes: 0 };
+}
+
+export function loadHistory(): Turno[] {
+  try {
+    const d = readLocalJSON<Turno[]>(KEY_HISTORY);
+    if (Array.isArray(d)) return sortTurnosByDateDesc(d);
+  } catch (e) { }
+  return [];
+}
+
+export function loadReservations(): Reserva[] {
+  try {
+    const d = readLocalJSON<Reserva[]>(KEY_RESERVATIONS);
+    if (Array.isArray(d)) return d;
+  } catch (e) { }
+  return [];
+}
+
+export function loadNotes(): NotaCalendario[] {
+  try {
+    const d = readLocalJSON<NotaCalendario[]>(KEY_NOTES);
+    if (Array.isArray(d)) return d;
+  } catch (e) { }
+  return [];
+}
+
+export function loadWeekOverrides(): LoadedWeekOverride[] {
+  try {
+    const d = readLocalJSON<LoadedWeekOverride[]>(KEY_WEEK_OVERRIDES);
+    if (Array.isArray(d)) return d;
+  } catch (e) { }
+  return [];
+}
+```
+
+#### Por qué se cambió
+El módulo nuevo concentra la carga inicial desde localStorage y reutiliza claves, lectura JSON y ordenación de turnos.
+
+### Cambio 6 - Proteger extracción de loaders
+
+#### Código anterior
+`No existía el test de extracción de loaders en src/__tests__/state-loaders-extraction.test.ts.`
+
+#### Código nuevo
+```ts
+import { existsSync, readFileSync } from "node:fs";
+import { resolve } from "node:path";
+import { describe, expect, it } from "vitest";
+import { KEY_CURRENT, KEY_HISTORY, KEY_SETTINGS } from "../storage-keys";
+
+describe("State loader extraction", () => {
+  const stateLoadersPath = resolve("src/state-loaders.ts");
+  const mainSource = readFileSync(resolve("src/main.tsx"), "utf8");
+
+  it("keeps localStorage state loaders outside main.tsx", async () => {
+    expect(existsSync(stateLoadersPath)).toBe(true);
+
+    const modulePath = "../state-loaders";
+    const { loadSettings, loadCurrent, loadHistory } = await import(modulePath);
+    localStorage.clear();
+
+    expect(loadSettings()).toMatchObject({
+      "porcentaje.jefe": 0,
+      "porcentaje.chofer": 0,
+      "descontar.datafono": true,
+      diaLibre: 2,
+      diaLibreDesde: null,
+    });
+    localStorage.setItem(KEY_SETTINGS, JSON.stringify({ "porcentaje.jefe": 55, diaLibre: 1 }));
+    expect(loadSettings()).toMatchObject({
+      "porcentaje.jefe": 55,
+      "descontar.datafono": true,
+      diaLibre: 1,
+    });
+
+    expect(loadCurrent()).toEqual({
+      entries: [],
+      startTime: null,
+      startDate: null,
+      isPaused: false,
+      pauseStartTime: null,
+      totalPausedMinutes: 0,
+    });
+    localStorage.setItem(KEY_CURRENT, JSON.stringify({ entries: [], startTime: "10:00", startDate: "2026-05-01" }));
+    expect(loadCurrent()).toMatchObject({ startTime: "10:00", isPaused: false, totalPausedMinutes: 0 });
+
+    localStorage.setItem(KEY_HISTORY, JSON.stringify([
+      { date: "2026-05-01", startDate: "2026-05-01", startTime: "08:00" },
+      { date: "2026-05-02", startDate: "2026-05-02", startTime: "08:00" },
+    ]));
+    expect(loadHistory().map((turno: { date: string }) => turno.date)).toEqual(["2026-05-02", "2026-05-01"]);
+
+    expect(mainSource).toContain('from "./state-loaders"');
+    expect(mainSource).not.toMatch(/^function loadSettings\(/m);
+    expect(mainSource).not.toMatch(/^function loadCurrent\(/m);
+    expect(mainSource).not.toMatch(/^function loadWeekOverrides\(/m);
+  });
+});
+```
+
+#### Por qué se cambió
+El test fija la extracción y valida defaults, merge de ajustes, fallback de turno actual y ordenación de historial.
+
 ## 2026-05-24 23:48 - Extraer contenedor Shell
 
 **Archivos modificados:** `src/main.tsx`, `src/components/shell.tsx`, `src/__tests__/shell-components-extraction.test.ts`

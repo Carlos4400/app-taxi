@@ -47,8 +47,9 @@ import { getDaysInMonth, getStartOffset } from "./calendar-date";
 import { MESES_ABREVIADOS, MESES_COMPLETOS, getAccountingPeriodLabel, getMesLabel } from "./date-labels";
 import { KM_CARD_UNIT_STYLE, TIME_CARD_HOUR_UNIT_STYLE, TIME_CARD_UNIT_STYLE, WEEK_LIST_CARD_TEXT_SIZES } from "./card-styles";
 import { fmtDate, getDiffMins, timeNow, today } from "./date-time";
-import { readLocalJSON, userStorageKey, writeUserLocalJSON } from "./user-storage";
+import { userStorageKey, writeUserLocalJSON } from "./user-storage";
 import { KEY_CURRENT, KEY_HISTORY, KEY_NOTES, KEY_RESERVATIONS, KEY_SETTINGS, KEY_WEEK_OVERRIDES } from "./storage-keys";
+import { loadCurrent, loadHistory, loadNotes, loadReservations, loadSettings, loadWeekOverrides } from "./state-loaders";
 import {
   userMetaDocRef,
   userSubcollectionRef,
@@ -221,26 +222,6 @@ function fmt(n: number): string {
   return fmtMoney(n);
 }
 
-function loadSettings(): AppSettings {
-  const defaults: AppSettings = {
-    "porcentaje.jefe": 0,
-    "porcentaje.chofer": 0,
-    "descontar.datafono": true,
-    "descontar.agencia_bono": true,
-    "descontar.extra": true,
-    "descontar.gasolina": true,
-    diaLibre: 2,           // Martes por defecto (tu día libre actual)
-    diaLibreDesde: null,
-  };
-  try {
-    const d = readLocalJSON<Partial<AppSettings>>(KEY_SETTINGS);
-    if (d) {
-      return { ...defaults, ...d };
-    }
-  } catch (e) { }
-  return defaults;
-}
-
 // El payload se construye en el call site con buildBackupPayloadFromState
 // pasando los estados React vivos (espejo de Firestore en memoria).
 // Antes había un default que leía de localStorage; eliminado para evitar
@@ -269,41 +250,6 @@ async function exportBackupJSON(backup: ReturnType<typeof buildBackupPayload>) {
   }
 }
 
-function loadCurrent(): CurrentState {
-  try {
-    const d = readLocalJSON<CurrentState>(KEY_CURRENT);
-    if (d) {
-      return {
-        ...d,
-        isPaused: d.isPaused || false,
-        pauseStartTime: d.pauseStartTime || null,
-        totalPausedMinutes: d.totalPausedMinutes || 0,
-      };
-    }
-  } catch (e) { }
-  return { entries: [], startTime: null, startDate: null, isPaused: false, pauseStartTime: null, totalPausedMinutes: 0 };
-}
-function loadHistory(): Turno[] {
-  try {
-    const d = readLocalJSON<Turno[]>(KEY_HISTORY);
-    if (Array.isArray(d)) return sortTurnosByDateDesc(d);
-  } catch (e) { }
-  return [];
-}
-function loadReservations(): Reserva[] {
-  try {
-    const d = readLocalJSON<Reserva[]>(KEY_RESERVATIONS);
-    if (Array.isArray(d)) return d;
-  } catch (e) { }
-  return [];
-}
-function loadNotes(): NotaCalendario[] {
-  try {
-    const d = readLocalJSON<NotaCalendario[]>(KEY_NOTES);
-    if (Array.isArray(d)) return d;
-  } catch (e) { }
-  return [];
-}
 // ============================================================================
 // SEMANAS — Funciones lógicas (Fase 2)
 // ============================================================================
@@ -503,14 +449,6 @@ export function calcularResumenContableTurnos(turnos: Turno[], settings: AppSett
 // ============================================================================
 // SEMANAS — Carga y guardado en localStorage (Fase 3)
 // ============================================================================
-
-function loadWeekOverrides(): WeekOverride[] {
-  try {
-    const d = readLocalJSON<WeekOverride[]>(KEY_WEEK_OVERRIDES);
-    if (Array.isArray(d)) return d;
-  } catch (e) { }
-  return [];
-}
 
 /**
  * Crea un override por defecto (vacío) para un weekId dado.
