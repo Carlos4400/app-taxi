@@ -4,6 +4,289 @@ Este archivo registra cambios de código hechos por agentes/modelos en este proy
 
 Cada entrada debe indicar archivos modificados, código anterior, código nuevo y por qué se cambió. Las entradas se añaden al **principio** del archivo (las más recientes arriba).
 
+## 2026-05-24 22:50 - Extraer tarjeta de notas
+
+**Archivos modificados:** `src/main.tsx`, `src/components/turno-notas.tsx`, `src/__tests__/detailed-notes-layout.test.ts`, `src/__tests__/turno-notas-component-extraction.test.ts`
+
+### Cambio 1 - Importar TurnoNotasCard
+
+#### Código anterior
+```tsx
+import { LoginScreen } from "./login-screen";
+import { fmtDuration, fmtKm, fmtKmNumber, fmtMoney, fmtMoneyNumber, splitDurationLabel } from "./formatters";
+import { ConfirmDialog, MainCard, SmallCard } from "./components/common";
+import {
+  userMetaDocRef,
+```
+
+#### Código nuevo
+```tsx
+import { LoginScreen } from "./login-screen";
+import { fmtDuration, fmtKm, fmtKmNumber, fmtMoney, fmtMoneyNumber, splitDurationLabel } from "./formatters";
+import { ConfirmDialog, MainCard, SmallCard } from "./components/common";
+import { TurnoNotasCard } from "./components/turno-notas";
+import {
+  userMetaDocRef,
+```
+
+#### Por qué se cambió
+`TurnoNotasCard` se movió fuera de `main.tsx` para continuar reduciendo el componente principal sin tocar la lógica contable.
+
+### Cambio 2 - Pasar dependencias a la tarjeta de notas
+
+#### Código anterior
+```tsx
+                  <TurnoNotasCard
+                    key={`notas-${data.turno.id}`}
+                    data={data}
+                    onClick={() => { setReturnScreen("detalleMes"); setViewTurno(data.turno); setScreen("summary"); }}
+                  />
+```
+
+#### Código nuevo
+```tsx
+                  <TurnoNotasCard
+                    key={`notas-${data.turno.id}`}
+                    data={data}
+                    formatDate={fmtDate}
+                    formatMoney={fmt}
+                    getEntryTypeMeta={getEntryTypeMeta}
+                    noteTimeStyle={NOTE_TIME_STYLE}
+                    onClick={() => { setReturnScreen("detalleMes"); setViewTurno(data.turno); setScreen("summary"); }}
+                  />
+```
+
+#### Por qué se cambió
+El componente extraído necesita el mismo formateo y metadatos que usaba dentro de `main.tsx`. Se pasan como props para conservar comportamiento y evitar ciclos de importación.
+
+### Cambio 3 - Pasar dependencias en detalle de semana
+
+#### Código anterior
+```tsx
+                  <TurnoNotasCard
+                    key={`notas-${data.turno.id}`}
+                    data={data}
+                    onClick={() => { setReturnScreen("detalleSemana"); setViewTurno(data.turno); setScreen("summary"); }}
+                  />
+```
+
+#### Código nuevo
+```tsx
+                  <TurnoNotasCard
+                    key={`notas-${data.turno.id}`}
+                    data={data}
+                    formatDate={fmtDate}
+                    formatMoney={fmt}
+                    getEntryTypeMeta={getEntryTypeMeta}
+                    noteTimeStyle={NOTE_TIME_STYLE}
+                    onClick={() => { setReturnScreen("detalleSemana"); setViewTurno(data.turno); setScreen("summary"); }}
+                  />
+```
+
+#### Por qué se cambió
+La segunda llamada al componente también debe recibir las dependencias explícitas para que la vista de detalle semanal mantenga exactamente el mismo renderizado.
+
+### Cambio 4 - Eliminar definición local de TurnoNotasCard
+
+#### Código anterior
+```tsx
+function TurnoNotasCard({
+  data,
+  onClick
+}: {
+  data: TurnoNotasSemana;
+  onClick: () => void;
+}) {
+  const { turno, notasGenerales, notasDetalladas } = data;
+  return (
+    <div
+      onClick={onClick}
+      style={{ background: "rgba(255,255,255,0.035)", borderRadius: 14, padding: "12px", border: "1px solid rgba(255,255,255,0.06)", cursor: "pointer" }}
+    >
+      <div style={{ display: "flex", justifyContent: "space-between", gap: 10, alignItems: "baseline", marginBottom: 10 }}>
+        <div style={{ fontSize: 15, fontWeight: 800, color: "white" }}>{fmtDate(turno.date)}</div>
+        <div style={{ fontSize: 12, fontWeight: 700, color: "rgba(255,255,255,0.42)", whiteSpace: "nowrap" }}>
+          {turno.startTime} - {turno.endTime}
+        </div>
+      </div>
+```
+
+#### Código nuevo
+```tsx
+// AuthGate: decide qué pintar en función del estado de autenticación.
+```
+
+#### Por qué se cambió
+La definición local de `TurnoNotasCard` desaparece de `main.tsx`; el siguiente bloque en esa zona vuelve a ser `AuthGate`. Esto reduce el tamaño del archivo principal sin cambiar el flujo de navegación ni los cálculos.
+
+### Cambio 5 - Nuevo componente TurnoNotasCard
+
+#### Código anterior
+`No existía el archivo src/components/turno-notas.tsx.`
+
+#### Código nuevo
+```tsx
+import type { CSSProperties } from "react";
+import type { TurnoNotasSemana } from "../main";
+
+type EntryTypeMetaForNotes = {
+  color: string;
+  label: string;
+};
+
+export function TurnoNotasCard({
+  data,
+  onClick,
+  formatDate,
+  formatMoney,
+  getEntryTypeMeta,
+  noteTimeStyle,
+}: {
+  data: TurnoNotasSemana;
+  onClick: () => void;
+  formatDate: (iso: string) => string;
+  formatMoney: (amount: number) => string;
+  getEntryTypeMeta: (type: string) => EntryTypeMetaForNotes;
+  noteTimeStyle: CSSProperties;
+}) {
+  const { turno, notasGenerales, notasDetalladas } = data;
+  return (
+    <div
+      onClick={onClick}
+      style={{ background: "rgba(255,255,255,0.035)", borderRadius: 14, padding: "12px", border: "1px solid rgba(255,255,255,0.06)", cursor: "pointer" }}
+    >
+      <div style={{ display: "flex", justifyContent: "space-between", gap: 10, alignItems: "baseline", marginBottom: 10 }}>
+        <div style={{ fontSize: 15, fontWeight: 800, color: "white" }}>{formatDate(turno.date)}</div>
+        <div style={{ fontSize: 12, fontWeight: 700, color: "rgba(255,255,255,0.42)", whiteSpace: "nowrap" }}>
+          {turno.startTime} - {turno.endTime}
+        </div>
+      </div>
+
+      {notasGenerales.length > 0 && (
+        <div style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: notasDetalladas.length ? 10 : 0 }}>
+          <div style={{ fontSize: 10, fontWeight: 800, color: "rgba(255,255,255,0.38)", textTransform: "uppercase", letterSpacing: "0.6px" }}>
+            Notas del turno
+          </div>
+          {notasGenerales.map((entry) => {
+            const meta = getEntryTypeMeta(entry.type);
+            return (
+              <div key={entry.id} style={{ fontSize: 13, color: "rgba(255,255,255,0.82)", background: "rgba(255,255,255,0.025)", borderRadius: 10, padding: "8px 10px", lineHeight: 1.35, display: "grid", gridTemplateColumns: "auto auto minmax(0, 1fr)", alignItems: "baseline", gap: 7, minWidth: 0 }}>
+                <span style={noteTimeStyle}>{entry.time}</span>
+                <span style={{ fontWeight: 700, color: meta.color, fontSize: 14, whiteSpace: "nowrap", flexShrink: 0 }}>{meta.label}</span>
+                <span style={{ color: "rgba(255,255,255,0.82)", fontSize: 12, lineHeight: 1.35, minWidth: 0, overflowWrap: "anywhere" }}>{entry.note}</span>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {notasDetalladas.length > 0 && (
+        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+          <div style={{ fontSize: 10, fontWeight: 800, color: "rgba(255,255,255,0.38)", textTransform: "uppercase", letterSpacing: "0.6px" }}>
+            Notas detalladas
+          </div>
+          {notasDetalladas.map((entry) => {
+            const meta = getEntryTypeMeta(entry.type);
+            return (
+              <div key={entry.id} style={{ fontSize: 13, background: "rgba(255,255,255,0.025)", padding: "8px 10px", borderRadius: 10, display: "grid", gridTemplateColumns: "auto auto minmax(0, 1fr) auto", alignItems: "baseline", gap: 7, minWidth: 0 }}>
+                <span style={noteTimeStyle}>{entry.time}</span>
+                <span style={{ fontWeight: 700, color: meta.color, fontSize: 14, whiteSpace: "nowrap", flexShrink: 0 }}>{meta.label}</span>
+                <span style={{ color: "rgba(255,255,255,0.82)", fontSize: 12, lineHeight: 1.35, flex: 1, minWidth: 0, overflowWrap: "anywhere" }}>{entry.note}</span>
+                <span style={{ fontSize: 15, fontWeight: 700, color: meta.color, whiteSpace: "nowrap", flexShrink: 0, alignSelf: "baseline" }}>{formatMoney(entry.amount)}</span>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+```
+
+#### Por qué se cambió
+Se creó un módulo específico para la tarjeta de notas de turno. El componente mantiene la misma estructura, estilos y datos, pero recibe formateadores y metadatos desde `main.tsx`.
+
+### Cambio 6 - Test de layout apuntando al nuevo archivo
+
+#### Código anterior
+```ts
+describe("Detailed notes layout", () => {
+  const source = readFileSync(resolve("src/main.tsx"), "utf8");
+```
+
+#### Código nuevo
+```ts
+describe("Detailed notes layout", () => {
+  const source = readFileSync(resolve("src/main.tsx"), "utf8");
+  const turnoNotasSource = readFileSync(resolve("src/components/turno-notas.tsx"), "utf8");
+```
+
+#### Por qué se cambió
+El test seguía leyendo solo `main.tsx`, pero el bloque que valida ahora vive en `src/components/turno-notas.tsx`.
+
+### Cambio 7 - Test de bloque de notas extraído
+
+#### Código anterior
+```ts
+    const turnoNotasCardBlock = source.match(
+      /function TurnoNotasCard\([\s\S]*?\/\/ AuthGate:/
+    )?.[0];
+```
+
+#### Código nuevo
+```ts
+    const turnoNotasCardBlock = turnoNotasSource;
+```
+
+#### Por qué se cambió
+Ya no hay que buscar el componente entre `TurnoNotasCard` y `AuthGate` dentro de `main.tsx`. El archivo del componente completo es ahora el bloque validado.
+
+### Cambio 8 - Test del estilo de hora en notas
+
+#### Código anterior
+```ts
+    expect(turnoNotasCardBlock).toMatch(/notasGenerales\.map[\s\S]*?<span style=\{NOTE_TIME_STYLE\}>\{entry\.time\}<\/span>/);
+    expect(turnoNotasCardBlock).toMatch(/notasDetalladas\.map[\s\S]*?<span style=\{NOTE_TIME_STYLE\}>\{entry\.time\}<\/span>/);
+```
+
+#### Código nuevo
+```ts
+    expect(turnoNotasCardBlock).toMatch(/notasGenerales\.map[\s\S]*?<span style=\{noteTimeStyle\}>\{entry\.time\}<\/span>/);
+    expect(turnoNotasCardBlock).toMatch(/notasDetalladas\.map[\s\S]*?<span style=\{noteTimeStyle\}>\{entry\.time\}<\/span>/);
+```
+
+#### Por qué se cambió
+El componente extraído recibe el estilo de hora como prop `noteTimeStyle`, en lugar de leer directamente la constante local `NOTE_TIME_STYLE` de `main.tsx`.
+
+### Cambio 9 - Test de extracción de TurnoNotasCard
+
+#### Código anterior
+`No existía el archivo src/__tests__/turno-notas-component-extraction.test.ts.`
+
+#### Código nuevo
+```ts
+import { existsSync, readFileSync } from "node:fs";
+import { resolve } from "node:path";
+import { describe, expect, it } from "vitest";
+
+describe("TurnoNotasCard extraction", () => {
+  const mainSource = readFileSync(resolve("src/main.tsx"), "utf8");
+  const componentPath = resolve("src/components/turno-notas.tsx");
+
+  it("keeps TurnoNotasCard outside main.tsx", () => {
+    expect(existsSync(componentPath)).toBe(true);
+
+    const componentSource = readFileSync(componentPath, "utf8");
+    expect(componentSource).toContain("export function TurnoNotasCard");
+    expect(mainSource).toContain('from "./components/turno-notas"');
+    expect(mainSource).not.toMatch(/^function TurnoNotasCard/m);
+  });
+});
+```
+
+#### Por qué se cambió
+Añade un candado para que `TurnoNotasCard` permanezca extraído y no vuelva a crecer dentro de `main.tsx`.
+
 ## 2026-05-24 22:41 - Extraer componentes comunes
 
 **Archivos modificados:** `src/main.tsx`, `src/components/common.tsx`, `src/__tests__/common-components-extraction.test.ts`

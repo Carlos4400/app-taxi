@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 
 describe("Detailed notes layout", () => {
   const source = readFileSync(resolve("src/main.tsx"), "utf8");
+  const turnoNotasSource = readFileSync(resolve("src/components/turno-notas.tsx"), "utf8");
 
   it("centralizes entry metadata with labels, colors and icons", () => {
     expect(source).toMatch(/type EntryTypeMeta = \{[\s\S]*?color: string;[\s\S]*?label: string;[\s\S]*?icon: \(size\?: number\) => React\.ReactNode;[\s\S]*?\};/);
@@ -100,16 +101,14 @@ describe("Detailed notes layout", () => {
   });
 
   it("shows the Nota label on turn-note cards", () => {
-    const turnoNotasCardBlock = source.match(
-      /function TurnoNotasCard\([\s\S]*?\/\/ AuthGate:/
-    )?.[0];
+    const turnoNotasCardBlock = turnoNotasSource;
 
     expect(turnoNotasCardBlock).toBeDefined();
     expect(turnoNotasCardBlock).toMatch(/notasGenerales\.map\(\(entry\) => \{[\s\S]*?const meta = getEntryTypeMeta\(entry\.type\)/);
     expect(turnoNotasCardBlock).toMatch(/notasGenerales\.map[\s\S]*?gridTemplateColumns: "auto auto minmax\(0, 1fr\)", alignItems: "baseline"[\s\S]*?\{meta\.label\}[\s\S]*?\{entry\.note\}/);
     expect(turnoNotasCardBlock).toMatch(/notasDetalladas\.map[\s\S]*?gridTemplateColumns: "auto auto minmax\(0, 1fr\) auto", alignItems: "baseline"[\s\S]*?\{meta\.label\}[\s\S]*?\{entry\.note\}/);
-    expect(turnoNotasCardBlock).toMatch(/notasGenerales\.map[\s\S]*?<span style=\{NOTE_TIME_STYLE\}>\{entry\.time\}<\/span>/);
-    expect(turnoNotasCardBlock).toMatch(/notasDetalladas\.map[\s\S]*?<span style=\{NOTE_TIME_STYLE\}>\{entry\.time\}<\/span>/);
+    expect(turnoNotasCardBlock).toMatch(/notasGenerales\.map[\s\S]*?<span style=\{noteTimeStyle\}>\{entry\.time\}<\/span>/);
+    expect(turnoNotasCardBlock).toMatch(/notasDetalladas\.map[\s\S]*?<span style=\{noteTimeStyle\}>\{entry\.time\}<\/span>/);
     expect(turnoNotasCardBlock).not.toMatch(/notasGenerales\.map[\s\S]*?background: "rgba\(150,130,255,0\.10\)"/);
   });
 
