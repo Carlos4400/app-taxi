@@ -30,7 +30,13 @@ import { TurnoNotasCard } from "./components/turno-notas";
 import { EditEntryDialog } from "./components/edit-entry-dialog";
 import { resolveLatestApkUpdate, type UpdateState } from "./update-flow";
 import { buildBackupPayload, buildBackupPayloadFromState } from "./backup";
-import { mergeTurnos, sortTurnosByDateDesc } from "./turnos";
+import {
+  ensureTurnosDiaLibreContable,
+  getTurnosByCalendarMonth,
+  getTurnosByCalendarYear,
+  mergeTurnos,
+  sortTurnosByDateDesc,
+} from "./turnos";
 import { parseCSVToHistory } from "./csv";
 import { getBackupMenuActionIds, getHomeQuickActionIds } from "./action-ids";
 import { getTurnosNotasSemana } from "./turno-notas-logic";
@@ -46,7 +52,13 @@ import { AdminListScreen, AdminUserView } from "./admin-screens";
 
 export { fmtDuration, fmtKm, fmtKmNumber, fmtMoney, fmtMoneyNumber, splitDurationLabel } from "./formatters";
 export { buildBackupPayload, buildBackupPayloadFromState };
-export { mergeTurnos, sortTurnosByDateDesc };
+export {
+  ensureTurnosDiaLibreContable,
+  getTurnosByCalendarMonth,
+  getTurnosByCalendarYear,
+  mergeTurnos,
+  sortTurnosByDateDesc,
+};
 export { parseCSVLine, parseCSVToHistory } from "./csv";
 export { getBackupMenuActionIds, getHomeQuickActionIds };
 export type { BackupMenuActionId, HomeQuickActionId } from "./action-ids";
@@ -310,28 +322,6 @@ function loadSettings(): AppSettings {
     }
   } catch (e) { }
   return defaults;
-}
-
-export function getTurnosByCalendarMonth(turnos: Turno[], year: number, month: number): Turno[] {
-  const monthId = `${year}-${String(month).padStart(2, "0")}`;
-  return sortTurnosByDateDesc(
-    turnos.filter((turno) => (turno.startDate || turno.date).slice(0, 7) === monthId)
-  );
-}
-
-export function getTurnosByCalendarYear(turnos: Turno[], year: number): Turno[] {
-  const yearId = String(year);
-  return sortTurnosByDateDesc(
-    turnos.filter((turno) => (turno.startDate || turno.date).slice(0, 4) === yearId)
-  );
-}
-
-export function ensureTurnosDiaLibreContable(turnos: Turno[], diaLibre: number): Turno[] {
-  return turnos.map((turno) =>
-    typeof turno.diaLibreContable === "number"
-      ? turno
-      : { ...turno, diaLibreContable: diaLibre }
-  );
 }
 
 // El payload se construye en el call site con buildBackupPayloadFromState

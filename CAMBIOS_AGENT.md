@@ -4,6 +4,172 @@ Este archivo registra cambios de código hechos por agentes/modelos en este proy
 
 Cada entrada debe indicar archivos modificados, código anterior, código nuevo y por qué se cambió. Las entradas se añaden al **principio** del archivo (las más recientes arriba).
 
+## 2026-05-24 23:23 - Extraer seleccion de turnos
+
+**Archivos modificados:** `src/main.tsx`, `src/turnos.ts`, `src/__tests__/turno-selection-extraction.test.ts`
+
+### Cambio 1 - Importar seleccion de turnos
+
+#### Código anterior
+```tsx
+import { buildBackupPayload, buildBackupPayloadFromState } from "./backup";
+import { mergeTurnos, sortTurnosByDateDesc } from "./turnos";
+```
+
+```tsx
+export { buildBackupPayload, buildBackupPayloadFromState };
+export { mergeTurnos, sortTurnosByDateDesc };
+```
+
+#### Código nuevo
+```tsx
+import { buildBackupPayload, buildBackupPayloadFromState } from "./backup";
+import {
+  ensureTurnosDiaLibreContable,
+  getTurnosByCalendarMonth,
+  getTurnosByCalendarYear,
+  mergeTurnos,
+  sortTurnosByDateDesc,
+} from "./turnos";
+```
+
+```tsx
+export { buildBackupPayload, buildBackupPayloadFromState };
+export {
+  ensureTurnosDiaLibreContable,
+  getTurnosByCalendarMonth,
+  getTurnosByCalendarYear,
+  mergeTurnos,
+  sortTurnosByDateDesc,
+};
+```
+
+#### Por qué se cambió
+`main.tsx` usa la selección por calendario y la migración de día libre desde `turnos.ts`, manteniendo los exports públicos.
+
+### Cambio 2 - Eliminar seleccion local
+
+#### Código anterior
+```tsx
+export function getTurnosByCalendarMonth(turnos: Turno[], year: number, month: number): Turno[] {
+  const monthId = `${year}-${String(month).padStart(2, "0")}`;
+  return sortTurnosByDateDesc(
+    turnos.filter((turno) => (turno.startDate || turno.date).slice(0, 7) === monthId)
+  );
+}
+
+export function getTurnosByCalendarYear(turnos: Turno[], year: number): Turno[] {
+  const yearId = String(year);
+  return sortTurnosByDateDesc(
+    turnos.filter((turno) => (turno.startDate || turno.date).slice(0, 4) === yearId)
+  );
+}
+
+export function ensureTurnosDiaLibreContable(turnos: Turno[], diaLibre: number): Turno[] {
+  return turnos.map((turno) =>
+    typeof turno.diaLibreContable === "number"
+      ? turno
+      : { ...turno, diaLibreContable: diaLibre }
+  );
+}
+
+// El payload se construye en el call site con buildBackupPayloadFromState
+```
+
+#### Código nuevo
+```tsx
+// El payload se construye en el call site con buildBackupPayloadFromState
+```
+
+#### Por qué se cambió
+La selección de turnos por mes/año y la migración de día libre son utilidades puras y quedan junto a la ordenación en `turnos.ts`.
+
+### Cambio 3 - Ampliar módulo de turnos
+
+#### Código anterior
+```ts
+export function sortTurnosByDateDesc<T extends SortableTurno>(turnos: T[]): T[] {
+  return [...turnos].sort((a, b) => {
+    const dateA = a.startDate || a.date;
+    const dateB = b.startDate || b.date;
+    const byDate = dateB.localeCompare(dateA);
+    if (byDate !== 0) return byDate;
+    return (b.startTime || "").localeCompare(a.startTime || "");
+  });
+}
+
+function getTurnoMergeKey(t: SortableTurno): string {
+```
+
+#### Código nuevo
+```ts
+export function sortTurnosByDateDesc<T extends SortableTurno>(turnos: T[]): T[] {
+  return [...turnos].sort((a, b) => {
+    const dateA = a.startDate || a.date;
+    const dateB = b.startDate || b.date;
+    const byDate = dateB.localeCompare(dateA);
+    if (byDate !== 0) return byDate;
+    return (b.startTime || "").localeCompare(a.startTime || "");
+  });
+}
+
+export function getTurnosByCalendarMonth<T extends SortableTurno>(turnos: T[], year: number, month: number): T[] {
+  const monthId = `${year}-${String(month).padStart(2, "0")}`;
+  return sortTurnosByDateDesc(
+    turnos.filter((turno) => (turno.startDate || turno.date).slice(0, 7) === monthId)
+  );
+}
+
+export function getTurnosByCalendarYear<T extends SortableTurno>(turnos: T[], year: number): T[] {
+  const yearId = String(year);
+  return sortTurnosByDateDesc(
+    turnos.filter((turno) => (turno.startDate || turno.date).slice(0, 4) === yearId)
+  );
+}
+
+export function ensureTurnosDiaLibreContable<T extends { diaLibreContable?: number }>(turnos: T[], diaLibre: number): T[] {
+  return turnos.map((turno) =>
+    typeof turno.diaLibreContable === "number"
+      ? turno
+      : { ...turno, diaLibreContable: diaLibre }
+  );
+}
+
+function getTurnoMergeKey(t: SortableTurno): string {
+```
+
+#### Por qué se cambió
+El módulo `turnos.ts` agrupa ahora ordenación, selección por calendario y migración de día libre con tipos estructurales.
+
+### Cambio 4 - Proteger extracción de selección
+
+#### Código anterior
+`No existía el test de extracción de selección en src/__tests__/turno-selection-extraction.test.ts.`
+
+#### Código nuevo
+```ts
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
+import { describe, expect, it } from "vitest";
+
+describe("Turno selection extraction", () => {
+  const turnosSource = readFileSync(resolve("src/turnos.ts"), "utf8");
+  const mainSource = readFileSync(resolve("src/main.tsx"), "utf8");
+
+  it("keeps calendar selection and dia libre migration in turnos.ts", () => {
+    expect(turnosSource).toContain("export function getTurnosByCalendarMonth");
+    expect(turnosSource).toContain("export function getTurnosByCalendarYear");
+    expect(turnosSource).toContain("export function ensureTurnosDiaLibreContable");
+    expect(mainSource).toContain('from "./turnos"');
+    expect(mainSource).not.toMatch(/^export function getTurnosByCalendarMonth\(/m);
+    expect(mainSource).not.toMatch(/^export function ensureTurnosDiaLibreContable\(/m);
+  });
+});
+```
+
+#### Por qué se cambió
+El test fija que selección de turnos y migración de día libre permanezcan fuera de `main.tsx`.
+
 ## 2026-05-24 23:20 - Extraer entrega de turnos
 
 **Archivos modificados:** `src/main.tsx`, `src/turno-entrega.ts`, `src/__tests__/turno-entrega-extraction.test.ts`

@@ -15,6 +15,28 @@ export function sortTurnosByDateDesc<T extends SortableTurno>(turnos: T[]): T[] 
   });
 }
 
+export function getTurnosByCalendarMonth<T extends SortableTurno>(turnos: T[], year: number, month: number): T[] {
+  const monthId = `${year}-${String(month).padStart(2, "0")}`;
+  return sortTurnosByDateDesc(
+    turnos.filter((turno) => (turno.startDate || turno.date).slice(0, 7) === monthId)
+  );
+}
+
+export function getTurnosByCalendarYear<T extends SortableTurno>(turnos: T[], year: number): T[] {
+  const yearId = String(year);
+  return sortTurnosByDateDesc(
+    turnos.filter((turno) => (turno.startDate || turno.date).slice(0, 4) === yearId)
+  );
+}
+
+export function ensureTurnosDiaLibreContable<T extends { diaLibreContable?: number }>(turnos: T[], diaLibre: number): T[] {
+  return turnos.map((turno) =>
+    typeof turno.diaLibreContable === "number"
+      ? turno
+      : { ...turno, diaLibreContable: diaLibre }
+  );
+}
+
 function getTurnoMergeKey(t: SortableTurno): string {
   return [
     t.startDate || "",
