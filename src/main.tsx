@@ -46,6 +46,7 @@ import { MESES_ABREVIADOS, MESES_COMPLETOS, getAccountingPeriodLabel, getMesLabe
 import { KM_CARD_UNIT_STYLE, TIME_CARD_HOUR_UNIT_STYLE, TIME_CARD_UNIT_STYLE, WEEK_LIST_CARD_TEXT_SIZES } from "./card-styles";
 import { fmtDate, getDiffMins, timeNow, today } from "./date-time";
 import { readLocalJSON, userStorageKey, writeUserLocalJSON } from "./user-storage";
+import { KEY_CURRENT, KEY_HISTORY, KEY_NOTES, KEY_RESERVATIONS, KEY_SETTINGS, KEY_WEEK_OVERRIDES } from "./storage-keys";
 import {
   userMetaDocRef,
   userSubcollectionRef,
@@ -172,13 +173,6 @@ const NOTE_TIME_STYLE = {
   flexShrink: 0,
   alignSelf: "baseline",
 } as const;
-
-const KEY_CURRENT = "taxi_current_v3";
-const KEY_HISTORY = "taxi_history_v3";
-const KEY_SETTINGS = "taxi_settings_v3";
-const KEY_WEEK_OVERRIDES = "taxi_week_overrides_v1";
-const KEY_RESERVATIONS = "taxi_reservations_v1";
-const KEY_NOTES = "taxi_notes_v1";
 
 export interface Reserva {
   id: string;

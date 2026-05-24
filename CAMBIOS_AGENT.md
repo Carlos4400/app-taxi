@@ -4,6 +4,105 @@ Este archivo registra cambios de código hechos por agentes/modelos en este proy
 
 Cada entrada debe indicar archivos modificados, código anterior, código nuevo y por qué se cambió. Las entradas se añaden al **principio** del archivo (las más recientes arriba).
 
+## 2026-05-24 23:42 - Extraer claves de almacenamiento
+
+**Archivos modificados:** `src/main.tsx`, `src/storage-keys.ts`, `src/__tests__/storage-keys-extraction.test.ts`
+
+### Cambio 1 - Importar claves de almacenamiento
+
+#### Código anterior
+```tsx
+import { fmtDate, getDiffMins, timeNow, today } from "./date-time";
+import { readLocalJSON, userStorageKey, writeUserLocalJSON } from "./user-storage";
+```
+
+#### Código nuevo
+```tsx
+import { fmtDate, getDiffMins, timeNow, today } from "./date-time";
+import { readLocalJSON, userStorageKey, writeUserLocalJSON } from "./user-storage";
+import { KEY_CURRENT, KEY_HISTORY, KEY_NOTES, KEY_RESERVATIONS, KEY_SETTINGS, KEY_WEEK_OVERRIDES } from "./storage-keys";
+```
+
+#### Por qué se cambió
+`main.tsx` usa las claves desde `storage-keys.ts`, preparando futuras extracciones de loaders sin duplicar strings.
+
+### Cambio 2 - Eliminar claves locales
+
+#### Código anterior
+```tsx
+const KEY_CURRENT = "taxi_current_v3";
+const KEY_HISTORY = "taxi_history_v3";
+const KEY_SETTINGS = "taxi_settings_v3";
+const KEY_WEEK_OVERRIDES = "taxi_week_overrides_v1";
+const KEY_RESERVATIONS = "taxi_reservations_v1";
+const KEY_NOTES = "taxi_notes_v1";
+
+export interface Reserva {
+```
+
+#### Código nuevo
+```tsx
+export interface Reserva {
+```
+
+#### Por qué se cambió
+Las claves de persistencia se centralizan fuera de `main.tsx` sin cambiar sus valores.
+
+### Cambio 3 - Crear módulo de claves
+
+#### Código anterior
+`No existía el módulo de claves en src/storage-keys.ts.`
+
+#### Código nuevo
+```ts
+export const KEY_CURRENT = "taxi_current_v3";
+export const KEY_HISTORY = "taxi_history_v3";
+export const KEY_SETTINGS = "taxi_settings_v3";
+export const KEY_WEEK_OVERRIDES = "taxi_week_overrides_v1";
+export const KEY_RESERVATIONS = "taxi_reservations_v1";
+export const KEY_NOTES = "taxi_notes_v1";
+```
+
+#### Por qué se cambió
+El módulo nuevo concentra los nombres de localStorage usados por estado, historial, ajustes, semanas, reservas y notas.
+
+### Cambio 4 - Proteger extracción de claves
+
+#### Código anterior
+`No existía el test de extracción de claves en src/__tests__/storage-keys-extraction.test.ts.`
+
+#### Código nuevo
+```ts
+import { existsSync, readFileSync } from "node:fs";
+import { resolve } from "node:path";
+import { describe, expect, it } from "vitest";
+
+describe("Storage key extraction", () => {
+  const storageKeysPath = resolve("src/storage-keys.ts");
+  const mainSource = readFileSync(resolve("src/main.tsx"), "utf8");
+
+  it("keeps localStorage key constants outside main.tsx", async () => {
+    expect(existsSync(storageKeysPath)).toBe(true);
+
+    const modulePath = "../storage-keys";
+    const { KEY_CURRENT, KEY_HISTORY, KEY_SETTINGS, KEY_WEEK_OVERRIDES, KEY_RESERVATIONS, KEY_NOTES } = await import(modulePath);
+    expect(KEY_CURRENT).toBe("taxi_current_v3");
+    expect(KEY_HISTORY).toBe("taxi_history_v3");
+    expect(KEY_SETTINGS).toBe("taxi_settings_v3");
+    expect(KEY_WEEK_OVERRIDES).toBe("taxi_week_overrides_v1");
+    expect(KEY_RESERVATIONS).toBe("taxi_reservations_v1");
+    expect(KEY_NOTES).toBe("taxi_notes_v1");
+
+    expect(mainSource).toContain('from "./storage-keys"');
+    expect(mainSource).not.toMatch(/^const KEY_CURRENT/m);
+    expect(mainSource).not.toMatch(/^const KEY_NOTES/m);
+  });
+});
+```
+
+#### Por qué se cambió
+El test fija la extracción y comprueba que los valores de las claves no cambien.
+
 ## 2026-05-24 23:39 - Extraer almacenamiento local
 
 **Archivos modificados:** `src/main.tsx`, `src/user-storage.ts`, `src/__tests__/user-storage-extraction.test.ts`
