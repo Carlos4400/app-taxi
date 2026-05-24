@@ -29,6 +29,7 @@ import { ConfirmDialog, MainCard, SmallCard } from "./components/common";
 import { TurnoNotasCard } from "./components/turno-notas";
 import { EditEntryDialog } from "./components/edit-entry-dialog";
 import { DurationCardValue } from "./components/duration-card-value";
+import { Shell } from "./components/shell";
 import { resolveLatestApkUpdate, type UpdateState } from "./update-flow";
 import { buildBackupPayload, buildBackupPayloadFromState } from "./backup";
 import {
@@ -1257,65 +1258,6 @@ const ENTRY_TYPE_META: Record<string, EntryTypeMeta> = {
   nulo: { color: N, label: "Nulo", icon: (s = 17) => <IconNulo s={s} c={N} /> },
   nota: { color: "white", label: "Nota", icon: (s = 17) => <IconNoteAdd s={s} showPlus={false} /> },
 };
-
-function Shell({
-  children,
-  burst,
-}: {
-  children: React.ReactNode;
-  burst: boolean;
-}) {
-  return (
-    <div
-      style={{
-        width: "100%",
-        maxWidth: 460,
-        height: "100dvh",
-        display: "flex",
-        flexDirection: "column",
-        background: "#0d0d14",
-        overflow: "hidden",
-        position: "relative",
-        paddingTop: "env(safe-area-inset-top)",
-        paddingBottom: "env(safe-area-inset-bottom)",
-      }}
-    >
-      {burst && <Burst />}
-      {children}
-    </div>
-  );
-}
-
-function Burst() {
-  return (
-    <div
-      style={{
-        position: "absolute",
-        inset: 0,
-        pointerEvents: "none",
-        zIndex: 99,
-        overflow: "hidden",
-      }}
-    >
-      {Array.from({ length: 22 }).map((_, i) => (
-        <div
-          key={i}
-          style={{
-            position: "absolute",
-            top: "-8px",
-            left: `${5 + Math.random() * 90}%`,
-            width: 7,
-            height: 7,
-            borderRadius: Math.random() > 0.5 ? "50%" : "2px",
-            background: [G, P, "white", "oklch(0.85 0.18 80)"][i % 4],
-            animation: `fall ${0.55 + Math.random() * 0.45}s ease-in forwards`,
-            animationDelay: `${Math.random() * 0.25}s`,
-          }}
-        />
-      ))}
-    </div>
-  );
-}
 
 // ============================================================================
 // MIGRACIÓN DE LOCALSTORAGE A FIRESTORE

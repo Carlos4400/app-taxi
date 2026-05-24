@@ -4,6 +4,215 @@ Este archivo registra cambios de código hechos por agentes/modelos en este proy
 
 Cada entrada debe indicar archivos modificados, código anterior, código nuevo y por qué se cambió. Las entradas se añaden al **principio** del archivo (las más recientes arriba).
 
+## 2026-05-24 23:48 - Extraer contenedor Shell
+
+**Archivos modificados:** `src/main.tsx`, `src/components/shell.tsx`, `src/__tests__/shell-components-extraction.test.ts`
+
+### Cambio 1 - Importar Shell
+
+#### Código anterior
+```tsx
+import { EditEntryDialog } from "./components/edit-entry-dialog";
+import { DurationCardValue } from "./components/duration-card-value";
+import { resolveLatestApkUpdate, type UpdateState } from "./update-flow";
+```
+
+#### Código nuevo
+```tsx
+import { EditEntryDialog } from "./components/edit-entry-dialog";
+import { DurationCardValue } from "./components/duration-card-value";
+import { Shell } from "./components/shell";
+import { resolveLatestApkUpdate, type UpdateState } from "./update-flow";
+```
+
+#### Por qué se cambió
+`Shell` se usa desde un componente propio para reducir el bloque visual de `main.tsx`.
+
+### Cambio 2 - Eliminar Shell local
+
+#### Código anterior
+```tsx
+function Shell({
+  children,
+  burst,
+}: {
+  children: React.ReactNode;
+  burst: boolean;
+}) {
+  return (
+    <div
+      style={{
+        width: "100%",
+        maxWidth: 460,
+        height: "100dvh",
+        display: "flex",
+        flexDirection: "column",
+        background: "#0d0d14",
+        overflow: "hidden",
+        position: "relative",
+        paddingTop: "env(safe-area-inset-top)",
+        paddingBottom: "env(safe-area-inset-bottom)",
+      }}
+    >
+      {burst && <Burst />}
+      {children}
+    </div>
+  );
+}
+
+function Burst() {
+  return (
+    <div
+      style={{
+        position: "absolute",
+        inset: 0,
+        pointerEvents: "none",
+        zIndex: 99,
+        overflow: "hidden",
+      }}
+    >
+      {Array.from({ length: 22 }).map((_, i) => (
+        <div
+          key={i}
+          style={{
+            position: "absolute",
+            top: "-8px",
+            left: `${5 + Math.random() * 90}%`,
+            width: 7,
+            height: 7,
+            borderRadius: Math.random() > 0.5 ? "50%" : "2px",
+            background: [G, P, "white", "oklch(0.85 0.18 80)"][i % 4],
+            animation: `fall ${0.55 + Math.random() * 0.45}s ease-in forwards`,
+            animationDelay: `${Math.random() * 0.25}s`,
+          }}
+        />
+      ))}
+    </div>
+  );
+}
+
+// ============================================================================
+// MIGRACIÓN DE LOCALSTORAGE A FIRESTORE
+// ============================================================================
+```
+
+#### Código nuevo
+```tsx
+// ============================================================================
+// MIGRACIÓN DE LOCALSTORAGE A FIRESTORE
+// ============================================================================
+```
+
+#### Por qué se cambió
+El contenedor visual y su animación salen de `main.tsx`; la estructura y estilos del contenedor se conservan.
+
+### Cambio 3 - Crear componente Shell
+
+#### Código anterior
+`No existía el componente Shell en src/components/shell.tsx.`
+
+#### Código nuevo
+```tsx
+import type { ReactNode } from "react";
+
+const BURST_GREEN = "oklch(0.68 0.20 145)";
+const BURST_PURPLE = "oklch(0.65 0.20 280)";
+
+export function Shell({
+  children,
+  burst,
+}: {
+  children: ReactNode;
+  burst: boolean;
+}) {
+  return (
+    <div
+      style={{
+        width: "100%",
+        maxWidth: 460,
+        height: "100dvh",
+        display: "flex",
+        flexDirection: "column",
+        background: "#0d0d14",
+        overflow: "hidden",
+        position: "relative",
+        paddingTop: "env(safe-area-inset-top)",
+        paddingBottom: "env(safe-area-inset-bottom)",
+      }}
+    >
+      {burst && <Burst />}
+      {children}
+    </div>
+  );
+}
+
+function Burst() {
+  return (
+    <div
+      style={{
+        position: "absolute",
+        inset: 0,
+        pointerEvents: "none",
+        zIndex: 99,
+        overflow: "hidden",
+      }}
+    >
+      {Array.from({ length: 22 }).map((_, i) => (
+        <div
+          key={i}
+          style={{
+            position: "absolute",
+            top: "-8px",
+            left: `${5 + Math.random() * 90}%`,
+            width: 7,
+            height: 7,
+            borderRadius: Math.random() > 0.5 ? "50%" : "2px",
+            background: [BURST_GREEN, BURST_PURPLE, "white", "oklch(0.85 0.18 80)"][i % 4],
+            animation: `fall ${0.55 + Math.random() * 0.45}s ease-in forwards`,
+            animationDelay: `${Math.random() * 0.25}s`,
+          }}
+        />
+      ))}
+    </div>
+  );
+}
+```
+
+#### Por qué se cambió
+El componente nuevo mantiene los estilos de Shell y define los colores de Burst con los mismos valores que usaba antes desde `G` y `P`.
+
+### Cambio 4 - Proteger extracción de Shell
+
+#### Código anterior
+`No existía el test de extracción de Shell en src/__tests__/shell-components-extraction.test.ts.`
+
+#### Código nuevo
+```ts
+import { existsSync, readFileSync } from "node:fs";
+import { resolve } from "node:path";
+import { describe, expect, it } from "vitest";
+
+describe("Shell component extraction", () => {
+  const shellPath = resolve("src/components/shell.tsx");
+  const mainSource = readFileSync(resolve("src/main.tsx"), "utf8");
+
+  it("keeps Shell and Burst outside main.tsx", () => {
+    expect(existsSync(shellPath)).toBe(true);
+
+    const shellSource = readFileSync(shellPath, "utf8");
+    expect(shellSource).toContain("export function Shell");
+    expect(shellSource).toContain("function Burst");
+    expect(shellSource).toContain("height: \"100dvh\"");
+    expect(mainSource).toContain('from "./components/shell"');
+    expect(mainSource).not.toMatch(/^function Shell\(/m);
+    expect(mainSource).not.toMatch(/^function Burst\(/m);
+  });
+});
+```
+
+#### Por qué se cambió
+El test fija que el contenedor y la animación permanezcan fuera de `main.tsx`.
+
 ## 2026-05-24 23:44 - Extraer valor de duracion
 
 **Archivos modificados:** `src/main.tsx`, `src/components/duration-card-value.tsx`, `src/__tests__/duration-card-value-extraction.test.ts`
