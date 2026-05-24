@@ -4,6 +4,391 @@ Este archivo registra cambios de código hechos por agentes/modelos en este proy
 
 Cada entrada debe indicar archivos modificados, código anterior, código nuevo y por qué se cambió. Las entradas se añaden al **principio** del archivo (las más recientes arriba).
 
+## 2026-05-24 22:41 - Extraer componentes comunes
+
+**Archivos modificados:** `src/main.tsx`, `src/components/common.tsx`, `src/__tests__/common-components-extraction.test.ts`
+
+### Cambio 1 - Importar componentes comunes
+
+#### Código anterior
+```tsx
+import { auth, db } from "./firebase";
+import { LoginScreen } from "./login-screen";
+import { fmtDuration, fmtKm, fmtKmNumber, fmtMoney, fmtMoneyNumber, splitDurationLabel } from "./formatters";
+import {
+  userMetaDocRef,
+  userSubcollectionRef,
+```
+
+#### Código nuevo
+```tsx
+import { auth, db } from "./firebase";
+import { LoginScreen } from "./login-screen";
+import { fmtDuration, fmtKm, fmtKmNumber, fmtMoney, fmtMoneyNumber, splitDurationLabel } from "./formatters";
+import { ConfirmDialog, MainCard, SmallCard } from "./components/common";
+import {
+  userMetaDocRef,
+  userSubcollectionRef,
+```
+
+#### Por qué se cambió
+`SmallCard`, `MainCard` y `ConfirmDialog` se movieron a un módulo común para reducir `main.tsx` sin tocar reglas de negocio ni cálculos de contabilidad.
+
+### Cambio 2 - Eliminar tarjetas locales de main
+
+#### Código anterior
+```tsx
+function SmallCard({
+  label,
+  color,
+  bg,
+  total,
+  icon,
+  onClick,
+  disabled,
+  ariaLabel,
+}: {
+  label: string;
+  color: string;
+  bg: string;
+  total: number;
+  icon: React.ReactNode;
+  onClick?: () => void;
+  disabled?: boolean;
+  ariaLabel?: string;
+}) {
+  return (
+    <div
+      onClick={!disabled ? onClick : undefined}
+      {...(onClick && !disabled ? { role: "button", tabIndex: 0 } : {})}
+      aria-label={ariaLabel || label}
+```
+
+#### Código nuevo
+```tsx
+function EditEntryDialog({
+```
+
+#### Por qué se cambió
+Las tarjetas comunes dejaron de definirse dentro de `main.tsx`; ahora se importan desde `src/components/common.tsx`. El siguiente bloque local en esa posición pasa a ser `EditEntryDialog`, sin cambiar la UI ni los cálculos.
+
+### Cambio 3 - Eliminar diálogo de confirmación local
+
+#### Código anterior
+```tsx
+interface ConfirmDialogProps {
+  text: string;
+  onConfirm: () => void;
+  onCancel: () => void;
+  confirmText?: string;
+  confirmBg?: string;
+  confirmColor?: string;
+  confirmBorder?: string;
+}
+
+function ConfirmDialog({ text, onConfirm, onCancel, confirmText, confirmBg, confirmColor, confirmBorder }: ConfirmDialogProps) {
+  return (
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-label={text}
+```
+
+#### Código nuevo
+```tsx
+function TurnoNotasCard({
+```
+
+#### Por qué se cambió
+El diálogo de confirmación se extrajo al módulo común junto con sus props. En `main.tsx` queda solo su uso mediante import, evitando duplicar responsabilidades en el componente principal.
+
+### Cambio 4 - Módulo común de componentes
+
+#### Código anterior
+`No existía el archivo src/components/common.tsx.`
+
+#### Código nuevo
+```tsx
+import type { ReactNode } from "react";
+import { fmtMoney } from "../formatters";
+
+function fmt(n: number): string {
+  return fmtMoney(n);
+}
+
+export function SmallCard({
+  label,
+  color,
+  bg,
+  total,
+  icon,
+  onClick,
+  disabled,
+  ariaLabel,
+}: {
+  label: string;
+  color: string;
+  bg: string;
+  total: number;
+  icon: ReactNode;
+  onClick?: () => void;
+  disabled?: boolean;
+  ariaLabel?: string;
+}) {
+  return (
+    <div
+      onClick={!disabled ? onClick : undefined}
+      {...(onClick && !disabled ? { role: "button", tabIndex: 0 } : {})}
+      aria-label={ariaLabel || label}
+      style={{
+        flex: 1,
+        background: bg,
+        borderRadius: 16,
+        padding: "12px 14px",
+        border: `1px solid ${color}33`,
+        display: "flex",
+        alignItems: "center",
+        gap: 10,
+        cursor: disabled ? "default" : onClick ? "pointer" : "default",
+        transition: "all 0.15s",
+        opacity: disabled ? 0.35 : 1,
+        pointerEvents: disabled ? "none" : "auto",
+        filter: disabled ? "grayscale(0.4)" : "none",
+      }}
+    >
+      {icon}
+      <div style={{ flex: 1 }}>
+        <div
+          style={{
+            fontSize: 11,
+            fontWeight: 600,
+            color: "rgba(255,255,255,0.45)",
+            letterSpacing: "0.5px",
+          }}
+        >
+          {label}
+        </div>
+        <div
+          style={{
+            fontSize: 18,
+            fontWeight: 800,
+            color,
+            letterSpacing: "-0.3px",
+            marginTop: 2,
+          }}
+        >
+          {fmt(total)}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export function MainCard({
+  label,
+  color,
+  bg,
+  total,
+  count,
+  icon,
+  onClick,
+  disabled,
+  ariaLabel,
+}: {
+  label: string;
+  color: string;
+  bg: string;
+  total: number;
+  count: number;
+  icon: ReactNode;
+  onClick?: () => void;
+  disabled?: boolean;
+  ariaLabel?: string;
+}) {
+  return (
+    <div
+      onClick={!disabled ? onClick : undefined}
+      {...(onClick && !disabled ? { role: "button", tabIndex: 0 } : {})}
+      aria-label={ariaLabel || label}
+      style={{
+        flex: 1,
+        background: bg,
+        borderRadius: 22,
+        padding: "20px 18px",
+        border: `1px solid ${color}33`,
+        cursor: disabled ? "default" : onClick ? "pointer" : "default",
+        opacity: disabled ? 0.35 : 1,
+        pointerEvents: disabled ? "none" : "auto",
+        filter: disabled ? "grayscale(0.4)" : "none",
+        transition: "all 0.15s",
+      }}
+    >
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 8,
+          marginBottom: 14,
+        }}
+      >
+        {icon}
+        <span
+          style={{
+            fontSize: 15,
+            fontWeight: 700,
+            color: "rgba(255,255,255,0.50)",
+          }}
+        >
+          {label}
+        </span>
+      </div>
+      <div
+        style={{
+          fontSize: "clamp(24px, 7vw, 34px)",
+          fontWeight: 900,
+          color,
+          letterSpacing: "-1px",
+          lineHeight: 1,
+        }}
+      >
+        {fmt(total)}
+      </div>
+      <div
+        style={{ fontSize: 12, color: "rgba(255,255,255,0.5)", marginTop: 8 }}
+      >
+        {count} entrada{count !== 1 ? "s" : ""}
+      </div>
+    </div>
+  );
+}
+
+export interface ConfirmDialogProps {
+  text: string;
+  onConfirm: () => void;
+  onCancel: () => void;
+  confirmText?: string;
+  confirmBg?: string;
+  confirmColor?: string;
+  confirmBorder?: string;
+}
+
+export function ConfirmDialog({ text, onConfirm, onCancel, confirmText, confirmBg, confirmColor, confirmBorder }: ConfirmDialogProps) {
+  return (
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-label={text}
+      style={{
+        position: "fixed",
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        background: "rgba(0,0,0,0.6)",
+        backdropFilter: "blur(4px)",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        zIndex: 10000,
+        animation: "fadeIn 0.2s ease",
+      }}
+    >
+      <div
+        style={{
+          background: "oklch(0.18 0.03 260)",
+          borderRadius: 20,
+          padding: 24,
+          width: "85%",
+          maxWidth: 320,
+          border: "1px solid rgba(255,255,255,0.1)",
+          boxShadow: "0 20px 40px rgba(0,0,0,0.5)",
+          animation: "fadeUp 0.3s ease",
+        }}
+      >
+        <div style={{ fontSize: 20, fontWeight: 800, color: "white", marginBottom: 12 }}>
+          Confirmar acción
+        </div>
+        <div style={{ fontSize: 15, color: "rgba(255,255,255,0.6)", marginBottom: 24, lineHeight: 1.4 }}>
+          {text}
+        </div>
+        <div style={{ display: "flex", gap: 12 }}>
+          <button
+            onClick={onCancel}
+            style={{
+              flex: 1,
+              padding: "14px",
+              borderRadius: 12,
+              border: "none",
+              background: "rgba(255,255,255,0.1)",
+              color: "white",
+              fontWeight: 700,
+              cursor: "pointer",
+            }}
+          >
+            Cancelar
+          </button>
+          <button
+            onClick={() => {
+              onConfirm();
+              onCancel();
+            }}
+            style={{
+              flex: 1,
+              padding: "14px",
+              borderRadius: 12,
+              border: confirmBorder || "none",
+              background: confirmBg || "rgba(255,60,60,0.2)",
+              color: confirmColor || "#ff6b6b",
+              fontWeight: 700,
+              cursor: "pointer",
+            }}
+          >
+            {confirmText || "Confirmar"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+```
+
+#### Por qué se cambió
+Centraliza los tres componentes comunes extraídos desde `main.tsx` y mantiene el mismo formato monetario mediante `fmtMoney`, sin depender de la función local `fmt` del archivo principal.
+
+### Cambio 5 - Test de extracción de componentes
+
+#### Código anterior
+`No existía el archivo src/__tests__/common-components-extraction.test.ts.`
+
+#### Código nuevo
+```ts
+import { existsSync, readFileSync } from "node:fs";
+import { resolve } from "node:path";
+import { describe, expect, it } from "vitest";
+
+describe("Common component extraction", () => {
+  const mainSource = readFileSync(resolve("src/main.tsx"), "utf8");
+  const commonPath = resolve("src/components/common.tsx");
+
+  it("keeps low-risk common components outside main.tsx", () => {
+    expect(existsSync(commonPath)).toBe(true);
+
+    const commonSource = readFileSync(commonPath, "utf8");
+    expect(commonSource).toContain("export function SmallCard");
+    expect(commonSource).toContain("export function MainCard");
+    expect(commonSource).toContain("export function ConfirmDialog");
+
+    expect(mainSource).toContain('from "./components/common"');
+    expect(mainSource).not.toMatch(/^function SmallCard/m);
+    expect(mainSource).not.toMatch(/^function MainCard/m);
+    expect(mainSource).not.toMatch(/^function ConfirmDialog/m);
+  });
+});
+```
+
+#### Por qué se cambió
+Añade un candado estático para impedir que los componentes comunes vuelvan a definirse dentro de `main.tsx` y para comprobar que el nuevo módulo exporta las piezas extraídas.
+
 ## 2026-05-24 22:21 - Actualizar documentación de Firebase
 
 **Archivos modificados:** `README.md`
