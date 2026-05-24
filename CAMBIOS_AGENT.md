@@ -4,6 +4,179 @@ Este archivo registra cambios de código hechos por agentes/modelos en este proy
 
 Cada entrada debe indicar archivos modificados, código anterior, código nuevo y por qué se cambió. Las entradas se añaden al **principio** del archivo (las más recientes arriba).
 
+## 2026-05-24 23:29 - Extraer etiquetas de fecha
+
+**Archivos modificados:** `src/main.tsx`, `src/date-labels.ts`, `src/__tests__/date-labels-extraction.test.ts`
+
+### Cambio 1 - Importar etiquetas de fecha
+
+#### Código anterior
+```tsx
+import { updateTurnoEntrega } from "./turno-entrega";
+import { getDaysInMonth, getStartOffset } from "./calendar-date";
+```
+
+```tsx
+export { getTurnosNotasSemana };
+export { updateTurnoEntrega };
+```
+
+#### Código nuevo
+```tsx
+import { updateTurnoEntrega } from "./turno-entrega";
+import { getDaysInMonth, getStartOffset } from "./calendar-date";
+import { MESES_ABREVIADOS, MESES_COMPLETOS, getAccountingPeriodLabel, getMesLabel } from "./date-labels";
+```
+
+```tsx
+export { getTurnosNotasSemana };
+export { updateTurnoEntrega };
+export { getAccountingPeriodLabel };
+```
+
+#### Por qué se cambió
+`main.tsx` usa meses y labels desde `date-labels.ts` y mantiene `getAccountingPeriodLabel` como export público.
+
+### Cambio 2 - Eliminar constantes de meses locales
+
+#### Código anterior
+```tsx
+const MESES_COMPLETOS = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
+const MESES_ABREVIADOS = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
+
+export const WEEK_LIST_CARD_TEXT_SIZES = {
+```
+
+#### Código nuevo
+```tsx
+export const WEEK_LIST_CARD_TEXT_SIZES = {
+```
+
+#### Por qué se cambió
+Las constantes de nombres de meses pasan al módulo compartido de etiquetas de fecha.
+
+### Cambio 3 - Usar getMesLabel importado
+
+#### Código anterior
+```tsx
+  // Empate
+  const labelOf = (mesId: string) => {
+    const [y, m] = mesId.split("-").map(Number);
+    return `${MESES_COMPLETOS[m - 1]} ${y}`;
+  };
+
+  // Ordenar candidatos cronológicamente (mes anterior primero)
+  const candidates = [primera[0], segunda[0]].sort();
+  return {
+    type: "tie",
+    candidates: candidates.map((mesId) => ({ mesId, mesLabel: labelOf(mesId) })),
+  };
+}
+```
+
+#### Código nuevo
+```tsx
+  // Empate
+  // Ordenar candidatos cronológicamente (mes anterior primero)
+  const candidates = [primera[0], segunda[0]].sort();
+  return {
+    type: "tie",
+    candidates: candidates.map((mesId) => ({ mesId, mesLabel: getMesLabel(mesId) })),
+  };
+}
+```
+
+#### Por qué se cambió
+La etiqueta de mes empatado reutiliza el helper compartido `getMesLabel` en lugar de duplicar la lógica.
+
+### Cambio 4 - Eliminar labels locales
+
+#### Código anterior
+```tsx
+/**
+ * Devuelve el label legible de un mesId "YYYY-MM" → "Mayo 2026"
+ */
+function getMesLabel(mesId: string): string {
+  const [y, m] = mesId.split("-").map(Number);
+  return `${MESES_COMPLETOS[m - 1]} ${y}`;
+}
+
+export function getAccountingPeriodLabel(year: number, month: number): string {
+  return getMesLabel(`${year}-${String(month).padStart(2, "0")}`);
+}
+
+/**
+ * Devuelve el rango formateado para mostrar en la tarjeta de semana.
+```
+
+#### Código nuevo
+```tsx
+/**
+ * Devuelve el rango formateado para mostrar en la tarjeta de semana.
+```
+
+#### Por qué se cambió
+`getMesLabel` y `getAccountingPeriodLabel` se trasladan a `date-labels.ts` para centralizar labels de fecha.
+
+### Cambio 5 - Crear módulo de etiquetas
+
+#### Código anterior
+`No existía el módulo de etiquetas de fecha en src/date-labels.ts.`
+
+#### Código nuevo
+```ts
+export const MESES_COMPLETOS = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
+export const MESES_ABREVIADOS = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
+
+export function getMesLabel(mesId: string): string {
+  const [y, m] = mesId.split("-").map(Number);
+  return `${MESES_COMPLETOS[m - 1]} ${y}`;
+}
+
+export function getAccountingPeriodLabel(year: number, month: number): string {
+  return getMesLabel(`${year}-${String(month).padStart(2, "0")}`);
+}
+```
+
+#### Por qué se cambió
+El módulo nuevo contiene los nombres de meses y labels reutilizados por calendario y contabilidad visual.
+
+### Cambio 6 - Proteger extracción de etiquetas
+
+#### Código anterior
+`No existía el test de extracción de etiquetas en src/__tests__/date-labels-extraction.test.ts.`
+
+#### Código nuevo
+```ts
+import { existsSync, readFileSync } from "node:fs";
+import { resolve } from "node:path";
+import { describe, expect, it } from "vitest";
+
+describe("Date label extraction", () => {
+  const dateLabelsPath = resolve("src/date-labels.ts");
+  const mainSource = readFileSync(resolve("src/main.tsx"), "utf8");
+
+  it("keeps month labels and accounting period labels outside main.tsx", async () => {
+    expect(existsSync(dateLabelsPath)).toBe(true);
+
+    const modulePath = "../date-labels";
+    const { MESES_COMPLETOS, MESES_ABREVIADOS, getAccountingPeriodLabel, getMesLabel } = await import(modulePath);
+    expect(MESES_COMPLETOS[4]).toBe("Mayo");
+    expect(MESES_ABREVIADOS[4]).toBe("May");
+    expect(getMesLabel("2026-05")).toBe("Mayo 2026");
+    expect(getAccountingPeriodLabel(2026, 5)).toBe("Mayo 2026");
+
+    expect(mainSource).toContain('from "./date-labels"');
+    expect(mainSource).not.toMatch(/^const MESES_COMPLETOS/m);
+    expect(mainSource).not.toMatch(/^function getMesLabel\(/m);
+    expect(mainSource).not.toMatch(/^export function getAccountingPeriodLabel\(/m);
+  });
+});
+```
+
+#### Por qué se cambió
+El test fija la extracción y comprueba los labels de Mayo usados por la app.
+
 ## 2026-05-24 23:26 - Extraer calendario mensual
 
 **Archivos modificados:** `src/main.tsx`, `src/calendar-date.ts`, `src/__tests__/calendar-date-extraction.test.ts`

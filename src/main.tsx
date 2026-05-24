@@ -42,6 +42,7 @@ import { getBackupMenuActionIds, getHomeQuickActionIds } from "./action-ids";
 import { getTurnosNotasSemana } from "./turno-notas-logic";
 import { updateTurnoEntrega } from "./turno-entrega";
 import { getDaysInMonth, getStartOffset } from "./calendar-date";
+import { MESES_ABREVIADOS, MESES_COMPLETOS, getAccountingPeriodLabel, getMesLabel } from "./date-labels";
 import {
   userMetaDocRef,
   userSubcollectionRef,
@@ -65,6 +66,7 @@ export { getBackupMenuActionIds, getHomeQuickActionIds };
 export type { BackupMenuActionId, HomeQuickActionId } from "./action-ids";
 export { getTurnosNotasSemana };
 export { updateTurnoEntrega };
+export { getAccountingPeriodLabel };
 
 const { useState, useEffect, useRef } = React;
 
@@ -157,9 +159,6 @@ type EntryTypeMeta = {
 function getEntryTypeMeta(type: string): EntryTypeMeta {
   return ENTRY_TYPE_META[type] || ENTRY_TYPE_META.nulo;
 }
-
-const MESES_COMPLETOS = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
-const MESES_ABREVIADOS = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
 
 export const WEEK_LIST_CARD_TEXT_SIZES = {
   range: "clamp(13px, 4.2cqw, 16px)",
@@ -655,29 +654,12 @@ function getWeekMonth(weekId: string): {
   }
 
   // Empate
-  const labelOf = (mesId: string) => {
-    const [y, m] = mesId.split("-").map(Number);
-    return `${MESES_COMPLETOS[m - 1]} ${y}`;
-  };
-
   // Ordenar candidatos cronológicamente (mes anterior primero)
   const candidates = [primera[0], segunda[0]].sort();
   return {
     type: "tie",
-    candidates: candidates.map((mesId) => ({ mesId, mesLabel: labelOf(mesId) })),
+    candidates: candidates.map((mesId) => ({ mesId, mesLabel: getMesLabel(mesId) })),
   };
-}
-
-/**
- * Devuelve el label legible de un mesId "YYYY-MM" → "Mayo 2026"
- */
-function getMesLabel(mesId: string): string {
-  const [y, m] = mesId.split("-").map(Number);
-  return `${MESES_COMPLETOS[m - 1]} ${y}`;
-}
-
-export function getAccountingPeriodLabel(year: number, month: number): string {
-  return getMesLabel(`${year}-${String(month).padStart(2, "0")}`);
 }
 
 /**
