@@ -3,7 +3,15 @@ import ReactDOM from "react-dom/client";
 import { Filesystem, Directory, Encoding } from "@capacitor/filesystem";
 import { Share } from "@capacitor/share";
 
-import { Capacitor } from "@capacitor/core";
+import { Capacitor, registerPlugin } from "@capacitor/core";
+
+export interface ApkInstallerPluginType {
+  canInstallPackages(): Promise<{ value: boolean }>;
+  openInstallPermissionSettings(): Promise<void>;
+  downloadAndInstall(options: { url: string; fileName: string }): Promise<{ success: boolean }>;
+}
+
+const ApkInstaller = registerPlugin<ApkInstallerPluginType>("ApkInstaller");
 
 import html2canvas from "html2canvas";
 import { onAuthStateChanged, signOut, type User } from "firebase/auth";
@@ -1526,13 +1534,13 @@ const IconSettings = ({ s = 24, c = "white" }: { s?: number; c?: string }) => (
 );
 
 const ENTRY_TYPE_META: Record<string, EntryTypeMeta> = {
-  propina:      { color: G,       label: "Propina",      icon: (s = 17) => <IconCoin   s={s} c={G} /> },
-  datafono:     { color: P,       label: "Datáfono",     icon: (s = 17) => <IconCard   s={s} c={P} /> },
-  agencia_bono: { color: A,       label: "Agencia/Bono", icon: (s = 17) => <IconAgency s={s} c={A} /> },
-  extra:        { color: E,       label: "Extra",        icon: (s = 17) => <IconExtra  s={s} c={E} /> },
-  gasolina:     { color: F,       label: "Gasolina",     icon: (s = 17) => <IconFuel   s={s} c={F} /> },
-  nulo:         { color: N,       label: "Nulo",         icon: (s = 17) => <IconNulo   s={s} c={N} /> },
-  nota:         { color: "white", label: "Nota",         icon: (s = 17) => <IconNoteAdd s={s} showPlus={false} /> },
+  propina: { color: G, label: "Propina", icon: (s = 17) => <IconCoin s={s} c={G} /> },
+  datafono: { color: P, label: "Datáfono", icon: (s = 17) => <IconCard s={s} c={P} /> },
+  agencia_bono: { color: A, label: "Agencia/Bono", icon: (s = 17) => <IconAgency s={s} c={A} /> },
+  extra: { color: E, label: "Extra", icon: (s = 17) => <IconExtra s={s} c={E} /> },
+  gasolina: { color: F, label: "Gasolina", icon: (s = 17) => <IconFuel s={s} c={F} /> },
+  nulo: { color: N, label: "Nulo", icon: (s = 17) => <IconNulo s={s} c={N} /> },
+  nota: { color: "white", label: "Nota", icon: (s = 17) => <IconNoteAdd s={s} showPlus={false} /> },
 };
 
 function Shell({
@@ -1751,7 +1759,9 @@ function App() {
     confirmBorder?: string;
   } | null>(null);
   const [updateMsg, setUpdateMsg] = useState("");
+  const [updateState, setUpdateState] = useState<"idle" | "checking" | "available" | "downloading" | "permission_required" | "error" | "installed">("idle");
   const [downloadUrl, setDownloadUrl] = useState("");
+  const [releaseUrl, setReleaseUrl] = useState("");
   const [editEntry, setEditEntry] = useState<Entry | null>(null);
   const [editEntryAmount, setEditEntryAmount] = useState("");
   const [editEntryNote, setEditEntryNote] = useState("");
@@ -2320,8 +2330,10 @@ function App() {
   }
 
   async function checkUpdate() {
+    setUpdateState("checking");
     setUpdateMsg("Buscando actualizaciones...");
     setDownloadUrl("");
+    setReleaseUrl("");
     try {
       const res = await fetch("https://api.github.com/repos/Carlos4400/app-taxi/releases/latest");
       if (!res.ok) throw new Error("No se encontró el release");
@@ -2329,19 +2341,66 @@ function App() {
       const latestVersion = data.tag_name ? data.tag_name.replace(/[^0-9.]/g, '') : null;
 
       if (latestVersion && latestVersion !== APP_VERSION) {
-        setUpdateMsg(`¡Nueva versión ${latestVersion} disponible!`);
-        if (data.assets && data.assets.length > 0) {
-          setDownloadUrl(data.assets[0].browser_download_url);
+        let apkAsset = data.assets?.find((asset: any) => asset.name && asset.name.endsWith(".apk"));
+        if (apkAsset) {
+          setDownloadUrl(apkAsset.browser_download_url);
+          setUpdateState("available");
+          setUpdateMsg(`¡Nueva versión ${latestVersion} disponible!`);
         } else {
-          setDownloadUrl(data.html_url);
+          setDownloadUrl("");
+          setReleaseUrl(data.html_url || "https://github.com/Carlos4400/app-taxi/releases/latest");
+          setUpdateState("error");
+          setUpdateMsg("No se encontró APK en el último release.");
         }
       } else {
+        setUpdateState("idle");
         setUpdateMsg("Tienes la última versión instalada.");
       }
     } catch (e) {
+      setUpdateState("error");
       setUpdateMsg("Error al conectar con GitHub.");
     }
   }
+
+  const handleInstallUpdate = async () => {
+    if (!downloadUrl.endsWith(".apk")) {
+      setUpdateState("error");
+      setUpdateMsg("No se encontró APK en el último release.");
+      return;
+    }
+
+    if (Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'android') {
+      try {
+        setUpdateState("checking");
+        const { value: hasPermission } = await ApkInstaller.canInstallPackages();
+        if (!hasPermission) {
+          setUpdateState("permission_required");
+          setUpdateMsg("Se requieren permisos para instalar aplicaciones desconocidas.");
+          await ApkInstaller.openInstallPermissionSettings();
+          return;
+        }
+
+        setUpdateState("downloading");
+        setUpdateMsg("Descargando actualización...");
+        const fileName = `app-update-${Date.now()}.apk`;
+        await ApkInstaller.downloadAndInstall({ url: downloadUrl, fileName });
+        setUpdateState("installed");
+        setUpdateMsg("Instalación iniciada.");
+      } catch (err: any) {
+        console.error("Error al descargar/instalar APK:", err);
+        setUpdateState("error");
+        setUpdateMsg("Error al instalar el APK. Inténtalo de nuevo.");
+      }
+    } else {
+      window.open(downloadUrl, "_blank", "noopener,noreferrer");
+    }
+  };
+
+  const handleOpenRelease = () => {
+    if (releaseUrl) {
+      window.open(releaseUrl, "_blank", "noopener,noreferrer");
+    }
+  };
 
   const S = {
     iconBtn: {
@@ -3729,7 +3788,7 @@ function App() {
       <Shell burst={false}>
         <div style={{ flex: 1, padding: "16px 20px", display: "flex", flexDirection: "column", gap: 16, overflowY: "auto" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 16 }}>
-            <button style={S.iconBtn} onClick={() => { setScreen("home"); setUpdateMsg(""); setDownloadUrl(""); }}><IconBack /></button>
+            <button style={S.iconBtn} onClick={() => { setScreen("home"); setUpdateMsg(""); setDownloadUrl(""); setReleaseUrl(""); }}><IconBack /></button>
             <div style={{ fontSize: 24, fontWeight: 800, color: "white" }}>Ajustes de Usuario</div>
           </div>
 
@@ -3742,17 +3801,17 @@ function App() {
               <IconRefresh s={20} c={G} /> Buscar actualizaciones
             </button>
 
-            {updateMsg && !downloadUrl && (
+            {updateMsg && (
               <div style={{ marginTop: 16, fontSize: 14, color: "rgba(255,255,255,0.6)", background: "rgba(0,0,0,0.2)", padding: "12px", borderRadius: 12 }}>
                 {updateMsg}
               </div>
             )}
 
-            {updateMsg && downloadUrl && (
-              <a
-                href={downloadUrl}
-                target="_blank"
-                rel="noopener noreferrer"
+            {(() => {
+              const hasApkDownload = downloadUrl.endsWith(".apk");
+              return hasApkDownload && updateState !== "downloading" && updateState !== "checking" && (
+              <button
+                onClick={handleInstallUpdate}
                 style={{
                   display: "flex",
                   alignItems: "center",
@@ -3762,17 +3821,42 @@ function App() {
                   marginTop: 16,
                   padding: "14px",
                   borderRadius: 14,
-                  background: G,
+                  border: "none",
+                  background: updateState === "permission_required" ? "#facc15" : G,
                   color: "black",
                   fontSize: 15,
                   fontWeight: 800,
-                  textDecoration: "none",
                   cursor: "pointer",
                   textAlign: "center"
                 }}
               >
-                <IconDownload s={20} c="#3b82f6" /> {updateMsg}
-              </a>
+                <IconDownload s={20} c="black" />
+                {Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'android'
+                  ? (updateState === "permission_required" ? "Continuar instalación" : "Descargar e instalar")
+                  : "Descargar actualización"}
+              </button>
+              );
+            })()}
+
+            {!Capacitor.isNativePlatform() && releaseUrl && (
+              <button
+                onClick={handleOpenRelease}
+                style={{
+                  width: "100%",
+                  marginTop: 12,
+                  padding: "14px",
+                  borderRadius: 14,
+                  border: "1px solid rgba(255,255,255,0.12)",
+                  background: "rgba(255,255,255,0.06)",
+                  color: "white",
+                  fontSize: 15,
+                  fontWeight: 800,
+                  cursor: "pointer",
+                  textAlign: "center"
+                }}
+              >
+                Abrir release
+              </button>
             )}
           </div>
 
@@ -6522,6 +6606,7 @@ function App() {
         setCopiado(true);
         setTimeout(() => setCopiado(false), 2000);
       }).catch((e) => {
+        alert("DEBUG: El copiado de texto falló.");
         console.error("Text copy failed: ", e);
       });
     };
@@ -6529,6 +6614,7 @@ function App() {
     const copyToClipboard = async () => {
       const element = document.getElementById("ticket-digital");
       if (!element) {
+        alert("DEBUG: No se encontró el elemento ticket-digital.");
         copyTextFallback();
         return;
       }
@@ -6549,7 +6635,7 @@ function App() {
 
           const elements = [ticket, ...Array.from(ticket.getElementsByTagName("*"))] as HTMLElement[];
           const replaceOklch = (str: string) => {
-            return str.replace(/oklch\(\s*([\d.]+)\s+([\d.]+)\s+([\d.]+)\s*\)/gi, (match, l, c, h) => {
+            return str.replace(/oklch\(\s*([\d.]+)\s+([\d.]+)\s+([\d.]+)(?:\s*\/\s*[\d.]+)?\s*\)/gi, (match, l, c, h) => {
               const lightness = parseFloat(l);
               const chroma = parseFloat(c);
               const hue = parseFloat(h);
@@ -6560,7 +6646,9 @@ function App() {
               if (Math.abs(lightness - 0.65) < 0.05 && Math.abs(chroma - 0.20) < 0.05 && Math.abs(hue - 280) < 5) return "#7c79ff";
               if (Math.abs(lightness - 0.75) < 0.05 && Math.abs(chroma - 0.16) < 0.05 && Math.abs(hue - 70) < 5) return "#ed990e";
               if (Math.abs(lightness - 0.72) < 0.05 && Math.abs(chroma - 0.14) < 0.05 && Math.abs(hue - 200) < 5) return "#00bec7";
-              return match;
+              if (Math.abs(lightness - 0.62) < 0.05 && Math.abs(chroma - 0.06) < 0.05 && Math.abs(hue - 260) < 5) return "#888899";
+              if (false) return match;
+              return "#ffffff";
             });
           };
           const replaceExportNeutrals = (str: string) => {
@@ -6599,6 +6687,7 @@ function App() {
       }).then((canvas) => {
         canvas.toBlob((blob) => {
           if (!blob) {
+            alert("DEBUG: Falló la creación del blob de la imagen.");
             copyTextFallback();
             return;
           }
@@ -6622,7 +6711,8 @@ function App() {
                   url: result.uri,
                   dialogTitle: "Compartir Liquidación",
                 });
-              } catch (e) {
+              } catch (e: any) {
+                alert("DEBUG: Error en Share.share nativo: " + (e?.message || JSON.stringify(e)));
                 console.error("Error sharing image, fallback to text:", e);
                 copyTextFallback();
               }
@@ -6633,11 +6723,13 @@ function App() {
               navigator.clipboard.write([item]).then(() => {
                 setCopiado(true);
                 setTimeout(() => setCopiado(false), 2000);
-              }).catch((err) => {
+              }).catch((err: any) => {
+                alert("DEBUG: navigator.clipboard.write falló. " + (err?.message || JSON.stringify(err)));
                 console.error("ClipboardItem write failed, fallback to text:", err);
                 copyTextFallback();
               });
             } else {
+              alert("DEBUG: navigator.clipboard o window.ClipboardItem no están disponibles. El navegador no lo soporta o no hay HTTPS.");
               copyTextFallback();
             }
           }
@@ -6655,7 +6747,7 @@ function App() {
       setProcesandoTicket(true);
       try {
         await document.fonts?.ready;
-      } catch {}
+      } catch { }
       html2canvas(element, {
         backgroundColor: "#ffffff",
         scale: 3,
@@ -6890,28 +6982,28 @@ function App() {
             )}
           </div>
 
-            <button
-              id="btn-imprimir-ticket"
-              onClick={sharePrinterTicket}
-              disabled={procesandoTicket}
-              style={{
-                padding: "16px 0",
-                borderRadius: 16,
-                background: procesandoTicket ? "rgba(255,255,255,0.04)" : "rgba(37, 210, 252, 0.1)",
-                border: procesandoTicket ? "1px solid rgba(255,255,255,0.08)" : "1px solid rgba(37, 210, 252, 0.3)",
-                color: procesandoTicket ? "rgba(255,255,255,0.35)" : "#25d2fc",
-                fontSize: 19,
-                fontWeight: 700,
-                cursor: procesandoTicket ? "not-allowed" : "pointer",
-                display: "flex",
-                justifyContent: "center",
-                alignItems: "center",
-                gap: 8,
-                transition: "all 0.2s"
-              }}
-            >
-              {procesandoTicket ? "Generando ticket..." : "Imprimir Ticket"}
-            </button>
+          <button
+            id="btn-imprimir-ticket"
+            onClick={sharePrinterTicket}
+            disabled={procesandoTicket}
+            style={{
+              padding: "16px 0",
+              borderRadius: 16,
+              background: procesandoTicket ? "rgba(255,255,255,0.04)" : "rgba(37, 210, 252, 0.1)",
+              border: procesandoTicket ? "1px solid rgba(255,255,255,0.08)" : "1px solid rgba(37, 210, 252, 0.3)",
+              color: procesandoTicket ? "rgba(255,255,255,0.35)" : "#25d2fc",
+              fontSize: 19,
+              fontWeight: 700,
+              cursor: procesandoTicket ? "not-allowed" : "pointer",
+              display: "flex",
+              justifyContent: "center",
+              alignItems: "center",
+              gap: 8,
+              transition: "all 0.2s"
+            }}
+          >
+            {procesandoTicket ? "Generando ticket..." : "Imprimir Ticket"}
+          </button>
 
           {/* Ticket termico oculto para impresora */}
           <div

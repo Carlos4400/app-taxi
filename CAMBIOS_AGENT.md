@@ -4,6 +4,446 @@ Este archivo registra cambios de código hechos por agentes/modelos en este proy
 
 Cada entrada debe indicar archivos modificados, código anterior, código nuevo y por qué se cambió. Las entradas se añaden al **principio** del archivo (las más recientes arriba).
 
+## 2026-05-24 19:15 - Implementar descarga e instalación nativa de APK en Android
+
+**Archivos modificados:** `android/app/src/main/AndroidManifest.xml`, `android/app/src/main/java/com/mijornada/app/MainActivity.java`, `android/app/src/main/java/com/mijornada/app/ApkInstallerPlugin.java`, `android/app/build.gradle`, `.github/workflows/android.yml`, `src/main.tsx`, `src/__tests__/logic.test.ts`, `src/__tests__/apk-update-flow.test.ts`
+
+### Cambio 1 - Permiso de instalación de paquetes
+
+#### Código anterior
+```xml
+    <!-- Permissions -->
+
+    <uses-permission android:name="android.permission.INTERNET" />
+</manifest>
+```
+
+#### Código nuevo
+```xml
+    <!-- Permissions -->
+
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
+</manifest>
+```
+
+#### Por qué se cambió
+Se requiere el permiso de Android REQUEST_INSTALL_PACKAGES para abrir e iniciar el instalador oficial de Android para las descargas de APK in-app.
+
+### Cambio 2 - Crear plugin local ApkInstaller
+
+#### Código anterior
+`No existía el bloque ApkInstallerPlugin.java en android/app/src/main/java/com/mijornada/app/ApkInstallerPlugin.java.`
+
+#### Código nuevo
+```java
+package com.mijornada.app;
+
+import android.content.Intent;
+import android.net.Uri;
+import android.os.Build;
+import android.provider.Settings;
+import androidx.core.content.FileProvider;
+import com.getcapacitor.JSObject;
+import com.getcapacitor.Plugin;
+import com.getcapacitor.PluginCall;
+import com.getcapacitor.PluginMethod;
+import com.getcapacitor.annotation.CapacitorPlugin;
+
+import java.io.BufferedInputStream;
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.InputStream;
+import java.net.HttpURLConnection;
+import java.net.URL;
+
+@CapacitorPlugin(name = "ApkInstaller")
+public class ApkInstallerPlugin extends Plugin {
+
+    @PluginMethod
+    public void canInstallPackages(PluginCall call) {
+        JSObject ret = new JSObject();
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                ret.put("value", getContext().getPackageManager().canRequestPackageInstalls());
+            } else {
+                ret.put("value", true);
+            }
+        } else {
+            ret.put("value", true);
+        }
+        call.resolve(ret);
+    }
+
+    @PluginMethod
+    public void openInstallPermissionSettings(PluginCall call) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            Intent intent = new Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES);
+            intent.setData(Uri.parse("package:" + getContext().getPackageName()));
+            getActivity().startActivity(intent);
+            call.resolve();
+        } else {
+            call.reject("Not required on this Android version");
+        }
+    }
+
+    @PluginMethod
+    public void downloadAndInstall(PluginCall call) {
+        String urlString = call.getString("url");
+        String fileName = call.getString("fileName");
+
+        if (urlString == null || fileName == null) {
+            call.reject("URL and fileName are required");
+            return;
+        }
+
+        new Thread(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    File file = new File(getContext().getCacheDir(), fileName);
+                    if (file.exists()) {
+                        file.delete();
+                    }
+
+                    URL url = new URL(urlString);
+                    HttpURLConnection connection = (HttpURLConnection) url.openConnection();
+                    connection.setInstanceFollowRedirects(true);
+
+                    int status = connection.getResponseCode();
+                    int redirectCount = 0;
+                    while (status == HttpURLConnection.HTTP_MOVED_TEMP || status == HttpURLConnection.HTTP_MOVED_PERM || status == 307 || status == 308) {
+                        if (redirectCount > 5) {
+                            throw new Exception("Too many redirects");
+                        }
+                        String newUrl = connection.getHeaderField("Location");
+                        connection = (HttpURLConnection) new URL(newUrl).openConnection();
+                        status = connection.getResponseCode();
+                        redirectCount++;
+                    }
+
+                    if (status != HttpURLConnection.HTTP_OK) {
+                        call.reject("Server returned HTTP " + status);
+                        return;
+                    }
+
+                    try (InputStream input = new BufferedInputStream(connection.getInputStream());
+                         FileOutputStream output = new FileOutputStream(file)) {
+
+                        byte[] data = new byte[8192];
+                        int count;
+                        while ((count = input.read(data)) != -1) {
+                            output.write(data, 0, count);
+                        }
+                    }
+
+                    Uri apkUri = FileProvider.getUriForFile(getContext(), getContext().getPackageName() + ".fileprovider", file);
+                    Intent intent = new Intent(Intent.ACTION_VIEW);
+                    intent.setDataAndType(apkUri, "application/vnd.android.package-archive");
+                    intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+                    intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                    getContext().startActivity(intent);
+
+                    JSObject ret = new JSObject();
+                    ret.put("success", true);
+                    call.resolve(ret);
+
+                } catch (Exception e) {
+                    call.reject("Error downloading or installing APK: " + e.getMessage(), e);
+                }
+            }
+        }).start();
+    }
+}
+```
+
+#### Por qué se cambió
+Se crea el plugin local ApkInstaller para verificar permisos de fuentes desconocidas, abrir los Ajustes de Android si falta dicho permiso, y descargar la APK en segundo plano lanzando la interfaz de instalación nativa.
+
+### Cambio 3 - Registro de ApkInstaller en MainActivity
+
+#### Código anterior
+```java
+import com.getcapacitor.BridgeActivity;
+
+public class MainActivity extends BridgeActivity {}
+```
+
+#### Código nuevo
+```java
+import android.os.Bundle;
+import com.getcapacitor.BridgeActivity;
+
+public class MainActivity extends BridgeActivity {
+    @Override
+    public void onCreate(Bundle savedInstanceState) {
+        registerPlugin(ApkInstallerPlugin.class);
+        super.onCreate(savedInstanceState);
+    }
+}
+```
+
+#### Por qué se cambió
+Se registra explícitamente el plugin ApkInstaller en la clase MainActivity para garantizar que el puente de Capacitor lo reconozca e inicialice durante el inicio de la app.
+
+### Cambio 4 - Versionado dinámico en Gradle
+
+#### Código anterior
+```groovy
+        versionCode 20
+        versionName "1.0.19"
+        testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
+```
+
+#### Código nuevo
+```groovy
+def packageJson = new groovy.json.JsonSlurper().parse(file('../../package.json'))
+def packageVersionName = packageJson.version ?: "1.0.0"
+def packageVersionCode = packageVersionName.tokenize('.').last().isInteger()
+        ? packageVersionName.tokenize('.').last().toInteger()
+        : 1
+
+android {
+    namespace "com.mijornada.app"
+    compileSdk rootProject.ext.compileSdkVersion
+    defaultConfig {
+        applicationId "com.mijornada.app"
+        minSdkVersion rootProject.ext.minSdkVersion
+        targetSdkVersion rootProject.ext.targetSdkVersion
+        def appVersionCode = System.getenv("ANDROID_VERSION_CODE") ? System.getenv("ANDROID_VERSION_CODE").toInteger() : packageVersionCode
+        def appVersionName = System.getenv("ANDROID_VERSION_NAME") ?: packageVersionName
+
+        versionCode appVersionCode
+        versionName appVersionName
+        testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
+    }
+}
+```
+
+#### Por qué se cambió
+Permite inyectar los códigos y nombres de versión de forma incremental en base a las ejecuciones del flujo de CI en GitHub Actions, y evita que una compilación local vuelva al `versionCode 20` y `versionName "1.0.19"` antiguos.
+
+### Cambio 5 - Inyección de variables en Actions de GitHub
+
+#### Código anterior
+```yaml
+      - name: Build Android APK
+        run: |
+          cd android
+          chmod +x gradlew
+          ./gradlew assembleDebug --no-daemon
+```
+
+#### Código nuevo
+```yaml
+      - name: Build Android APK
+        env:
+          ANDROID_VERSION_CODE: ${{ github.run_number }}
+          ANDROID_VERSION_NAME: 1.0.${{ github.run_number }}
+        run: |
+          cd android
+          chmod +x gradlew
+          ./gradlew assembleDebug --no-daemon
+```
+
+#### Por qué se cambió
+Para pasar de manera segura e incremental el número de build del pipeline a Gradle en cada compilación automática.
+
+### Cambio 6 - Lógica y UI de actualización en main.tsx
+
+#### Código anterior
+```tsx
+      if (latestVersion && latestVersion !== APP_VERSION) {
+        setUpdateMsg(`¡Nueva versión ${latestVersion} disponible!`);
+        if (data.assets && data.assets.length > 0) {
+          setDownloadUrl(data.assets[0].browser_download_url);
+        } else {
+          setDownloadUrl(data.html_url);
+        }
+      } else {
+        setUpdateMsg("Tienes la última versión instalada.");
+      }
+```
+
+#### Código nuevo
+```tsx
+      if (latestVersion && latestVersion !== APP_VERSION) {
+        let apkAsset = data.assets?.find((asset: any) => asset.name && asset.name.endsWith(".apk"));
+        if (apkAsset) {
+          setDownloadUrl(apkAsset.browser_download_url);
+          setUpdateState("available");
+          setUpdateMsg(`¡Nueva versión ${latestVersion} disponible!`);
+        } else {
+          setDownloadUrl("");
+          setReleaseUrl(data.html_url || "https://github.com/Carlos4400/app-taxi/releases/latest");
+          setUpdateState("error");
+          setUpdateMsg("No se encontró APK en el último release.");
+        }
+      } else {
+        setUpdateState("idle");
+        setUpdateMsg("Tienes la última versión instalada.");
+      }
+```
+
+```tsx
+            {(() => {
+              const hasApkDownload = downloadUrl.endsWith(".apk");
+              return hasApkDownload && updateState !== "downloading" && updateState !== "checking" && (
+              <button
+                onClick={handleInstallUpdate}
+```
+
+#### Por qué se cambió
+Reemplaza el flujo anterior por un flujo nativo e interactivo de descarga e instalación local de la APK de forma integrada en Android, e impide exponer como instalable una URL que no termine en `.apk`.
+
+### Cambio 7 - Arreglar errores de tipado de Turno en los mocks de tests
+
+#### Código anterior
+Los objetos mocks de `Turno` en `src/__tests__/logic.test.ts` carecían de los atributos obligatorios como `notes`, `startTime` o `endTime` tras adiciones del modelo de datos.
+
+#### Código nuevo
+Se añaden las propiedades por defecto correspondientes para que `npx tsc --noEmit` pase el chequeo sin errores de tipado en compilación estática.
+
+### Cambio 8 - Tests del flujo de actualización APK
+
+#### Código anterior
+`No existía apk-update-flow.test.ts en src/__tests__/apk-update-flow.test.ts.`
+
+#### Código nuevo
+```ts
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
+import { describe, expect, it } from "vitest";
+
+describe("APK update flow hardening", () => {
+  const mainSource = readFileSync(resolve("src/main.tsx"), "utf8");
+  const gradleSource = readFileSync(resolve("android/app/build.gradle"), "utf8");
+
+  it("does not expose an installable Android URL when the latest release has no APK asset", () => {
+    expect(mainSource).toContain('asset.name.endsWith(".apk")');
+    expect(mainSource).toMatch(/setUpdateMsg\("No se encontr\S+ APK en el \S+ltimo release\."\)/);
+    expect(mainSource).not.toContain("Sin APK directo");
+    expect(mainSource).not.toContain("const fallbackUrl = data.assets?.[0]?.browser_download_url || data.html_url");
+  });
+
+  it("only shows the native install button for APK URLs", () => {
+    expect(mainSource).toContain("const hasApkDownload = downloadUrl.endsWith(\".apk\")");
+    expect(mainSource).toMatch(/hasApkDownload && updateState !== "downloading" && updateState !== "checking"/);
+  });
+
+  it("derives local Android version values from package.json when CI variables are absent", () => {
+    expect(gradleSource).toContain("def packageJson = new groovy.json.JsonSlurper().parse(file('../../package.json'))");
+    expect(gradleSource).toContain('def packageVersionName = packageJson.version ?: "1.0.0"');
+    expect(gradleSource).toContain("def packageVersionCode = packageVersionName.tokenize('.').last().isInteger()");
+    expect(gradleSource).not.toContain('?: "1.0.19"');
+    expect(gradleSource).not.toContain(": 20");
+  });
+});
+```
+
+#### Por qué se cambió
+Se añaden pruebas específicas para impedir regresiones en la validación estricta de APK, la visibilidad del botón nativo de instalación y el fallback local de versionado Android desde `package.json`.
+
+## 2026-05-24 18:38 - Solucionar timeout de ClipboardItem en iOS/Web
+
+**Archivos modificados:** `src/main.tsx`
+
+### Cambio 1 - Usar ClipboardItem con Promesa para evitar bloqueos
+
+#### Código anterior
+```tsx
+      html2canvas(element, {
+        backgroundColor: "#0d0d14",
+        scale: 3,
+        useCORS: true,
+        logging: false,
+        onclone: (clonedDoc) => {
+          // ... (configuración de html2canvas)
+        }
+      }).then((canvas) => {
+        canvas.toBlob((blob) => {
+          if (!blob) {
+            copyTextFallback();
+            return;
+          }
+
+          if (Capacitor.isNativePlatform()) {
+            // ... exportación nativa
+          } else {
+            if (navigator.clipboard && window.ClipboardItem) {
+              const item = new ClipboardItem({ "image/png": blob });
+              navigator.clipboard.write([item]).then(() => {
+                setCopiado(true);
+                setTimeout(() => setCopiado(false), 2000);
+              }).catch((err) => {
+                console.error("ClipboardItem write failed, fallback to text:", err);
+                copyTextFallback();
+              });
+            } else {
+              copyTextFallback();
+            }
+          }
+        }, "image/png");
+      }).catch((err) => {
+        console.error("html2canvas failed, fallback to text:", err);
+        copyTextFallback();
+      });
+```
+
+#### Código nuevo
+```tsx
+      const h2cOptions = {
+        backgroundColor: "#0d0d14",
+        scale: 3,
+        useCORS: true,
+        logging: false,
+        onclone: (clonedDoc: any) => {
+          // ... (configuración de html2canvas)
+        }
+      };
+
+      if (!Capacitor.isNativePlatform() && navigator.clipboard && window.ClipboardItem) {
+        try {
+          const blobPromise = html2canvas(element, h2cOptions as any).then((canvas) => {
+            return new Promise<Blob>((resolve, reject) => {
+              canvas.toBlob((blob) => {
+                if (blob) resolve(blob);
+                else reject(new Error("Error al crear blob"));
+              }, "image/png");
+            });
+          });
+
+          const item = new ClipboardItem({ "image/png": blobPromise });
+          await navigator.clipboard.write([item]);
+          setCopiado(true);
+          setTimeout(() => setCopiado(false), 2000);
+        } catch (err) {
+          console.error("ClipboardItem write failed, fallback to text:", err);
+          copyTextFallback();
+        }
+      } else {
+        html2canvas(element, h2cOptions as any).then((canvas) => {
+          canvas.toBlob((blob) => {
+            if (!blob) {
+              copyTextFallback();
+              return;
+            }
+
+            if (Capacitor.isNativePlatform()) {
+              // ... exportación nativa
+            } else {
+              copyTextFallback();
+            }
+          }, "image/png");
+        }).catch((err) => {
+          console.error("html2canvas failed, fallback to text:", err);
+          copyTextFallback();
+        });
+      }
+```
+
+#### Por qué se cambió
+El código anterior generaba el canvas y luego intentaba escribir en el portapapeles dentro de `.then()`. Navegadores como Safari/iOS bloquean escrituras asíncronas en el portapapeles si toman demasiado tiempo después del evento del usuario. La solución moderna (y la única soportada en iOS web) consiste en instanciar el `ClipboardItem` sincrónicamente y pasarle una Promesa que se resolverá con el Blob. Se separa el flujo de web y de Capacitor para asegurar que la web respete este estándar.
 ## 2026-05-23 22:17 - Alinear notas por baseline
 
 **Archivos modificados:** `src/main.tsx`, `src/__tests__/detailed-notes-layout.test.ts`, `src/__tests__/liquidacion-semana.test.ts`
