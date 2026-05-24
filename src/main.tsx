@@ -34,6 +34,7 @@ import { mergeTurnos, sortTurnosByDateDesc } from "./turnos";
 import { parseCSVToHistory } from "./csv";
 import { getBackupMenuActionIds, getHomeQuickActionIds } from "./action-ids";
 import { getTurnosNotasSemana } from "./turno-notas-logic";
+import { updateTurnoEntrega } from "./turno-entrega";
 import {
   userMetaDocRef,
   userSubcollectionRef,
@@ -50,6 +51,7 @@ export { parseCSVLine, parseCSVToHistory } from "./csv";
 export { getBackupMenuActionIds, getHomeQuickActionIds };
 export type { BackupMenuActionId, HomeQuickActionId } from "./action-ids";
 export { getTurnosNotasSemana };
+export { updateTurnoEntrega };
 
 const { useState, useEffect, useRef } = React;
 
@@ -599,19 +601,6 @@ export function calcularResumenContableTurnos(turnos: Turno[], settings: AppSett
     totalDescontar: roundMoney(totalDescontar),
     totalADar: roundMoney(totalADar),
   };
-}
-
-export function updateTurnoEntrega(
-  turnos: Turno[],
-  turnoId: number,
-  entregada: boolean,
-  fechaEntrega: string | null
-): Turno[] {
-  return turnos.map((t) =>
-    t.id === turnoId
-      ? { ...t, entregada, fechaEntrega: entregada ? fechaEntrega : null }
-      : t
-  );
 }
 
 // ============================================================================

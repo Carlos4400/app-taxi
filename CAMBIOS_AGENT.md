@@ -4,6 +4,131 @@ Este archivo registra cambios de código hechos por agentes/modelos en este proy
 
 Cada entrada debe indicar archivos modificados, código anterior, código nuevo y por qué se cambió. Las entradas se añaden al **principio** del archivo (las más recientes arriba).
 
+## 2026-05-24 23:20 - Extraer entrega de turnos
+
+**Archivos modificados:** `src/main.tsx`, `src/turno-entrega.ts`, `src/__tests__/turno-entrega-extraction.test.ts`
+
+### Cambio 1 - Importar entrega de turnos
+
+#### Código anterior
+```tsx
+import { getBackupMenuActionIds, getHomeQuickActionIds } from "./action-ids";
+import { getTurnosNotasSemana } from "./turno-notas-logic";
+```
+
+```tsx
+export type { BackupMenuActionId, HomeQuickActionId } from "./action-ids";
+export { getTurnosNotasSemana };
+```
+
+#### Código nuevo
+```tsx
+import { getBackupMenuActionIds, getHomeQuickActionIds } from "./action-ids";
+import { getTurnosNotasSemana } from "./turno-notas-logic";
+import { updateTurnoEntrega } from "./turno-entrega";
+```
+
+```tsx
+export type { BackupMenuActionId, HomeQuickActionId } from "./action-ids";
+export { getTurnosNotasSemana };
+export { updateTurnoEntrega };
+```
+
+#### Por qué se cambió
+`main.tsx` usa la actualización de entrega desde el nuevo módulo y conserva su export público para los tests.
+
+### Cambio 2 - Eliminar entrega local
+
+#### Código anterior
+```tsx
+export function updateTurnoEntrega(
+  turnos: Turno[],
+  turnoId: number,
+  entregada: boolean,
+  fechaEntrega: string | null
+): Turno[] {
+  return turnos.map((t) =>
+    t.id === turnoId
+      ? { ...t, entregada, fechaEntrega: entregada ? fechaEntrega : null }
+      : t
+  );
+}
+
+// ============================================================================
+// SEMANAS — Carga y guardado en localStorage (Fase 3)
+// ============================================================================
+```
+
+#### Código nuevo
+```tsx
+// ============================================================================
+// SEMANAS — Carga y guardado en localStorage (Fase 3)
+// ============================================================================
+```
+
+#### Por qué se cambió
+La modificación pura de estado de entrega se movió fuera de `main.tsx`; mantiene la misma regla para limpiar `fechaEntrega` al desmarcar.
+
+### Cambio 3 - Crear módulo de entrega
+
+#### Código anterior
+`No existía el módulo de entrega en src/turno-entrega.ts.`
+
+#### Código nuevo
+```ts
+export type EntregaTurno = {
+  id: number;
+  entregada?: boolean;
+  fechaEntrega?: string | null;
+};
+
+export function updateTurnoEntrega<T extends EntregaTurno>(
+  turnos: T[],
+  turnoId: number,
+  entregada: boolean,
+  fechaEntrega: string | null
+): T[] {
+  return turnos.map((t) =>
+    t.id === turnoId
+      ? { ...t, entregada, fechaEntrega: entregada ? fechaEntrega : null }
+      : t
+  );
+}
+```
+
+#### Por qué se cambió
+El módulo nuevo encapsula la actualización de entrega con un tipo estructural para no depender de `main.tsx`.
+
+### Cambio 4 - Proteger extracción de entrega
+
+#### Código anterior
+`No existía el test de extracción de entrega en src/__tests__/turno-entrega-extraction.test.ts.`
+
+#### Código nuevo
+```ts
+import { existsSync, readFileSync } from "node:fs";
+import { resolve } from "node:path";
+import { describe, expect, it } from "vitest";
+
+describe("Turno entrega extraction", () => {
+  const entregaPath = resolve("src/turno-entrega.ts");
+  const mainSource = readFileSync(resolve("src/main.tsx"), "utf8");
+
+  it("keeps delivery status updates outside main.tsx", () => {
+    expect(existsSync(entregaPath)).toBe(true);
+
+    const entregaSource = readFileSync(entregaPath, "utf8");
+    expect(entregaSource).toContain("export function updateTurnoEntrega");
+    expect(entregaSource).toContain("fechaEntrega: entregada ? fechaEntrega : null");
+    expect(mainSource).toContain('from "./turno-entrega"');
+    expect(mainSource).not.toMatch(/^export function updateTurnoEntrega\(/m);
+  });
+});
+```
+
+#### Por qué se cambió
+El test fija que la actualización de entrega permanezca fuera de `main.tsx`.
+
 ## 2026-05-24 23:18 - Extraer notas de turnos
 
 **Archivos modificados:** `src/main.tsx`, `src/turno-notas-logic.ts`, `src/__tests__/turno-notas-logic-extraction.test.ts`
