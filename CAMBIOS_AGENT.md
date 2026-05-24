@@ -4,6 +4,113 @@ Este archivo registra cambios de código hechos por agentes/modelos en este proy
 
 Cada entrada debe indicar archivos modificados, código anterior, código nuevo y por qué se cambió. Las entradas se añaden al **principio** del archivo (las más recientes arriba).
 
+## 2026-05-24 23:26 - Extraer calendario mensual
+
+**Archivos modificados:** `src/main.tsx`, `src/calendar-date.ts`, `src/__tests__/calendar-date-extraction.test.ts`
+
+### Cambio 1 - Importar helpers de calendario
+
+#### Código anterior
+```tsx
+import { getTurnosNotasSemana } from "./turno-notas-logic";
+import { updateTurnoEntrega } from "./turno-entrega";
+```
+
+#### Código nuevo
+```tsx
+import { getTurnosNotasSemana } from "./turno-notas-logic";
+import { updateTurnoEntrega } from "./turno-entrega";
+import { getDaysInMonth, getStartOffset } from "./calendar-date";
+```
+
+#### Por qué se cambió
+`main.tsx` usa los helpers de calendario desde el nuevo módulo para pintar el mes sin mantener esas funciones locales.
+
+### Cambio 2 - Eliminar helpers locales de calendario
+
+#### Código anterior
+```tsx
+function getDaysInMonth(year: number, month: number): number {
+  return new Date(year, month + 1, 0).getDate();
+}
+function getStartOffset(year: number, month: number): number {
+  const firstDay = new Date(year, month, 1);
+  let offset = firstDay.getDay() - 1;
+  if (offset < 0) offset = 6;
+  return offset;
+}
+
+// ============================================================================
+// SEMANAS — Funciones lógicas (Fase 2)
+// ============================================================================
+```
+
+#### Código nuevo
+```tsx
+// ============================================================================
+// SEMANAS — Funciones lógicas (Fase 2)
+// ============================================================================
+```
+
+#### Por qué se cambió
+Los cálculos de rejilla mensual se mueven fuera de `main.tsx` sin cambiar la forma de contar días ni el offset de lunes.
+
+### Cambio 3 - Crear módulo de calendario
+
+#### Código anterior
+`No existía el módulo de calendario en src/calendar-date.ts.`
+
+#### Código nuevo
+```ts
+export function getDaysInMonth(year: number, month: number): number {
+  return new Date(year, month + 1, 0).getDate();
+}
+
+export function getStartOffset(year: number, month: number): number {
+  const firstDay = new Date(year, month, 1);
+  let offset = firstDay.getDay() - 1;
+  if (offset < 0) offset = 6;
+  return offset;
+}
+```
+
+#### Por qué se cambió
+El módulo nuevo contiene helpers puros de calendario mensual, separados de la pantalla principal.
+
+### Cambio 4 - Proteger extracción de calendario
+
+#### Código anterior
+`No existía el test de extracción de calendario en src/__tests__/calendar-date-extraction.test.ts.`
+
+#### Código nuevo
+```ts
+import { existsSync, readFileSync } from "node:fs";
+import { resolve } from "node:path";
+import { describe, expect, it } from "vitest";
+
+describe("Calendar date extraction", () => {
+  const calendarDatePath = resolve("src/calendar-date.ts");
+  const mainSource = readFileSync(resolve("src/main.tsx"), "utf8");
+
+  it("keeps month grid date helpers outside main.tsx", async () => {
+    expect(existsSync(calendarDatePath)).toBe(true);
+
+    const modulePath = "../calendar-date";
+    const { getDaysInMonth, getStartOffset } = await import(modulePath);
+    expect(getDaysInMonth(2026, 1)).toBe(28);
+    expect(getDaysInMonth(2024, 1)).toBe(29);
+    expect(getStartOffset(2026, 4)).toBe(4);
+
+    expect(mainSource).toContain('from "./calendar-date"');
+    expect(mainSource).not.toMatch(/^function getDaysInMonth\(/m);
+    expect(mainSource).not.toMatch(/^function getStartOffset\(/m);
+  });
+});
+```
+
+#### Por qué se cambió
+El test fija la extracción y comprueba valores de febrero normal, febrero bisiesto y offset mensual.
+
 ## 2026-05-24 23:23 - Extraer seleccion de turnos
 
 **Archivos modificados:** `src/main.tsx`, `src/turnos.ts`, `src/__tests__/turno-selection-extraction.test.ts`

@@ -41,6 +41,7 @@ import { parseCSVToHistory } from "./csv";
 import { getBackupMenuActionIds, getHomeQuickActionIds } from "./action-ids";
 import { getTurnosNotasSemana } from "./turno-notas-logic";
 import { updateTurnoEntrega } from "./turno-entrega";
+import { getDaysInMonth, getStartOffset } from "./calendar-date";
 import {
   userMetaDocRef,
   userSubcollectionRef,
@@ -387,16 +388,6 @@ function loadNotes(): NotaCalendario[] {
   } catch (e) { }
   return [];
 }
-function getDaysInMonth(year: number, month: number): number {
-  return new Date(year, month + 1, 0).getDate();
-}
-function getStartOffset(year: number, month: number): number {
-  const firstDay = new Date(year, month, 1);
-  let offset = firstDay.getDay() - 1;
-  if (offset < 0) offset = 6;
-  return offset;
-}
-
 // ============================================================================
 // SEMANAS — Funciones lógicas (Fase 2)
 // ============================================================================
