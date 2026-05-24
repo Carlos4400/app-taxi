@@ -4,6 +4,222 @@ Este archivo registra cambios de código hechos por agentes/modelos en este proy
 
 Cada entrada debe indicar archivos modificados, código anterior, código nuevo y por qué se cambió. Las entradas se añaden al **principio** del archivo (las más recientes arriba).
 
+## 2026-05-24 22:56 - Extraer resolución de update APK
+
+**Archivos modificados:** `src/main.tsx`, `src/update-flow.ts`, `src/__tests__/apk-update-flow.test.ts`, `src/__tests__/update-flow-extraction.test.ts`
+
+### Cambio 1 - Importar helper de update
+
+#### Código anterior
+```tsx
+import { ConfirmDialog, MainCard, SmallCard } from "./components/common";
+import { TurnoNotasCard } from "./components/turno-notas";
+import {
+  userMetaDocRef,
+```
+
+#### Código nuevo
+```tsx
+import { ConfirmDialog, MainCard, SmallCard } from "./components/common";
+import { TurnoNotasCard } from "./components/turno-notas";
+import { resolveLatestApkUpdate, type UpdateState } from "./update-flow";
+import {
+  userMetaDocRef,
+```
+
+#### Por qué se cambió
+La decisión sobre el último release de GitHub y su APK se movió a un helper puro para reducir lógica dentro de `main.tsx`.
+
+### Cambio 2 - Tipar estado de update
+
+#### Código anterior
+```tsx
+  const [updateState, setUpdateState] = useState<"idle" | "checking" | "available" | "downloading" | "permission_required" | "error" | "installed">("idle");
+```
+
+#### Código nuevo
+```tsx
+  const [updateState, setUpdateState] = useState<UpdateState>("idle");
+```
+
+#### Por qué se cambió
+El tipo union del estado de update se centraliza en `src/update-flow.ts`, evitando duplicarlo en `main.tsx`.
+
+### Cambio 3 - Sustituir parseo inline del release
+
+#### Código anterior
+```tsx
+      const data = await res.json();
+      const latestVersion = data.tag_name ? data.tag_name.replace(/[^0-9.]/g, '') : null;
+
+      if (latestVersion && latestVersion !== APP_VERSION) {
+        let apkAsset = data.assets?.find((asset: any) => asset.name && asset.name.endsWith(".apk"));
+        if (apkAsset) {
+          setDownloadUrl(apkAsset.browser_download_url);
+          setUpdateState("available");
+          setUpdateMsg(`¡Nueva versión ${latestVersion} disponible!`);
+        } else {
+          setDownloadUrl("");
+          setReleaseUrl(data.html_url || "https://github.com/Carlos4400/app-taxi/releases/latest");
+          setUpdateState("error");
+          setUpdateMsg("No se encontró APK en el último release.");
+        }
+      } else {
+        setUpdateState("idle");
+        setUpdateMsg("Tienes la última versión instalada.");
+      }
+```
+
+#### Código nuevo
+```tsx
+      const data = await res.json();
+      const result = resolveLatestApkUpdate(data, APP_VERSION);
+      setDownloadUrl(result.downloadUrl);
+      setReleaseUrl(result.releaseUrl);
+      setUpdateState(result.updateState);
+      setUpdateMsg(result.updateMsg);
+```
+
+#### Por qué se cambió
+`main.tsx` conserva el fetch y la actualización de estado React, pero delega la resolución del release a una función pura testeable. No cambia la UI ni el flujo de instalación.
+
+### Cambio 4 - Helper puro de update APK
+
+#### Código anterior
+`No existía el archivo src/update-flow.ts.`
+
+#### Código nuevo
+```ts
+export type UpdateState =
+  | "idle"
+  | "checking"
+  | "available"
+  | "downloading"
+  | "permission_required"
+  | "error"
+  | "installed";
+
+export interface GitHubReleaseAsset {
+  name?: string;
+  browser_download_url?: string;
+}
+
+export interface GitHubLatestRelease {
+  tag_name?: string;
+  html_url?: string;
+  assets?: GitHubReleaseAsset[];
+}
+
+export interface UpdateCheckResult {
+  updateState: UpdateState;
+  updateMsg: string;
+  downloadUrl: string;
+  releaseUrl: string;
+}
+
+const LATEST_RELEASE_URL = "https://github.com/Carlos4400/app-taxi/releases/latest";
+
+export function resolveLatestApkUpdate(
+  data: GitHubLatestRelease,
+  currentVersion: string,
+): UpdateCheckResult {
+  const latestVersion = data.tag_name ? data.tag_name.replace(/[^0-9.]/g, '') : null;
+
+  if (latestVersion && latestVersion !== currentVersion) {
+    const apkAsset = data.assets?.find((asset) => asset.name && asset.name.endsWith(".apk"));
+    if (apkAsset) {
+      return {
+        downloadUrl: apkAsset.browser_download_url || "",
+        releaseUrl: "",
+        updateState: "available",
+        updateMsg: `¡Nueva versión ${latestVersion} disponible!`,
+      };
+    }
+
+    return {
+      downloadUrl: "",
+      releaseUrl: data.html_url || LATEST_RELEASE_URL,
+      updateState: "error",
+      updateMsg: "No se encontró APK en el último release.",
+    };
+  }
+
+  return {
+    downloadUrl: "",
+    releaseUrl: "",
+    updateState: "idle",
+    updateMsg: "Tienes la última versión instalada.",
+  };
+}
+```
+
+#### Por qué se cambió
+Centraliza la lógica de detectar versión nueva, asset `.apk`, fallback a release y mensajes de estado. Al ser puro, se puede validar sin montar React ni tocar Capacitor.
+
+### Cambio 5 - Test APK apuntando al helper
+
+#### Código anterior
+```ts
+describe("APK update flow hardening", () => {
+  const mainSource = readFileSync(resolve("src/main.tsx"), "utf8");
+  const gradleSource = readFileSync(resolve("android/app/build.gradle"), "utf8");
+
+  it("does not expose an installable Android URL when the latest release has no APK asset", () => {
+    expect(mainSource).toContain('asset.name.endsWith(".apk")');
+    expect(mainSource).toMatch(/setUpdateMsg\("No se encontr\S+ APK en el \S+ltimo release\."\)/);
+    expect(mainSource).not.toContain("Sin APK directo");
+    expect(mainSource).not.toContain("const fallbackUrl = data.assets?.[0]?.browser_download_url || data.html_url");
+  });
+```
+
+#### Código nuevo
+```ts
+describe("APK update flow hardening", () => {
+  const mainSource = readFileSync(resolve("src/main.tsx"), "utf8");
+  const updateFlowSource = readFileSync(resolve("src/update-flow.ts"), "utf8");
+  const gradleSource = readFileSync(resolve("android/app/build.gradle"), "utf8");
+
+  it("does not expose an installable Android URL when the latest release has no APK asset", () => {
+    expect(updateFlowSource).toContain('asset.name.endsWith(".apk")');
+    expect(updateFlowSource).toContain('updateMsg: "No se encontró APK en el último release."');
+    expect(updateFlowSource).not.toContain("Sin APK directo");
+    expect(updateFlowSource).not.toContain("const fallbackUrl = data.assets?.[0]?.browser_download_url || data.html_url");
+  });
+```
+
+#### Por qué se cambió
+El candado que antes inspeccionaba `main.tsx` debe mirar ahora el helper extraído, porque ahí vive la validación estricta de asset `.apk`.
+
+### Cambio 6 - Test de extracción de update
+
+#### Código anterior
+`No existía el archivo src/__tests__/update-flow-extraction.test.ts.`
+
+#### Código nuevo
+```ts
+import { existsSync, readFileSync } from "node:fs";
+import { resolve } from "node:path";
+import { describe, expect, it } from "vitest";
+
+describe("Update flow extraction", () => {
+  const helperPath = resolve("src/update-flow.ts");
+  const mainSource = readFileSync(resolve("src/main.tsx"), "utf8");
+
+  it("keeps GitHub release parsing outside main.tsx", () => {
+    expect(existsSync(helperPath)).toBe(true);
+
+    const helperSource = readFileSync(helperPath, "utf8");
+    expect(helperSource).toContain("export function resolveLatestApkUpdate");
+    expect(helperSource).toContain('asset.name.endsWith(".apk")');
+    expect(mainSource).toContain('from "./update-flow"');
+    expect(mainSource).not.toContain('data.assets?.find((asset: any) => asset.name && asset.name.endsWith(".apk"))');
+  });
+});
+```
+
+#### Por qué se cambió
+Añade un candado para que el parseo del release de GitHub no vuelva a crecer dentro de `main.tsx`.
+
 ## 2026-05-24 22:50 - Extraer tarjeta de notas
 
 **Archivos modificados:** `src/main.tsx`, `src/components/turno-notas.tsx`, `src/__tests__/detailed-notes-layout.test.ts`, `src/__tests__/turno-notas-component-extraction.test.ts`

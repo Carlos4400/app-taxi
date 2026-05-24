@@ -4,13 +4,14 @@ import { describe, expect, it } from "vitest";
 
 describe("APK update flow hardening", () => {
   const mainSource = readFileSync(resolve("src/main.tsx"), "utf8");
+  const updateFlowSource = readFileSync(resolve("src/update-flow.ts"), "utf8");
   const gradleSource = readFileSync(resolve("android/app/build.gradle"), "utf8");
 
   it("does not expose an installable Android URL when the latest release has no APK asset", () => {
-    expect(mainSource).toContain('asset.name.endsWith(".apk")');
-    expect(mainSource).toMatch(/setUpdateMsg\("No se encontr\S+ APK en el \S+ltimo release\."\)/);
-    expect(mainSource).not.toContain("Sin APK directo");
-    expect(mainSource).not.toContain("const fallbackUrl = data.assets?.[0]?.browser_download_url || data.html_url");
+    expect(updateFlowSource).toContain('asset.name.endsWith(".apk")');
+    expect(updateFlowSource).toContain('updateMsg: "No se encontró APK en el último release."');
+    expect(updateFlowSource).not.toContain("Sin APK directo");
+    expect(updateFlowSource).not.toContain("const fallbackUrl = data.assets?.[0]?.browser_download_url || data.html_url");
   });
 
   it("only shows the native install button for APK URLs", () => {

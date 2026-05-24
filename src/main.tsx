@@ -27,6 +27,7 @@ import { LoginScreen } from "./login-screen";
 import { fmtDuration, fmtKm, fmtKmNumber, fmtMoney, fmtMoneyNumber, splitDurationLabel } from "./formatters";
 import { ConfirmDialog, MainCard, SmallCard } from "./components/common";
 import { TurnoNotasCard } from "./components/turno-notas";
+import { resolveLatestApkUpdate, type UpdateState } from "./update-flow";
 import {
   userMetaDocRef,
   userSubcollectionRef,
@@ -1761,7 +1762,7 @@ function App() {
     confirmBorder?: string;
   } | null>(null);
   const [updateMsg, setUpdateMsg] = useState("");
-  const [updateState, setUpdateState] = useState<"idle" | "checking" | "available" | "downloading" | "permission_required" | "error" | "installed">("idle");
+  const [updateState, setUpdateState] = useState<UpdateState>("idle");
   const [downloadUrl, setDownloadUrl] = useState("");
   const [releaseUrl, setReleaseUrl] = useState("");
   const [editEntry, setEditEntry] = useState<Entry | null>(null);
@@ -2340,24 +2341,11 @@ function App() {
       const res = await fetch("https://api.github.com/repos/Carlos4400/app-taxi/releases/latest");
       if (!res.ok) throw new Error("No se encontró el release");
       const data = await res.json();
-      const latestVersion = data.tag_name ? data.tag_name.replace(/[^0-9.]/g, '') : null;
-
-      if (latestVersion && latestVersion !== APP_VERSION) {
-        let apkAsset = data.assets?.find((asset: any) => asset.name && asset.name.endsWith(".apk"));
-        if (apkAsset) {
-          setDownloadUrl(apkAsset.browser_download_url);
-          setUpdateState("available");
-          setUpdateMsg(`¡Nueva versión ${latestVersion} disponible!`);
-        } else {
-          setDownloadUrl("");
-          setReleaseUrl(data.html_url || "https://github.com/Carlos4400/app-taxi/releases/latest");
-          setUpdateState("error");
-          setUpdateMsg("No se encontró APK en el último release.");
-        }
-      } else {
-        setUpdateState("idle");
-        setUpdateMsg("Tienes la última versión instalada.");
-      }
+      const result = resolveLatestApkUpdate(data, APP_VERSION);
+      setDownloadUrl(result.downloadUrl);
+      setReleaseUrl(result.releaseUrl);
+      setUpdateState(result.updateState);
+      setUpdateMsg(result.updateMsg);
     } catch (e) {
       setUpdateState("error");
       setUpdateMsg("Error al conectar con GitHub.");
