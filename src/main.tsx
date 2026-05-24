@@ -44,6 +44,7 @@ import { updateTurnoEntrega } from "./turno-entrega";
 import { getDaysInMonth, getStartOffset } from "./calendar-date";
 import { MESES_ABREVIADOS, MESES_COMPLETOS, getAccountingPeriodLabel, getMesLabel } from "./date-labels";
 import { KM_CARD_UNIT_STYLE, TIME_CARD_HOUR_UNIT_STYLE, TIME_CARD_UNIT_STYLE, WEEK_LIST_CARD_TEXT_SIZES } from "./card-styles";
+import { fmtDate, getDiffMins, timeNow, today } from "./date-time";
 import {
   userMetaDocRef,
   userSubcollectionRef,
@@ -235,28 +236,6 @@ export interface AppSettings {
 declare const __APP_VERSION__: string;
 const APP_VERSION = __APP_VERSION__;
 
-function today(): string {
-  const d = new Date();
-  const year = d.getFullYear();
-  const month = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
-}
-function timeNow(): string {
-  return new Date().toLocaleTimeString("es-ES", {
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-}
-
-function getDiffMins(t1: string, t2: string): number {
-  const [h1, m1] = t1.split(':').map(Number);
-  const [h2, m2] = t2.split(':').map(Number);
-  let mins = (h2 * 60 + m2) - (h1 * 60 + m1);
-  if (mins < 0) mins += 24 * 60;
-  return mins;
-}
-
 function fmt(n: number): string {
   return fmtMoney(n);
 }
@@ -269,17 +248,6 @@ function DurationCardValue({ value }: { value: string }) {
       {parts.minutes}<span style={TIME_CARD_UNIT_STYLE}>m</span>
     </>
   );
-}
-
-function fmtDate(iso: string): string {
-  return new Date(iso + "T12:00:00")
-    .toLocaleDateString("es-ES", {
-      weekday: "short",
-      day: "numeric",
-      month: "short",
-      year: "numeric",
-    })
-    .replace(/^\w/, (c) => c.toUpperCase());
 }
 
 function loadSettings(): AppSettings {

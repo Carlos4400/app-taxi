@@ -4,6 +4,172 @@ Este archivo registra cambios de código hechos por agentes/modelos en este proy
 
 Cada entrada debe indicar archivos modificados, código anterior, código nuevo y por qué se cambió. Las entradas se añaden al **principio** del archivo (las más recientes arriba).
 
+## 2026-05-24 23:36 - Extraer fecha y hora
+
+**Archivos modificados:** `src/main.tsx`, `src/date-time.ts`, `src/__tests__/date-time-extraction.test.ts`
+
+### Cambio 1 - Importar helpers de fecha y hora
+
+#### Código anterior
+```tsx
+import { MESES_ABREVIADOS, MESES_COMPLETOS, getAccountingPeriodLabel, getMesLabel } from "./date-labels";
+import { KM_CARD_UNIT_STYLE, TIME_CARD_HOUR_UNIT_STYLE, TIME_CARD_UNIT_STYLE, WEEK_LIST_CARD_TEXT_SIZES } from "./card-styles";
+```
+
+#### Código nuevo
+```tsx
+import { MESES_ABREVIADOS, MESES_COMPLETOS, getAccountingPeriodLabel, getMesLabel } from "./date-labels";
+import { KM_CARD_UNIT_STYLE, TIME_CARD_HOUR_UNIT_STYLE, TIME_CARD_UNIT_STYLE, WEEK_LIST_CARD_TEXT_SIZES } from "./card-styles";
+import { fmtDate, getDiffMins, timeNow, today } from "./date-time";
+```
+
+#### Por qué se cambió
+`main.tsx` usa helpers de fecha y hora desde el nuevo módulo para reducir lógica local no contable.
+
+### Cambio 2 - Eliminar helpers locales de hora
+
+#### Código anterior
+```tsx
+function today(): string {
+  const d = new Date();
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+function timeNow(): string {
+  return new Date().toLocaleTimeString("es-ES", {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
+function getDiffMins(t1: string, t2: string): number {
+  const [h1, m1] = t1.split(':').map(Number);
+  const [h2, m2] = t2.split(':').map(Number);
+  let mins = (h2 * 60 + m2) - (h1 * 60 + m1);
+  if (mins < 0) mins += 24 * 60;
+  return mins;
+}
+
+function fmt(n: number): string {
+```
+
+#### Código nuevo
+```tsx
+function fmt(n: number): string {
+```
+
+#### Por qué se cambió
+`today`, `timeNow` y `getDiffMins` se mueven a `date-time.ts` manteniendo fecha local, hora `es-ES` y cruce de medianoche.
+
+### Cambio 3 - Eliminar formato de fecha local
+
+#### Código anterior
+```tsx
+function fmtDate(iso: string): string {
+  return new Date(iso + "T12:00:00")
+    .toLocaleDateString("es-ES", {
+      weekday: "short",
+      day: "numeric",
+      month: "short",
+      year: "numeric",
+    })
+    .replace(/^\w/, (c) => c.toUpperCase());
+}
+
+function loadSettings(): AppSettings {
+```
+
+#### Código nuevo
+```tsx
+function loadSettings(): AppSettings {
+```
+
+#### Por qué se cambió
+`fmtDate` se traslada al mismo módulo de fecha/hora sin alterar el locale ni el uso de mediodía para evitar desplazamientos.
+
+### Cambio 4 - Crear módulo de fecha y hora
+
+#### Código anterior
+`No existía el módulo de fecha y hora en src/date-time.ts.`
+
+#### Código nuevo
+```ts
+export function today(): string {
+  const d = new Date();
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+export function timeNow(): string {
+  return new Date().toLocaleTimeString("es-ES", {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
+export function getDiffMins(t1: string, t2: string): number {
+  const [h1, m1] = t1.split(":").map(Number);
+  const [h2, m2] = t2.split(":").map(Number);
+  let mins = (h2 * 60 + m2) - (h1 * 60 + m1);
+  if (mins < 0) mins += 24 * 60;
+  return mins;
+}
+
+export function fmtDate(iso: string): string {
+  return new Date(iso + "T12:00:00")
+    .toLocaleDateString("es-ES", {
+      weekday: "short",
+      day: "numeric",
+      month: "short",
+      year: "numeric",
+    })
+    .replace(/^\w/, (c) => c.toUpperCase());
+}
+```
+
+#### Por qué se cambió
+El módulo nuevo agrupa helpers de fecha, hora y duración entre dos horas.
+
+### Cambio 5 - Proteger extracción de fecha y hora
+
+#### Código anterior
+`No existía el test de extracción de fecha y hora en src/__tests__/date-time-extraction.test.ts.`
+
+#### Código nuevo
+```ts
+import { existsSync, readFileSync } from "node:fs";
+import { resolve } from "node:path";
+import { describe, expect, it } from "vitest";
+
+describe("Date time extraction", () => {
+  const dateTimePath = resolve("src/date-time.ts");
+  const mainSource = readFileSync(resolve("src/main.tsx"), "utf8");
+
+  it("keeps date and time helpers outside main.tsx", async () => {
+    expect(existsSync(dateTimePath)).toBe(true);
+
+    const modulePath = "../date-time";
+    const { today, timeNow, getDiffMins, fmtDate } = await import(modulePath);
+    expect(today()).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+    expect(timeNow()).toMatch(/^\d{2}:\d{2}$/);
+    expect(getDiffMins("22:30", "01:15")).toBe(165);
+    expect(fmtDate("2026-05-08")).toMatch(/8.*2026/);
+
+    expect(mainSource).toContain('from "./date-time"');
+    expect(mainSource).not.toMatch(/^function today\(/m);
+    expect(mainSource).not.toMatch(/^function getDiffMins\(/m);
+    expect(mainSource).not.toMatch(/^function fmtDate\(/m);
+  });
+});
+```
+
+#### Por qué se cambió
+El test fija la extracción y valida formato ISO, hora HH:mm, cruce de medianoche y formato de fecha visible.
+
 ## 2026-05-24 23:33 - Extraer estilos de tarjetas
 
 **Archivos modificados:** `src/main.tsx`, `src/card-styles.ts`, `src/__tests__/card-styles-extraction.test.ts`
