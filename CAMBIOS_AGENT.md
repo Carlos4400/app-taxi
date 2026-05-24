@@ -4,6 +4,178 @@ Este archivo registra cambios de código hechos por agentes/modelos en este proy
 
 Cada entrada debe indicar archivos modificados, código anterior, código nuevo y por qué se cambió. Las entradas se añaden al **principio** del archivo (las más recientes arriba).
 
+## 2026-05-24 23:09 - Extraer utilidades de turnos
+
+**Archivos modificados:** `src/main.tsx`, `src/turnos.ts`, `src/__tests__/turno-merge-extraction.test.ts`
+
+### Cambio 1 - Importar utilidades de turnos
+
+#### Código anterior
+```tsx
+import { resolveLatestApkUpdate, type UpdateState } from "./update-flow";
+import { buildBackupPayload, buildBackupPayloadFromState } from "./backup";
+```
+
+```tsx
+export { fmtDuration, fmtKm, fmtKmNumber, fmtMoney, fmtMoneyNumber, splitDurationLabel } from "./formatters";
+export { buildBackupPayload, buildBackupPayloadFromState };
+```
+
+#### Código nuevo
+```tsx
+import { resolveLatestApkUpdate, type UpdateState } from "./update-flow";
+import { buildBackupPayload, buildBackupPayloadFromState } from "./backup";
+import { mergeTurnos, sortTurnosByDateDesc } from "./turnos";
+```
+
+```tsx
+export { fmtDuration, fmtKm, fmtKmNumber, fmtMoney, fmtMoneyNumber, splitDurationLabel } from "./formatters";
+export { buildBackupPayload, buildBackupPayloadFromState };
+export { mergeTurnos, sortTurnosByDateDesc };
+```
+
+#### Por qué se cambió
+`main.tsx` usa y reexporta las utilidades desde el nuevo módulo `turnos.ts`, manteniendo los imports públicos existentes para los tests.
+
+### Cambio 2 - Eliminar ordenación local
+
+#### Código anterior
+```tsx
+export function sortTurnosByDateDesc(turnos: Turno[]): Turno[] {
+  return [...turnos].sort((a, b) => {
+    const dateA = a.startDate || a.date;
+    const dateB = b.startDate || b.date;
+    const byDate = dateB.localeCompare(dateA);
+    if (byDate !== 0) return byDate;
+    return (b.startTime || "").localeCompare(a.startTime || "");
+  });
+}
+
+export function getTurnosByCalendarMonth(turnos: Turno[], year: number, month: number): Turno[] {
+```
+
+#### Código nuevo
+```tsx
+export function getTurnosByCalendarMonth(turnos: Turno[], year: number, month: number): Turno[] {
+```
+
+#### Por qué se cambió
+La ordenación pura de turnos se movió a `turnos.ts` para reducir `main.tsx` sin cambiar el criterio de fecha ni hora.
+
+### Cambio 3 - Eliminar fusión local
+
+#### Código anterior
+```tsx
+// Esta función mezcla los turnos seleccionados con los actuales sin duplicar
+function getTurnoMergeKey(t: Turno): string {
+  return [
+    t.startDate || "",
+    t.date || "",
+    t.startTime || "",
+    t.endTime || "",
+  ].join("|");
+}
+
+export function mergeTurnos(actuales: Turno[], nuevos: Turno[]) {
+  const map = new Map();
+  // Primero metemos los que ya tienes
+  actuales.forEach(t => map.set(getTurnoMergeKey(t), t));
+  // Luego añadimos los nuevos (si coinciden fecha e inicio, el map no se duplica)
+  nuevos.forEach(t => map.set(getTurnoMergeKey(t), t));
+
+  return sortTurnosByDateDesc(Array.from(map.values()));
+}
+
+function loadCurrent(): CurrentState {
+```
+
+#### Código nuevo
+```tsx
+function loadCurrent(): CurrentState {
+```
+
+#### Por qué se cambió
+La fusión de turnos importados se trasladó con su clave interna al módulo `turnos.ts`, manteniendo el mismo comportamiento de deduplicación.
+
+### Cambio 4 - Crear módulo de turnos
+
+#### Código anterior
+`No existía el módulo de turnos en src/turnos.ts.`
+
+#### Código nuevo
+```ts
+export type SortableTurno = {
+  date: string;
+  startDate?: string | null;
+  startTime?: string | null;
+  endTime?: string | null;
+};
+
+export function sortTurnosByDateDesc<T extends SortableTurno>(turnos: T[]): T[] {
+  return [...turnos].sort((a, b) => {
+    const dateA = a.startDate || a.date;
+    const dateB = b.startDate || b.date;
+    const byDate = dateB.localeCompare(dateA);
+    if (byDate !== 0) return byDate;
+    return (b.startTime || "").localeCompare(a.startTime || "");
+  });
+}
+
+function getTurnoMergeKey(t: SortableTurno): string {
+  return [
+    t.startDate || "",
+    t.date || "",
+    t.startTime || "",
+    t.endTime || "",
+  ].join("|");
+}
+
+export function mergeTurnos<T extends SortableTurno>(actuales: T[], nuevos: T[]): T[] {
+  const map = new Map<string, T>();
+  // Primero metemos los que ya tienes
+  actuales.forEach((t) => map.set(getTurnoMergeKey(t), t));
+  // Luego añadimos los nuevos (si coinciden fecha e inicio, el map no se duplica)
+  nuevos.forEach((t) => map.set(getTurnoMergeKey(t), t));
+
+  return sortTurnosByDateDesc(Array.from(map.values()));
+}
+```
+
+#### Por qué se cambió
+El módulo nuevo agrupa ordenación y fusión de turnos con tipos estructurales para no depender de `main.tsx`.
+
+### Cambio 5 - Proteger extracción de turnos
+
+#### Código anterior
+`No existía el test de extracción de turnos en src/__tests__/turno-merge-extraction.test.ts.`
+
+#### Código nuevo
+```ts
+import { existsSync, readFileSync } from "node:fs";
+import { resolve } from "node:path";
+import { describe, expect, it } from "vitest";
+
+describe("Turno merge extraction", () => {
+  const turnosPath = resolve("src/turnos.ts");
+  const mainSource = readFileSync(resolve("src/main.tsx"), "utf8");
+
+  it("keeps turno sorting and merge helpers outside main.tsx", () => {
+    expect(existsSync(turnosPath)).toBe(true);
+
+    const turnosSource = readFileSync(turnosPath, "utf8");
+    expect(turnosSource).toContain("export function sortTurnosByDateDesc");
+    expect(turnosSource).toContain("export function mergeTurnos");
+    expect(turnosSource).toContain("function getTurnoMergeKey");
+    expect(mainSource).toContain('from "./turnos"');
+    expect(mainSource).not.toMatch(/^export function sortTurnosByDateDesc\(/m);
+    expect(mainSource).not.toMatch(/^export function mergeTurnos\(/m);
+  });
+});
+```
+
+#### Por qué se cambió
+El test fija que las utilidades de ordenación y fusión permanecen fuera de `main.tsx`.
+
 ## 2026-05-24 23:06 - Extraer builders de backup
 
 **Archivos modificados:** `src/main.tsx`, `src/backup.ts`, `src/__tests__/backup-extraction.test.ts`

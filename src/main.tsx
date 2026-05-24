@@ -30,6 +30,7 @@ import { TurnoNotasCard } from "./components/turno-notas";
 import { EditEntryDialog } from "./components/edit-entry-dialog";
 import { resolveLatestApkUpdate, type UpdateState } from "./update-flow";
 import { buildBackupPayload, buildBackupPayloadFromState } from "./backup";
+import { mergeTurnos, sortTurnosByDateDesc } from "./turnos";
 import {
   userMetaDocRef,
   userSubcollectionRef,
@@ -41,6 +42,7 @@ import { AdminListScreen, AdminUserView } from "./admin-screens";
 
 export { fmtDuration, fmtKm, fmtKmNumber, fmtMoney, fmtMoneyNumber, splitDurationLabel } from "./formatters";
 export { buildBackupPayload, buildBackupPayloadFromState };
+export { mergeTurnos, sortTurnosByDateDesc };
 
 const { useState, useEffect, useRef } = React;
 
@@ -325,16 +327,6 @@ export function parseCSVLine(text: string): string[] {
   return result;
 }
 
-export function sortTurnosByDateDesc(turnos: Turno[]): Turno[] {
-  return [...turnos].sort((a, b) => {
-    const dateA = a.startDate || a.date;
-    const dateB = b.startDate || b.date;
-    const byDate = dateB.localeCompare(dateA);
-    if (byDate !== 0) return byDate;
-    return (b.startTime || "").localeCompare(a.startTime || "");
-  });
-}
-
 export function getTurnosByCalendarMonth(turnos: Turno[], year: number, month: number): Turno[] {
   const monthId = `${year}-${String(month).padStart(2, "0")}`;
   return sortTurnosByDateDesc(
@@ -451,26 +443,6 @@ async function exportBackupJSON(backup: ReturnType<typeof buildBackupPayload>) {
     console.error("exportBackupJSON error:", e);
     alert("No se pudo exportar la copia de seguridad.");
   }
-}
-
-// Esta función mezcla los turnos seleccionados con los actuales sin duplicar
-function getTurnoMergeKey(t: Turno): string {
-  return [
-    t.startDate || "",
-    t.date || "",
-    t.startTime || "",
-    t.endTime || "",
-  ].join("|");
-}
-
-export function mergeTurnos(actuales: Turno[], nuevos: Turno[]) {
-  const map = new Map();
-  // Primero metemos los que ya tienes
-  actuales.forEach(t => map.set(getTurnoMergeKey(t), t));
-  // Luego añadimos los nuevos (si coinciden fecha e inicio, el map no se duplica)
-  nuevos.forEach(t => map.set(getTurnoMergeKey(t), t));
-
-  return sortTurnosByDateDesc(Array.from(map.values()));
 }
 
 function loadCurrent(): CurrentState {
