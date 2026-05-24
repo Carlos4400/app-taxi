@@ -33,6 +33,7 @@ import { buildBackupPayload, buildBackupPayloadFromState } from "./backup";
 import { mergeTurnos, sortTurnosByDateDesc } from "./turnos";
 import { parseCSVToHistory } from "./csv";
 import { getBackupMenuActionIds, getHomeQuickActionIds } from "./action-ids";
+import { getTurnosNotasSemana } from "./turno-notas-logic";
 import {
   userMetaDocRef,
   userSubcollectionRef,
@@ -48,6 +49,7 @@ export { mergeTurnos, sortTurnosByDateDesc };
 export { parseCSVLine, parseCSVToHistory } from "./csv";
 export { getBackupMenuActionIds, getHomeQuickActionIds };
 export type { BackupMenuActionId, HomeQuickActionId } from "./action-ids";
+export { getTurnosNotasSemana };
 
 const { useState, useEffect, useRef } = React;
 
@@ -610,16 +612,6 @@ export function updateTurnoEntrega(
       ? { ...t, entregada, fechaEntrega: entregada ? fechaEntrega : null }
       : t
   );
-}
-
-export function getTurnosNotasSemana(turnos: Turno[]): TurnoNotasSemana[] {
-  return turnos
-    .map((turno) => {
-      const notasGenerales = turno.entries.filter((entry) => entry.type === "nota" && !!entry.note?.trim());
-      const notasDetalladas = turno.entries.filter((entry) => entry.type !== "nota" && !!entry.note?.trim());
-      return { turno, notasGenerales, notasDetalladas };
-    })
-    .filter((item) => item.notasGenerales.length > 0 || item.notasDetalladas.length > 0);
 }
 
 // ============================================================================

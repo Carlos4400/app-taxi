@@ -4,6 +4,121 @@ Este archivo registra cambios de código hechos por agentes/modelos en este proy
 
 Cada entrada debe indicar archivos modificados, código anterior, código nuevo y por qué se cambió. Las entradas se añaden al **principio** del archivo (las más recientes arriba).
 
+## 2026-05-24 23:18 - Extraer notas de turnos
+
+**Archivos modificados:** `src/main.tsx`, `src/turno-notas-logic.ts`, `src/__tests__/turno-notas-logic-extraction.test.ts`
+
+### Cambio 1 - Importar lógica de notas
+
+#### Código anterior
+```tsx
+import { parseCSVToHistory } from "./csv";
+import { getBackupMenuActionIds, getHomeQuickActionIds } from "./action-ids";
+```
+
+```tsx
+export { getBackupMenuActionIds, getHomeQuickActionIds };
+export type { BackupMenuActionId, HomeQuickActionId } from "./action-ids";
+```
+
+#### Código nuevo
+```tsx
+import { parseCSVToHistory } from "./csv";
+import { getBackupMenuActionIds, getHomeQuickActionIds } from "./action-ids";
+import { getTurnosNotasSemana } from "./turno-notas-logic";
+```
+
+```tsx
+export { getBackupMenuActionIds, getHomeQuickActionIds };
+export type { BackupMenuActionId, HomeQuickActionId } from "./action-ids";
+export { getTurnosNotasSemana };
+```
+
+#### Por qué se cambió
+`main.tsx` usa el filtro de notas desde el nuevo módulo y conserva el export público para los tests.
+
+### Cambio 2 - Eliminar filtro local de notas
+
+#### Código anterior
+```tsx
+export function getTurnosNotasSemana(turnos: Turno[]): TurnoNotasSemana[] {
+  return turnos
+    .map((turno) => {
+      const notasGenerales = turno.entries.filter((entry) => entry.type === "nota" && !!entry.note?.trim());
+      const notasDetalladas = turno.entries.filter((entry) => entry.type !== "nota" && !!entry.note?.trim());
+      return { turno, notasGenerales, notasDetalladas };
+    })
+    .filter((item) => item.notasGenerales.length > 0 || item.notasDetalladas.length > 0);
+}
+
+// ============================================================================
+// SEMANAS — Carga y guardado en localStorage (Fase 3)
+// ============================================================================
+```
+
+#### Código nuevo
+```tsx
+// ============================================================================
+// SEMANAS — Carga y guardado en localStorage (Fase 3)
+// ============================================================================
+```
+
+#### Por qué se cambió
+El filtrado de notas semanales se movió fuera de `main.tsx`; no cambia qué entradas se consideran notas generales o detalladas.
+
+### Cambio 3 - Crear módulo de notas de turnos
+
+#### Código anterior
+`No existía el módulo de lógica de notas en src/turno-notas-logic.ts.`
+
+#### Código nuevo
+```ts
+import type { Turno, TurnoNotasSemana } from "./main";
+
+export function getTurnosNotasSemana(turnos: Turno[]): TurnoNotasSemana[] {
+  return turnos
+    .map((turno) => {
+      const notasGenerales = turno.entries.filter((entry) => entry.type === "nota" && !!entry.note?.trim());
+      const notasDetalladas = turno.entries.filter((entry) => entry.type !== "nota" && !!entry.note?.trim());
+      return { turno, notasGenerales, notasDetalladas };
+    })
+    .filter((item) => item.notasGenerales.length > 0 || item.notasDetalladas.length > 0);
+}
+```
+
+#### Por qué se cambió
+El módulo nuevo contiene solo la lógica pura de selección de notas y usa importación de tipos para no crear dependencias en runtime.
+
+### Cambio 4 - Proteger extracción de notas
+
+#### Código anterior
+`No existía el test de extracción de notas en src/__tests__/turno-notas-logic-extraction.test.ts.`
+
+#### Código nuevo
+```ts
+import { existsSync, readFileSync } from "node:fs";
+import { resolve } from "node:path";
+import { describe, expect, it } from "vitest";
+
+describe("Turno notes logic extraction", () => {
+  const notesLogicPath = resolve("src/turno-notas-logic.ts");
+  const mainSource = readFileSync(resolve("src/main.tsx"), "utf8");
+
+  it("keeps weekly turn note filtering outside main.tsx", () => {
+    expect(existsSync(notesLogicPath)).toBe(true);
+
+    const notesLogicSource = readFileSync(notesLogicPath, "utf8");
+    expect(notesLogicSource).toContain("export function getTurnosNotasSemana");
+    expect(notesLogicSource).toContain('entry.type === "nota"');
+    expect(mainSource).toContain('from "./turno-notas-logic"');
+    expect(mainSource).not.toMatch(/^export function getTurnosNotasSemana\(/m);
+  });
+});
+```
+
+#### Por qué se cambió
+El test fija que el filtrado semanal de notas permanezca fuera de `main.tsx`.
+
 ## 2026-05-24 23:15 - Extraer acciones de menu
 
 **Archivos modificados:** `src/main.tsx`, `src/action-ids.ts`, `src/__tests__/action-ids-extraction.test.ts`
