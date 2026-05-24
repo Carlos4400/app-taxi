@@ -4,6 +4,177 @@ Este archivo registra cambios de código hechos por agentes/modelos en este proy
 
 Cada entrada debe indicar archivos modificados, código anterior, código nuevo y por qué se cambió. Las entradas se añaden al **principio** del archivo (las más recientes arriba).
 
+## 2026-05-24 23:01 - Extraer diálogo de edición
+
+**Archivos modificados:** `src/main.tsx`, `src/components/edit-entry-dialog.tsx`, `src/__tests__/edit-entry-dialog-extraction.test.ts`
+
+### Cambio 1 - Importar diálogo de edición
+
+#### Código anterior
+```tsx
+import { ConfirmDialog, MainCard, SmallCard } from "./components/common";
+import { TurnoNotasCard } from "./components/turno-notas";
+import { resolveLatestApkUpdate, type UpdateState } from "./update-flow";
+```
+
+#### Código nuevo
+```tsx
+import { ConfirmDialog, MainCard, SmallCard } from "./components/common";
+import { TurnoNotasCard } from "./components/turno-notas";
+import { EditEntryDialog } from "./components/edit-entry-dialog";
+import { resolveLatestApkUpdate, type UpdateState } from "./update-flow";
+```
+
+#### Por qué se cambió
+`EditEntryDialog` se movió a un componente propio para seguir reduciendo `main.tsx` sin tocar cálculos ni estado contable.
+
+### Cambio 2 - Pasar dependencias al diálogo
+
+#### Código anterior
+```tsx
+          <EditEntryDialog
+            entry={editEntry}
+            amount={editEntryAmount}
+            note={editEntryNote}
+            onAmountChange={setEditEntryAmount}
+            onNoteChange={setEditEntryNote}
+            onSave={saveEditEntry}
+            onDelete={() => {
+```
+
+#### Código nuevo
+```tsx
+          <EditEntryDialog
+            entry={editEntry}
+            amount={editEntryAmount}
+            note={editEntryNote}
+            onAmountChange={setEditEntryAmount}
+            onNoteChange={setEditEntryNote}
+            onSave={saveEditEntry}
+            getEntryTypeMeta={getEntryTypeMeta}
+            deleteIcon={<IconDel />}
+            onDelete={() => {
+```
+
+#### Por qué se cambió
+El componente extraído necesita el mismo metadato visual de tipo de entrada y el mismo icono de borrar que usaba dentro de `main.tsx`. Se pasan como props para evitar ciclos de importación.
+
+### Cambio 3 - Eliminar definición local de EditEntryDialog
+
+#### Código anterior
+```tsx
+function EditEntryDialog({
+  entry,
+  amount,
+  note,
+  onAmountChange,
+  onNoteChange,
+  onSave,
+  onDelete,
+  onCancel,
+}: {
+  entry: Entry;
+  amount: string;
+  note: string;
+  onAmountChange: (v: string) => void;
+  onNoteChange: (v: string) => void;
+  onSave: () => void;
+  onDelete: () => void;
+  onCancel: () => void;
+}) {
+  const [showKP, setShowKP] = React.useState(false);
+  const meta = getEntryTypeMeta(entry.type);
+```
+
+#### Código nuevo
+```tsx
+// AuthGate: decide qué pintar en función del estado de autenticación.
+```
+
+#### Por qué se cambió
+La implementación local del diálogo se eliminó de `main.tsx`; el siguiente bloque después de `App` vuelve a ser `AuthGate`. Esto reduce superficie del archivo principal sin modificar comportamiento de edición.
+
+### Cambio 4 - Nuevo componente EditEntryDialog
+
+#### Código anterior
+`No existía el archivo src/components/edit-entry-dialog.tsx.`
+
+#### Código nuevo
+```tsx
+import { useState, type ReactNode } from "react";
+import type { Entry } from "../main";
+
+type EntryTypeMetaForDialog = {
+  color: string;
+  label: string;
+};
+
+export function EditEntryDialog({
+  entry,
+  amount,
+  note,
+  onAmountChange,
+  onNoteChange,
+  onSave,
+  onDelete,
+  onCancel,
+  getEntryTypeMeta,
+  deleteIcon,
+}: {
+  entry: Entry;
+  amount: string;
+  note: string;
+  onAmountChange: (v: string) => void;
+  onNoteChange: (v: string) => void;
+  onSave: () => void;
+  onDelete: () => void;
+  onCancel: () => void;
+  getEntryTypeMeta: (type: string) => EntryTypeMetaForDialog;
+  deleteIcon: ReactNode;
+}) {
+  const [showKP, setShowKP] = useState(false);
+  const meta = getEntryTypeMeta(entry.type);
+
+  function kpAmount(k: string) {
+    if (k === "DEL") { onAmountChange(amount.slice(0, -1)); return; }
+    if (k === ",") { if (!amount.includes(",")) onAmountChange(amount + ","); return; }
+    if (amount.replace(",", "").length >= 7) return;
+    onAmountChange(amount + k);
+  }
+```
+
+#### Por qué se cambió
+Se creó un componente específico para editar entradas. Mantiene la misma lógica de teclado, guardado, borrado y nota, pero recibe las dependencias visuales desde `main.tsx`.
+
+### Cambio 5 - Test de extracción del diálogo
+
+#### Código anterior
+`No existía el archivo src/__tests__/edit-entry-dialog-extraction.test.ts.`
+
+#### Código nuevo
+```ts
+import { existsSync, readFileSync } from "node:fs";
+import { resolve } from "node:path";
+import { describe, expect, it } from "vitest";
+
+describe("EditEntryDialog extraction", () => {
+  const mainSource = readFileSync(resolve("src/main.tsx"), "utf8");
+  const componentPath = resolve("src/components/edit-entry-dialog.tsx");
+
+  it("keeps EditEntryDialog outside main.tsx", () => {
+    expect(existsSync(componentPath)).toBe(true);
+
+    const componentSource = readFileSync(componentPath, "utf8");
+    expect(componentSource).toContain("export function EditEntryDialog");
+    expect(mainSource).toContain('from "./components/edit-entry-dialog"');
+    expect(mainSource).not.toMatch(/^function EditEntryDialog/m);
+  });
+});
+```
+
+#### Por qué se cambió
+Añade un candado para que el diálogo de edición permanezca extraído y no vuelva a crecer dentro de `main.tsx`.
+
 ## 2026-05-24 22:56 - Extraer resolución de update APK
 
 **Archivos modificados:** `src/main.tsx`, `src/update-flow.ts`, `src/__tests__/apk-update-flow.test.ts`, `src/__tests__/update-flow-extraction.test.ts`
