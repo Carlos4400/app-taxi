@@ -4,6 +4,112 @@ Este archivo registra cambios de código hechos por agentes/modelos en este proy
 
 Cada entrada debe indicar archivos modificados, código anterior, código nuevo y por qué se cambió. Las entradas se añaden al **principio** del archivo (las más recientes arriba).
 
+## 2026-05-26 00:32 - Actualizar guías del recorte de main
+
+**Archivos modificados:** `RECORTAR_MAIN_TSX_MEJORADO.md`, `ESTRUCTURA.md`
+
+### Cambio 1 - Estado actual del recorte
+
+#### Código anterior
+`No existía la sección "Estado actual del recorte" en RECORTAR_MAIN_TSX_MEJORADO.md.`
+
+#### Código nuevo
+```md
+## Estado actual del recorte
+
+Estas pantallas ya están extraídas de `src/main.tsx` y no deben volver a duplicarse dentro del archivo principal:
+
+- `src/screens/add-entry-screen.tsx`: pantalla para añadir datáfono y propina.
+- `src/screens/add-nota-general-screen.tsx`: pantalla para añadir una nota general al turno.
+- `src/screens/add-single-entry-screen.tsx`: pantalla para añadir Agencia/Bono, Extra, Gasolina o Nulo.
+
+Las siguientes fases deben continuar por responsabilidades naturales:
+
+- pantallas completas pendientes
+- componentes reutilizables reales
+- lógica pura no contable
+- servicios aislados
+
+No extraer piezas demasiado pequeñas por inercia. Un icono suelto, un estilo aislado o un helper mínimo solo deben extraerse si forman parte de un bloque reutilizable claro, si reducen una dependencia real o si encajan con una responsabilidad ya existente.
+
+Para las pantallas, el criterio profesional es primero separar la pantalla completa cuando tenga frontera clara. Después, si varias pantallas repiten una pieza de interfaz con responsabilidad propia, esa pieza puede moverse a `src/components/` en una fase posterior.
+```
+
+#### Por qué se cambió
+El documento necesitaba reflejar que las pantallas de entrada ya están extraídas y orientar las siguientes fases hacia responsabilidades naturales, no hacia piezas sueltas sin frontera clara.
+
+### Cambio 2 - Reglas del registro documental
+
+#### Código anterior
+```md
+- `Código anterior` debe contener el fragmento literal que estaba en `main.tsx` antes de extraerlo, o el texto literal de ausencia exigido por `AGENTS.md` si el bloque no existía.
+- `Código nuevo` debe contener el fragmento literal que quedó después, normalmente el nuevo import, el nuevo export o el nuevo bloque en el archivo destino.
+- Si el código ya no existe en `main.tsx`, no usar frases sueltas mal formateadas. Usar un bloque Markdown válido que muestre el import/export nuevo o una frase literal válida dentro de un fence correcto.
+- Los fences Markdown deben estar bien formados: abrir con triple backtick y cerrar con triple backtick.
+- No usar backticks mezclados, fences rotos ni combinaciones como `` `texto` `` envueltas en backticks sueltos.
+```
+
+#### Código nuevo
+```md
+- `Código anterior` debe contener el fragmento literal que estaba en `main.tsx` antes de extraerlo, o el texto literal de ausencia exigido por `AGENTS.md` si el bloque no existía.
+- `Código nuevo` debe contener el fragmento literal que quedó después, normalmente el nuevo import, el nuevo export o el nuevo bloque en el archivo destino.
+- Si el código ya no existe en `main.tsx`, no usar frases sueltas mal formateadas. Usar un bloque Markdown válido que muestre el import/export nuevo o una frase literal válida dentro de un fence correcto.
+- No usar `...`, placeholders, resúmenes ni comentarios inventados como sustituto del código literal dentro de `Código anterior` o `Código nuevo`.
+- El texto documental de la entrada debe escribirse en español. Evitar inglés innecesario cuando exista una forma clara en español.
+- Los fences Markdown deben estar bien formados: abrir con triple backtick y cerrar con triple backtick.
+- No usar backticks mezclados, fences rotos ni combinaciones como `` `texto` `` envueltas en backticks sueltos.
+```
+
+#### Por qué se cambió
+Las fases recientes mostraron que el registro podía quedar con placeholders, resúmenes o texto en inglés. Se reforzó la regla para que `CAMBIOS_AGENT.md` sea literal y revisable.
+
+### Cambio 3 - Registro de cambios del documento de recorte
+
+#### Código anterior
+`No existía el punto 11 en el "Registro de cambios respecto a la versión original" de RECORTAR_MAIN_TSX_MEJORADO.md.`
+
+#### Código nuevo
+```md
+11. **Estado actual del recorte.** Nueva sección. Se deja constancia de las pantallas de entrada ya extraídas y se aclara que las fases siguientes deben continuar por responsabilidades naturales, evitando piezas demasiado pequeñas salvo que formen un bloque reutilizable claro. También se refuerza que `CAMBIOS_AGENT.md` no debe usar placeholders, resúmenes ni texto documental en inglés cuando pueda escribirse en español.
+```
+
+#### Por qué se cambió
+El documento mantiene un registro interno de mejoras respecto a la versión original. La nueva sección y el refuerzo documental debían quedar reflejados allí.
+
+### Cambio 4 - Ejemplos y criterio de pantallas
+
+#### Código anterior
+```md
+| `src/screens/` | Pantallas completas de la app. | `login-screen.tsx`, `admin-screens.tsx`, `auth-gate.tsx` |
+```
+
+#### Código nuevo
+```md
+| `src/screens/` | Pantallas completas de la app. | `add-entry-screen.tsx`, `add-nota-general-screen.tsx`, `add-single-entry-screen.tsx`, `login-screen.tsx`, `admin-screens.tsx`, `auth-gate.tsx` |
+```
+
+#### Por qué se cambió
+La guía de estructura debía mostrar las pantallas de entrada ya extraídas como ejemplos reales de `src/screens/`.
+
+### Cambio 5 - Criterio entre screens y components
+
+#### Código anterior
+```md
+Regla general: **un archivo = una responsabilidad clara**, con un nombre que la describa.
+```
+
+#### Código nuevo
+```md
+Regla general: **un archivo = una responsabilidad clara**, con un nombre que la describa.
+
+Una pantalla completa va en `src/screens/`. Las piezas de interfaz reutilizables que se usen dentro de varias pantallas van en `src/components/`.
+
+Si una extracción empieza como código privado de una pantalla, puede quedarse dentro del archivo de esa pantalla. Solo se mueve a `src/components/` cuando se reutiliza, cuando tiene responsabilidad propia clara o cuando evita duplicación real entre pantallas.
+```
+
+#### Por qué se cambió
+La guía necesitaba aclarar cuándo una extracción debe quedarse como pantalla y cuándo conviene mover piezas compartidas a componentes reutilizables.
+
 ## 2026-05-26 00:00 - Extraer pantalla de datapropina a src/screens/add-entry-screen.tsx
 
 **Archivos modificados:** `src/screens/add-entry-screen.tsx`, `src/main.tsx`

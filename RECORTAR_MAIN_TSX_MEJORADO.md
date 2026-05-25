@@ -14,6 +14,25 @@ La misión no es mejorar la app: la misión es reducir `src/main.tsx` sin cambia
 Reducir progresivamente `src/main.tsx` moviendo responsabilidades a módulos pequeños, claros y testeados.
 El resultado debe respetar la estructura oficial de la app, mantener el comportamiento actual y conservar exactamente los resultados contables.
 
+## Estado actual del recorte
+
+Estas pantallas ya están extraídas de `src/main.tsx` y no deben volver a duplicarse dentro del archivo principal:
+
+- `src/screens/add-entry-screen.tsx`: pantalla para añadir datáfono y propina.
+- `src/screens/add-nota-general-screen.tsx`: pantalla para añadir una nota general al turno.
+- `src/screens/add-single-entry-screen.tsx`: pantalla para añadir Agencia/Bono, Extra, Gasolina o Nulo.
+
+Las siguientes fases deben continuar por responsabilidades naturales:
+
+- pantallas completas pendientes
+- componentes reutilizables reales
+- lógica pura no contable
+- servicios aislados
+
+No extraer piezas demasiado pequeñas por inercia. Un icono suelto, un estilo aislado o un helper mínimo solo deben extraerse si forman parte de un bloque reutilizable claro, si reducen una dependencia real o si encajan con una responsabilidad ya existente.
+
+Para las pantallas, el criterio profesional es primero separar la pantalla completa cuando tenga frontera clara. Después, si varias pantallas repiten una pieza de interfaz con responsabilidad propia, esa pieza puede moverse a `src/components/` en una fase posterior.
+
 ## Regla absoluta: contabilidad congelada
 
 La contabilidad no se modifica.
@@ -300,6 +319,8 @@ Reglas adicionales para tareas de recorte:
 - `Código anterior` debe contener el fragmento literal que estaba en `main.tsx` antes de extraerlo, o el texto literal de ausencia exigido por `AGENTS.md` si el bloque no existía.
 - `Código nuevo` debe contener el fragmento literal que quedó después, normalmente el nuevo import, el nuevo export o el nuevo bloque en el archivo destino.
 - Si el código ya no existe en `main.tsx`, no usar frases sueltas mal formateadas. Usar un bloque Markdown válido que muestre el import/export nuevo o una frase literal válida dentro de un fence correcto.
+- No usar `...`, placeholders, resúmenes ni comentarios inventados como sustituto del código literal dentro de `Código anterior` o `Código nuevo`.
+- El texto documental de la entrada debe escribirse en español. Evitar inglés innecesario cuando exista una forma clara en español.
 - Los fences Markdown deben estar bien formados: abrir con triple backtick y cerrar con triple backtick.
 - No usar backticks mezclados, fences rotos ni combinaciones como `` `texto` `` envueltas en backticks sueltos.
 - Si hay dos cambios relevantes, documentarlos como cambios separados: creación en el archivo destino y eliminación/import en `main.tsx`.
@@ -436,5 +457,7 @@ Si hay duda entre reescribir y mover sin cambiar, mover sin cambiar.
 9. **Registro obligatorio en `CAMBIOS_AGENT.md`.** Nueva sección. Se refuerza que el registro no puede ser un resumen ni una frase mal formada: debe contener código anterior, código nuevo, motivo concreto y fences Markdown válidos. También se añade como señal de stop, revisión del diff, prohibición y criterio de tarea terminada.
 
 10. **Tamaño correcto de una fase.** Nueva sección. Se aclara que una fase debe ser pequeña por responsabilidad, no necesariamente por número de líneas. Puede mover más de 100-200 líneas si extrae una unidad natural completa, pero debe justificarlo y esperar confirmación si supera ese tamaño aproximado.
+
+11. **Estado actual del recorte.** Nueva sección. Se deja constancia de las pantallas de entrada ya extraídas y se aclara que las fases siguientes deben continuar por responsabilidades naturales, evitando piezas demasiado pequeñas salvo que formen un bloque reutilizable claro. También se refuerza que `CAMBIOS_AGENT.md` no debe usar placeholders, resúmenes ni texto documental en inglés cuando pueda escribirse en español.
 
 Nota de transparencia: estas mejoras se basan en el texto del documento original, buenas prácticas de refactor de código heredado y, para la sección "Archivos contables protegidos", en la revisión de las rutas actuales del proyecto. No sustituye a la "Fase 0": antes de recortar hay que volver a verificar tests, cobertura real y estado limpio del repositorio.

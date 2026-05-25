@@ -9,7 +9,7 @@ Esta guía explica cómo está organizado el proyecto y dónde colocar cada cosa
 | `src/main.tsx` | Punto de entrada de la app. No se mueve de la raíz. | `main.tsx` |
 | `src/logic/` | Lógica de negocio y utilidades **puras**: funciones que calculan, transforman o formatean datos. No tocan Firebase, ni el navegador, ni React. | `accounting.ts`, `week-logic.ts`, `csv.ts`, `date-time.ts`, `formatters.ts` |
 | `src/services/` | Todo lo que habla con el exterior: Firebase, almacenamiento del dispositivo, plugins nativos. | `firebase.ts`, `firestore-sync.ts`, `user-storage.ts`, `apk-installer.ts` |
-| `src/screens/` | Pantallas completas de la app. | `login-screen.tsx`, `admin-screens.tsx`, `auth-gate.tsx` |
+| `src/screens/` | Pantallas completas de la app. | `add-entry-screen.tsx`, `add-nota-general-screen.tsx`, `add-single-entry-screen.tsx`, `login-screen.tsx`, `admin-screens.tsx`, `auth-gate.tsx` |
 | `src/components/` | Piezas de interfaz reutilizables que se usan dentro de las pantallas. | `shell.tsx`, `edit-entry-dialog.tsx`, `turno-notas.tsx` |
 | `src/shared/` | Tipos de TypeScript y constantes compartidas por todo el proyecto. | `types.ts`, `action-ids.ts`, `storage-keys.ts` |
 | `src/__tests__/` | Los tests. Uno por módulo. | `accounting-extraction.test.ts` |
@@ -25,6 +25,10 @@ Pregúntate esto, en este orden, y para en la primera respuesta que sea "sí":
 5. ¿Es un tipo de datos o una constante que usarán varios sitios? → `src/shared/`
 
 Regla general: **un archivo = una responsabilidad clara**, con un nombre que la describa.
+
+Una pantalla completa va en `src/screens/`. Las piezas de interfaz reutilizables que se usen dentro de varias pantallas van en `src/components/`.
+
+Si una extracción empieza como código privado de una pantalla, puede quedarse dentro del archivo de esa pantalla. Solo se mueve a `src/components/` cuando se reutiliza, cuando tiene responsabilidad propia clara o cuando evita duplicación real entre pantallas.
 
 ## Cuándo crear una carpeta nueva
 
