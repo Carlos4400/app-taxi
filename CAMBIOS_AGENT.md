@@ -4,6 +4,546 @@ Este archivo registra cambios de código hechos por agentes/modelos en este proy
 
 Cada entrada debe indicar archivos modificados, código anterior, código nuevo y por qué se cambió. Las entradas se añaden al **principio** del archivo (las más recientes arriba).
 
+## 2026-05-25 15:36 - Extraer logica semanal
+
+**Archivos modificados:** `src/main.tsx`, `src/week-logic.ts`, `src/__tests__/week-logic-extraction.test.ts`
+
+### Cambio 1 - Importar lógica semanal
+
+#### Código anterior
+```tsx
+import { getDaysInMonth, getStartOffset } from "./calendar-date";
+import { MESES_ABREVIADOS, MESES_COMPLETOS, getAccountingPeriodLabel, getMesLabel } from "./date-labels";
+import { KM_CARD_UNIT_STYLE, TIME_CARD_HOUR_UNIT_STYLE, TIME_CARD_UNIT_STYLE, WEEK_LIST_CARD_TEXT_SIZES } from "./card-styles";
+import { fmtDate, getDiffMins, timeNow, today } from "./date-time";
+import { userStorageKey, writeUserLocalJSON } from "./user-storage";
+import { KEY_CURRENT, KEY_HISTORY, KEY_NOTES, KEY_RESERVATIONS, KEY_SETTINGS, KEY_WEEK_OVERRIDES } from "./storage-keys";
+import { loadCurrent, loadHistory, loadNotes, loadReservations, loadSettings, loadWeekOverrides } from "./state-loaders";
+```
+
+```tsx
+export { updateTurnoEntrega };
+export { getAccountingPeriodLabel };
+export { KM_CARD_UNIT_STYLE, TIME_CARD_HOUR_UNIT_STYLE, TIME_CARD_UNIT_STYLE, WEEK_LIST_CARD_TEXT_SIZES };
+```
+
+#### Código nuevo
+```tsx
+import { getDaysInMonth, getStartOffset } from "./calendar-date";
+import { MESES_COMPLETOS, getAccountingPeriodLabel, getMesLabel } from "./date-labels";
+import { KM_CARD_UNIT_STYLE, TIME_CARD_HOUR_UNIT_STYLE, TIME_CARD_UNIT_STYLE, WEEK_LIST_CARD_TEXT_SIZES } from "./card-styles";
+import { fmtDate, getDiffMins, timeNow, today } from "./date-time";
+import { userStorageKey, writeUserLocalJSON } from "./user-storage";
+import { KEY_CURRENT, KEY_HISTORY, KEY_NOTES, KEY_RESERVATIONS, KEY_SETTINGS, KEY_WEEK_OVERRIDES } from "./storage-keys";
+import { loadCurrent, loadHistory, loadNotes, loadReservations, loadSettings, loadWeekOverrides } from "./state-loaders";
+import {
+  formatWeekRange,
+  formatWeekRangeFull,
+  getCurrentOpenWeekId,
+  getTurnoAccountingWeekId,
+  getTurnoFechaEfectiva,
+  getWeekId,
+  getWeekMonth,
+  getWeekOverride,
+  getWeekRange,
+  getWeekStartDate,
+  groupTurnosByWeek,
+  isWeekClosed,
+  selectAccountingHeroWeek,
+} from "./week-logic";
+```
+
+```tsx
+export { updateTurnoEntrega };
+export { getAccountingPeriodLabel };
+export { KM_CARD_UNIT_STYLE, TIME_CARD_HOUR_UNIT_STYLE, TIME_CARD_UNIT_STYLE, WEEK_LIST_CARD_TEXT_SIZES };
+export {
+  getCurrentOpenWeekId,
+  getTurnoAccountingWeekId,
+  getTurnoFechaEfectiva,
+  getWeekId,
+  getWeekRange,
+  getWeekStartDate,
+  groupTurnosByWeek,
+  selectAccountingHeroWeek,
+};
+```
+
+#### Por qué se cambió
+`main.tsx` usa la lógica semanal desde `week-logic.ts` y mantiene los exports públicos usados por los tests existentes.
+
+### Cambio 2 - Eliminar funciones semanales locales
+
+#### Código anterior
+```tsx
+// ============================================================================
+// SEMANAS — Funciones lógicas (Fase 2)
+// ============================================================================
+
+export function getWeekStartDate(dateStr: string, diaLibre: number): string {
+  const d = new Date(dateStr + "T12:00:00");
+  const currentDayOfWeek = d.getDay();
+  const startDayOfWeek = (diaLibre + 1) % 7;
+  let diff = currentDayOfWeek - startDayOfWeek;
+  if (diff < 0) diff += 7;
+  d.setDate(d.getDate() - diff);
+  return d.toISOString().slice(0, 10);
+}
+
+export function getWeekId(dateStr: string, diaLibre: number): string {
+  return getWeekStartDate(dateStr, diaLibre);
+}
+
+export function getWeekRange(weekId: string): { inicio: string; fin: string } {
+  const d = new Date(weekId + "T12:00:00");
+  const inicio = weekId;
+  d.setDate(d.getDate() + 5);
+  const fin = d.toISOString().slice(0, 10);
+  return { inicio, fin };
+}
+
+export function getCurrentOpenWeekId(hoyISO: string, diaLibre: number): string | null {
+  const hoy = new Date(hoyISO + "T12:00:00");
+  if (hoy.getDay() === diaLibre) return null;
+
+  const weekId = getWeekId(hoyISO, diaLibre);
+  return isWeekClosed(weekId, hoyISO) ? null : weekId;
+}
+
+export function selectAccountingHeroWeek(
+  currentOpenWeekId: string | null,
+  recentWeekIds: string[]
+): { weekId: string; kind: "current" | "latest" } | null {
+  if (currentOpenWeekId) return { weekId: currentOpenWeekId, kind: "current" };
+  const latestWeekId = recentWeekIds[0];
+  return latestWeekId ? { weekId: latestWeekId, kind: "latest" } : null;
+}
+
+/**
+ * Devuelve la fecha "efectiva" de un turno para asignarlo a una semana.
+ *
+ * Regla:
+ *   - Si startDate cae en día laboral → usar startDate
+ *   - Si startDate cae en el día libre Y date (fin) cae en un día laboral
+ *     distinto → usar date (el turno cuenta para la semana del día de fin)
+ *   - En cualquier otro caso → startDate || date
+ */
+export function getTurnoFechaEfectiva(turno: Turno, diaLibre: number): string {
+  const fechaInicio = turno.startDate || turno.date;
+  if (!fechaInicio) return turno.date;
+
+  const diaInicio = new Date(fechaInicio + "T12:00:00").getDay();
+
+  // Si empezó en día libre y terminó en otro día (laboral) → usar fecha de fin
+  if (diaInicio === diaLibre && turno.date && turno.date !== fechaInicio) {
+    const diaFin = new Date(turno.date + "T12:00:00").getDay();
+    if (diaFin !== diaLibre) {
+      return turno.date;
+    }
+  }
+
+  return fechaInicio;
+}
+
+export function getTurnoAccountingWeekId(turno: Turno, diaLibre: number): string | null {
+  const diaLibreTurno = turno.diaLibreContable ?? diaLibre;
+  const fechaInicio = turno.startDate || turno.date;
+  if (!fechaInicio) return getWeekId(turno.date, diaLibreTurno);
+
+  const diaInicio = new Date(fechaInicio + "T12:00:00").getDay();
+  const diaFin = new Date(turno.date + "T12:00:00").getDay();
+
+  if (diaInicio === diaLibreTurno && turno.date === fechaInicio) {
+    return null;
+  }
+
+  if (diaInicio === diaLibreTurno && turno.date && turno.date !== fechaInicio && diaFin !== diaLibreTurno) {
+    return getWeekId(turno.date, diaLibreTurno);
+  }
+
+  return getWeekId(fechaInicio, diaLibreTurno);
+}
+
+export function groupTurnosByWeek(turnos: Turno[], diaLibre: number): Map<string, Turno[]> {
+  const map = new Map<string, Turno[]>();
+  const sorted = [...turnos].sort((a, b) => {
+    const dateA = getTurnoFechaEfectiva(a, diaLibre);
+    const dateB = getTurnoFechaEfectiva(b, diaLibre);
+    return dateA.localeCompare(dateB);
+  });
+  for (const t of sorted) {
+    const weekId = getTurnoAccountingWeekId(t, diaLibre);
+    if (!weekId) continue;
+    if (!map.has(weekId)) {
+      map.set(weekId, []);
+    }
+    map.get(weekId)!.push(t);
+  }
+  return map;
+}
+
+function isWeekClosed(weekId: string, hoyISO: string): boolean {
+  const { fin } = getWeekRange(weekId);
+  return hoyISO > fin;
+}
+
+export function calcularTotalesTurnos(turnos: Turno[]) {
+```
+
+#### Código nuevo
+```tsx
+export function calcularTotalesTurnos(turnos: Turno[]) {
+```
+
+#### Por qué se cambió
+Las reglas de semana, día libre y agrupación de turnos se trasladan a un módulo puro; no se cambian las fórmulas contables.
+
+### Cambio 3 - Eliminar helpers semanales de UI
+
+#### Código anterior
+```tsx
+/**
+ * Crea un override por defecto (vacío) para un weekId dado.
+ */
+/**
+ * Devuelve el override de una semana, o null si no existe.
+ */
+function getWeekOverride(overrides: WeekOverride[], weekId: string): WeekOverride | null {
+  return overrides.find((o) => o.weekId === weekId) || null;
+}
+
+const DIAS_LABORABLES_SEMANA = 6;
+/**
+ * Decide a qué mes pertenece una semana laboral.
+ *
+ * Regla:
+ *   - Cuenta los días LABORALES del calendario que caen en cada mes.
+ *   - El mes con más días gana.
+ *   - Si hay empate (3-3), devuelve "empate" con los dos meses candidatos
+ *     para que la UI pida al usuario que elija.
+ *
+ * Devuelve:
+ *   { type: "single", mesId: "2026-05" }                              // sin empate
+ *   { type: "tie", candidates: [{mesId, mesLabel}, {mesId, mesLabel}] } // empate
+ */
+function getWeekMonth(weekId: string): {
+  type: "single";
+  mesId: string;
+} | {
+  type: "tie";
+  candidates: { mesId: string; mesLabel: string }[];
+} {
+  const range = getWeekRange(weekId);
+  const start = new Date(range.inicio + "T12:00:00");
+
+  // Contar 6 días laborales (la semana completa, todos los días son laborales por construcción)
+  const conteo = new Map<string, number>(); // "YYYY-MM" → nº días
+  for (let i = 0; i < DIAS_LABORABLES_SEMANA; i++) {
+    const d = new Date(start);
+    d.setDate(start.getDate() + i);
+    const mesId = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+    conteo.set(mesId, (conteo.get(mesId) || 0) + 1);
+  }
+
+  const entradas = Array.from(conteo.entries());
+
+  // Una sola entrada → toda la semana en un mes
+  if (entradas.length === 1) {
+    return { type: "single", mesId: entradas[0][0] };
+  }
+
+  // Dos entradas → comparar
+  entradas.sort((a, b) => b[1] - a[1]); // ordena por más días desc
+  const [primera, segunda] = entradas;
+
+  if (primera[1] !== segunda[1]) {
+    return { type: "single", mesId: primera[0] };
+  }
+
+  // Empate
+  // Ordenar candidatos cronológicamente (mes anterior primero)
+  const candidates = [primera[0], segunda[0]].sort();
+  return {
+    type: "tie",
+    candidates: candidates.map((mesId) => ({ mesId, mesLabel: getMesLabel(mesId) })),
+  };
+}
+
+/**
+ * Devuelve el rango formateado para mostrar en la tarjeta de semana.
+ * Ej: "6 - 11 May" o "29 Abr - 4 May"
+ */
+function formatWeekRange(weekId: string): string {
+  const { inicio, fin } = getWeekRange(weekId);
+  const dInicio = new Date(inicio + "T12:00:00");
+  const dFin = new Date(fin + "T12:00:00");
+  if (dInicio.getMonth() === dFin.getMonth() && dInicio.getFullYear() === dFin.getFullYear()) {
+    return `${dInicio.getDate()} - ${dFin.getDate()} ${MESES_COMPLETOS[dFin.getMonth()]}`;
+  }
+  return `${dInicio.getDate()} ${MESES_COMPLETOS[dInicio.getMonth()]} - ${dFin.getDate()} ${MESES_COMPLETOS[dFin.getMonth()]}`;
+}
+
+/**
+ * Devuelve el rango con fecha completa para cabecera de detalle.
+ * Ej: "Mié 6 May - Lun 11 May 2026"
+ */
+function formatWeekRangeFull(weekId: string): string {
+  const { inicio, fin } = getWeekRange(weekId);
+  const dInicio = new Date(inicio + "T12:00:00");
+  const dFin = new Date(fin + "T12:00:00");
+  const dias = ["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"];
+  return `${dias[dInicio.getDay()]} ${dInicio.getDate()} ${MESES_ABREVIADOS[dInicio.getMonth()]} - ${dias[dFin.getDay()]} ${dFin.getDate()} ${MESES_ABREVIADOS[dFin.getMonth()]} ${dFin.getFullYear()}`;
+}
+
+const IconCoin = ({ s = 24, c = G }: { s?: number; c?: string }) => (
+```
+
+#### Código nuevo
+```tsx
+const IconCoin = ({ s = 24, c = G }: { s?: number; c?: string }) => (
+```
+
+#### Por qué se cambió
+Los helpers de override, mes de semana y labels de rango se mueven junto a la lógica semanal para mantener una sola responsabilidad.
+
+### Cambio 4 - Crear módulo semanal
+
+#### Código anterior
+`No existía el módulo semanal en src/week-logic.ts.`
+
+#### Código nuevo
+```ts
+import { MESES_ABREVIADOS, MESES_COMPLETOS, getMesLabel } from "./date-labels";
+
+export type WeekTurno = {
+  date: string;
+  startDate?: string | null;
+  diaLibreContable?: number;
+};
+
+export type WeekOverrideLike = {
+  weekId: string;
+};
+
+export const DIAS_LABORABLES_SEMANA = 6;
+
+export function getWeekStartDate(dateStr: string, diaLibre: number): string {
+  const d = new Date(dateStr + "T12:00:00");
+  const currentDayOfWeek = d.getDay();
+  const startDayOfWeek = (diaLibre + 1) % 7;
+  let diff = currentDayOfWeek - startDayOfWeek;
+  if (diff < 0) diff += 7;
+  d.setDate(d.getDate() - diff);
+  return d.toISOString().slice(0, 10);
+}
+
+export function getWeekId(dateStr: string, diaLibre: number): string {
+  return getWeekStartDate(dateStr, diaLibre);
+}
+
+export function getWeekRange(weekId: string): { inicio: string; fin: string } {
+  const d = new Date(weekId + "T12:00:00");
+  const inicio = weekId;
+  d.setDate(d.getDate() + 5);
+  const fin = d.toISOString().slice(0, 10);
+  return { inicio, fin };
+}
+
+export function isWeekClosed(weekId: string, hoyISO: string): boolean {
+  const { fin } = getWeekRange(weekId);
+  return hoyISO > fin;
+}
+
+export function getCurrentOpenWeekId(hoyISO: string, diaLibre: number): string | null {
+  const hoy = new Date(hoyISO + "T12:00:00");
+  if (hoy.getDay() === diaLibre) return null;
+
+  const weekId = getWeekId(hoyISO, diaLibre);
+  return isWeekClosed(weekId, hoyISO) ? null : weekId;
+}
+
+export function selectAccountingHeroWeek(
+  currentOpenWeekId: string | null,
+  recentWeekIds: string[]
+): { weekId: string; kind: "current" | "latest" } | null {
+  if (currentOpenWeekId) return { weekId: currentOpenWeekId, kind: "current" };
+  const latestWeekId = recentWeekIds[0];
+  return latestWeekId ? { weekId: latestWeekId, kind: "latest" } : null;
+}
+
+export function getTurnoFechaEfectiva(turno: WeekTurno, diaLibre: number): string {
+  const fechaInicio = turno.startDate || turno.date;
+  if (!fechaInicio) return turno.date;
+
+  const diaInicio = new Date(fechaInicio + "T12:00:00").getDay();
+
+  // Si empezó en día libre y terminó en otro día (laboral) → usar fecha de fin
+  if (diaInicio === diaLibre && turno.date && turno.date !== fechaInicio) {
+    const diaFin = new Date(turno.date + "T12:00:00").getDay();
+    if (diaFin !== diaLibre) {
+      return turno.date;
+    }
+  }
+
+  return fechaInicio;
+}
+
+export function getTurnoAccountingWeekId(turno: WeekTurno, diaLibre: number): string | null {
+  const diaLibreTurno = turno.diaLibreContable ?? diaLibre;
+  const fechaInicio = turno.startDate || turno.date;
+  if (!fechaInicio) return getWeekId(turno.date, diaLibreTurno);
+
+  const diaInicio = new Date(fechaInicio + "T12:00:00").getDay();
+  const diaFin = new Date(turno.date + "T12:00:00").getDay();
+
+  if (diaInicio === diaLibreTurno && turno.date === fechaInicio) {
+    return null;
+  }
+
+  if (diaInicio === diaLibreTurno && turno.date && turno.date !== fechaInicio && diaFin !== diaLibreTurno) {
+    return getWeekId(turno.date, diaLibreTurno);
+  }
+
+  return getWeekId(fechaInicio, diaLibreTurno);
+}
+
+export function groupTurnosByWeek<T extends WeekTurno>(turnos: T[], diaLibre: number): Map<string, T[]> {
+  const map = new Map<string, T[]>();
+  const sorted = [...turnos].sort((a, b) => {
+    const dateA = getTurnoFechaEfectiva(a, diaLibre);
+    const dateB = getTurnoFechaEfectiva(b, diaLibre);
+    return dateA.localeCompare(dateB);
+  });
+  for (const t of sorted) {
+    const weekId = getTurnoAccountingWeekId(t, diaLibre);
+    if (!weekId) continue;
+    if (!map.has(weekId)) {
+      map.set(weekId, []);
+    }
+    map.get(weekId)!.push(t);
+  }
+  return map;
+}
+
+export function getWeekOverride<T extends WeekOverrideLike>(overrides: T[], weekId: string): T | null {
+  return overrides.find((o) => o.weekId === weekId) || null;
+}
+
+export function getWeekMonth(weekId: string): {
+  type: "single";
+  mesId: string;
+} | {
+  type: "tie";
+  candidates: { mesId: string; mesLabel: string }[];
+} {
+  const range = getWeekRange(weekId);
+  const start = new Date(range.inicio + "T12:00:00");
+
+  // Contar 6 días laborales (la semana completa, todos los días son laborales por construcción)
+  const conteo = new Map<string, number>(); // "YYYY-MM" → nº días
+  for (let i = 0; i < DIAS_LABORABLES_SEMANA; i++) {
+    const d = new Date(start);
+    d.setDate(start.getDate() + i);
+    const mesId = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+    conteo.set(mesId, (conteo.get(mesId) || 0) + 1);
+  }
+
+  const entradas = Array.from(conteo.entries());
+
+  // Una sola entrada → toda la semana en un mes
+  if (entradas.length === 1) {
+    return { type: "single", mesId: entradas[0][0] };
+  }
+
+  // Dos entradas → comparar
+  entradas.sort((a, b) => b[1] - a[1]); // ordena por más días desc
+  const [primera, segunda] = entradas;
+
+  if (primera[1] !== segunda[1]) {
+    return { type: "single", mesId: primera[0] };
+  }
+
+  // Empate
+  // Ordenar candidatos cronológicamente (mes anterior primero)
+  const candidates = [primera[0], segunda[0]].sort();
+  return {
+    type: "tie",
+    candidates: candidates.map((mesId) => ({ mesId, mesLabel: getMesLabel(mesId) })),
+  };
+}
+
+export function formatWeekRange(weekId: string): string {
+  const { inicio, fin } = getWeekRange(weekId);
+  const dInicio = new Date(inicio + "T12:00:00");
+  const dFin = new Date(fin + "T12:00:00");
+  if (dInicio.getMonth() === dFin.getMonth() && dInicio.getFullYear() === dFin.getFullYear()) {
+    return `${dInicio.getDate()} - ${dFin.getDate()} ${MESES_COMPLETOS[dFin.getMonth()]}`;
+  }
+  return `${dInicio.getDate()} ${MESES_COMPLETOS[dInicio.getMonth()]} - ${dFin.getDate()} ${MESES_COMPLETOS[dFin.getMonth()]}`;
+}
+
+export function formatWeekRangeFull(weekId: string): string {
+  const { inicio, fin } = getWeekRange(weekId);
+  const dInicio = new Date(inicio + "T12:00:00");
+  const dFin = new Date(fin + "T12:00:00");
+  const dias = ["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"];
+  return `${dias[dInicio.getDay()]} ${dInicio.getDate()} ${MESES_ABREVIADOS[dInicio.getMonth()]} - ${dias[dFin.getDay()]} ${dFin.getDate()} ${MESES_ABREVIADOS[dFin.getMonth()]} ${dFin.getFullYear()}`;
+}
+```
+
+#### Por qué se cambió
+El módulo nuevo agrupa reglas semanales, asignación de turnos y etiquetas de rango con tipos estructurales para no depender de `main.tsx`.
+
+### Cambio 5 - Proteger extracción semanal
+
+#### Código anterior
+`No existía el test de extracción semanal en src/__tests__/week-logic-extraction.test.ts.`
+
+#### Código nuevo
+```ts
+import { existsSync, readFileSync } from "node:fs";
+import { resolve } from "node:path";
+import { describe, expect, it } from "vitest";
+
+describe("Week logic extraction", () => {
+  const weekLogicPath = resolve("src/week-logic.ts");
+  const mainSource = readFileSync(resolve("src/main.tsx"), "utf8");
+
+  it("keeps week assignment and labels outside main.tsx", async () => {
+    expect(existsSync(weekLogicPath)).toBe(true);
+
+    const modulePath = "../week-logic";
+    const {
+      getWeekStartDate,
+      getWeekRange,
+      getCurrentOpenWeekId,
+      getTurnoAccountingWeekId,
+      groupTurnosByWeek,
+      getWeekMonth,
+      formatWeekRange,
+      formatWeekRangeFull,
+    } = await import(modulePath);
+
+    expect(getWeekStartDate("2026-05-08", 2)).toBe("2026-05-06");
+    expect(getWeekRange("2026-05-06")).toEqual({ inicio: "2026-05-06", fin: "2026-05-11" });
+    expect(getCurrentOpenWeekId("2026-05-12", 2)).toBeNull();
+    expect(getTurnoAccountingWeekId({ date: "2026-05-13", startDate: "2026-05-12" }, 2)).toBe("2026-05-13");
+    expect(Array.from(groupTurnosByWeek([{ date: "2026-05-13", startDate: "2026-05-13" }], 2).keys())).toEqual(["2026-05-13"]);
+    expect(getWeekMonth("2026-05-29").type).toBe("tie");
+    expect(formatWeekRange("2026-05-06")).toContain("Mayo");
+    expect(formatWeekRangeFull("2026-05-06")).toContain("2026");
+
+    expect(mainSource).toContain('from "./week-logic"');
+    expect(mainSource).not.toMatch(/^export function getWeekStartDate\(/m);
+    expect(mainSource).not.toMatch(/^export function groupTurnosByWeek\(/m);
+    expect(mainSource).not.toMatch(/^function formatWeekRange\(/m);
+  });
+});
+```
+
+#### Por qué se cambió
+El test fija que la lógica semanal quede fuera de `main.tsx` y valida reglas críticas de inicio, rango, día libre, agrupación y etiquetas.
+
 ## 2026-05-24 23:53 - Extraer loaders de estado
 
 **Archivos modificados:** `src/main.tsx`, `src/state-loaders.ts`, `src/__tests__/state-loaders-extraction.test.ts`
