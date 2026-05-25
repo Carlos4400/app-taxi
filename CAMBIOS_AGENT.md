@@ -94,7 +94,7 @@ import { IconCoin, IconPercent, IconCard, IconAgency, IconExtra, IconFuel, IconN
 ```
 
 #### Por qué se cambió
-Las definiciones inline se sustituyen por los imports del módulo extraído.
+Las definiciones inline se sustituyen por los imports del módulo extraído. La modificación real a main.tsx (borrado de las 7 definiciones inline e importación desde entry-icons) se completó el 2026-05-26 01:14 como parte de finalizar esta fase.
 
 ## 2026-05-26 01:00 - Extraer iconos de navegación a src/components/navigation-icons.tsx
 
@@ -220,7 +220,7 @@ import { IconBack, IconDel, IconRefresh, IconDownload, IconUpload, IconCalendar,
 ```
 
 #### Por qué se cambió
-Las definiciones inline se sustituyen por los imports del módulo extraído.
+Las definiciones inline se sustituyen por los imports del módulo extraído. La modificación real a main.tsx (borrado de las 10 definiciones inline e importación desde navigation-icons) se completó el 2026-05-26 01:14 como parte de finalizar esta fase.
 
 ## 2026-05-26 00:32 - Actualizar guías del recorte de main
 
