@@ -4,6 +4,57 @@ Este archivo registra cambios de código hechos por agentes/modelos en este proy
 
 Cada entrada debe indicar archivos modificados, código anterior, código nuevo y por qué se cambió. Las entradas se añaden al **principio** del archivo (las más recientes arriba).
 
+## 2026-05-25 23:54 - Extraer pantalla addNotaGeneral a src/screens/add-nota-general-screen.tsx
+
+**Archivos modificados:** `src/screens/add-nota-general-screen.tsx`, `src/main.tsx`
+
+### Cambio 1 - Pantalla addNotaGeneral extraída
+
+#### Código anterior
+`No existía src/screens/add-nota-general-screen.tsx.`
+
+#### Código nuevo
+```tsx
+export const AddNotaGeneralScreen: FC<AddNotaGeneralScreenProps> = ({
+  noteS, setNoteS, setCurrent, setScreen,
+}) => {
+  // textarea + botón guardar para añadir nota al turno
+};
+```
+
+#### Por qué se cambió
+La pantalla `addNotaGeneral` es una responsabilidad autocontenida (textarea para nota + botón añadir). Extraerla a `src/screens/add-nota-general-screen.tsx` reduce `main.tsx` en ~56 líneas con frontera clara y 4 props.
+
+### Cambio 2 - Reemplazar bloque addNotaGeneral en main.tsx
+
+#### Código anterior
+```tsx
+if (screen === "addNotaGeneral") {
+  return (
+    <Shell burst={false}>
+      <div>...textarea y botón...</div>
+    </Shell>
+  );
+}
+```
+
+#### Código nuevo
+```tsx
+if (screen === "addNotaGeneral") {
+  return (
+    <AddNotaGeneralScreen
+      noteS={noteS}
+      setNoteS={setNoteS}
+      setCurrent={setCurrent}
+      setScreen={setScreen}
+    />
+  );
+}
+```
+
+#### Por qué se cambió
+El bloque inline fue reemplazado por el componente extraído, pasando el estado y setters como props. Comportamiento idéntico.
+
 ## 2026-05-25 23:47 - Extraer pantalla addSingle a src/screens/add-single-entry-screen.tsx
 
 **Archivos modificados:** `src/screens/add-single-entry-screen.tsx`, `src/main.tsx`

@@ -25,6 +25,7 @@ import { EditEntryDialog } from "./components/edit-entry-dialog";
 import { DurationCardValue } from "./components/duration-card-value";
 import { IconPlay, IconPause } from "./components/turno-control-icons";
 import { AddSingleEntryScreen } from "./screens/add-single-entry-screen";
+import { AddNotaGeneralScreen } from "./screens/add-nota-general-screen";
 import { Shell } from "./components/shell";
 import { ApkInstaller } from "./services/apk-installer";
 import { resolveLatestApkUpdate, type UpdateState } from "./logic/update-flow";
@@ -4205,59 +4206,12 @@ function App() {
 
   if (screen === "addNotaGeneral") {
     return (
-      <Shell burst={false}>
-        <div style={{ flex: 1, padding: "12px 20px 16px", display: "flex", flexDirection: "column", minHeight: 0, overflow: "hidden", animation: "slideIn 0.25s ease" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 24, flexShrink: 0 }}>
-            <button style={S.iconBtn} onClick={() => { setScreen("main"); setNoteS(""); }}>
-              <IconBack />
-            </button>
-            <div style={{ fontSize: 24, fontWeight: 800, color: "white" }}>
-              Añadir Nota
-            </div>
-          </div>
-
-          <div style={{ flex: 1, display: "flex", flexDirection: "column" }}>
-            <textarea
-              placeholder="Escribe algo sobre el Turno..."
-              value={noteS}
-              onChange={(e) => setNoteS(e.target.value)}
-              style={{
-                flex: 1,
-                background: "rgba(255,255,255,0.05)",
-                border: "none",
-                borderRadius: 16,
-                padding: 16,
-                color: "white",
-                fontSize: 16,
-                outline: "none",
-                resize: "none",
-                fontFamily: "inherit",
-                lineHeight: 1.5
-              }}
-            />
-          </div>
-
-          <button
-            onClick={() => {
-              if (noteS.trim()) {
-                const newEntry = {
-                  id: Date.now(),
-                  type: "nota",
-                  amount: 0,
-                  note: noteS.trim(),
-                  time: new Date().toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" })
-                };
-                setCurrent(prev => ({ ...prev, entries: [...prev.entries, newEntry] }));
-              }
-              setNoteS("");
-              setScreen("main");
-            }}
-            style={{ width: "100%", padding: 18, marginTop: 16, borderRadius: 16, border: "none", background: "white", color: "black", fontWeight: 800, fontSize: 18, cursor: "pointer", flexShrink: 0 }}
-          >
-            Añadir al Turno
-          </button>
-        </div>
-      </Shell>
+      <AddNotaGeneralScreen
+        noteS={noteS}
+        setNoteS={setNoteS}
+        setCurrent={setCurrent}
+        setScreen={setScreen}
+      />
     );
   }
 
