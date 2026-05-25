@@ -129,6 +129,35 @@ Una fase debe extraer una sola responsabilidad clara:
 No hacer refactors grandes.
 No mezclar extracción con cambios visuales, cambios funcionales, limpieza estética, renombrados masivos o reorganización general.
 
+## Tamaño correcto de una fase
+
+El tamaño de una fase se mide por responsabilidad, no solo por número de líneas.
+
+Una fase debe extraer una unidad natural y completa:
+
+- un helper con sentido propio
+- una constante o grupo de constantes relacionadas
+- un componente completo
+- un diálogo completo
+- un teclado o control completo
+- una pantalla pequeña
+- un servicio aislado
+
+No dividir un componente natural en trozos artificiales solo para reducir líneas.
+
+Una fase puede mover más de 100-200 líneas si el bloque sigue siendo una sola responsabilidad clara y tiene una frontera limpia.
+
+Si la fase supera unas 200 líneas movidas, el agente debe justificar por qué sigue siendo una sola responsabilidad y esperar confirmación antes de modificar.
+
+La fase es demasiado grande si:
+
+- necesita decir "y también"
+- mezcla UI, lógica, estilos y servicios no relacionados
+- toca más de 3-4 archivos de código sin una razón clara
+- requiere muchas props artificiales para funcionar
+- deja el nuevo archivo dependiendo de medio `main.tsx`
+- no se puede revisar en pocos minutos
+
 ## Nombre obligatorio de cada fase
 
 Antes de modificar archivos, la fase debe tener un nombre concreto con este formato:
@@ -405,5 +434,7 @@ Si hay duda entre reescribir y mover sin cambiar, mover sin cambiar.
 8. **Parada obligatoria al terminar cada fase.** Nueva sección. Una vez extraído un bloque, verificadas las pruebas y actualizado el registro, el agente debe parar y esperar confirmación de Carlos antes de iniciar otra extracción.
 
 9. **Registro obligatorio en `CAMBIOS_AGENT.md`.** Nueva sección. Se refuerza que el registro no puede ser un resumen ni una frase mal formada: debe contener código anterior, código nuevo, motivo concreto y fences Markdown válidos. También se añade como señal de stop, revisión del diff, prohibición y criterio de tarea terminada.
+
+10. **Tamaño correcto de una fase.** Nueva sección. Se aclara que una fase debe ser pequeña por responsabilidad, no necesariamente por número de líneas. Puede mover más de 100-200 líneas si extrae una unidad natural completa, pero debe justificarlo y esperar confirmación si supera ese tamaño aproximado.
 
 Nota de transparencia: estas mejoras se basan en el texto del documento original, buenas prácticas de refactor de código heredado y, para la sección "Archivos contables protegidos", en la revisión de las rutas actuales del proyecto. No sustituye a la "Fase 0": antes de recortar hay que volver a verificar tests, cobertura real y estado limpio del repositorio.

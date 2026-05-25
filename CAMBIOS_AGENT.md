@@ -4,6 +4,67 @@ Este archivo registra cambios de código hechos por agentes/modelos en este proy
 
 Cada entrada debe indicar archivos modificados, código anterior, código nuevo y por qué se cambió. Las entradas se añaden al **principio** del archivo (las más recientes arriba).
 
+## 2026-05-25 23:01 - Precisar tamaño de fases
+
+**Archivos modificados:** `RECORTAR_MAIN_TSX_MEJORADO.md`
+
+### Cambio 1 - Tamaño de fase
+
+#### Código anterior
+`No existía la sección "Tamaño correcto de una fase" en RECORTAR_MAIN_TSX_MEJORADO.md.`
+
+#### Código nuevo
+```md
+## Tamaño correcto de una fase
+
+El tamaño de una fase se mide por responsabilidad, no solo por número de líneas.
+
+Una fase debe extraer una unidad natural y completa:
+
+- un helper con sentido propio
+- una constante o grupo de constantes relacionadas
+- un componente completo
+- un diálogo completo
+- un teclado o control completo
+- una pantalla pequeña
+- un servicio aislado
+
+No dividir un componente natural en trozos artificiales solo para reducir líneas.
+
+Una fase puede mover más de 100-200 líneas si el bloque sigue siendo una sola responsabilidad clara y tiene una frontera limpia.
+
+Si la fase supera unas 200 líneas movidas, el agente debe justificar por qué sigue siendo una sola responsabilidad y esperar confirmación antes de modificar.
+
+La fase es demasiado grande si:
+
+- necesita decir "y también"
+- mezcla UI, lógica, estilos y servicios no relacionados
+- toca más de 3-4 archivos de código sin una razón clara
+- requiere muchas props artificiales para funcionar
+- deja el nuevo archivo dependiendo de medio `main.tsx`
+- no se puede revisar en pocos minutos
+```
+
+#### Por qué se cambió
+El documento necesitaba aclarar que las fases deben ser pequeñas por responsabilidad, no por número estricto de líneas, para evitar tanto refactors grandes como extracciones artificialmente pequeñas.
+
+### Cambio 2 - Registro interno del tamaño
+
+#### Código anterior
+```md
+9. **Registro obligatorio en `CAMBIOS_AGENT.md`.** Nueva sección. Se refuerza que el registro no puede ser un resumen ni una frase mal formada: debe contener código anterior, código nuevo, motivo concreto y fences Markdown válidos. También se añade como señal de stop, revisión del diff, prohibición y criterio de tarea terminada.
+```
+
+#### Código nuevo
+```md
+9. **Registro obligatorio en `CAMBIOS_AGENT.md`.** Nueva sección. Se refuerza que el registro no puede ser un resumen ni una frase mal formada: debe contener código anterior, código nuevo, motivo concreto y fences Markdown válidos. También se añade como señal de stop, revisión del diff, prohibición y criterio de tarea terminada.
+
+10. **Tamaño correcto de una fase.** Nueva sección. Se aclara que una fase debe ser pequeña por responsabilidad, no necesariamente por número de líneas. Puede mover más de 100-200 líneas si extrae una unidad natural completa, pero debe justificarlo y esperar confirmación si supera ese tamaño aproximado.
+```
+
+#### Por qué se cambió
+El registro interno del documento debía reflejar la nueva regla sobre tamaño y responsabilidad de cada fase.
+
 ## 2026-05-25 22:55 - Reforzar registro de recortes
 
 **Archivos modificados:** `RECORTAR_MAIN_TSX_MEJORADO.md`
