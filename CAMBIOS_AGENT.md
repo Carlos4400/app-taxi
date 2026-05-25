@@ -4,6 +4,66 @@ Este archivo registra cambios de código hechos por agentes/modelos en este proy
 
 Cada entrada debe indicar archivos modificados, código anterior, código nuevo y por qué se cambió. Las entradas se añaden al **principio** del archivo (las más recientes arriba).
 
+## 2026-05-25 23:16 - Extraer IconPlay e IconPause a turno-control-icons.tsx
+
+**Archivos modificados:** `src/components/turno-control-icons.tsx`, `src/main.tsx`
+
+### Cambio 1 - IconPlay e IconPause extraídos
+
+#### Código anterior
+`No existía src/components/turno-control-icons.tsx.`
+
+#### Código nuevo
+```tsx
+import type { FC } from 'react';
+
+export const IconPlay: FC<{ s?: number; c?: string }> = ({ s = 24, c = "white" }) => (
+  <svg width={s} height={s} viewBox="0 0 24 24" fill="none" style={{ display: "inline-block", verticalAlign: "middle" }}>
+    <path
+      d="M8 5.5L18.5 12L8 18.5V5.5Z"
+      fill={c}
+    />
+  </svg>
+);
+
+export const IconPause: FC<{ s?: number; c?: string }> = ({ s = 24, c = "white" }) => (
+  <svg width={s} height={s} viewBox="0 0 24 24" fill="none" style={{ display: "inline-block", verticalAlign: "middle" }}>
+    <rect x="6.5" y="5" width="4.2" height="14" rx="1.7" fill={c} />
+    <rect x="13.3" y="5" width="4.2" height="14" rx="1.7" fill={c} />
+  </svg>
+);
+```
+
+#### Por qué se cambió
+`IconPlay` e `IconPause` son íconos de control de turno que formaban parte del bloque grande de SVGs inline en `main.tsx`. Extraídos como unidad natural a `src/components/turno-control-icons.tsx`.
+
+### Cambio 2 - Eliminar IconPlay e IconPause de main.tsx
+
+#### Código anterior
+```tsx
+const IconPlay = ({ s = 24, c = "white" }: { s?: number; c?: string }) => (
+  <svg width={s} height={s} viewBox="0 0 24 24" fill="none" style={{ display: "inline-block", verticalAlign: "middle" }}>
+    <path
+      d="M8 5.5L18.5 12L8 18.5V5.5Z"
+      fill={c}
+    />
+  </svg>
+);
+
+const IconPause = ({ s = 24, c = "white" }: { s?: number; c?: string }) => (
+  <svg width={s} height={s} viewBox="0 0 24 24" fill="none" style={{ display: "inline-block", verticalAlign: "middle" }}>
+    <rect x="6.5" y="5" width="4.2" height="14" rx="1.7" fill={c} />
+    <rect x="13.3" y="5" width="4.2" height="14" rx="1.7" fill={c} />
+  </svg>
+);
+```
+
+#### Código nuevo
+`` `IconPlay` e `IconPause` se eliminaron de `main.tsx`. Se importan desde `src/components/turno-control-icons.tsx`.` ``
+
+#### Por qué se cambió
+Mismo motivo que arriba: extracción de unidad natural de SVGs de control de turno.
+
 ## 2026-05-25 23:01 - Precisar tamaño de fases
 
 **Archivos modificados:** `RECORTAR_MAIN_TSX_MEJORADO.md`

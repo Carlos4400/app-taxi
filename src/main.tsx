@@ -23,6 +23,7 @@ import { ConfirmDialog, MainCard, SmallCard } from "./components/common";
 import { TurnoNotasCard } from "./components/turno-notas";
 import { EditEntryDialog } from "./components/edit-entry-dialog";
 import { DurationCardValue } from "./components/duration-card-value";
+import { IconPlay, IconPause } from "./components/turno-control-icons";
 import { Shell } from "./components/shell";
 import { ApkInstaller } from "./services/apk-installer";
 import { resolveLatestApkUpdate, type UpdateState } from "./logic/update-flow";
@@ -689,22 +690,6 @@ const IconRocket = ({ s = 24, c = "white" }: { s?: number; c?: string }) => (
       <path d="M8 22 L8 25" stroke={c} strokeWidth="1.8" strokeLinecap="round" />
       <path d="M16 22 L16 25" stroke={c} strokeWidth="1.8" strokeLinecap="round" />
     </g>
-  </svg>
-);
-
-const IconPlay = ({ s = 24, c = "white" }: { s?: number; c?: string }) => (
-  <svg width={s} height={s} viewBox="0 0 24 24" fill="none" style={{ display: "inline-block", verticalAlign: "middle" }}>
-    <path
-      d="M8 5.5L18.5 12L8 18.5V5.5Z"
-      fill={c}
-    />
-  </svg>
-);
-
-const IconPause = ({ s = 24, c = "white" }: { s?: number; c?: string }) => (
-  <svg width={s} height={s} viewBox="0 0 24 24" fill="none" style={{ display: "inline-block", verticalAlign: "middle" }}>
-    <rect x="6.5" y="5" width="4.2" height="14" rx="1.7" fill={c} />
-    <rect x="13.3" y="5" width="4.2" height="14" rx="1.7" fill={c} />
   </svg>
 );
 
