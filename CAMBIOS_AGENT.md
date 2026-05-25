@@ -4,6 +4,102 @@ Este archivo registra cambios de código hechos por agentes/modelos en este proy
 
 Cada entrada debe indicar archivos modificados, código anterior, código nuevo y por qué se cambió. Las entradas se añaden al **principio** del archivo (las más recientes arriba).
 
+## 2026-05-25 15:58 - Extraer version de la app
+
+**Archivos modificados:** `src/main.tsx`, `src/app-version.ts`, `src/__tests__/app-version-extraction.test.ts`
+
+### Cambio 1 - Importar versión de la app
+
+#### Código anterior
+```tsx
+import { auth, db } from "./firebase";
+import { AuthGate } from "./auth-gate";
+import { registerServiceWorker } from "./service-worker-registration";
+import { fmtDuration, fmtKm, fmtKmNumber, fmtMoney, fmtMoneyNumber } from "./formatters";
+```
+
+#### Código nuevo
+```tsx
+import { auth, db } from "./firebase";
+import { AuthGate } from "./auth-gate";
+import { registerServiceWorker } from "./service-worker-registration";
+import { APP_VERSION } from "./app-version";
+import { fmtDuration, fmtKm, fmtKmNumber, fmtMoney, fmtMoneyNumber } from "./formatters";
+```
+
+#### Por qué se cambió
+`main.tsx` sigue usando `APP_VERSION`, pero ahora lo recibe desde un módulo específico de versionado.
+
+### Cambio 2 - Quitar versión inyectada de main
+
+#### Código anterior
+```tsx
+// Inyectado por Vite en build a partir de process.env.APP_VERSION o package.json.
+declare const __APP_VERSION__: string;
+const APP_VERSION = __APP_VERSION__;
+
+function fmt(n: number): string {
+  return fmtMoney(n);
+}
+```
+
+#### Código nuevo
+```tsx
+function fmt(n: number): string {
+  return fmtMoney(n);
+}
+```
+
+#### Por qué se cambió
+La declaración global de Vite y la constante derivada salen de `main.tsx` sin cambiar el valor usado por el flujo de actualización ni por el texto de versión.
+
+### Cambio 3 - Crear módulo de versión
+
+#### Código anterior
+`No existía el módulo de versión en src/app-version.ts.`
+
+#### Código nuevo
+```ts
+// Inyectado por Vite en build a partir de process.env.APP_VERSION o package.json.
+declare const __APP_VERSION__: string;
+
+export const APP_VERSION = __APP_VERSION__;
+```
+
+#### Por qué se cambió
+La constante de versión queda aislada en un archivo pequeño y reutilizable, manteniendo la misma variable global inyectada por Vite.
+
+### Cambio 4 - Proteger extracción de versión
+
+#### Código anterior
+`No existía el test de extracción de versión en src/__tests__/app-version-extraction.test.ts.`
+
+#### Código nuevo
+```ts
+import { existsSync, readFileSync } from "node:fs";
+import { resolve } from "node:path";
+import { describe, expect, it } from "vitest";
+
+describe("app version extraction", () => {
+  const appVersionPath = resolve("src/app-version.ts");
+  const mainSource = readFileSync(resolve("src/main.tsx"), "utf8");
+
+  it("keeps Vite injected app version outside main.tsx", () => {
+    expect(existsSync(appVersionPath)).toBe(true);
+
+    const appVersionSource = readFileSync(appVersionPath, "utf8");
+    expect(appVersionSource).toContain("declare const __APP_VERSION__: string");
+    expect(appVersionSource).toContain("export const APP_VERSION = __APP_VERSION__");
+    expect(mainSource).toContain('from "./app-version"');
+    expect(mainSource).not.toContain("declare const __APP_VERSION__: string");
+    expect(mainSource).not.toContain("const APP_VERSION = __APP_VERSION__");
+  });
+});
+```
+
+#### Por qué se cambió
+El test asegura que el versionado inyectado queda fuera de `main.tsx` y que el archivo principal importa la constante extraída.
+
 ## 2026-05-25 15:56 - Extraer registro del service worker
 
 **Archivos modificados:** `src/main.tsx`, `src/service-worker-registration.ts`, `src/__tests__/service-worker-registration.test.ts`

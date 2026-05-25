@@ -17,6 +17,7 @@ import {
 import { auth, db } from "./firebase";
 import { AuthGate } from "./auth-gate";
 import { registerServiceWorker } from "./service-worker-registration";
+import { APP_VERSION } from "./app-version";
 import { fmtDuration, fmtKm, fmtKmNumber, fmtMoney, fmtMoneyNumber } from "./formatters";
 import { ConfirmDialog, MainCard, SmallCard } from "./components/common";
 import { TurnoNotasCard } from "./components/turno-notas";
@@ -249,10 +250,6 @@ export interface AppSettings {
   diaLibre: number;              // 0=Domingo, 1=Lunes, 2=Martes, 3=Miércoles, 4=Jueves, 5=Viernes, 6=Sábado
   diaLibreDesde: string | null;  // Fecha ISO desde la que aplica este día libre (null si nunca se ha cambiado)
 }
-// Inyectado por Vite en build a partir de process.env.APP_VERSION o package.json.
-declare const __APP_VERSION__: string;
-const APP_VERSION = __APP_VERSION__;
-
 function fmt(n: number): string {
   return fmtMoney(n);
 }
