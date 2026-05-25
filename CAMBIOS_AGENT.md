@@ -4,6 +4,397 @@ Este archivo registra cambios de código hechos por agentes/modelos en este proy
 
 Cada entrada debe indicar archivos modificados, código anterior, código nuevo y por qué se cambió. Las entradas se añaden al **principio** del archivo (las más recientes arriba).
 
+## 2026-05-25 15:42 - Extraer contabilidad pura
+
+**Archivos modificados:** `src/main.tsx`, `src/accounting.ts`, `src/__tests__/accounting-extraction.test.ts`
+
+### Cambio 1 - Importar contabilidad pura
+
+#### Código anterior
+```tsx
+import {
+  formatWeekRange,
+  formatWeekRangeFull,
+  getCurrentOpenWeekId,
+  getTurnoAccountingWeekId,
+  getTurnoFechaEfectiva,
+  getWeekId,
+  getWeekMonth,
+  getWeekOverride,
+  getWeekRange,
+  getWeekStartDate,
+  groupTurnosByWeek,
+  isWeekClosed,
+  selectAccountingHeroWeek,
+} from "./week-logic";
+```
+
+```tsx
+export {
+  getCurrentOpenWeekId,
+  getTurnoAccountingWeekId,
+  getTurnoFechaEfectiva,
+  getWeekId,
+  getWeekRange,
+  getWeekStartDate,
+  groupTurnosByWeek,
+  selectAccountingHeroWeek,
+};
+```
+
+#### Código nuevo
+```tsx
+import {
+  formatWeekRange,
+  formatWeekRangeFull,
+  getCurrentOpenWeekId,
+  getTurnoAccountingWeekId,
+  getTurnoFechaEfectiva,
+  getWeekId,
+  getWeekMonth,
+  getWeekOverride,
+  getWeekRange,
+  getWeekStartDate,
+  groupTurnosByWeek,
+  isWeekClosed,
+  selectAccountingHeroWeek,
+} from "./week-logic";
+import {
+  buildTurnoConfigFromSettings,
+  calcularResumenContableTurnos,
+  calcularTotalesTurnos,
+  calcularTurnoContable,
+  getTurnoConfig,
+  roundMoney,
+} from "./accounting";
+```
+
+```tsx
+export {
+  getCurrentOpenWeekId,
+  getTurnoAccountingWeekId,
+  getTurnoFechaEfectiva,
+  getWeekId,
+  getWeekRange,
+  getWeekStartDate,
+  groupTurnosByWeek,
+  selectAccountingHeroWeek,
+};
+export {
+  buildTurnoConfigFromSettings,
+  calcularResumenContableTurnos,
+  calcularTotalesTurnos,
+  calcularTurnoContable,
+  getTurnoConfig,
+};
+```
+
+#### Por qué se cambió
+`main.tsx` usa las fórmulas desde `accounting.ts` y mantiene los exports públicos usados por los tests y pantallas.
+
+### Cambio 2 - Eliminar fórmulas locales
+
+#### Código anterior
+```tsx
+export function calcularTotalesTurnos(turnos: Turno[]) {
+  let totalP = 0;
+  let totalD = 0;
+  let totalA = 0;
+  let totalE = 0;
+  let totalF = 0;
+  let totalN = 0;
+  let dinero = 0;
+  let km = 0;
+  for (const t of turnos) {
+    totalP += t.totalP || 0;
+    totalD += t.totalD || 0;
+    totalA += t.totalA || 0;
+    totalE += t.totalE || 0;
+    totalF += t.totalF || 0;
+    totalN += t.totalN || 0;
+    dinero += t.dinero || 0;
+    km += t.km || 0;
+  }
+  return { totalP, totalD, totalA, totalE, totalF, totalN, dinero, km };
+}
+
+function roundMoney(n: number): number {
+  return Math.round((n + Number.EPSILON) * 100) / 100;
+}
+
+export function buildTurnoConfigFromSettings(settings: AppSettings): TurnoConfig {
+  return {
+    porcentajeJefe: settings["porcentaje.jefe"],
+    porcentajeChofer: settings["porcentaje.chofer"],
+    descDatafono: settings["descontar.datafono"],
+    descAgencia: settings["descontar.agencia_bono"],
+    descExtra: settings["descontar.extra"],
+    descGasolina: settings["descontar.gasolina"],
+  };
+}
+
+export function getTurnoConfig(turno: Turno, settings: AppSettings): TurnoConfig {
+  return turno.configTurno || buildTurnoConfigFromSettings(settings);
+}
+
+export function calcularTurnoContable(turno: Turno, settings: AppSettings) {
+  const config = getTurnoConfig(turno, settings);
+  const dineroBase = (turno.dinero || 0) - (turno.totalN || 0);
+  const descD = config.descDatafono ? (turno.totalD || 0) : 0;
+  const descA = config.descAgencia ? (turno.totalA || 0) : 0;
+  const descE = config.descExtra ? (turno.totalE || 0) : 0;
+  const descF = config.descGasolina ? (turno.totalF || 0) : 0;
+  const totalDescontar = descD + descA + descE + descF;
+
+  return {
+    dineroBase: roundMoney(dineroBase),
+    miGanancia: roundMoney((dineroBase * (config.porcentajeChofer / 100)) + (turno.totalP || 0)),
+    descD,
+    descA,
+    descE,
+    descF,
+    totalDescontar: roundMoney(totalDescontar),
+    totalADar: roundMoney((dineroBase * (config.porcentajeJefe / 100)) - totalDescontar),
+    config,
+  };
+}
+
+export function calcularResumenContableTurnos(turnos: Turno[], settings: AppSettings) {
+  const totales = calcularTotalesTurnos(turnos);
+  let miGanancia = 0;
+  let totalDescontar = 0;
+  let totalADar = 0;
+
+  for (const turno of turnos) {
+    const calculo = calcularTurnoContable(turno, settings);
+    miGanancia += calculo.miGanancia;
+    totalDescontar += calculo.totalDescontar;
+    totalADar += calculo.totalADar;
+  }
+
+  return {
+    ...totales,
+    dineroBase: roundMoney((totales.dinero || 0) - (totales.totalN || 0)),
+    miGanancia: roundMoney(miGanancia),
+    totalDescontar: roundMoney(totalDescontar),
+    totalADar: roundMoney(totalADar),
+  };
+}
+
+// ============================================================================
+// SEMANAS — Carga y guardado en localStorage (Fase 3)
+// ============================================================================
+```
+
+#### Código nuevo
+```tsx
+// ============================================================================
+// SEMANAS — Carga y guardado en localStorage (Fase 3)
+// ============================================================================
+```
+
+#### Por qué se cambió
+Las fórmulas contables se trasladan a `accounting.ts` sin cambiar operaciones, porcentajes, descuentos ni redondeo.
+
+### Cambio 3 - Crear módulo contable
+
+#### Código anterior
+`No existía el módulo contable en src/accounting.ts.`
+
+#### Código nuevo
+```ts
+export type AccountingSettings = {
+  "porcentaje.jefe": number;
+  "porcentaje.chofer": number;
+  "descontar.datafono": boolean;
+  "descontar.agencia_bono": boolean;
+  "descontar.extra": boolean;
+  "descontar.gasolina": boolean;
+};
+
+export type AccountingTurnoConfig = {
+  porcentajeJefe: number;
+  porcentajeChofer: number;
+  descDatafono: boolean;
+  descAgencia: boolean;
+  descExtra: boolean;
+  descGasolina: boolean;
+};
+
+export type AccountingTurno = {
+  totalP?: number;
+  totalD?: number;
+  totalA?: number;
+  totalE?: number;
+  totalF?: number;
+  totalN?: number;
+  dinero?: number;
+  km?: number;
+  configTurno?: AccountingTurnoConfig;
+};
+
+export function calcularTotalesTurnos<T extends AccountingTurno>(turnos: T[]) {
+  let totalP = 0;
+  let totalD = 0;
+  let totalA = 0;
+  let totalE = 0;
+  let totalF = 0;
+  let totalN = 0;
+  let dinero = 0;
+  let km = 0;
+  for (const t of turnos) {
+    totalP += t.totalP || 0;
+    totalD += t.totalD || 0;
+    totalA += t.totalA || 0;
+    totalE += t.totalE || 0;
+    totalF += t.totalF || 0;
+    totalN += t.totalN || 0;
+    dinero += t.dinero || 0;
+    km += t.km || 0;
+  }
+  return { totalP, totalD, totalA, totalE, totalF, totalN, dinero, km };
+}
+
+export function roundMoney(n: number): number {
+  return Math.round((n + Number.EPSILON) * 100) / 100;
+}
+
+export function buildTurnoConfigFromSettings(settings: AccountingSettings): AccountingTurnoConfig {
+  return {
+    porcentajeJefe: settings["porcentaje.jefe"],
+    porcentajeChofer: settings["porcentaje.chofer"],
+    descDatafono: settings["descontar.datafono"],
+    descAgencia: settings["descontar.agencia_bono"],
+    descExtra: settings["descontar.extra"],
+    descGasolina: settings["descontar.gasolina"],
+  };
+}
+
+export function getTurnoConfig(turno: AccountingTurno, settings: AccountingSettings): AccountingTurnoConfig {
+  return turno.configTurno || buildTurnoConfigFromSettings(settings);
+}
+
+export function calcularTurnoContable(turno: AccountingTurno, settings: AccountingSettings) {
+  const config = getTurnoConfig(turno, settings);
+  const dineroBase = (turno.dinero || 0) - (turno.totalN || 0);
+  const descD = config.descDatafono ? (turno.totalD || 0) : 0;
+  const descA = config.descAgencia ? (turno.totalA || 0) : 0;
+  const descE = config.descExtra ? (turno.totalE || 0) : 0;
+  const descF = config.descGasolina ? (turno.totalF || 0) : 0;
+  const totalDescontar = descD + descA + descE + descF;
+
+  return {
+    dineroBase: roundMoney(dineroBase),
+    miGanancia: roundMoney((dineroBase * (config.porcentajeChofer / 100)) + (turno.totalP || 0)),
+    descD,
+    descA,
+    descE,
+    descF,
+    totalDescontar: roundMoney(totalDescontar),
+    totalADar: roundMoney((dineroBase * (config.porcentajeJefe / 100)) - totalDescontar),
+    config,
+  };
+}
+
+export function calcularResumenContableTurnos<T extends AccountingTurno>(turnos: T[], settings: AccountingSettings) {
+  const totales = calcularTotalesTurnos(turnos);
+  let miGanancia = 0;
+  let totalDescontar = 0;
+  let totalADar = 0;
+
+  for (const turno of turnos) {
+    const calculo = calcularTurnoContable(turno, settings);
+    miGanancia += calculo.miGanancia;
+    totalDescontar += calculo.totalDescontar;
+    totalADar += calculo.totalADar;
+  }
+
+  return {
+    ...totales,
+    dineroBase: roundMoney((totales.dinero || 0) - (totales.totalN || 0)),
+    miGanancia: roundMoney(miGanancia),
+    totalDescontar: roundMoney(totalDescontar),
+    totalADar: roundMoney(totalADar),
+  };
+}
+```
+
+#### Por qué se cambió
+El módulo nuevo contiene solo contabilidad pura con tipos estructurales compatibles con los turnos y settings actuales.
+
+### Cambio 4 - Proteger extracción contable
+
+#### Código anterior
+`No existía el test de extracción contable en src/__tests__/accounting-extraction.test.ts.`
+
+#### Código nuevo
+```ts
+import { existsSync, readFileSync } from "node:fs";
+import { resolve } from "node:path";
+import { describe, expect, it } from "vitest";
+
+describe("Accounting extraction", () => {
+  const accountingPath = resolve("src/accounting.ts");
+  const mainSource = readFileSync(resolve("src/main.tsx"), "utf8");
+
+  it("keeps pure accounting formulas outside main.tsx", async () => {
+    expect(existsSync(accountingPath)).toBe(true);
+
+    const modulePath = "../accounting";
+    const {
+      calcularTotalesTurnos,
+      calcularTurnoContable,
+      calcularResumenContableTurnos,
+      roundMoney,
+    } = await import(modulePath);
+
+    const settings = {
+      "porcentaje.jefe": 55,
+      "porcentaje.chofer": 45,
+      "descontar.datafono": true,
+      "descontar.agencia_bono": true,
+      "descontar.extra": true,
+      "descontar.gasolina": true,
+      diaLibre: 2,
+      diaLibreDesde: null,
+    };
+    const turno = {
+      dinero: 245.8,
+      totalN: 15,
+      totalP: 12.5,
+      totalD: 35,
+      totalA: 18,
+      totalE: 7.5,
+      totalF: 22,
+      km: 120,
+    };
+
+    expect(calcularTotalesTurnos([turno])).toMatchObject({ dinero: 245.8, totalN: 15, km: 120 });
+    expect(calcularTurnoContable(turno, settings)).toMatchObject({
+      dineroBase: 230.8,
+      miGanancia: 116.36,
+      totalDescontar: 82.5,
+      totalADar: 44.44,
+    });
+    expect(calcularResumenContableTurnos([turno], settings)).toMatchObject({
+      dineroBase: 230.8,
+      miGanancia: 116.36,
+      totalDescontar: 82.5,
+      totalADar: 44.44,
+    });
+    expect(roundMoney(1.005)).toBe(1.01);
+
+    expect(mainSource).toContain('from "./accounting"');
+    expect(mainSource).not.toMatch(/^export function calcularTurnoContable\(/m);
+    expect(mainSource).not.toMatch(/^export function calcularResumenContableTurnos\(/m);
+    expect(mainSource).not.toMatch(/^function roundMoney\(/m);
+  });
+});
+```
+
+#### Por qué se cambió
+El test fija que las fórmulas vivan fuera de `main.tsx` y comprueba una cuenta con nulos, propinas, descuentos y redondeo.
+
 ## 2026-05-25 15:36 - Extraer logica semanal
 
 **Archivos modificados:** `src/main.tsx`, `src/week-logic.ts`, `src/__tests__/week-logic-extraction.test.ts`
