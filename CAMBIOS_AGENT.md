@@ -4,6 +4,72 @@ Este archivo registra cambios de código hechos por agentes/modelos en este proy
 
 Cada entrada debe indicar archivos modificados, código anterior, código nuevo y por qué se cambió. Las entradas se añaden al **principio** del archivo (las más recientes arriba).
 
+## 2026-05-25 23:47 - Extraer pantalla addSingle a src/screens/add-single-entry-screen.tsx
+
+**Archivos modificados:** `src/screens/add-single-entry-screen.tsx`, `src/main.tsx`
+
+### Cambio 1 - Pantalla addSingle extraída
+
+#### Código anterior
+`No existía src/screens/add-single-entry-screen.tsx.`
+
+#### Código nuevo
+```tsx
+export const AddSingleEntryScreen: FC<AddSingleEntryScreenProps> = ({
+  singleMode,
+  valS,
+  setValS,
+  noteS,
+  setNoteS,
+  setCurrent,
+  setSingleMode,
+  setScreen,
+}: AddSingleEntryScreenProps) => {
+  // teclado numérico, display de importe, input nota, botón guardar
+  //...
+};
+```
+
+#### Por qué se cambió
+La pantalla `addSingle` es una responsabilidad autocontenida (teclado numérico para añadir entradas individuales). Extraerla a `src/screens/add-single-entry-screen.tsx` reduce `main.tsx` en ~78 líneas y la convierte en una unidad reutilizable con frontera clara.
+
+### Cambio 2 - Reemplazar bloque addSingle en main.tsx
+
+#### Código anterior
+```tsx
+if (screen === "addSingle" && singleMode) {
+  const cfg = { ... };
+  function kpS(v: string) { ... }
+  function saveS() { ... }
+  return (
+    <Shell burst={false}>
+      <div>...teclado y display...</div>
+    </Shell>
+  );
+}
+```
+
+#### Código nuevo
+```tsx
+if (screen === "addSingle" && singleMode) {
+  return (
+    <AddSingleEntryScreen
+      singleMode={singleMode as "agencia_bono" | "extra" | "gasolina" | "nulo"}
+      valS={valS}
+      setValS={setValS}
+      noteS={noteS}
+      setNoteS={setNoteS}
+      setCurrent={setCurrent}
+      setSingleMode={setSingleMode}
+      setScreen={setScreen}
+    />
+  );
+}
+```
+
+#### Por qué se cambió
+El bloque inline fue reemplazado por el componente extraído, pasando el estado y setters necesarios como props. El comportamiento visible es idéntico.
+
 ## 2026-05-25 23:16 - Extraer IconPlay e IconPause a turno-control-icons.tsx
 
 **Archivos modificados:** `src/components/turno-control-icons.tsx`, `src/main.tsx`

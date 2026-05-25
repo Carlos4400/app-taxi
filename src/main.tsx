@@ -24,6 +24,7 @@ import { TurnoNotasCard } from "./components/turno-notas";
 import { EditEntryDialog } from "./components/edit-entry-dialog";
 import { DurationCardValue } from "./components/duration-card-value";
 import { IconPlay, IconPause } from "./components/turno-control-icons";
+import { AddSingleEntryScreen } from "./screens/add-single-entry-screen";
 import { Shell } from "./components/shell";
 import { ApkInstaller } from "./services/apk-installer";
 import { resolveLatestApkUpdate, type UpdateState } from "./logic/update-flow";
@@ -4188,82 +4189,17 @@ function App() {
   }
 
   if (screen === "addSingle" && singleMode) {
-    const cfg = {
-      agencia_bono: { accent: A, bg: ABG, label: "Agencia/Bono", Icon: IconAgency },
-      extra: { accent: E, bg: EBG, label: "Extra", Icon: IconExtra },
-      gasolina: { accent: F, bg: FBG, label: "Gasolina", Icon: IconFuel },
-      nulo: { accent: N, bg: NBG, label: "Nulo", Icon: IconNulo },
-    }[singleMode] || { accent: E, bg: EBG, label: "Extra", Icon: IconExtra };
-    const { accent } = cfg;
-    const label = cfg.label;
-
-    function kpS(v: string) {
-      if (v === "DEL") {
-        setValS((p) => p.slice(0, -1));
-        return;
-      }
-      if (v === ",") {
-        if (!valS.includes(",")) setValS((p) => p + ",");
-        return;
-      }
-      if (valS.replace(",", "").length >= 6) return;
-      setValS((p) => p + v);
-    }
-    const validS = valS && parseFloat(valS.replace(",", ".")) > 0;
-    function saveS() {
-      if (!validS) return;
-      const now = timeNow();
-      const entry: Entry = {
-        id: Date.now(),
-        type: singleMode!,
-        amount: parseFloat(valS.replace(",", ".")),
-        note: noteS.trim(),
-        time: now,
-      };
-      setCurrent((prev) => ({
-        ...prev,
-        startTime: prev.startTime || now,
-        startDate: prev.startDate || today(),
-        entries: [...prev.entries, entry],
-      }));
-      setValS("");
-      setNoteS("");
-      setSingleMode(null);
-      setScreen("main");
-    }
-
     return (
-      <Shell burst={false}>
-        <div style={{ flex: 1, padding: "12px 20px", display: "flex", flexDirection: "column", minHeight: 0, overflow: "hidden" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 16, flexShrink: 0 }}>
-            <button style={S.iconBtn} onClick={() => { setScreen("main"); setSingleMode(null); setValS(""); setNoteS(""); }}>
-              <IconBack />
-            </button>
-            <div style={{ fontSize: 24, fontWeight: 800, color: "white" }}>
-              Añadir {label}
-            </div>
-          </div>
-          <div style={{ fontSize: 40, fontWeight: 900, color: accent, marginBottom: 16, flexShrink: 0 }}>
-            {valS || "0"} €
-          </div>
-          <input
-            placeholder="Nota (opcional)"
-            value={noteS}
-            onChange={(e) => setNoteS(e.target.value)}
-            style={{ width: "100%", padding: 10, borderRadius: 8, background: "rgba(255,255,255,0.05)", border: "none", color: "white", outline: "none", flexShrink: 0, marginBottom: 12 }}
-          />
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8, flexShrink: 0 }}>
-            {["1", "2", "3", "4", "5", "6", "7", "8", "9", "DEL", "0", ","].map((k) => (
-              <button key={k} aria-label={k === "DEL" ? "Borrar" : k === "," ? "Coma decimal" : k} onClick={() => kpS(k)} style={{ ...S.keyBtn, padding: "20px 0", background: "rgba(255,255,255,0.05)", color: "white", fontSize: 22, fontWeight: 700 }}>
-                {k === "DEL" ? <IconDel /> : k}
-              </button>
-            ))}
-          </div>
-          <button onClick={saveS} style={{ width: "100%", padding: 15, marginTop: 12, borderRadius: 12, border: "none", background: accent, color: "black", fontWeight: 700, flexShrink: 0 }}>
-            Guardar
-          </button>
-        </div>
-      </Shell>
+      <AddSingleEntryScreen
+        singleMode={singleMode as "agencia_bono" | "extra" | "gasolina" | "nulo"}
+        valS={valS}
+        setValS={setValS}
+        noteS={noteS}
+        setNoteS={setNoteS}
+        setCurrent={setCurrent}
+        setSingleMode={setSingleMode}
+        setScreen={setScreen}
+      />
     );
   }
 
