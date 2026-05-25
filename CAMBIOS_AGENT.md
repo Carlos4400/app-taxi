@@ -4,6 +4,437 @@ Este archivo registra cambios de código hechos por agentes/modelos en este proy
 
 Cada entrada debe indicar archivos modificados, código anterior, código nuevo y por qué se cambió. Las entradas se añaden al **principio** del archivo (las más recientes arriba).
 
+## 2026-05-25 22:13 - Reforzar recorte de main
+
+**Archivos modificados:** `RECORTAR_MAIN_TSX_MEJORADO.md`
+
+### Cambio 1 - Archivos contables protegidos
+
+#### Código anterior
+`No existía la sección "Archivos contables protegidos" en RECORTAR_MAIN_TSX_MEJORADO.md.`
+
+#### Código nuevo
+```md
+### Archivos contables protegidos
+
+La contabilidad real de la app ya está extraída y organizada fuera de `main.tsx`.
+
+Durante tareas de recorte de `src/main.tsx`, estos archivos no forman parte del trabajo pendiente. No se editan, no se reordenan, no se renombran, no se simplifican y no se "mejoran" salvo que Carlos pida explícitamente una fase contable:
+
+- `src/logic/accounting.ts`: fórmulas de dinero base, porcentajes, descuentos, propinas, totales, ganancia, total a descontar, total a dar y redondeos.
+- `src/logic/week-logic.ts`: reglas de semana contable, día libre, fecha efectiva del turno, agrupación por semana y selección de semana para informes.
+- `src/logic/turnos.ts`: orden, fusión, selección por calendario y migración de `diaLibreContable`.
+- `src/logic/turno-entrega.ts`: estado de entrega de turnos y fecha de entrega.
+- `src/logic/state-loaders.ts`: valores por defecto de ajustes contables (`descontar.*`, `diaLibre`, porcentajes y configuración inicial relacionada).
+- `src/shared/types.ts`: campos del modelo que participan en contabilidad (`totalD`, `totalP`, `totalA`, `totalE`, `totalF`, `totalN`, `dinero`, `km`, `entregada`, `fechaEntrega`, `diaLibreContable`, `config` y ajustes).
+- `src/main.tsx`: cualquier bloque que use `calcularTurnoContable`, `calcularResumenContableTurnos`, `calcularTotalesTurnos`, `roundMoney`, `groupTurnosByWeek`, `getTurnoAccountingWeekId`, `getTurnoFechaEfectiva`, `updateTurnoEntrega`, claves `descontar.*`, `diaLibre`, `totalDescontar`, `totalADar`, `dineroBase`, `miGanancia` o pantallas de contabilidad/liquidación.
+
+Regla práctica: si el cambio toca alguno de estos archivos o identificadores, tratarlo como contabilidad o contabilidad cercana. No se reescribe, no se simplifica y no se aprovecha para "mejorar" nada. Solo se puede mover de sitio con tests verdes, re-exports compatibles y confirmación clara de que la fase consiste exactamente en esa extracción.
+
+El trabajo normal de recorte debe concentrarse en otras responsabilidades que todavía queden dentro de `src/main.tsx`, sin tocar la lógica contable ya separada.
+
+Si el objetivo de la fase no nombra explícitamente uno de estos bloques contables, estos archivos deben quedar fuera del diff.
+```
+
+#### Por qué se cambió
+El documento necesitaba nombrar rutas e identificadores concretos y aclarar que la contabilidad real ya está extraída, organizada y fuera del trabajo normal de recorte de `main.tsx`.
+
+### Cambio 2 - Parada de fase
+
+#### Código anterior
+`No existía la sección "Parada obligatoria al terminar cada fase" en RECORTAR_MAIN_TSX_MEJORADO.md.`
+
+#### Código nuevo
+```md
+## Parada obligatoria al terminar cada fase
+
+Al terminar una fase, el agente debe parar.
+
+No debe empezar otra extracción en la misma respuesta salvo que Carlos lo pida explícitamente.
+
+Antes de parar debe dejar:
+
+- el bloque extraído
+- imports y exports ajustados
+- tests relevantes añadidos o actualizados
+- verificaciones ejecutadas, o el motivo concreto de no poder ejecutarlas
+- `CAMBIOS_AGENT.md` actualizado si se modificaron archivos
+- resumen claro de lo hecho y de cualquier riesgo pendiente
+
+Después de eso, debe esperar confirmación de Carlos antes de continuar con otro bloque.
+
+Está prohibido encadenar varias extracciones por iniciativa propia.
+```
+
+#### Por qué se cambió
+La regla evita que una fase pequeña derive en varias extracciones encadenadas y obliga a esperar confirmación de Carlos antes de tocar otro bloque.
+
+### Cambio 3 - Bloqueos adicionales
+
+#### Código anterior
+`No existían reglas específicas para bloquear diffs sobre archivos contables protegidos ni para prohibir una segunda extracción sin confirmación.`
+
+#### Código nuevo
+```md
+- El diff toca un archivo contable protegido sin que la fase lo hubiera nombrado explícitamente.
+- no aparecen archivos contables protegidos salvo que la fase fuera explícitamente sobre uno de ellos
+- Tocar archivos contables protegidos si la fase no los nombra de forma explícita.
+- Empezar una segunda extracción sin confirmación explícita de Carlos.
+
+7. **Archivos contables protegidos.** Nueva subsección dentro de "Regla absoluta". Se aclara que la contabilidad real ya está extraída y organizada fuera de `main.tsx`, y se listan las rutas concretas que contienen fórmulas, reglas semanales, entregas, ajustes, tipos y usos contables. Si una fase no nombra explícitamente esos bloques, deben quedar fuera del diff.
+
+8. **Parada obligatoria al terminar cada fase.** Nueva sección. Una vez extraído un bloque, verificadas las pruebas y actualizado el registro, el agente debe parar y esperar confirmación de Carlos antes de iniciar otra extracción.
+```
+
+#### Por qué se cambió
+Las secciones de stop, revisión del diff, prohibiciones y registro interno debían reflejar las dos reglas nuevas para que no queden como recomendaciones aisladas.
+
+### Cambio 4 - Tests de seguridad contable
+
+#### Código anterior
+```md
+### Archivos de test contables congelados
+
+Los siguientes archivos de test son la **fuente de verdad** de la contabilidad y están congelados:
+```
+
+#### Código nuevo
+```md
+### Tests de seguridad contable congelados
+
+Los tests no son la contabilidad real de la app. Son candados para detectar si alguien cambia una cuenta sin querer.
+
+Los siguientes archivos de test están congelados:
+```
+
+#### Por qué se cambió
+La sección podía confundirse con los archivos donde vive la contabilidad real. Se renombra y se aclara que los tests son candados de seguridad, no la lógica contable de la app.
+
+### Cambio 5 - Nota de transparencia
+
+#### Código anterior
+```md
+Nota de transparencia: estas mejoras se basan únicamente en el texto del documento original y en buenas prácticas de refactor de código heredado. No se ha verificado el estado real del repositorio (si los tests citados existen, qué cubren, o el contenido de `AGENTS.md` / `ESTRUCTURA.md`). Esa comprobación es justamente el objetivo de la "Fase 0".
+```
+
+#### Código nuevo
+```md
+Nota de transparencia: estas mejoras se basan en el texto del documento original, buenas prácticas de refactor de código heredado y, para la sección "Archivos contables protegidos", en la revisión de las rutas actuales del proyecto. No sustituye a la "Fase 0": antes de recortar hay que volver a verificar tests, cobertura real y estado limpio del repositorio.
+```
+
+#### Por qué se cambió
+La lista de archivos contables protegidos se contrastó con rutas actuales del proyecto, así que la nota final debía reflejar esa verificación limitada sin eliminar la obligación de ejecutar la fase 0 antes de recortar.
+
+## 2026-05-25 20:02 - Limpiar guía de estructura
+
+**Archivos modificados:** `ESTRUCTURA.md`, `PLAN_REORGANIZACION_SRC.md`
+
+### Cambio 1 - Texto de la guía
+
+#### Código anterior
+```md
+# Estructura del proyecto â€” GuÃ­a para aÃ±adir cÃ³digo nuevo
+
+Esta guÃ­a explica cÃ³mo estÃ¡ organizado el proyecto y dÃ³nde colocar cada cosa nueva. ConsÃºltala cada vez que vayas a aÃ±adir una funciÃ³n, una pantalla, un componente o un tipo, para que la app siga ordenada con el tiempo.
+```
+
+#### Código nuevo
+```md
+# Estructura del proyecto - Guía para añadir código nuevo
+
+Esta guía explica cómo está organizado el proyecto y dónde colocar cada cosa nueva. Consúltala cada vez que vayas a añadir una función, una pantalla, un componente o un tipo, para que la app siga ordenada con el tiempo.
+```
+
+#### Por qué se cambió
+El archivo tenía caracteres rotos y debía quedar legible como guía de referencia.
+
+### Cambio 2 - Nota de reorganización
+
+#### Código anterior
+```md
+Nota: esta guÃ­a describe la estructura oficial **con carpetas**. La reorganizaciÃ³n de `src/` para llegar a ella estÃ¡ descrita en `PLAN_REORGANIZACION_SRC.md`. Si todavÃ­a no se ha aplicado, esta guÃ­a es el destino al que apuntar.
+```
+
+#### Código nuevo
+```md
+No existe la nota sobre la reorganización pendiente en `ESTRUCTURA.md`.
+```
+
+#### Por qué se cambió
+La reorganización de `src/` ya estaba aplicada, así que la nota había quedado obsoleta.
+
+### Cambio 3 - Plan de reorganización
+
+#### Código anterior
+```md
+# Plan Profesional — Reorganización de la carpeta `src/`
+
+Plan solicitado por Carlos. Describe cómo pasar la carpeta `src/` de una estructura plana a subcarpetas por rol. Es un plan: **no se ejecuta nada**; queda para revisar y aprobar.
+```
+
+#### Código nuevo
+```md
+No existe `PLAN_REORGANIZACION_SRC.md` en la raíz del proyecto.
+```
+
+#### Por qué se cambió
+El plan ya se había ejecutado y el usuario pidió borrarlo.
+
+## 2026-05-25 19:54 - Reorganizar carpeta src
+
+**Archivos modificados:**
+- `README.md`
+- `src/main.tsx`
+- `src/logic/`
+- `src/services/`
+- `src/screens/`
+- `src/shared/`
+- `src/components/common.tsx`
+- `src/components/duration-card-value.tsx`
+- `src/components/edit-entry-dialog.tsx`
+- `src/components/turno-notas.tsx`
+- `src/__tests__/`
+
+### Cambio 1 - Carpetas por rol
+
+#### Código anterior
+Código anterior no verificable: no hay commit intermedio que capture el estado exacto posterior a la extracción de `src/ui-theme.ts` y anterior a mover los archivos.
+
+#### Código nuevo
+```ts
+expect(rootFiles).toEqual(["main.tsx"]);
+
+for (const file of [
+  "types.ts",
+  "action-ids.ts",
+  "storage-keys.ts",
+  "card-styles.ts",
+  "ui-theme.ts",
+  "app-version.ts",
+]) {
+  expect(existsSync(resolve("src/shared", file))).toBe(true);
+}
+```
+
+#### Por qué se cambió
+Los módulos sueltos de `src/` se agruparon por rol y se añadió un test que fija que la raíz de `src/` conserve solo `main.tsx`.
+
+### Cambio 2 - Imports del archivo principal
+
+#### Código anterior
+Código anterior no verificable: el estado anterior exacto de `src/main.tsx` no estaba guardado en un commit local después de la extracción de tema.
+
+#### Código nuevo
+```tsx
+import { auth, db } from "./services/firebase";
+import { AuthGate } from "./screens/auth-gate";
+import { APP_VERSION } from "./shared/app-version";
+import { fmtDuration, fmtKm, fmtKmNumber, fmtMoney, fmtMoneyNumber } from "./logic/formatters";
+import { A, ABG, C, CBG, E, EBG, F, FBG, G, GBG, N, NBG, P, PBG } from "./shared/ui-theme";
+```
+
+#### Por qué se cambió
+`main.tsx` necesitaba apuntar a las nuevas carpetas sin cambiar la lógica importada.
+
+### Cambio 3 - Rutas relativas internas
+
+#### Código anterior
+Código anterior no verificable: las rutas internas se reescribieron de forma mecánica después de mover archivos y el estado exacto anterior no existe como commit separado.
+
+#### Código nuevo
+```ts
+import type { AppSettings, Entry, NotaCalendario, Reserva, Turno } from "../shared/types";
+import { readLocalJSON } from "../services/user-storage";
+import { sortTurnosByDateDesc } from "./turnos";
+```
+
+#### Por qué se cambió
+Los archivos movidos a `src/logic/`, `src/services/`, `src/screens/` y `src/shared/` necesitaban rutas relativas correctas entre carpetas.
+
+### Cambio 4 - Tests de rutas
+
+#### Código anterior
+Código anterior no verificable: los tests contenían rutas literales anteriores a la reorganización, pero no hay commit intermedio que aísle solo ese estado.
+
+#### Código nuevo
+```ts
+const typesPath = resolve("src/shared/types.ts");
+const stateLoadersSource = readFileSync(resolve("src/logic/state-loaders.ts"), "utf8");
+const csvPath = resolve("src/logic/csv.ts");
+expect(mainSource).toContain('from "./logic/csv"');
+```
+
+#### Por qué se cambió
+Los tests que validan extracciones inspeccionaban rutas antiguas y debían comprobar las nuevas ubicaciones.
+
+### Cambio 5 - Estructura en README
+
+#### Código anterior
+```md
+app-taxi/
+├── src/
+│   ├── main.tsx              # Componente React principal
+│   ├── login-screen.tsx      # Pantalla de login, registro y recuperación
+│   ├── admin-screens.tsx     # Vistas del modo administrador
+│   ├── firebase.ts           # Inicialización de Firebase (Auth + Firestore)
+│   ├── firestore-sync.ts     # Sincronización del estado con Firestore
+│   ├── formatters.ts         # Utilidades de formato
+│   └── __tests__/            # Tests (Vitest)
+```
+
+#### Código nuevo
+```md
+app-taxi/
+|-- src/
+|   |-- main.tsx              # Punto de entrada de React
+|   |-- logic/                # Calculos, fechas, turnos, backups y parsing
+|   |-- services/             # Firebase, Firestore, almacenamiento y Capacitor
+|   |-- screens/              # Pantallas de login, auth y administracion
+|   |-- components/           # Componentes reutilizables de UI
+|   |-- shared/               # Tipos, claves, estilos y constantes compartidas
+|   `-- __tests__/            # Tests (Vitest)
+```
+
+#### Por qué se cambió
+La documentación de estructura debía reflejar las carpetas creadas en `src/`.
+
+## 2026-05-25 19:22 - Extraer tema visual
+
+**Archivos modificados:** `src/main.tsx`, `src/ui-theme.ts`, `src/__tests__/ui-theme-extraction.test.ts`, `src/__tests__/liquidacion-semana.test.ts`
+
+### Cambio 1 - Constantes visuales
+
+#### Código anterior
+```tsx
+const G = "oklch(0.68 0.20 145)";
+const GBG = "oklch(0.18 0.07 145)";
+const P = "oklch(0.65 0.20 280)";
+const PBG = "oklch(0.17 0.07 280)";
+const A = "oklch(0.75 0.16 70)";
+const ABG = "oklch(0.20 0.06 70)";
+const E = "oklch(0.72 0.14 200)";
+const EBG = "oklch(0.19 0.05 200)";
+const F = "oklch(0.70 0.18 25)";
+const FBG = "oklch(0.19 0.06 25)";
+const N = "oklch(0.62 0.06 260)";
+const NBG = "oklch(0.18 0.03 260)";
+const C = "oklch(0.75 0.15 290)";
+const CBG = "oklch(0.18 0.05 290 / 0.12)";
+```
+
+#### Código nuevo
+```ts
+export const G = "oklch(0.68 0.20 145)";
+export const GBG = "oklch(0.18 0.07 145)";
+export const P = "oklch(0.65 0.20 280)";
+export const PBG = "oklch(0.17 0.07 280)";
+export const A = "oklch(0.75 0.16 70)";
+export const ABG = "oklch(0.20 0.06 70)";
+export const E = "oklch(0.72 0.14 200)";
+export const EBG = "oklch(0.19 0.05 200)";
+export const F = "oklch(0.70 0.18 25)";
+export const FBG = "oklch(0.19 0.06 25)";
+export const N = "oklch(0.62 0.06 260)";
+export const NBG = "oklch(0.18 0.03 260)";
+export const C = "oklch(0.75 0.15 290)";
+export const CBG = "oklch(0.18 0.05 290 / 0.12)";
+```
+
+#### Por qué se cambió
+Las constantes visuales se movieron a `src/ui-theme.ts` para continuar adelgazando `main.tsx` sin cambiar los valores de color.
+
+### Cambio 2 - Importación del tema visual
+
+#### Código anterior
+`No existía la importación de constantes visuales desde src/ui-theme.ts en src/main.tsx.`
+
+#### Código nuevo
+```tsx
+import { A, ABG, C, CBG, E, EBG, F, FBG, G, GBG, N, NBG, P, PBG } from "./ui-theme";
+```
+
+#### Por qué se cambió
+`main.tsx` necesitaba usar las mismas constantes visuales desde el nuevo módulo externo.
+
+### Cambio 3 - Test de extracción del tema
+
+#### Código anterior
+`No existía ui-theme-extraction.test.ts en src/__tests__.`
+
+#### Código nuevo
+```ts
+import { existsSync, readFileSync } from "node:fs";
+import { resolve } from "node:path";
+import { describe, expect, it } from "vitest";
+
+describe("UI theme extraction", () => {
+  const themePath = resolve("src/ui-theme.ts");
+  const mainSource = readFileSync(resolve("src/main.tsx"), "utf8");
+
+  it("keeps visual color constants outside main.tsx", async () => {
+    expect(existsSync(themePath)).toBe(true);
+
+    const modulePath = "../ui-theme";
+    const theme = await import(modulePath);
+    expect(theme).toMatchObject({
+      G: "oklch(0.68 0.20 145)",
+      GBG: "oklch(0.18 0.07 145)",
+      P: "oklch(0.65 0.20 280)",
+      PBG: "oklch(0.17 0.07 280)",
+      A: "oklch(0.75 0.16 70)",
+      ABG: "oklch(0.20 0.06 70)",
+      E: "oklch(0.72 0.14 200)",
+      EBG: "oklch(0.19 0.05 200)",
+      F: "oklch(0.70 0.18 25)",
+      FBG: "oklch(0.19 0.06 25)",
+      N: "oklch(0.62 0.06 260)",
+      NBG: "oklch(0.18 0.03 260)",
+      C: "oklch(0.75 0.15 290)",
+      CBG: "oklch(0.18 0.05 290 / 0.12)",
+    });
+
+    expect(mainSource).toContain('from "./ui-theme"');
+    expect(mainSource).not.toMatch(/^const G = /m);
+    expect(mainSource).not.toMatch(/^const CBG = /m);
+  });
+});
+```
+
+#### Por qué se cambió
+El test fija que las constantes visuales vivan fuera de `main.tsx` y conserven sus valores literales.
+
+### Cambio 4 - Test de colores de liquidación
+
+#### Código anterior
+```ts
+describe("Liquidación Semanal screen and typography", () => {
+  const source = readFileSync(resolve("src/main.tsx"), "utf8");
+```
+
+```ts
+  it("uses faithful sRGB colors only for the copied liquidation image", () => {
+    expect(source).toContain('const G = "oklch(0.68 0.20 145)"');
+    expect(source).toContain('oklch(0.70 0.18 25)');
+    expect(source).toContain('oklch(0.72 0.14 200)');
+```
+
+#### Código nuevo
+```ts
+describe("Liquidación Semanal screen and typography", () => {
+  const source = readFileSync(resolve("src/main.tsx"), "utf8");
+  const themeSource = readFileSync(resolve("src/ui-theme.ts"), "utf8");
+```
+
+```ts
+  it("uses faithful sRGB colors only for the copied liquidation image", () => {
+    expect(themeSource).toContain('export const G = "oklch(0.68 0.20 145)"');
+    expect(themeSource).toContain('oklch(0.70 0.18 25)');
+    expect(themeSource).toContain('oklch(0.72 0.14 200)');
+```
+
+#### Por qué se cambió
+El test seguía verificando los colores visuales en `main.tsx`; tras la extracción debe verificar esos literales en `src/ui-theme.ts`.
+
 ## 2026-05-25 16:03 - Extraer tipos de dominio
 
 **Archivos modificados:** `src/main.tsx`, `src/types.ts`, `src/state-loaders.ts`, `src/turno-notas-logic.ts`, `src/components/turno-notas.tsx`, `src/components/edit-entry-dialog.tsx`, `src/__tests__/domain-types-extraction.test.ts`

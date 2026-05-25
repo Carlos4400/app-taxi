@@ -3,13 +3,13 @@ import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 
 describe("Accounting extraction", () => {
-  const accountingPath = resolve("src/accounting.ts");
+  const accountingPath = resolve("src/logic/accounting.ts");
   const mainSource = readFileSync(resolve("src/main.tsx"), "utf8");
 
   it("keeps pure accounting formulas outside main.tsx", async () => {
     expect(existsSync(accountingPath)).toBe(true);
 
-    const modulePath = "../accounting";
+    const modulePath = "../logic/accounting";
     const {
       calcularTotalesTurnos,
       calcularTurnoContable,
@@ -53,7 +53,7 @@ describe("Accounting extraction", () => {
     });
     expect(roundMoney(1.005)).toBe(1.01);
 
-    expect(mainSource).toContain('from "./accounting"');
+    expect(mainSource).toContain('from "./logic/accounting"');
     expect(mainSource).not.toMatch(/^export function calcularTurnoContable\(/m);
     expect(mainSource).not.toMatch(/^export function calcularResumenContableTurnos\(/m);
     expect(mainSource).not.toMatch(/^function roundMoney\(/m);

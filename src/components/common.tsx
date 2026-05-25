@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { fmtMoney } from "../formatters";
+import { fmtMoney } from "../logic/formatters";
 
 function fmt(n: number): string {
   return fmtMoney(n);

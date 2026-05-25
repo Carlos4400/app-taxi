@@ -11,9 +11,9 @@
 
 import React from "react";
 import { collection, getDocs, onSnapshot } from "firebase/firestore";
-import { db } from "./firebase";
-import { userMetaDocRef, userSubcollectionRef } from "./firestore-sync";
-import { fmtKm, fmtMoney as fmtEuro } from "./formatters";
+import { db } from "../services/firebase";
+import { userMetaDocRef, userSubcollectionRef } from "../services/firestore-sync";
+import { fmtKm, fmtMoney as fmtEuro } from "../logic/formatters";
 
 const { useState, useEffect, useMemo } = React;
 

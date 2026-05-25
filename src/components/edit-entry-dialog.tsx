@@ -1,5 +1,5 @@
 import { useState, type ReactNode } from "react";
-import type { Entry } from "../types";
+import type { Entry } from "../shared/types";
 
 type EntryTypeMetaForDialog = {
   color: string;

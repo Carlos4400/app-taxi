@@ -3,7 +3,7 @@ import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 
 describe("Backup builder extraction", () => {
-  const backupPath = resolve("src/backup.ts");
+  const backupPath = resolve("src/logic/backup.ts");
   const mainSource = readFileSync(resolve("src/main.tsx"), "utf8");
 
   it("keeps backup payload builders outside main.tsx", () => {
@@ -12,7 +12,7 @@ describe("Backup builder extraction", () => {
     const backupSource = readFileSync(backupPath, "utf8");
     expect(backupSource).toContain("export function buildBackupPayload");
     expect(backupSource).toContain("export function buildBackupPayloadFromState");
-    expect(mainSource).toContain('from "./backup"');
+    expect(mainSource).toContain('from "./logic/backup"');
     expect(mainSource).not.toMatch(/^export function buildBackupPayload\(/m);
   });
 });

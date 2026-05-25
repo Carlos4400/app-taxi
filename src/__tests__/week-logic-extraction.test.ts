@@ -3,13 +3,13 @@ import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 
 describe("Week logic extraction", () => {
-  const weekLogicPath = resolve("src/week-logic.ts");
+  const weekLogicPath = resolve("src/logic/week-logic.ts");
   const mainSource = readFileSync(resolve("src/main.tsx"), "utf8");
 
   it("keeps week assignment and labels outside main.tsx", async () => {
     expect(existsSync(weekLogicPath)).toBe(true);
 
-    const modulePath = "../week-logic";
+    const modulePath = "../logic/week-logic";
     const {
       getWeekStartDate,
       getWeekRange,
@@ -30,7 +30,7 @@ describe("Week logic extraction", () => {
     expect(formatWeekRange("2026-05-06")).toContain("Mayo");
     expect(formatWeekRangeFull("2026-05-06")).toContain("2026");
 
-    expect(mainSource).toContain('from "./week-logic"');
+    expect(mainSource).toContain('from "./logic/week-logic"');
     expect(mainSource).not.toMatch(/^export function getWeekStartDate\(/m);
     expect(mainSource).not.toMatch(/^export function groupTurnosByWeek\(/m);
     expect(mainSource).not.toMatch(/^function formatWeekRange\(/m);

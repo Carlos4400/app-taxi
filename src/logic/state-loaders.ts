@@ -1,5 +1,5 @@
-import type { AppSettings, Entry, NotaCalendario, Reserva, Turno } from "./types";
-import { readLocalJSON } from "./user-storage";
+import type { AppSettings, Entry, NotaCalendario, Reserva, Turno } from "../shared/types";
+import { readLocalJSON } from "../services/user-storage";
 import {
   KEY_CURRENT,
   KEY_HISTORY,
@@ -7,7 +7,7 @@ import {
   KEY_RESERVATIONS,
   KEY_SETTINGS,
   KEY_WEEK_OVERRIDES,
-} from "./storage-keys";
+} from "../shared/storage-keys";
 import { sortTurnosByDateDesc } from "./turnos";
 
 type LoadedCurrentState = {

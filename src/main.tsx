@@ -14,38 +14,39 @@ import {
   setDoc,
   writeBatch,
 } from "firebase/firestore";
-import { auth, db } from "./firebase";
-import { AuthGate } from "./auth-gate";
-import { registerServiceWorker } from "./service-worker-registration";
-import { APP_VERSION } from "./app-version";
-import { fmtDuration, fmtKm, fmtKmNumber, fmtMoney, fmtMoneyNumber } from "./formatters";
+import { auth, db } from "./services/firebase";
+import { AuthGate } from "./screens/auth-gate";
+import { registerServiceWorker } from "./services/service-worker-registration";
+import { APP_VERSION } from "./shared/app-version";
+import { fmtDuration, fmtKm, fmtKmNumber, fmtMoney, fmtMoneyNumber } from "./logic/formatters";
 import { ConfirmDialog, MainCard, SmallCard } from "./components/common";
 import { TurnoNotasCard } from "./components/turno-notas";
 import { EditEntryDialog } from "./components/edit-entry-dialog";
 import { DurationCardValue } from "./components/duration-card-value";
 import { Shell } from "./components/shell";
-import { ApkInstaller } from "./apk-installer";
-import { resolveLatestApkUpdate, type UpdateState } from "./update-flow";
-import { buildBackupPayload, buildBackupPayloadFromState } from "./backup";
-import { exportBackupJSON } from "./backup-export";
+import { ApkInstaller } from "./services/apk-installer";
+import { resolveLatestApkUpdate, type UpdateState } from "./logic/update-flow";
+import { buildBackupPayload, buildBackupPayloadFromState } from "./logic/backup";
+import { exportBackupJSON } from "./logic/backup-export";
 import {
   ensureTurnosDiaLibreContable,
   getTurnosByCalendarMonth,
   getTurnosByCalendarYear,
   mergeTurnos,
   sortTurnosByDateDesc,
-} from "./turnos";
-import { parseCSVToHistory } from "./csv";
-import { getBackupMenuActionIds, getHomeQuickActionIds } from "./action-ids";
-import { getTurnosNotasSemana } from "./turno-notas-logic";
-import { updateTurnoEntrega } from "./turno-entrega";
-import { getDaysInMonth, getStartOffset } from "./calendar-date";
-import { MESES_COMPLETOS, getAccountingPeriodLabel, getMesLabel } from "./date-labels";
-import { KM_CARD_UNIT_STYLE, TIME_CARD_HOUR_UNIT_STYLE, TIME_CARD_UNIT_STYLE, WEEK_LIST_CARD_TEXT_SIZES } from "./card-styles";
-import { fmtDate, getDiffMins, timeNow, today } from "./date-time";
-import { userStorageKey, writeUserLocalJSON } from "./user-storage";
-import { KEY_CURRENT, KEY_HISTORY, KEY_NOTES, KEY_RESERVATIONS, KEY_SETTINGS, KEY_WEEK_OVERRIDES } from "./storage-keys";
-import { loadCurrent, loadHistory, loadNotes, loadReservations, loadSettings, loadWeekOverrides } from "./state-loaders";
+} from "./logic/turnos";
+import { parseCSVToHistory } from "./logic/csv";
+import { getBackupMenuActionIds, getHomeQuickActionIds } from "./shared/action-ids";
+import { getTurnosNotasSemana } from "./logic/turno-notas-logic";
+import { updateTurnoEntrega } from "./logic/turno-entrega";
+import { getDaysInMonth, getStartOffset } from "./logic/calendar-date";
+import { MESES_COMPLETOS, getAccountingPeriodLabel, getMesLabel } from "./logic/date-labels";
+import { KM_CARD_UNIT_STYLE, TIME_CARD_HOUR_UNIT_STYLE, TIME_CARD_UNIT_STYLE, WEEK_LIST_CARD_TEXT_SIZES } from "./shared/card-styles";
+import { fmtDate, getDiffMins, timeNow, today } from "./logic/date-time";
+import { userStorageKey, writeUserLocalJSON } from "./services/user-storage";
+import { KEY_CURRENT, KEY_HISTORY, KEY_NOTES, KEY_RESERVATIONS, KEY_SETTINGS, KEY_WEEK_OVERRIDES } from "./shared/storage-keys";
+import { loadCurrent, loadHistory, loadNotes, loadReservations, loadSettings, loadWeekOverrides } from "./logic/state-loaders";
+import { A, ABG, C, CBG, E, EBG, F, FBG, G, GBG, N, NBG, P, PBG } from "./shared/ui-theme";
 import type {
   AppSettings,
   CurrentState,
@@ -57,7 +58,7 @@ import type {
   Turno,
   TurnoNotasSemana,
   WeekOverride,
-} from "./types";
+} from "./shared/types";
 import {
   formatWeekRange,
   formatWeekRangeFull,
@@ -72,7 +73,7 @@ import {
   groupTurnosByWeek,
   isWeekClosed,
   selectAccountingHeroWeek,
-} from "./week-logic";
+} from "./logic/week-logic";
 import {
   buildTurnoConfigFromSettings,
   calcularResumenContableTurnos,
@@ -80,17 +81,17 @@ import {
   calcularTurnoContable,
   getTurnoConfig,
   roundMoney,
-} from "./accounting";
+} from "./logic/accounting";
 import {
   userMetaDocRef,
   userSubcollectionRef,
   saveUserDoc,
   syncSubcollection,
   userHasFirestoreData,
-} from "./firestore-sync";
-import { AdminListScreen, AdminUserView } from "./admin-screens";
+} from "./services/firestore-sync";
+import { AdminListScreen, AdminUserView } from "./screens/admin-screens";
 
-export { fmtDuration, fmtKm, fmtKmNumber, fmtMoney, fmtMoneyNumber, splitDurationLabel } from "./formatters";
+export { fmtDuration, fmtKm, fmtKmNumber, fmtMoney, fmtMoneyNumber, splitDurationLabel } from "./logic/formatters";
 export { buildBackupPayload, buildBackupPayloadFromState };
 export {
   ensureTurnosDiaLibreContable,
@@ -99,9 +100,9 @@ export {
   mergeTurnos,
   sortTurnosByDateDesc,
 };
-export { parseCSVLine, parseCSVToHistory } from "./csv";
+export { parseCSVLine, parseCSVToHistory } from "./logic/csv";
 export { getBackupMenuActionIds, getHomeQuickActionIds };
-export type { BackupMenuActionId, HomeQuickActionId } from "./action-ids";
+export type { BackupMenuActionId, HomeQuickActionId } from "./shared/action-ids";
 export { getTurnosNotasSemana };
 export { updateTurnoEntrega };
 export { getAccountingPeriodLabel };
@@ -118,7 +119,7 @@ export type {
   TurnoConfig,
   TurnoNotasSemana,
   WeekOverride,
-} from "./types";
+} from "./shared/types";
 export {
   getCurrentOpenWeekId,
   getTurnoAccountingWeekId,
@@ -138,21 +139,6 @@ export {
 };
 
 const { useState, useEffect, useRef } = React;
-
-const G = "oklch(0.68 0.20 145)";
-const GBG = "oklch(0.18 0.07 145)";
-const P = "oklch(0.65 0.20 280)";
-const PBG = "oklch(0.17 0.07 280)";
-const A = "oklch(0.75 0.16 70)";
-const ABG = "oklch(0.20 0.06 70)";
-const E = "oklch(0.72 0.14 200)";
-const EBG = "oklch(0.19 0.05 200)";
-const F = "oklch(0.70 0.18 25)";
-const FBG = "oklch(0.19 0.06 25)";
-const N = "oklch(0.62 0.06 260)";
-const NBG = "oklch(0.18 0.03 260)";
-const C = "oklch(0.75 0.15 290)";
-const CBG = "oklch(0.18 0.05 290 / 0.12)";
 
 type EntryTypeMeta = {
   color: string;

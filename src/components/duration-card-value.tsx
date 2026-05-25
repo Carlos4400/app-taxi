@@ -1,5 +1,5 @@
-import { TIME_CARD_HOUR_UNIT_STYLE, TIME_CARD_UNIT_STYLE } from "../card-styles";
-import { splitDurationLabel } from "../formatters";
+import { TIME_CARD_HOUR_UNIT_STYLE, TIME_CARD_UNIT_STYLE } from "../shared/card-styles";
+import { splitDurationLabel } from "../logic/formatters";
 
 export function DurationCardValue({ value }: { value: string }) {
   const parts = splitDurationLabel(value);

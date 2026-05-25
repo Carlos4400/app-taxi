@@ -1,7 +1,7 @@
 import React from "react";
 import { onAuthStateChanged, type User } from "firebase/auth";
 
-import { auth } from "./firebase";
+import { auth } from "../services/firebase";
 import { LoginScreen } from "./login-screen";
 
 export function AuthGate({ AppComponent }: { AppComponent: React.ComponentType }) {

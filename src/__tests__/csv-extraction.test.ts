@@ -3,7 +3,7 @@ import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 
 describe("CSV parsing extraction", () => {
-  const csvPath = resolve("src/csv.ts");
+  const csvPath = resolve("src/logic/csv.ts");
   const mainSource = readFileSync(resolve("src/main.tsx"), "utf8");
 
   it("keeps CSV parsing helpers outside main.tsx", () => {
@@ -13,7 +13,7 @@ describe("CSV parsing extraction", () => {
     expect(csvSource).toContain("export function parseCSVLine");
     expect(csvSource).toContain("export function parseCSVToHistory");
     expect(csvSource).toContain('from "./turnos"');
-    expect(mainSource).toContain('from "./csv"');
+    expect(mainSource).toContain('from "./logic/csv"');
     expect(mainSource).not.toMatch(/^export function parseCSVLine\(/m);
     expect(mainSource).not.toMatch(/^export function parseCSVToHistory\(/m);
   });

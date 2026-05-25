@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { fmtDuration, fmtKm, fmtKmNumber, fmtMoney, fmtMoneyNumber, splitDurationLabel } from "../formatters";
+import { fmtDuration, fmtKm, fmtKmNumber, fmtMoney, fmtMoneyNumber, splitDurationLabel } from "../logic/formatters";
 
 describe("Shared formatting helpers", () => {
   it("formats kilometers from the shared formatter", () => {

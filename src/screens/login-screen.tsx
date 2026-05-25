@@ -23,7 +23,7 @@ import {
   serverTimestamp,
   writeBatch,
 } from "firebase/firestore";
-import { auth, db } from "./firebase";
+import { auth, db } from "../services/firebase";
 
 const { useState } = React;
 

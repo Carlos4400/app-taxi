@@ -1,0 +1,14 @@
+export const G = "oklch(0.68 0.20 145)";
+export const GBG = "oklch(0.18 0.07 145)";
+export const P = "oklch(0.65 0.20 280)";
+export const PBG = "oklch(0.17 0.07 280)";
+export const A = "oklch(0.75 0.16 70)";
+export const ABG = "oklch(0.20 0.06 70)";
+export const E = "oklch(0.72 0.14 200)";
+export const EBG = "oklch(0.19 0.05 200)";
+export const F = "oklch(0.70 0.18 25)";
+export const FBG = "oklch(0.19 0.06 25)";
+export const N = "oklch(0.62 0.06 260)";
+export const NBG = "oklch(0.18 0.03 260)";
+export const C = "oklch(0.75 0.15 290)";
+export const CBG = "oklch(0.18 0.05 290 / 0.12)";

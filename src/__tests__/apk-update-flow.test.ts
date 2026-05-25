@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 
 describe("APK update flow hardening", () => {
   const mainSource = readFileSync(resolve("src/main.tsx"), "utf8");
-  const updateFlowSource = readFileSync(resolve("src/update-flow.ts"), "utf8");
+  const updateFlowSource = readFileSync(resolve("src/logic/update-flow.ts"), "utf8");
   const gradleSource = readFileSync(resolve("android/app/build.gradle"), "utf8");
 
   it("does not expose an installable Android URL when the latest release has no APK asset", () => {

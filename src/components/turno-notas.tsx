@@ -1,5 +1,5 @@
 import type { CSSProperties } from "react";
-import type { TurnoNotasSemana } from "../types";
+import type { TurnoNotasSemana } from "../shared/types";
 
 type EntryTypeMetaForNotes = {
   color: string;

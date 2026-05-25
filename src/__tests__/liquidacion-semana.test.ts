@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 
 describe("Liquidación Semanal screen and typography", () => {
   const source = readFileSync(resolve("src/main.tsx"), "utf8");
+  const themeSource = readFileSync(resolve("src/shared/ui-theme.ts"), "utf8");
 
   it("applies fluid typography to the week detail title", () => {
     expect(source).toMatch(
@@ -39,9 +40,9 @@ describe("Liquidación Semanal screen and typography", () => {
   });
 
   it("uses faithful sRGB colors only for the copied liquidation image", () => {
-    expect(source).toContain('const G = "oklch(0.68 0.20 145)"');
-    expect(source).toContain('oklch(0.70 0.18 25)');
-    expect(source).toContain('oklch(0.72 0.14 200)');
+    expect(themeSource).toContain('export const G = "oklch(0.68 0.20 145)"');
+    expect(themeSource).toContain('oklch(0.70 0.18 25)');
+    expect(themeSource).toContain('oklch(0.72 0.14 200)');
 
     const exportColorBlock = source.match(
       /const replaceOklch = \(str: string\) => \{[\s\S]*?return match;/

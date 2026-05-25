@@ -91,23 +91,23 @@ cd android && ./gradlew assembleDebug
 
 ```
 app-taxi/
-├── src/
-│   ├── main.tsx              # Componente React principal
-│   ├── login-screen.tsx      # Pantalla de login, registro y recuperación
-│   ├── admin-screens.tsx     # Vistas del modo administrador
-│   ├── firebase.ts           # Inicialización de Firebase (Auth + Firestore)
-│   ├── firestore-sync.ts     # Sincronización del estado con Firestore
-│   ├── formatters.ts         # Utilidades de formato
-│   └── __tests__/            # Tests (Vitest)
-├── public/                   # Assets estáticos (icons, manifest, sw)
-├── android/                  # Proyecto Android (Capacitor)
-├── firestore.rules           # Reglas de seguridad de Firestore
-├── package.json
-├── vite.config.ts
-├── capacitor.config.ts
-└── .github/workflows/        # CI/CD
-    ├── android.yml           # Construye el APK y publica Release
-    └── pages.yml             # Despliega la PWA en GitHub Pages
+|-- src/
+|   |-- main.tsx              # Punto de entrada de React
+|   |-- logic/                # Calculos, fechas, turnos, backups y parsing
+|   |-- services/             # Firebase, Firestore, almacenamiento y Capacitor
+|   |-- screens/              # Pantallas de login, auth y administracion
+|   |-- components/           # Componentes reutilizables de UI
+|   |-- shared/               # Tipos, claves, estilos y constantes compartidas
+|   `-- __tests__/            # Tests (Vitest)
+|-- public/                   # Assets estaticos (icons, manifest, sw)
+|-- android/                  # Proyecto Android (Capacitor)
+|-- firestore.rules           # Reglas de seguridad de Firestore
+|-- package.json
+|-- vite.config.ts
+|-- capacitor.config.ts
+`-- .github/workflows/        # CI/CD
+    |-- android.yml           # Construye el APK y publica Release
+    `-- pages.yml             # Despliega la PWA en GitHub Pages
 ```
 
 ## CI/CD
