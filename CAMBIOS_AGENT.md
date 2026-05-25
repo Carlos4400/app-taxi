@@ -59,7 +59,10 @@ const IconPause = ({ s = 24, c = "white" }: { s?: number; c?: string }) => (
 ```
 
 #### Código nuevo
-`` `IconPlay` e `IconPause` se eliminaron de `main.tsx`. Se importan desde `src/components/turno-control-icons.tsx`.` ``
+```ts
+// IconPlay e IconPause se eliminaron de main.tsx
+import { IconPlay, IconPause } from "./components/turno-control-icons";
+```
 
 #### Por qué se cambió
 Mismo motivo que arriba: extracción de unidad natural de SVGs de control de turno.
@@ -231,7 +234,10 @@ function fmt(n: number): string {
 ```
 
 #### Código nuevo
-`` `fmt` se eliminó de `main.tsx`. Se importa ahora de `src/logic/formatters.ts`.` ``
+```ts
+// function fmt ya no existe en main.tsx
+import { fmtDuration, fmtKm, fmtKmNumber, fmtMoney, fmtMoneyNumber, fmt } from "./logic/formatters";
+```
 
 #### Por qué se cambió
 El wrapper local ya no es necesario; `fmt` se importa directamente de su módulo natural.
