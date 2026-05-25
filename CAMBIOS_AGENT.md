@@ -4,6 +4,185 @@ Este archivo registra cambios de código hechos por agentes/modelos en este proy
 
 Cada entrada debe indicar archivos modificados, código anterior, código nuevo y por qué se cambió. Las entradas se añaden al **principio** del archivo (las más recientes arriba).
 
+## 2026-05-26 02:00 - Extraer CalendarScreen a src/screens/calendar-screen.tsx
+
+**Archivos modificados:** `src/screens/calendar-screen.tsx`, `src/components/calendar-icons.tsx`, `src/main.tsx`
+
+### Cambio 1 - Iconos de calendario centralizados
+
+#### Código anterior
+`No existía src/components/calendar-icons.tsx.`
+
+#### Código nuevo
+```tsx
+export const IconPencilNeon = ({ s = 28 }: { s?: number }) => (
+  <svg width={s} height={s} viewBox="0 0 24 24" fill="none" ...>
+    {/* Definición SVG completa */}
+  </svg>
+);
+
+export const IconTimer = ({ s = 24, c = "white" }: { s?: number; c?: string }) => (
+  <svg width={s} height={s} viewBox="0 0 24 24" fill="none" ...>
+    {/* Definición SVG completa */}
+  </svg>
+);
+
+export const IconMoneyBag = ({ s = 24, c = "white" }: { s?: number; c?: string }) => (
+  <svg width={s} height={s} viewBox="0 0 24 24" fill="none" ...>
+    {/* Definición SVG completa */}
+  </svg>
+);
+```
+
+#### Por qué se cambió
+Los iconos IconPencilNeon, IconTimer e IconMoneyBag eran definiciones inline en `main.tsx` usados exclusivamente por CalendarScreen. Extraerlos a `src/components/calendar-icons.tsx` centraliza iconos con responsabilidad clara.
+
+### Cambio 2 - CalendarScreen extraída
+
+#### Código anterior
+`No existía src/screens/calendar-screen.tsx.`
+
+#### Código nuevo
+```tsx
+import React from "react";
+import { Shell } from "../components/shell";
+import { ConfirmDialog } from "../components/common";
+import { IconBack, IconCalendar } from "../components/navigation-icons";
+import { IconPencilNeon, IconMoneyBag, IconTimer } from "../components/calendar-icons";
+import { fmt, fmtDuration } from "../logic/formatters";
+import { getDiffMins, today } from "../logic/date-time";
+import { getStartOffset, getDaysInMonth } from "../logic/calendar-date";
+import { calcularTurnoContable } from "../logic/accounting";
+import { C, G } from "../shared/ui-theme";
+import type { AppSettings, NotaCalendario, NotaTipo, Reserva, Turno } from "../shared/types";
+
+interface CalendarScreenProps {
+  calendarMonth: Date;
+  setCalendarMonth: (d: Date) => void;
+  calendarView: 'month' | 'agenda';
+  setCalendarView: (v: 'month' | 'agenda') => void;
+  showMonthPicker: boolean;
+  setShowMonthPicker: React.Dispatch<React.SetStateAction<boolean>>;
+  pickerYear: number;
+  setPickerYear: React.Dispatch<React.SetStateAction<number>>;
+  selectedDate: string;
+  setSelectedDate: (d: string) => void;
+  showNotaDialog: boolean;
+  setShowNotaDialog: (v: boolean) => void;
+  notaTipo: NotaTipo;
+  setNotaTipo: (t: NotaTipo) => void;
+  notaTexto: string;
+  setNotaTexto: (t: string) => void;
+  editingNota: NotaCalendario | null;
+  setEditingNota: (n: NotaCalendario | null) => void;
+  notes: NotaCalendario[];
+  setNotes: (n: NotaCalendario[] | ((prev: NotaCalendario[]) => NotaCalendario[])) => void;
+  showReservaDialog: boolean;
+  setShowReservaDialog: (v: boolean) => void;
+  reservaTime: string;
+  setReservaTime: (t: string) => void;
+  reservaOrigen: string;
+  setReservaOrigen: (o: string) => void;
+  reservaDestino: string;
+  setReservaDestino: (d: string) => void;
+  reservaCliente: string;
+  setReservaCliente: (c: string) => void;
+  reservaTelefono: string;
+  setReservaTelefono: (t: string) => void;
+  reservaNotas: string;
+  setReservaNotas: (n: string) => void;
+  editingReserva: Reserva | null;
+  setEditingReserva: (r: Reserva | null) => void;
+  reservations: Reserva[];
+  setReservations: (r: Reserva[] | ((prev: Reserva[]) => Reserva[])) => void;
+  confirmDialog: { ... } | null;
+  setConfirmDialog: (d: null | { ... }) => void;
+  history: Turno[];
+  settings: AppSettings;
+  openNewReserva: (date?: string) => void;
+}
+
+export function CalendarScreen({ ... }: CalendarScreenProps) {
+  // ~800 líneas de la pantalla calendario completa
+}
+```
+
+#### Por qué se cambió
+La pantalla de calendario (`screen === "calendar"`) era un bloque inline de ~767 líneas en `main.tsx`. Extraerla a `src/screens/calendar-screen.tsx` reduce significativamente el archivo principal y aísla la responsabilidad de calendario como componente independiente con frontera clara.
+
+### Cambio 3 - Reemplazar bloque inline en main.tsx
+
+#### Código anterior
+```tsx
+  if (screen === "calendar") {
+    const year = calendarMonth.getFullYear();
+    const month = calendarMonth.getMonth();
+    const startOffset = getStartOffset(year, month);
+    // ... ~760 líneas inline del bloque calendar ...
+    return (
+      <Shell burst={false}>
+        {/* JSX completo de calendario */}
+      </Shell>
+    );
+  }
+```
+
+#### Código nuevo
+```tsx
+  if (screen === "calendar") {
+    return (
+      <CalendarScreen
+        calendarMonth={calendarMonth}
+        setCalendarMonth={setCalendarMonth}
+        calendarView={calendarView}
+        setCalendarView={setCalendarView}
+        showMonthPicker={showMonthPicker}
+        setShowMonthPicker={setShowMonthPicker}
+        pickerYear={pickerYear}
+        setPickerYear={setPickerYear}
+        selectedDate={selectedDate}
+        setSelectedDate={setSelectedDate}
+        showNotaDialog={showNotaDialog}
+        setShowNotaDialog={setShowNotaDialog}
+        notaTipo={notaTipo}
+        setNotaTipo={setNotaTipo}
+        notaTexto={notaTexto}
+        setNotaTexto={setNotaTexto}
+        editingNota={editingNota}
+        setEditingNota={setEditingNota}
+        notes={notes}
+        setNotes={setNotes}
+        showReservaDialog={showReservaDialog}
+        setShowReservaDialog={setShowReservaDialog}
+        reservaTime={reservaTime}
+        setReservaTime={setReservaTime}
+        reservaOrigen={reservaOrigen}
+        setReservaOrigen={setReservaOrigen}
+        reservaDestino={reservaDestino}
+        setReservaDestino={setReservaDestino}
+        reservaCliente={reservaCliente}
+        setReservaCliente={setReservaCliente}
+        reservaTelefono={reservaTelefono}
+        setReservaTelefono={setReservaTelefono}
+        reservaNotas={reservaNotas}
+        setReservaNotas={setReservaNotas}
+        editingReserva={editingReserva}
+        setEditingReserva={setEditingReserva}
+        reservations={reservations}
+        setReservations={setReservations}
+        confirmDialog={confirmDialog}
+        setConfirmDialog={setConfirmDialog}
+        history={history}
+        settings={settings}
+        openNewReserva={openNewReserva}
+      />
+    );
+  }
+```
+
+#### Por qué se cambió
+El bloque inline de ~767 líneas se sustituye por el componente `CalendarScreen` importado. Los iconos IconPencilNeon, IconTimer e IconMoneyBag permanecen en `main.tsx` porque se usan en otras pantallas (no exclusivamente en calendario).
+
 ## 2026-05-26 01:28 - Extraer HomeScreen a src/screens/home-screen.tsx
 
 **Archivos modificados:** `src/screens/home-screen.tsx`, `src/components/home-icons.tsx`, `src/main.tsx`
