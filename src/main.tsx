@@ -16,6 +16,7 @@ import {
 } from "firebase/firestore";
 import { auth, db } from "./firebase";
 import { AuthGate } from "./auth-gate";
+import { registerServiceWorker } from "./service-worker-registration";
 import { fmtDuration, fmtKm, fmtKmNumber, fmtMoney, fmtMoneyNumber } from "./formatters";
 import { ConfirmDialog, MainCard, SmallCard } from "./components/common";
 import { TurnoNotasCard } from "./components/turno-notas";
@@ -7366,11 +7367,4 @@ if (rootElement) {
   ReactDOM.createRoot(rootElement).render(<AuthGate AppComponent={App} />);
 }
 
-if ("serviceWorker" in navigator) {
-  window.addEventListener("load", () => {
-    navigator.serviceWorker
-      .register("./sw.js")
-      .then(() => console.log("SW registered"))
-      .catch((err) => console.warn("SW registration failed", err));
-  });
-}
+registerServiceWorker();

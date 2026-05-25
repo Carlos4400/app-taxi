@@ -4,6 +4,115 @@ Este archivo registra cambios de código hechos por agentes/modelos en este proy
 
 Cada entrada debe indicar archivos modificados, código anterior, código nuevo y por qué se cambió. Las entradas se añaden al **principio** del archivo (las más recientes arriba).
 
+## 2026-05-25 15:56 - Extraer registro del service worker
+
+**Archivos modificados:** `src/main.tsx`, `src/service-worker-registration.ts`, `src/__tests__/service-worker-registration.test.ts`
+
+### Cambio 1 - Usar registro externo
+
+#### Código anterior
+```tsx
+const rootElement = document.getElementById("root");
+if (rootElement) {
+  ReactDOM.createRoot(rootElement).render(<AuthGate AppComponent={App} />);
+}
+
+if ("serviceWorker" in navigator) {
+  window.addEventListener("load", () => {
+    navigator.serviceWorker
+      .register("./sw.js")
+      .then(() => console.log("SW registered"))
+      .catch((err) => console.warn("SW registration failed", err));
+  });
+}
+```
+
+#### Código nuevo
+```tsx
+const rootElement = document.getElementById("root");
+if (rootElement) {
+  ReactDOM.createRoot(rootElement).render(<AuthGate AppComponent={App} />);
+}
+
+registerServiceWorker();
+```
+
+#### Por qué se cambió
+`main.tsx` mantiene solo la llamada de arranque y delega el detalle del service worker en un módulo dedicado sin cambiar ruta, evento `load` ni mensajes de consola.
+
+### Cambio 2 - Importar registro del service worker
+
+#### Código anterior
+```tsx
+import { auth, db } from "./firebase";
+import { AuthGate } from "./auth-gate";
+import { fmtDuration, fmtKm, fmtKmNumber, fmtMoney, fmtMoneyNumber } from "./formatters";
+```
+
+#### Código nuevo
+```tsx
+import { auth, db } from "./firebase";
+import { AuthGate } from "./auth-gate";
+import { registerServiceWorker } from "./service-worker-registration";
+import { fmtDuration, fmtKm, fmtKmNumber, fmtMoney, fmtMoneyNumber } from "./formatters";
+```
+
+#### Por qué se cambió
+La nueva función de registro se importa explícitamente para que el arranque siga ocurriendo desde `main.tsx`.
+
+### Cambio 3 - Crear módulo de registro
+
+#### Código anterior
+`No existía el módulo de registro del service worker en src/service-worker-registration.ts.`
+
+#### Código nuevo
+```ts
+export function registerServiceWorker() {
+  if ("serviceWorker" in navigator) {
+    window.addEventListener("load", () => {
+      navigator.serviceWorker.register("./sw.js")
+        .then(() => console.log("SW registered"))
+        .catch((err) => console.warn("SW registration failed", err));
+    });
+  }
+}
+```
+
+#### Por qué se cambió
+La comprobación de soporte, el listener de carga y el registro de `./sw.js` quedan aislados para reducir código de infraestructura dentro de `main.tsx`.
+
+### Cambio 4 - Proteger extracción del service worker
+
+#### Código anterior
+`No existía el test de extracción del service worker en src/__tests__/service-worker-registration.test.ts.`
+
+#### Código nuevo
+```ts
+import { existsSync, readFileSync } from "node:fs";
+import { resolve } from "node:path";
+import { describe, expect, it } from "vitest";
+
+describe("service worker registration extraction", () => {
+  const registrationPath = resolve("src/service-worker-registration.ts");
+  const mainSource = readFileSync(resolve("src/main.tsx"), "utf8");
+
+  it("keeps service worker registration outside main.tsx", () => {
+    expect(existsSync(registrationPath)).toBe(true);
+
+    const registrationSource = readFileSync(registrationPath, "utf8");
+    expect(registrationSource).toContain('"serviceWorker" in navigator');
+    expect(registrationSource).toContain('navigator.serviceWorker.register("./sw.js")');
+    expect(registrationSource).toContain("SW registered");
+    expect(mainSource).toContain('from "./service-worker-registration"');
+    expect(mainSource).toContain("registerServiceWorker();");
+    expect(mainSource).not.toContain('navigator.serviceWorker.register("./sw.js")');
+  });
+});
+```
+
+#### Por qué se cambió
+El test verifica que el registro vive fuera de `main.tsx` y que el archivo principal conserva la llamada de inicialización.
+
 ## 2026-05-25 15:53 - Extraer puerta de autenticacion
 
 **Archivos modificados:** `src/main.tsx`, `src/auth-gate.tsx`, `src/__tests__/auth-gate-extraction.test.ts`
