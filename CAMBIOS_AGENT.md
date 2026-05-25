@@ -4,6 +4,55 @@ Este archivo registra cambios de código hechos por agentes/modelos en este proy
 
 Cada entrada debe indicar archivos modificados, código anterior, código nuevo y por qué se cambió. Las entradas se añaden al **principio** del archivo (las más recientes arriba).
 
+## 2026-05-26 00:00 - Extraer pantalla add a src/screens/add-entry-screen.tsx
+
+**Archivos modificados:** `src/screens/add-entry-screen.tsx`, `src/main.tsx`
+
+### Cambio 1 - Pantalla add extraída
+
+#### Código anterior
+`No existía src/screens/add-entry-screen.tsx.`
+
+#### Código nuevo
+```tsx
+export const AddEntryScreen: FC<AddEntryScreenProps> = ({
+  activeField, setActiveField, valP, setValP, valD, setValD,
+  noteP, setNoteP, noteD, setNoteD, setCurrent, setScreen,
+}) => {
+  // teclado datapropina, display, input nota, botón guardar
+};
+```
+
+#### Por qué se cambió
+La pantalla `screen === "add"` (~106 líneas) es el teclado principal para añadir datapropina. Extraerla a `src/screens/add-entry-screen.tsx` reduce `main.tsx` con frontera clara y 12 props.
+
+### Cambio 2 - Reemplazar bloque add en main.tsx
+
+#### Código anterior
+```tsx
+if (screen === "add") {
+  const setVal = activeField === "propina" ? setValP : setValD;
+  // ... kpAdd, handleSaveAdd, JSX completo
+}
+```
+
+#### Código nuevo
+```tsx
+if (screen === "add") {
+  return (
+    <AddEntryScreen
+      activeField={activeField} setActiveField={setActiveField}
+      valP={valP} setValP={setValP} valD={valD} setValD={setValD}
+      noteP={noteP} setNoteP={setNoteP} noteD={noteD} setNoteD={setNoteD}
+      setCurrent={setCurrent} setScreen={setScreen}
+    />
+  );
+}
+```
+
+#### Por qué se cambió
+Bloque inline reemplazado por componente extraído. Comportamiento idéntico.
+
 ## 2026-05-25 23:54 - Extraer pantalla addNotaGeneral a src/screens/add-nota-general-screen.tsx
 
 **Archivos modificados:** `src/screens/add-nota-general-screen.tsx`, `src/main.tsx`
