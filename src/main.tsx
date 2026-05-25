@@ -18,7 +18,7 @@ import { auth, db } from "./services/firebase";
 import { AuthGate } from "./screens/auth-gate";
 import { registerServiceWorker } from "./services/service-worker-registration";
 import { APP_VERSION } from "./shared/app-version";
-import { fmtDuration, fmtKm, fmtKmNumber, fmtMoney, fmtMoneyNumber } from "./logic/formatters";
+import { fmtDuration, fmtKm, fmtKmNumber, fmtMoney, fmtMoneyNumber, fmt } from "./logic/formatters";
 import { ConfirmDialog, MainCard, SmallCard } from "./components/common";
 import { TurnoNotasCard } from "./components/turno-notas";
 import { EditEntryDialog } from "./components/edit-entry-dialog";
@@ -158,10 +158,6 @@ const NOTE_TIME_STYLE = {
   flexShrink: 0,
   alignSelf: "baseline",
 } as const;
-
-function fmt(n: number): string {
-  return fmtMoney(n);
-}
 
 // ============================================================================
 // SEMANAS — Carga y guardado en localStorage (Fase 3)

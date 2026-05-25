@@ -4,6 +4,40 @@ Este archivo registra cambios de código hechos por agentes/modelos en este proy
 
 Cada entrada debe indicar archivos modificados, código anterior, código nuevo y por qué se cambió. Las entradas se añaden al **principio** del archivo (las más recientes arriba).
 
+## 2026-05-25 22:50 - Extraer fmt a formatters
+
+**Archivos modificados:** `src/logic/formatters.ts`, `src/main.tsx`
+
+### Cambio 1 - fmt en formatters
+
+#### Código anterior
+`No existía fmt en src/logic/formatters.ts.`
+
+#### Código nuevo
+```ts
+export function fmt(n: number): string {
+  return fmtMoney(n);
+}
+```
+
+#### Por qué se cambió
+`fmt` es un wrapper trivial de `fmtMoney` que vive en `main.tsx`. Moverlo a `src/logic/formatters.ts` lo posiciona junto a sus funciones relacionadas y elimina código duplicado en `main.tsx` sin cambiar comportamiento.
+
+### Cambio 2 - Eliminar fmt local de main.tsx
+
+#### Código anterior
+```ts
+function fmt(n: number): string {
+  return fmtMoney(n);
+}
+```
+
+#### Código nuevo
+`` `fmt` se eliminó de `main.tsx`. Se importa ahora de `src/logic/formatters.ts`.` ``
+
+#### Por qué se cambió
+El wrapper local ya no es necesario; `fmt` se importa directamente de su módulo natural.
+
 ## 2026-05-25 22:13 - Reforzar recorte de main
 
 **Archivos modificados:** `RECORTAR_MAIN_TSX_MEJORADO.md`

@@ -9,6 +9,10 @@ export function fmtMoney(n: number): string {
   return `${fmtMoneyNumber(n)} €`;
 }
 
+export function fmt(n: number): string {
+  return fmtMoney(n);
+}
+
 export function fmtKmNumber(n: number): string {
   const sign = n < 0 ? "-" : "";
   const [integerPart, decimalPart] = Math.abs(n).toString().split(".");
