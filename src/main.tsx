@@ -3,15 +3,7 @@ import ReactDOM from "react-dom/client";
 import { Filesystem, Directory, Encoding } from "@capacitor/filesystem";
 import { Share } from "@capacitor/share";
 
-import { Capacitor, registerPlugin } from "@capacitor/core";
-
-export interface ApkInstallerPluginType {
-  canInstallPackages(): Promise<{ value: boolean }>;
-  openInstallPermissionSettings(): Promise<void>;
-  downloadAndInstall(options: { url: string; fileName: string }): Promise<{ success: boolean }>;
-}
-
-const ApkInstaller = registerPlugin<ApkInstallerPluginType>("ApkInstaller");
+import { Capacitor } from "@capacitor/core";
 
 import html2canvas from "html2canvas";
 import { onAuthStateChanged, signOut, type User } from "firebase/auth";
@@ -30,6 +22,7 @@ import { TurnoNotasCard } from "./components/turno-notas";
 import { EditEntryDialog } from "./components/edit-entry-dialog";
 import { DurationCardValue } from "./components/duration-card-value";
 import { Shell } from "./components/shell";
+import { ApkInstaller } from "./apk-installer";
 import { resolveLatestApkUpdate, type UpdateState } from "./update-flow";
 import { buildBackupPayload, buildBackupPayloadFromState } from "./backup";
 import { exportBackupJSON } from "./backup-export";

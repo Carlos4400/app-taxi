@@ -4,6 +4,104 @@ Este archivo registra cambios de código hechos por agentes/modelos en este proy
 
 Cada entrada debe indicar archivos modificados, código anterior, código nuevo y por qué se cambió. Las entradas se añaden al **principio** del archivo (las más recientes arriba).
 
+## 2026-05-25 15:49 - Extraer instalador APK
+
+**Archivos modificados:** `src/main.tsx`, `src/apk-installer.ts`, `src/__tests__/apk-installer-extraction.test.ts`
+
+### Cambio 1 - Mover registro nativo APK
+
+#### Código anterior
+```tsx
+import { Capacitor, registerPlugin } from "@capacitor/core";
+
+export interface ApkInstallerPluginType {
+  canInstallPackages(): Promise<{ value: boolean }>;
+  openInstallPermissionSettings(): Promise<void>;
+  downloadAndInstall(options: { url: string; fileName: string }): Promise<{ success: boolean }>;
+}
+
+const ApkInstaller = registerPlugin<ApkInstallerPluginType>("ApkInstaller");
+```
+
+#### Código nuevo
+```tsx
+import { Capacitor } from "@capacitor/core";
+
+import html2canvas from "html2canvas";
+import { onAuthStateChanged, signOut, type User } from "firebase/auth";
+import {
+  onSnapshot,
+  doc,
+  getDoc,
+  setDoc,
+  writeBatch,
+} from "firebase/firestore";
+import { auth, db } from "./firebase";
+import { LoginScreen } from "./login-screen";
+import { fmtDuration, fmtKm, fmtKmNumber, fmtMoney, fmtMoneyNumber } from "./formatters";
+import { ConfirmDialog, MainCard, SmallCard } from "./components/common";
+import { TurnoNotasCard } from "./components/turno-notas";
+import { EditEntryDialog } from "./components/edit-entry-dialog";
+import { DurationCardValue } from "./components/duration-card-value";
+import { Shell } from "./components/shell";
+import { ApkInstaller } from "./apk-installer";
+```
+
+#### Por qué se cambió
+El registro del plugin nativo APK se separa de `main.tsx` para reducir responsabilidad del archivo principal sin cambiar el objeto `ApkInstaller` que usa el flujo de actualización.
+
+### Cambio 2 - Crear módulo de instalador APK
+
+#### Código anterior
+`No existía el módulo de instalador APK en src/apk-installer.ts.`
+
+#### Código nuevo
+```ts
+import { registerPlugin } from "@capacitor/core";
+
+export interface ApkInstallerPluginType {
+  canInstallPackages(): Promise<{ value: boolean }>;
+  openInstallPermissionSettings(): Promise<void>;
+  downloadAndInstall(options: { url: string; fileName: string }): Promise<{ success: boolean }>;
+}
+
+export const ApkInstaller = registerPlugin<ApkInstallerPluginType>("ApkInstaller");
+```
+
+#### Por qué se cambió
+El tipo y el registro del plugin quedan encapsulados en un módulo pequeño reutilizable, manteniendo el mismo nombre de plugin nativo y la misma firma de `downloadAndInstall`.
+
+### Cambio 3 - Proteger la extracción del instalador
+
+#### Código anterior
+`No existía el test de extracción del instalador APK en src/__tests__/apk-installer-extraction.test.ts.`
+
+#### Código nuevo
+```ts
+import { existsSync, readFileSync } from "node:fs";
+import { resolve } from "node:path";
+import { describe, expect, it } from "vitest";
+
+describe("APK installer extraction", () => {
+  const installerPath = resolve("src/apk-installer.ts");
+  const mainSource = readFileSync(resolve("src/main.tsx"), "utf8");
+
+  it("keeps native APK installer registration outside main.tsx", () => {
+    expect(existsSync(installerPath)).toBe(true);
+
+    const installerSource = readFileSync(installerPath, "utf8");
+    expect(installerSource).toContain('registerPlugin<ApkInstallerPluginType>("ApkInstaller")');
+    expect(installerSource).toContain("downloadAndInstall");
+    expect(mainSource).toContain('from "./apk-installer"');
+    expect(mainSource).not.toContain('registerPlugin<ApkInstallerPluginType>("ApkInstaller")');
+    expect(mainSource).not.toMatch(/^export interface ApkInstallerPluginType/m);
+  });
+});
+```
+
+#### Por qué se cambió
+El test asegura que el registro nativo no vuelva a crecer dentro de `main.tsx` y que la importación del nuevo módulo se mantenga activa.
+
 ## 2026-05-25 15:46 - Extraer exportacion de backup
 
 **Archivos modificados:** `src/main.tsx`, `src/backup-export.ts`, `src/__tests__/backup-export-extraction.test.ts`
