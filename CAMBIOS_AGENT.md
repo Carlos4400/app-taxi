@@ -4,6 +4,145 @@ Este archivo registra cambios de código hechos por agentes/modelos en este proy
 
 Cada entrada debe indicar archivos modificados, código anterior, código nuevo y por qué se cambió. Las entradas se añaden al **principio** del archivo (las más recientes arriba).
 
+## 2026-05-25 15:46 - Extraer exportacion de backup
+
+**Archivos modificados:** `src/main.tsx`, `src/backup-export.ts`, `src/__tests__/backup-export-extraction.test.ts`
+
+### Cambio 1 - Importar exportación de backup
+
+#### Código anterior
+```tsx
+import { resolveLatestApkUpdate, type UpdateState } from "./update-flow";
+import { buildBackupPayload, buildBackupPayloadFromState } from "./backup";
+```
+
+#### Código nuevo
+```tsx
+import { resolveLatestApkUpdate, type UpdateState } from "./update-flow";
+import { buildBackupPayload, buildBackupPayloadFromState } from "./backup";
+import { exportBackupJSON } from "./backup-export";
+```
+
+#### Por qué se cambió
+`main.tsx` usa la exportación de backup desde un módulo propio y deja de contener la llamada directa de backup JSON.
+
+### Cambio 2 - Eliminar exportación local de backup
+
+#### Código anterior
+```tsx
+// El payload se construye en el call site con buildBackupPayloadFromState
+// pasando los estados React vivos (espejo de Firestore en memoria).
+// Antes había un default que leía de localStorage; eliminado para evitar
+// exportar datos obsoletos: localStorage va un tick por detrás del estado.
+async function exportBackupJSON(backup: ReturnType<typeof buildBackupPayload>) {
+  const json = JSON.stringify(backup, null, 2);
+  const fileName = `taxi_backup_${new Date().toISOString().split("T")[0]}.json`;
+
+  try {
+    const result = await Filesystem.writeFile({
+      path: fileName,
+      data: json,
+      directory: Directory.Cache,
+      encoding: Encoding.UTF8,
+    });
+
+    await Share.share({
+      title: "Copia de seguridad",
+      text: "Copia de seguridad de Mi Turno",
+      url: result.uri,
+      dialogTitle: "Compartir / Guardar copia de seguridad",
+    });
+  } catch (e) {
+    console.error("exportBackupJSON error:", e);
+    alert("No se pudo exportar la copia de seguridad.");
+  }
+}
+
+// ============================================================================
+// SEMANAS — Carga y guardado en localStorage (Fase 3)
+// ============================================================================
+```
+
+#### Código nuevo
+```tsx
+// ============================================================================
+// SEMANAS — Carga y guardado en localStorage (Fase 3)
+// ============================================================================
+```
+
+#### Por qué se cambió
+El guardado y compartición de backup se trasladan a `backup-export.ts` sin cambiar nombre de archivo, carpeta Cache, encoding ni mensaje de error.
+
+### Cambio 3 - Crear módulo de exportación
+
+#### Código anterior
+`No existía el módulo de exportación de backup en src/backup-export.ts.`
+
+#### Código nuevo
+```ts
+import { Directory, Encoding, Filesystem } from "@capacitor/filesystem";
+import { Share } from "@capacitor/share";
+import type { buildBackupPayload } from "./backup";
+
+export async function exportBackupJSON(backup: ReturnType<typeof buildBackupPayload>) {
+  const json = JSON.stringify(backup, null, 2);
+  const fileName = `taxi_backup_${new Date().toISOString().split("T")[0]}.json`;
+
+  try {
+    const result = await Filesystem.writeFile({
+      path: fileName,
+      data: json,
+      directory: Directory.Cache,
+      encoding: Encoding.UTF8,
+    });
+
+    await Share.share({
+      title: "Copia de seguridad",
+      text: "Copia de seguridad de Mi Turno",
+      url: result.uri,
+      dialogTitle: "Compartir / Guardar copia de seguridad",
+    });
+  } catch (e) {
+    console.error("exportBackupJSON error:", e);
+    alert("No se pudo exportar la copia de seguridad.");
+  }
+}
+```
+
+#### Por qué se cambió
+El módulo nuevo encapsula la integración Capacitor de backup JSON y tipa el payload con el builder existente.
+
+### Cambio 4 - Proteger extracción de exportación
+
+#### Código anterior
+`No existía el test de extracción de exportación de backup en src/__tests__/backup-export-extraction.test.ts.`
+
+#### Código nuevo
+```ts
+import { existsSync, readFileSync } from "node:fs";
+import { resolve } from "node:path";
+import { describe, expect, it } from "vitest";
+
+describe("Backup export extraction", () => {
+  const backupExportPath = resolve("src/backup-export.ts");
+  const mainSource = readFileSync(resolve("src/main.tsx"), "utf8");
+
+  it("keeps Capacitor backup export outside main.tsx", () => {
+    expect(existsSync(backupExportPath)).toBe(true);
+
+    const backupExportSource = readFileSync(backupExportPath, "utf8");
+    expect(backupExportSource).toContain("export async function exportBackupJSON");
+    expect(backupExportSource).toContain("@capacitor/filesystem");
+    expect(backupExportSource).toContain("@capacitor/share");
+    expect(mainSource).toContain('from "./backup-export"');
+    expect(mainSource).not.toMatch(/^async function exportBackupJSON\(/m);
+  });
+});
+```
+
+#### Por qué se cambió
+El test fija que la exportación Capacitor de backup quede fuera de `main.tsx`.
+
 ## 2026-05-25 15:42 - Extraer contabilidad pura
 
 **Archivos modificados:** `src/main.tsx`, `src/accounting.ts`, `src/__tests__/accounting-extraction.test.ts`

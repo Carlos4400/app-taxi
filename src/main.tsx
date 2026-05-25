@@ -32,6 +32,7 @@ import { DurationCardValue } from "./components/duration-card-value";
 import { Shell } from "./components/shell";
 import { resolveLatestApkUpdate, type UpdateState } from "./update-flow";
 import { buildBackupPayload, buildBackupPayloadFromState } from "./backup";
+import { exportBackupJSON } from "./backup-export";
 import {
   ensureTurnosDiaLibreContable,
   getTurnosByCalendarMonth,
@@ -260,34 +261,6 @@ const APP_VERSION = __APP_VERSION__;
 
 function fmt(n: number): string {
   return fmtMoney(n);
-}
-
-// El payload se construye en el call site con buildBackupPayloadFromState
-// pasando los estados React vivos (espejo de Firestore en memoria).
-// Antes había un default que leía de localStorage; eliminado para evitar
-// exportar datos obsoletos: localStorage va un tick por detrás del estado.
-async function exportBackupJSON(backup: ReturnType<typeof buildBackupPayload>) {
-  const json = JSON.stringify(backup, null, 2);
-  const fileName = `taxi_backup_${new Date().toISOString().split("T")[0]}.json`;
-
-  try {
-    const result = await Filesystem.writeFile({
-      path: fileName,
-      data: json,
-      directory: Directory.Cache,
-      encoding: Encoding.UTF8,
-    });
-
-    await Share.share({
-      title: "Copia de seguridad",
-      text: "Copia de seguridad de Mi Turno",
-      url: result.uri,
-      dialogTitle: "Compartir / Guardar copia de seguridad",
-    });
-  } catch (e) {
-    console.error("exportBackupJSON error:", e);
-    alert("No se pudo exportar la copia de seguridad.");
-  }
 }
 
 // ============================================================================
