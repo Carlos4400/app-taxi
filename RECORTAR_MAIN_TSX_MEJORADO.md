@@ -254,6 +254,28 @@ Este tipo de cambio no afecta a las fórmulas contables, pero sí puede cambiar 
 6. Actualizar `CAMBIOS_AGENT.md` según `AGENTS.md`.
 7. Hacer **un commit de git por fase**, con un mensaje que coincida con el nombre de la fase. Una fase = un commit. Esto permite revisar y revertir cada fase de forma aislada si algo sale mal.
 
+## Registro obligatorio en `CAMBIOS_AGENT.md`
+
+Si una fase modifica archivos, debe actualizar `CAMBIOS_AGENT.md` cumpliendo exactamente `AGENTS.md`.
+
+No basta con añadir un resumen. El registro debe documentar literalmente el cambio.
+
+Cada bloque debe tener:
+
+- `Código anterior`
+- `Código nuevo`
+- `Por qué se cambió`
+
+Reglas adicionales para tareas de recorte:
+
+- `Código anterior` debe contener el fragmento literal que estaba en `main.tsx` antes de extraerlo, o el texto literal de ausencia exigido por `AGENTS.md` si el bloque no existía.
+- `Código nuevo` debe contener el fragmento literal que quedó después, normalmente el nuevo import, el nuevo export o el nuevo bloque en el archivo destino.
+- Si el código ya no existe en `main.tsx`, no usar frases sueltas mal formateadas. Usar un bloque Markdown válido que muestre el import/export nuevo o una frase literal válida dentro de un fence correcto.
+- Los fences Markdown deben estar bien formados: abrir con triple backtick y cerrar con triple backtick.
+- No usar backticks mezclados, fences rotos ni combinaciones como `` `texto` `` envueltas en backticks sueltos.
+- Si hay dos cambios relevantes, documentarlos como cambios separados: creación en el archivo destino y eliminación/import en `main.tsx`.
+- Antes de terminar, revisar visualmente la entrada nueva de `CAMBIOS_AGENT.md` y comprobar que se renderiza como Markdown válido.
+
 ## Parada obligatoria al terminar cada fase
 
 Al terminar una fase, el agente debe parar.
@@ -305,6 +327,7 @@ Parar y pedir confirmación a Carlos si ocurre cualquiera de estos casos:
 - Se detecta un ciclo de imports difícil de resolver.
 - La fase ya no se puede describir con una sola frase concreta.
 - En la fase 0, la cobertura de tests contables es débil o no comprueba importes exactos.
+- La entrada nueva de `CAMBIOS_AGENT.md` queda mal formada, no contiene código literal o tiene fences Markdown rotos.
 
 ## Revisión obligatoria del diff
 
@@ -318,6 +341,7 @@ Antes de terminar, revisar `git diff` y confirmar que:
 - no hay renombrados masivos innecesarios
 - no hay archivos autogenerados modificados sin motivo
 - `CAMBIOS_AGENT.md` documenta la sesión
+- la entrada nueva de `CAMBIOS_AGENT.md` tiene `Código anterior`, `Código nuevo`, `Por qué se cambió` y fences Markdown válidos
 
 ## Prohibido
 
@@ -335,6 +359,7 @@ Antes de terminar, revisar `git diff` y confirmar que:
 - Crear módulos genéricos tipo cajón desastre.
 - Tocar archivos no relacionados.
 - Terminar una tarea con archivos modificados sin actualizar `CAMBIOS_AGENT.md`.
+- Terminar una tarea con una entrada de `CAMBIOS_AGENT.md` mal formada, sin código literal o con fences Markdown rotos.
 - Mover código contable sin un test de caracterización verde escrito previamente sobre el código original.
 
 ## Criterio de tarea terminada
@@ -351,6 +376,7 @@ Una fase está terminada solo si:
 - `git diff` solo contiene cambios esperados.
 - La fase quedó en un commit propio.
 - `CAMBIOS_AGENT.md` documenta literalmente el cambio.
+- La entrada nueva de `CAMBIOS_AGENT.md` cumple `AGENTS.md` y sus fences Markdown son válidos.
 
 ## Regla final
 
@@ -377,5 +403,7 @@ Si hay duda entre reescribir y mover sin cambiar, mover sin cambiar.
 7. **Archivos contables protegidos.** Nueva subsección dentro de "Regla absoluta". Se aclara que la contabilidad real ya está extraída y organizada fuera de `main.tsx`, y se listan las rutas concretas que contienen fórmulas, reglas semanales, entregas, ajustes, tipos y usos contables. Si una fase no nombra explícitamente esos bloques, deben quedar fuera del diff.
 
 8. **Parada obligatoria al terminar cada fase.** Nueva sección. Una vez extraído un bloque, verificadas las pruebas y actualizado el registro, el agente debe parar y esperar confirmación de Carlos antes de iniciar otra extracción.
+
+9. **Registro obligatorio en `CAMBIOS_AGENT.md`.** Nueva sección. Se refuerza que el registro no puede ser un resumen ni una frase mal formada: debe contener código anterior, código nuevo, motivo concreto y fences Markdown válidos. También se añade como señal de stop, revisión del diff, prohibición y criterio de tarea terminada.
 
 Nota de transparencia: estas mejoras se basan en el texto del documento original, buenas prácticas de refactor de código heredado y, para la sección "Archivos contables protegidos", en la revisión de las rutas actuales del proyecto. No sustituye a la "Fase 0": antes de recortar hay que volver a verificar tests, cobertura real y estado limpio del repositorio.

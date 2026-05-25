@@ -4,6 +4,83 @@ Este archivo registra cambios de código hechos por agentes/modelos en este proy
 
 Cada entrada debe indicar archivos modificados, código anterior, código nuevo y por qué se cambió. Las entradas se añaden al **principio** del archivo (las más recientes arriba).
 
+## 2026-05-25 22:55 - Reforzar registro de recortes
+
+**Archivos modificados:** `RECORTAR_MAIN_TSX_MEJORADO.md`
+
+### Cambio 1 - Registro obligatorio de recorte
+
+#### Código anterior
+`No existía la sección "Registro obligatorio en CAMBIOS_AGENT.md" en RECORTAR_MAIN_TSX_MEJORADO.md.`
+
+#### Código nuevo
+```md
+## Registro obligatorio en `CAMBIOS_AGENT.md`
+
+Si una fase modifica archivos, debe actualizar `CAMBIOS_AGENT.md` cumpliendo exactamente `AGENTS.md`.
+
+No basta con añadir un resumen. El registro debe documentar literalmente el cambio.
+
+Cada bloque debe tener:
+
+- `Código anterior`
+- `Código nuevo`
+- `Por qué se cambió`
+
+Reglas adicionales para tareas de recorte:
+
+- `Código anterior` debe contener el fragmento literal que estaba en `main.tsx` antes de extraerlo, o el texto literal de ausencia exigido por `AGENTS.md` si el bloque no existía.
+- `Código nuevo` debe contener el fragmento literal que quedó después, normalmente el nuevo import, el nuevo export o el nuevo bloque en el archivo destino.
+- Si el código ya no existe en `main.tsx`, no usar frases sueltas mal formateadas. Usar un bloque Markdown válido que muestre el import/export nuevo o una frase literal válida dentro de un fence correcto.
+- Los fences Markdown deben estar bien formados: abrir con triple backtick y cerrar con triple backtick.
+- No usar backticks mezclados, fences rotos ni combinaciones como `` `texto` `` envueltas en backticks sueltos.
+- Si hay dos cambios relevantes, documentarlos como cambios separados: creación en el archivo destino y eliminación/import en `main.tsx`.
+- Antes de terminar, revisar visualmente la entrada nueva de `CAMBIOS_AGENT.md` y comprobar que se renderiza como Markdown válido.
+```
+
+#### Por qué se cambió
+El documento solo exigía actualizar `CAMBIOS_AGENT.md`, pero no reforzaba que la entrada debía estar bien formada, con fragmentos literales y fences Markdown válidos.
+
+### Cambio 2 - Validaciones del registro
+
+#### Código anterior
+```md
+- `CAMBIOS_AGENT.md` documenta la sesión
+- Terminar una tarea con archivos modificados sin actualizar `CAMBIOS_AGENT.md`.
+- `CAMBIOS_AGENT.md` documenta literalmente el cambio.
+```
+
+#### Código nuevo
+```md
+- La entrada nueva de `CAMBIOS_AGENT.md` queda mal formada, no contiene código literal o tiene fences Markdown rotos.
+- `CAMBIOS_AGENT.md` documenta la sesión
+- la entrada nueva de `CAMBIOS_AGENT.md` tiene `Código anterior`, `Código nuevo`, `Por qué se cambió` y fences Markdown válidos
+- Terminar una tarea con archivos modificados sin actualizar `CAMBIOS_AGENT.md`.
+- Terminar una tarea con una entrada de `CAMBIOS_AGENT.md` mal formada, sin código literal o con fences Markdown rotos.
+- `CAMBIOS_AGENT.md` documenta literalmente el cambio.
+- La entrada nueva de `CAMBIOS_AGENT.md` cumple `AGENTS.md` y sus fences Markdown son válidos.
+```
+
+#### Por qué se cambió
+Las secciones de stop, revisión del diff, prohibiciones y criterio de tarea terminada debían convertir el formato correcto de `CAMBIOS_AGENT.md` en una condición obligatoria de cierre.
+
+### Cambio 3 - Registro interno del documento
+
+#### Código anterior
+```md
+8. **Parada obligatoria al terminar cada fase.** Nueva sección. Una vez extraído un bloque, verificadas las pruebas y actualizado el registro, el agente debe parar y esperar confirmación de Carlos antes de iniciar otra extracción.
+```
+
+#### Código nuevo
+```md
+8. **Parada obligatoria al terminar cada fase.** Nueva sección. Una vez extraído un bloque, verificadas las pruebas y actualizado el registro, el agente debe parar y esperar confirmación de Carlos antes de iniciar otra extracción.
+
+9. **Registro obligatorio en `CAMBIOS_AGENT.md`.** Nueva sección. Se refuerza que el registro no puede ser un resumen ni una frase mal formada: debe contener código anterior, código nuevo, motivo concreto y fences Markdown válidos. También se añade como señal de stop, revisión del diff, prohibición y criterio de tarea terminada.
+```
+
+#### Por qué se cambió
+El propio documento necesitaba reflejar en su registro interno la nueva regla sobre entradas válidas en `CAMBIOS_AGENT.md`.
+
 ## 2026-05-25 22:50 - Extraer fmt a formatters
 
 **Archivos modificados:** `src/logic/formatters.ts`, `src/main.tsx`
