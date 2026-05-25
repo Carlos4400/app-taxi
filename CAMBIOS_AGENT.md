@@ -4,6 +4,94 @@ Este archivo registra cambios de código hechos por agentes/modelos en este proy
 
 Cada entrada debe indicar archivos modificados, código anterior, código nuevo y por qué se cambió. Las entradas se añaden al **principio** del archivo (las más recientes arriba).
 
+## 2026-05-26 01:28 - Extraer HomeScreen a src/screens/home-screen.tsx
+
+**Archivos modificados:** `src/screens/home-screen.tsx`, `src/components/home-icons.tsx`, `src/main.tsx`
+
+### Cambio 1 - HomeScreen extraída
+
+#### Código anterior
+`No existía src/screens/home-screen.tsx.`
+
+#### Código nuevo
+```tsx
+export const HomeScreen: FC<HomeScreenProps> = ({
+  isPaused,
+  isAdmin,
+  active,
+  onSetScreen,
+  onSetCalendarView,
+  onOpenNewReserva,
+  onSetAdminMode,
+  onSetConfirmDialog,
+  renderReservaDialog,
+}) => {
+  const homeQuickActionIds = getHomeQuickActionIds(isAdmin);
+  return (
+    <Shell burst={false}>
+      {/* ... UI completo de la pantalla home ... */}
+    </Shell>
+  );
+};
+```
+
+#### Por qué se cambió
+La pantalla principal de la app (home) estaba definida inline en `main.tsx`. Extraerla a `src/screens/home-screen.tsx` reduce ~270 líneas del archivo principal y la aísla como componente independiente.
+
+### Cambio 2 - Iconos de HomeScreen centralizados
+
+#### Código anterior
+`No existía src/components/home-icons.tsx.`
+
+#### Código nuevo
+```tsx
+export const IconRocket: FC<{ s?: number; c?: string }> = (...) => (...);
+export const IconClipboard: FC<{ s?: number; c?: string }> = (...) => (...);
+export const IconChart: FC<{ s?: number; c?: string }> = (...) => (...);
+export const IconReservaWrite: FC<{ s?: number; c?: string }> = (...) => (...);
+export const IconAgenda: FC<{ s?: number; c?: string }> = (...) => (...);
+export const IconPlay: FC<{ s?: number; c?: string }> = (...) => (...);
+```
+
+#### Por qué se cambió
+Estos 6 iconos eran definiciones inline en `main.tsx` usadas por HomeScreen. Centralizarlos en `src/components/home-icons.tsx` evita duplicación y permite que `home-screen.tsx` los importe sin depender de `main.tsx`.
+
+### Cambio 3 - Reemplazar bloque inline en main.tsx
+
+#### Código anterior
+```tsx
+  if (screen === "home") {
+    const homeQuickActionIds = getHomeQuickActionIds(isAdmin);
+    return (
+      <Shell burst={false}>
+        {/* ... 270 líneas inline ... */}
+      </Shell>
+    );
+  }
+```
+
+#### Código nuevo
+```tsx
+  if (screen === "home") {
+    return (
+      <HomeScreen
+        isPaused={current.isPaused}
+        isAdmin={isAdmin}
+        active={active}
+        onSetScreen={setScreen}
+        onSetCalendarView={setCalendarView}
+        onOpenNewReserva={openNewReserva}
+        onSetAdminMode={setAdminMode}
+        onSetConfirmDialog={setConfirmDialog}
+        renderReservaDialog={renderReservaDialog}
+      />
+    );
+  }
+```
+
+#### Por qué se cambió
+El bloque inline de ~270 líneas se sustituye por el componente `HomeScreen` importado. main.tsx pasa de 6828 a 6574 líneas.
+
 ## 2026-05-26 01:00 - Extraer iconos de entradas a src/components/entry-icons.tsx
 
 **Archivos modificados:** `src/components/entry-icons.tsx`, `src/main.tsx`
