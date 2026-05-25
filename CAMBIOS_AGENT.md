@@ -4,6 +4,386 @@ Este archivo registra cambios de código hechos por agentes/modelos en este proy
 
 Cada entrada debe indicar archivos modificados, código anterior, código nuevo y por qué se cambió. Las entradas se añaden al **principio** del archivo (las más recientes arriba).
 
+## 2026-05-25 16:03 - Extraer tipos de dominio
+
+**Archivos modificados:** `src/main.tsx`, `src/types.ts`, `src/state-loaders.ts`, `src/turno-notas-logic.ts`, `src/components/turno-notas.tsx`, `src/components/edit-entry-dialog.tsx`, `src/__tests__/domain-types-extraction.test.ts`
+
+### Cambio 1 - Importar y reexportar tipos
+
+#### Código anterior
+`No existía la importación type-only desde src/types.ts ni la reexportación de tipos de dominio desde src/main.tsx.`
+
+#### Código nuevo
+```tsx
+import type {
+  AppSettings,
+  CurrentState,
+  EditTurnoState,
+  Entry,
+  NotaCalendario,
+  NotaTipo,
+  Reserva,
+  Turno,
+  TurnoNotasSemana,
+  WeekOverride,
+} from "./types";
+```
+
+```tsx
+export type {
+  AppSettings,
+  CurrentState,
+  EditTurnoState,
+  Entry,
+  NotaCalendario,
+  NotaTipo,
+  Reserva,
+  Turno,
+  TurnoConfig,
+  TurnoNotasSemana,
+  WeekOverride,
+} from "./types";
+```
+
+#### Por qué se cambió
+`main.tsx` conserva compatibilidad para consumidores externos mediante reexportación, pero deja de definir los tipos de dominio en el archivo principal.
+
+### Cambio 2 - Quitar tipos de turno de main
+
+#### Código anterior
+```tsx
+export interface Entry {
+  id: number;
+  type: string;
+  amount: number;
+  note: string;
+  time: string;
+}
+
+export interface TurnoConfig {
+  porcentajeJefe: number;
+  porcentajeChofer: number;
+  descDatafono: boolean;
+  descAgencia: boolean;
+  descExtra: boolean;
+  descGasolina: boolean;
+}
+
+export interface Turno {
+  id: number;
+  date: string;
+  startTime: string | null;
+  endTime: string;
+  entries: Entry[];
+  totalP: number;
+  totalD: number;
+  totalA: number;
+  totalE: number;
+  totalF: number;
+  totalN: number;
+  dinero: number;
+  km: number;
+  notes: string;
+  startDate: string | null;
+  totalPausedMinutes?: number;
+  entregada?: boolean;
+  fechaEntrega?: string | null;
+  configTurno?: TurnoConfig;
+  diaLibreContable?: number;
+}
+
+export interface TurnoNotasSemana {
+  turno: Turno;
+  notasGenerales: Entry[];
+  notasDetalladas: Entry[];
+}
+
+interface EditTurnoState extends Turno {
+  dineroStr?: string;
+  kmStr?: string;
+  newType?: string | null;
+  newAmount?: string;
+  newNote?: string;
+  isAddingNote?: boolean;
+  tempNote?: string;
+}
+
+interface CurrentState {
+  entries: Entry[];
+  startTime: string | null;
+  startDate: string | null;
+  isPaused?: boolean;
+  pauseStartTime?: string | null;
+  totalPausedMinutes?: number;
+}
+```
+
+#### Código nuevo
+```tsx
+const G = "oklch(0.68 0.20 145)";
+```
+
+#### Por qué se cambió
+Los tipos de turno pasan a `src/types.ts`; `main.tsx` continúa usándolos como importaciones type-only, sin generar código runtime nuevo.
+
+### Cambio 3 - Quitar tipos de calendario de main
+
+#### Código anterior
+```tsx
+export interface Reserva {
+  id: string;
+  date: string;        // "YYYY-MM-DD"
+  time: string;        // "HH:mm"
+  origen: string;
+  destino: string;
+  cliente: string;
+  telefono: string;    // permite llamada directa
+  notas: string;
+}
+
+export type NotaTipo = 'ITV' | 'Seguro' | 'Normal' | 'Día libre';
+
+export interface NotaCalendario {
+  id: string;
+  date: string;        // "YYYY-MM-DD"
+  tipo: NotaTipo;
+  texto: string;
+}
+
+interface WeekOverride {
+  weekId: string;
+  notes: string;
+  entregada: boolean;
+  fechaEntrega: string | null;
+}
+
+export interface AppSettings {
+  "porcentaje.jefe": number;
+  "porcentaje.chofer": number;
+  "descontar.datafono": boolean;
+  "descontar.agencia_bono": boolean;
+  "descontar.extra": boolean;
+  "descontar.gasolina": boolean;
+  diaLibre: number;              // 0=Domingo, 1=Lunes, 2=Martes, 3=Miércoles, 4=Jueves, 5=Viernes, 6=Sábado
+  diaLibreDesde: string | null;  // Fecha ISO desde la que aplica este día libre (null si nunca se ha cambiado)
+}
+```
+
+#### Código nuevo
+```tsx
+function fmt(n: number): string {
+  return fmtMoney(n);
+}
+```
+
+#### Por qué se cambió
+Los tipos de reservas, notas, semanas y ajustes pasan al módulo común de tipos, separando modelo de dominio de la pantalla principal.
+
+### Cambio 4 - Crear módulo de tipos
+
+#### Código anterior
+`No existía el módulo de tipos de dominio en src/types.ts.`
+
+#### Código nuevo
+```ts
+export interface Entry {
+  id: number;
+  type: string;
+  amount: number;
+  note: string;
+  time: string;
+}
+
+export interface TurnoConfig {
+  porcentajeJefe: number;
+  porcentajeChofer: number;
+  descDatafono: boolean;
+  descAgencia: boolean;
+  descExtra: boolean;
+  descGasolina: boolean;
+}
+
+export interface Turno {
+  id: number;
+  date: string;
+  startTime: string | null;
+  endTime: string;
+  entries: Entry[];
+  totalP: number;
+  totalD: number;
+  totalA: number;
+  totalE: number;
+  totalF: number;
+  totalN: number;
+  dinero: number;
+  km: number;
+  notes: string;
+  startDate: string | null;
+  totalPausedMinutes?: number;
+  entregada?: boolean;
+  fechaEntrega?: string | null;
+  configTurno?: TurnoConfig;
+  diaLibreContable?: number;
+}
+
+export interface TurnoNotasSemana {
+  turno: Turno;
+  notasGenerales: Entry[];
+  notasDetalladas: Entry[];
+}
+
+export interface EditTurnoState extends Turno {
+  dineroStr?: string;
+  kmStr?: string;
+  newType?: string | null;
+  newAmount?: string;
+  newNote?: string;
+  isAddingNote?: boolean;
+  tempNote?: string;
+}
+
+export interface CurrentState {
+  entries: Entry[];
+  startTime: string | null;
+  startDate: string | null;
+  isPaused?: boolean;
+  pauseStartTime?: string | null;
+  totalPausedMinutes?: number;
+}
+
+export interface Reserva {
+  id: string;
+  date: string;        // "YYYY-MM-DD"
+  time: string;        // "HH:mm"
+  origen: string;
+  destino: string;
+  cliente: string;
+  telefono: string;    // permite llamada directa
+  notas: string;
+}
+
+export type NotaTipo = "ITV" | "Seguro" | "Normal" | "Día libre";
+
+export interface NotaCalendario {
+  id: string;
+  date: string;        // "YYYY-MM-DD"
+  tipo: NotaTipo;
+  texto: string;
+}
+
+export interface WeekOverride {
+  weekId: string;
+  notes: string;
+  entregada: boolean;
+  fechaEntrega: string | null;
+}
+
+export interface AppSettings {
+  "porcentaje.jefe": number;
+  "porcentaje.chofer": number;
+  "descontar.datafono": boolean;
+  "descontar.agencia_bono": boolean;
+  "descontar.extra": boolean;
+  "descontar.gasolina": boolean;
+  diaLibre: number;              // 0=Domingo, 1=Lunes, 2=Martes, 3=Miércoles, 4=Jueves, 5=Viernes, 6=Sábado
+  diaLibreDesde: string | null;  // Fecha ISO desde la que aplica este día libre (null si nunca se ha cambiado)
+}
+```
+
+#### Por qué se cambió
+Agrupar tipos compartidos evita que módulos auxiliares dependan de `main.tsx` solo para tipos y hace más claro el modelo de datos de la app.
+
+### Cambio 5 - Actualizar loaders a tipos comunes
+
+#### Código anterior
+```ts
+import type { AppSettings, Entry, NotaCalendario, Reserva, Turno } from "./main";
+```
+
+#### Código nuevo
+```ts
+import type { AppSettings, Entry, NotaCalendario, Reserva, Turno } from "./types";
+```
+
+#### Por qué se cambió
+`state-loaders.ts` deja de depender de `main.tsx` para cargar los tipos usados al leer localStorage.
+
+### Cambio 6 - Actualizar componentes de notas y edición
+
+#### Código anterior
+```ts
+import type { Turno, TurnoNotasSemana } from "./main";
+```
+
+```tsx
+import type { CSSProperties } from "react";
+import type { TurnoNotasSemana } from "../main";
+```
+
+```tsx
+import { useState, type ReactNode } from "react";
+import type { Entry } from "../main";
+```
+
+#### Código nuevo
+```ts
+import type { Turno, TurnoNotasSemana } from "./types";
+```
+
+```tsx
+import type { CSSProperties } from "react";
+import type { TurnoNotasSemana } from "../types";
+```
+
+```tsx
+import { useState, type ReactNode } from "react";
+import type { Entry } from "../types";
+```
+
+#### Por qué se cambió
+La lógica y los componentes que solo necesitan tipos consumen el módulo común y reducen el acoplamiento con el archivo principal.
+
+### Cambio 7 - Proteger extracción de tipos
+
+#### Código anterior
+`No existía el test de extracción de tipos de dominio en src/__tests__/domain-types-extraction.test.ts.`
+
+#### Código nuevo
+```ts
+import { existsSync, readFileSync } from "node:fs";
+import { resolve } from "node:path";
+import { describe, expect, it } from "vitest";
+
+describe("domain types extraction", () => {
+  const typesPath = resolve("src/types.ts");
+  const mainSource = readFileSync(resolve("src/main.tsx"), "utf8");
+
+  it("keeps shared domain types outside main.tsx", () => {
+    expect(existsSync(typesPath)).toBe(true);
+
+    const typesSource = readFileSync(typesPath, "utf8");
+    const stateLoadersSource = readFileSync(resolve("src/state-loaders.ts"), "utf8");
+    const turnoNotasSource = readFileSync(resolve("src/turno-notas-logic.ts"), "utf8");
+    const turnoNotasCardSource = readFileSync(resolve("src/components/turno-notas.tsx"), "utf8");
+    const editEntryDialogSource = readFileSync(resolve("src/components/edit-entry-dialog.tsx"), "utf8");
+
+    expect(typesSource).toContain("export interface Turno");
+    expect(typesSource).toContain("export interface AppSettings");
+    expect(typesSource).toContain("export interface Reserva");
+    expect(mainSource).toContain('from "./types"');
+    expect(mainSource).not.toMatch(/^export interface Turno /m);
+    expect(mainSource).not.toMatch(/^export interface AppSettings /m);
+    expect(stateLoadersSource).toContain('from "./types"');
+    expect(turnoNotasSource).toContain('from "./types"');
+    expect(turnoNotasCardSource).toContain('from "../types"');
+    expect(editEntryDialogSource).toContain('from "../types"');
+  });
+});
+```
+
+#### Por qué se cambió
+El test confirma que los tipos compartidos viven en `src/types.ts` y que los consumidores dejan de importarlos desde `main.tsx`.
+
 ## 2026-05-25 15:58 - Extraer version de la app
 
 **Archivos modificados:** `src/main.tsx`, `src/app-version.ts`, `src/__tests__/app-version-extraction.test.ts`

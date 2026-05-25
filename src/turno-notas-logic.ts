@@ -1,4 +1,4 @@
-import type { Turno, TurnoNotasSemana } from "./main";
+import type { Turno, TurnoNotasSemana } from "./types";
 
 export function getTurnosNotasSemana(turnos: Turno[]): TurnoNotasSemana[] {
   return turnos

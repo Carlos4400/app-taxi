@@ -1,4 +1,4 @@
-import type { AppSettings, Entry, NotaCalendario, Reserva, Turno } from "./main";
+import type { AppSettings, Entry, NotaCalendario, Reserva, Turno } from "./types";
 import { readLocalJSON } from "./user-storage";
 import {
   KEY_CURRENT,

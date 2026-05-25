@@ -46,6 +46,18 @@ import { fmtDate, getDiffMins, timeNow, today } from "./date-time";
 import { userStorageKey, writeUserLocalJSON } from "./user-storage";
 import { KEY_CURRENT, KEY_HISTORY, KEY_NOTES, KEY_RESERVATIONS, KEY_SETTINGS, KEY_WEEK_OVERRIDES } from "./storage-keys";
 import { loadCurrent, loadHistory, loadNotes, loadReservations, loadSettings, loadWeekOverrides } from "./state-loaders";
+import type {
+  AppSettings,
+  CurrentState,
+  EditTurnoState,
+  Entry,
+  NotaCalendario,
+  NotaTipo,
+  Reserva,
+  Turno,
+  TurnoNotasSemana,
+  WeekOverride,
+} from "./types";
 import {
   formatWeekRange,
   formatWeekRangeFull,
@@ -94,6 +106,19 @@ export { getTurnosNotasSemana };
 export { updateTurnoEntrega };
 export { getAccountingPeriodLabel };
 export { KM_CARD_UNIT_STYLE, TIME_CARD_HOUR_UNIT_STYLE, TIME_CARD_UNIT_STYLE, WEEK_LIST_CARD_TEXT_SIZES };
+export type {
+  AppSettings,
+  CurrentState,
+  EditTurnoState,
+  Entry,
+  NotaCalendario,
+  NotaTipo,
+  Reserva,
+  Turno,
+  TurnoConfig,
+  TurnoNotasSemana,
+  WeekOverride,
+} from "./types";
 export {
   getCurrentOpenWeekId,
   getTurnoAccountingWeekId,
@@ -113,71 +138,6 @@ export {
 };
 
 const { useState, useEffect, useRef } = React;
-
-export interface Entry {
-  id: number;
-  type: string;
-  amount: number;
-  note: string;
-  time: string;
-}
-
-export interface TurnoConfig {
-  porcentajeJefe: number;
-  porcentajeChofer: number;
-  descDatafono: boolean;
-  descAgencia: boolean;
-  descExtra: boolean;
-  descGasolina: boolean;
-}
-
-export interface Turno {
-  id: number;
-  date: string;
-  startTime: string | null;
-  endTime: string;
-  entries: Entry[];
-  totalP: number;
-  totalD: number;
-  totalA: number;
-  totalE: number;
-  totalF: number;
-  totalN: number;
-  dinero: number;
-  km: number;
-  notes: string;
-  startDate: string | null;
-  totalPausedMinutes?: number;
-  entregada?: boolean;
-  fechaEntrega?: string | null;
-  configTurno?: TurnoConfig;
-  diaLibreContable?: number;
-}
-
-export interface TurnoNotasSemana {
-  turno: Turno;
-  notasGenerales: Entry[];
-  notasDetalladas: Entry[];
-}
-
-interface EditTurnoState extends Turno {
-  dineroStr?: string;
-  kmStr?: string;
-  newType?: string | null;
-  newAmount?: string;
-  newNote?: string;
-  isAddingNote?: boolean;
-  tempNote?: string;
-}
-
-interface CurrentState {
-  entries: Entry[];
-  startTime: string | null;
-  startDate: string | null;
-  isPaused?: boolean;
-  pauseStartTime?: string | null;
-  totalPausedMinutes?: number;
-}
 
 const G = "oklch(0.68 0.20 145)";
 const GBG = "oklch(0.18 0.07 145)";
@@ -213,43 +173,6 @@ const NOTE_TIME_STYLE = {
   alignSelf: "baseline",
 } as const;
 
-export interface Reserva {
-  id: string;
-  date: string;        // "YYYY-MM-DD"
-  time: string;        // "HH:mm"
-  origen: string;
-  destino: string;
-  cliente: string;
-  telefono: string;    // permite llamada directa
-  notas: string;
-}
-
-export type NotaTipo = 'ITV' | 'Seguro' | 'Normal' | 'Día libre';
-
-export interface NotaCalendario {
-  id: string;
-  date: string;        // "YYYY-MM-DD"
-  tipo: NotaTipo;
-  texto: string;
-}
-
-interface WeekOverride {
-  weekId: string;
-  notes: string;
-  entregada: boolean;
-  fechaEntrega: string | null;
-}
-
-export interface AppSettings {
-  "porcentaje.jefe": number;
-  "porcentaje.chofer": number;
-  "descontar.datafono": boolean;
-  "descontar.agencia_bono": boolean;
-  "descontar.extra": boolean;
-  "descontar.gasolina": boolean;
-  diaLibre: number;              // 0=Domingo, 1=Lunes, 2=Martes, 3=Miércoles, 4=Jueves, 5=Viernes, 6=Sábado
-  diaLibreDesde: string | null;  // Fecha ISO desde la que aplica este día libre (null si nunca se ha cambiado)
-}
 function fmt(n: number): string {
   return fmtMoney(n);
 }
