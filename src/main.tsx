@@ -6,7 +6,7 @@ import { Share } from "@capacitor/share";
 import { Capacitor } from "@capacitor/core";
 
 import html2canvas from "html2canvas";
-import { onAuthStateChanged, signOut, type User } from "firebase/auth";
+import { signOut } from "firebase/auth";
 import {
   onSnapshot,
   doc,
@@ -15,7 +15,7 @@ import {
   writeBatch,
 } from "firebase/firestore";
 import { auth, db } from "./firebase";
-import { LoginScreen } from "./login-screen";
+import { AuthGate } from "./auth-gate";
 import { fmtDuration, fmtKm, fmtKmNumber, fmtMoney, fmtMoneyNumber } from "./formatters";
 import { ConfirmDialog, MainCard, SmallCard } from "./components/common";
 import { TurnoNotasCard } from "./components/turno-notas";
@@ -7361,52 +7361,9 @@ function App() {
   );
 }
 
-// AuthGate: decide qué pintar en función del estado de autenticación.
-//   - Mientras Firebase comprueba si hay sesión guardada → "Cargando…".
-//   - Sin usuario          → LoginScreen.
-//   - Con usuario          → App. Se usa key={user.uid} para forzar un remount
-//                             completo si cambia el usuario, asegurando que el
-//                             estado interno de App se reinicia entre usuarios.
-function AuthGate() {
-  const [user, setUser] = useState<User | null>(null);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    const unsub = onAuthStateChanged(auth, (u) => {
-      setUser(u);
-      setLoading(false);
-    });
-    return unsub;
-  }, []);
-
-  if (loading) {
-    return (
-      <div
-        style={{
-          minHeight: "100vh",
-          background: "oklch(0.14 0.02 260)",
-          color: "oklch(0.92 0.02 260)",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          fontSize: 16,
-        }}
-      >
-        Cargando…
-      </div>
-    );
-  }
-
-  if (!user) {
-    return <LoginScreen />;
-  }
-
-  return <App key={user.uid} />;
-}
-
 const rootElement = document.getElementById("root");
 if (rootElement) {
-  ReactDOM.createRoot(rootElement).render(<AuthGate />);
+  ReactDOM.createRoot(rootElement).render(<AuthGate AppComponent={App} />);
 }
 
 if ("serviceWorker" in navigator) {

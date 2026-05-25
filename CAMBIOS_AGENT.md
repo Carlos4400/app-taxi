@@ -4,6 +4,193 @@ Este archivo registra cambios de código hechos por agentes/modelos en este proy
 
 Cada entrada debe indicar archivos modificados, código anterior, código nuevo y por qué se cambió. Las entradas se añaden al **principio** del archivo (las más recientes arriba).
 
+## 2026-05-25 15:53 - Extraer puerta de autenticacion
+
+**Archivos modificados:** `src/main.tsx`, `src/auth-gate.tsx`, `src/__tests__/auth-gate-extraction.test.ts`
+
+### Cambio 1 - Importar AuthGate externo
+
+#### Código anterior
+```tsx
+import { onAuthStateChanged, signOut, type User } from "firebase/auth";
+import {
+  onSnapshot,
+  doc,
+  getDoc,
+  setDoc,
+  writeBatch,
+} from "firebase/firestore";
+import { auth, db } from "./firebase";
+import { LoginScreen } from "./login-screen";
+```
+
+#### Código nuevo
+```tsx
+import { signOut } from "firebase/auth";
+import {
+  onSnapshot,
+  doc,
+  getDoc,
+  setDoc,
+  writeBatch,
+} from "firebase/firestore";
+import { auth, db } from "./firebase";
+import { AuthGate } from "./auth-gate";
+```
+
+#### Por qué se cambió
+`main.tsx` ya no necesita conocer `onAuthStateChanged`, el tipo `User` ni `LoginScreen` porque la puerta de autenticación vive en su propio módulo.
+
+### Cambio 2 - Sustituir AuthGate local
+
+#### Código anterior
+```tsx
+// AuthGate: decide qué pintar en función del estado de autenticación.
+//   - Mientras Firebase comprueba si hay sesión guardada → "Cargando…".
+//   - Sin usuario          → LoginScreen.
+//   - Con usuario          → App. Se usa key={user.uid} para forzar un remount
+//                             completo si cambia el usuario, asegurando que el
+//                             estado interno de App se reinicia entre usuarios.
+function AuthGate() {
+  const [user, setUser] = useState<User | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const unsub = onAuthStateChanged(auth, (u) => {
+      setUser(u);
+      setLoading(false);
+    });
+    return unsub;
+  }, []);
+
+  if (loading) {
+    return (
+      <div
+        style={{
+          minHeight: "100vh",
+          background: "oklch(0.14 0.02 260)",
+          color: "oklch(0.92 0.02 260)",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          fontSize: 16,
+        }}
+      >
+        Cargando…
+      </div>
+    );
+  }
+
+  if (!user) {
+    return <LoginScreen />;
+  }
+
+  return <App key={user.uid} />;
+}
+
+const rootElement = document.getElementById("root");
+if (rootElement) {
+  ReactDOM.createRoot(rootElement).render(<AuthGate />);
+}
+```
+
+#### Código nuevo
+```tsx
+const rootElement = document.getElementById("root");
+if (rootElement) {
+  ReactDOM.createRoot(rootElement).render(<AuthGate AppComponent={App} />);
+}
+```
+
+#### Por qué se cambió
+La lógica de autenticación se delega en `auth-gate.tsx` y `main.tsx` solo le entrega el componente `App`, manteniendo el remount por usuario dentro del nuevo módulo.
+
+### Cambio 3 - Crear módulo AuthGate
+
+#### Código anterior
+`No existía el módulo AuthGate en src/auth-gate.tsx.`
+
+#### Código nuevo
+```tsx
+import React from "react";
+import { onAuthStateChanged, type User } from "firebase/auth";
+
+import { auth } from "./firebase";
+import { LoginScreen } from "./login-screen";
+
+export function AuthGate({ AppComponent }: { AppComponent: React.ComponentType }) {
+  const [user, setUser] = React.useState<User | null>(null);
+  const [loading, setLoading] = React.useState(true);
+
+  React.useEffect(() => {
+    const unsub = onAuthStateChanged(auth, (u) => {
+      setUser(u);
+      setLoading(false);
+    });
+    return unsub;
+  }, []);
+
+  if (loading) {
+    return (
+      <div
+        style={{
+          minHeight: "100vh",
+          background: "oklch(0.14 0.02 260)",
+          color: "oklch(0.92 0.02 260)",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          fontSize: 16,
+        }}
+      >
+        Cargando…
+      </div>
+    );
+  }
+
+  if (!user) {
+    return <LoginScreen />;
+  }
+
+  return <AppComponent key={user.uid} />;
+}
+```
+
+#### Por qué se cambió
+La comprobación de sesión, la pantalla de carga y el fallback a login se aíslan en un componente pequeño sin alterar textos, estilos ni el comportamiento de remount por `uid`.
+
+### Cambio 4 - Proteger extracción de AuthGate
+
+#### Código anterior
+`No existía el test de extracción de AuthGate en src/__tests__/auth-gate-extraction.test.ts.`
+
+#### Código nuevo
+```ts
+import { existsSync, readFileSync } from "node:fs";
+import { resolve } from "node:path";
+import { describe, expect, it } from "vitest";
+
+describe("AuthGate extraction", () => {
+  const authGatePath = resolve("src/auth-gate.tsx");
+  const mainSource = readFileSync(resolve("src/main.tsx"), "utf8");
+
+  it("keeps Firebase auth gating outside main.tsx", () => {
+    expect(existsSync(authGatePath)).toBe(true);
+
+    const authGateSource = readFileSync(authGatePath, "utf8");
+    expect(authGateSource).toContain("onAuthStateChanged");
+    expect(authGateSource).toContain("LoginScreen");
+    expect(authGateSource).toContain("AppComponent");
+    expect(mainSource).toContain('from "./auth-gate"');
+    expect(mainSource).toContain("<AuthGate AppComponent={App} />");
+    expect(mainSource).not.toMatch(/^function AuthGate\(\)/m);
+  });
+});
+```
+
+#### Por qué se cambió
+El test impide que la puerta de autenticación vuelva a quedar embebida en `main.tsx` y valida que la app se siga montando a través del componente extraído.
+
 ## 2026-05-25 15:49 - Extraer instalador APK
 
 **Archivos modificados:** `src/main.tsx`, `src/apk-installer.ts`, `src/__tests__/apk-installer-extraction.test.ts`
