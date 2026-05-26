@@ -4,6 +4,69 @@ Este archivo registra cambios de código hechos por agentes/modelos en este proy
 
 Cada entrada debe indicar archivos modificados, código anterior, código nuevo y por qué se cambió. Las entradas se añaden al **principio** del archivo (las más recientes arriba).
 
+## 2026-05-26 18:00 - Restaurar icono de cohete en inicio
+
+**Archivos modificados:** `src/components/home-icons.tsx`, `src/__tests__/home-icons.test.ts`
+
+### Cambio 1 - Test del icono de cohete
+
+#### Código anterior
+`No existía src/__tests__/home-icons.test.ts.`
+
+#### Código nuevo
+```ts
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
+import { describe, expect, it } from "vitest";
+
+describe("Home icon extraction", () => {
+  const source = readFileSync(resolve("src/components/home-icons.tsx"), "utf8");
+
+  it("keeps the original rocket icon shape", () => {
+    expect(source).toContain('transform="rotate(45 12 12)"');
+    expect(source).toContain("M12 2 C16 3 17 9 16 14 L8 14 C7 9 8 3 12 2 Z");
+    expect(source).toContain("M8 22 L8 25");
+    expect(source).toContain("M16 22 L16 25");
+    expect(source).toContain('verticalAlign: "middle"');
+  });
+});
+```
+
+#### Por qué se cambió
+Se añadió una comprobación fija para que el icono de cohete extraído mantenga la forma original que tenía en `main.tsx` antes del recorte.
+
+### Cambio 2 - SVG del cohete
+
+#### Código anterior
+```tsx
+export const IconRocket: FC<{ s?: number; c?: string }> = ({ s = 24, c = "white" }: { s?: number; c?: string }) => (
+  <svg width={s} height={s} viewBox="0 0 24 24" fill="none">
+    <path d="M4.5 16.5C4.5 16.5 6 12 12 6C12 6 12 12 16.5 13.5M16.5 13.5L19.5 15M19.5 15L22 17M19.5 15C19.5 15 20 17 18 19C16 21 14 19.5 14 19.5M14 19.5L9 14.5" stroke={c} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+  </svg>
+);
+```
+
+#### Código nuevo
+```tsx
+export const IconRocket: FC<{ s?: number; c?: string }> = ({ s = 24, c = "white" }: { s?: number; c?: string }) => (
+  <svg width={s} height={s} viewBox="0 0 24 24" fill="none" style={{ display: "inline-block", verticalAlign: "middle" }}>
+    <g transform="rotate(45 12 12)">
+      <path d="M12 2 C16 3 17 9 16 14 L8 14 C7 9 8 3 12 2 Z" stroke={c} strokeWidth="1.8" strokeLinejoin="round" />
+      <path d="M9.5 5 Q12 6 14.5 5" stroke={c} strokeWidth="1.8" strokeLinecap="round" />
+      <circle cx="12" cy="8" r="1.5" stroke={c} strokeWidth="1.8" />
+      <path d="M8 11 C5 11 4 14 4 16 C6 16 8 14 8 14" stroke={c} strokeWidth="1.8" strokeLinejoin="round" />
+      <path d="M16 11 C19 11 20 14 20 16 C18 16 16 14 16 14" stroke={c} strokeWidth="1.8" strokeLinejoin="round" />
+      <path d="M10 14 L9 16 C11 16.5 13 16.5 15 16 L14 14" stroke={c} strokeWidth="1.8" strokeLinejoin="round" />
+      <path d="M8 22 L8 25" stroke={c} strokeWidth="1.8" strokeLinecap="round" />
+      <path d="M16 22 L16 25" stroke={c} strokeWidth="1.8" strokeLinecap="round" />
+    </g>
+  </svg>
+);
+```
+
+#### Por qué se cambió
+El recorte había sustituido el cohete original por un trazo simplificado que se veía deformado en la pantalla de inicio. Se restauró el SVG original sin cambiar el comportamiento del botón.
+
 ## 2026-05-26 16:39 - Corregir notas detalladas al cerrar turno
 
 **Archivos modificados:** `src/screens/confirm-end-screen.tsx`, `src/shared/entry-type-meta.tsx`, `src/__tests__/detailed-notes-layout.test.ts`
