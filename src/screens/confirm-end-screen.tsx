@@ -4,6 +4,7 @@ import { IconBack, IconDel } from "../components/navigation-icons";
 import { IconCoin, IconCard, IconAgency, IconExtra, IconFuel, IconNulo } from "../components/entry-icons";
 import { IconNoteAdd, IconTaxiBadgeNeon, IconRoad } from "../components/summary-icons";
 import { fmt } from "../logic/formatters";
+import { getEntryTypeMeta } from "../shared/entry-type-meta";
 import { A, ABG, E, EBG, F, FBG, G, GBG, N, NBG, P, PBG } from "../shared/ui-theme";
 import type { CurrentState, AppSettings, Entry } from "../shared/types";
 
@@ -219,13 +220,16 @@ export function ConfirmEndScreen({
                     <IconNoteAdd s={17} showPlus={false} /> Notas del Turno
                   </div>
                   <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                    {gNotes.map(e => (
-                      <div key={e.id} style={{ display: "grid", gridTemplateColumns: "auto auto minmax(0, 1fr)", alignItems: "baseline", gap: 9, color: "rgba(255,255,255,0.8)", fontSize: 13, lineHeight: 1.4, background: "rgba(255,255,255,0.025)", padding: "8px 10px", borderRadius: 9, minWidth: 0 }}>
-                        <span style={NOTE_TIME_STYLE}>{e.time}</span>
-                        <span style={{ fontWeight: 700, color: "white", fontSize: 14, whiteSpace: "nowrap", flexShrink: 0 }}>{e.type}</span>
-                        <span style={{ color: "rgba(255,255,255,0.82)", fontSize: 12, lineHeight: 1.38, minWidth: 0, overflowWrap: "anywhere" }}>{e.note}</span>
-                      </div>
-                    ))}
+                    {gNotes.map(e => {
+                      const meta = getEntryTypeMeta(e.type);
+                      return (
+                        <div key={e.id} style={{ display: "grid", gridTemplateColumns: "auto auto minmax(0, 1fr)", alignItems: "baseline", gap: 9, color: "rgba(255,255,255,0.8)", fontSize: 13, lineHeight: 1.4, background: "rgba(255,255,255,0.025)", padding: "8px 10px", borderRadius: 9, minWidth: 0 }}>
+                          <span style={NOTE_TIME_STYLE}>{e.time}</span>
+                          <span style={{ fontWeight: 700, color: meta.color, fontSize: 14, whiteSpace: "nowrap", flexShrink: 0 }}>{meta.label}</span>
+                          <span style={{ color: "rgba(255,255,255,0.82)", fontSize: 12, lineHeight: 1.38, minWidth: 0, overflowWrap: "anywhere" }}>{e.note}</span>
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
               );

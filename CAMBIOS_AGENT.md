@@ -36,7 +36,6 @@ Las pantallas extraídas en sesiones anteriores necesitaban ser importadas para 
     return (
       <Shell burst={false}>
         <div style={{ flex: 1, padding: "16px 20px", display: "flex", flexDirection: "column", gap: 14, overflowY: "auto" }}>
-          ... (contenido completo del bloque)
         </div>
       </Shell>
     );
@@ -74,10 +73,9 @@ Separación de responsabilidades: el bloque if de PantallaTurnos ahora usa el co
     return (
       <Shell burst={false}>
         <div style={{ flex: 1, padding: "16px 20px", display: "flex", flexDirection: "column", gap: 14, overflowY: "auto" }}>
-          ... (contenido completo del bloque)
         </div>
         {confirmDialog && <ConfirmDialog {...confirmDialog} onCancel={() => setConfirmDialog(null)} />}
-        {editEntry && (<EditEntryDialog ... />)}
+        {editEntry && (<EditEntryDialog />)}
       </Shell>
     );
   }
@@ -114,10 +112,9 @@ Separación de responsabilidades: el bloque if de todayHistory ahora usa el comp
 #### Código anterior
 ```tsx
   if (screen === "confirmEnd") {
-    function kpEnd(v: string) { ... }
+    function kpEnd(v: string) { }
     return (
       <Shell burst={false}>
-        ... (contenido completo con el teclado in-app)
       </Shell>
     );
   }
@@ -405,10 +402,8 @@ La pantalla de calendario (`screen === "calendar"`) era un bloque inline de ~767
     const year = calendarMonth.getFullYear();
     const month = calendarMonth.getMonth();
     const startOffset = getStartOffset(year, month);
-    // ... ~760 líneas inline del bloque calendar ...
     return (
       <Shell burst={false}>
-        {/* JSX completo de calendario */}
       </Shell>
     );
   }
@@ -495,7 +490,6 @@ export const HomeScreen: FC<HomeScreenProps> = ({
   const homeQuickActionIds = getHomeQuickActionIds(isAdmin);
   return (
     <Shell burst={false}>
-      {/* ... UI completo de la pantalla home ... */}
     </Shell>
   );
 };

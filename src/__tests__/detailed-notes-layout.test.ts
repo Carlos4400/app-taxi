@@ -4,6 +4,8 @@ import { describe, expect, it } from "vitest";
 
 describe("Detailed notes layout", () => {
   const source = readFileSync(resolve("src/main.tsx"), "utf8");
+  const summaryIconsSource = readFileSync(resolve("src/components/summary-icons.tsx"), "utf8");
+  const confirmEndSource = readFileSync(resolve("src/screens/confirm-end-screen.tsx"), "utf8");
   const turnoNotasSource = readFileSync(resolve("src/components/turno-notas.tsx"), "utf8");
 
   it("centralizes entry metadata with labels, colors and icons", () => {
@@ -30,7 +32,7 @@ describe("Detailed notes layout", () => {
   });
 
   it("uses a restrained faithful pin icon for detailed notes", () => {
-    const iconPinBlock = source.match(/const IconPinNeon = \([\s\S]*?\n\);/)?.[0];
+    const iconPinBlock = summaryIconsSource.match(/const IconPinNeon = \([\s\S]*?\n\);/)?.[0];
 
     expect(iconPinBlock).toBeDefined();
     expect(iconPinBlock).toMatch(/c = "oklch\(0\.72 0\.14 28\)"/);
@@ -72,12 +74,12 @@ describe("Detailed notes layout", () => {
   });
 
   it("keeps turn summary and end-turn note sections visually consistent", () => {
-    const summaryBlock = source.match(
+    const summaryBlockMatch = source.match(
       /if \(screen === 'summary' && viewTurno\) \{[\s\S]*?\/\* Contenedor Inferior Agrupado: Descontar y Dar \*\//
-    )?.[0];
-    const confirmEndBlock = source.match(
-      /if \(screen === "confirmEnd"\) \{[\s\S]*?<button onClick=\{handleEndTurno\}/
-    )?.[0];
+    );
+    const summaryBlock = summaryBlockMatch ? summaryBlockMatch[0] : undefined;
+    const confirmEndMatch = confirmEndSource.match(/gNotes\.map\([\s\S]*?<\/div>\s*\);\s*\}\)/);
+    const confirmEndBlock = confirmEndMatch ? confirmEndMatch[0] : undefined;
 
     expect(summaryBlock).toBeDefined();
     expect(confirmEndBlock).toBeDefined();

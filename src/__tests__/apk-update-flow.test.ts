@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 
 describe("APK update flow hardening", () => {
   const mainSource = readFileSync(resolve("src/main.tsx"), "utf8");
+  const settingsScreenSource = readFileSync(resolve("src/screens/settings-screen.tsx"), "utf8");
   const updateFlowSource = readFileSync(resolve("src/logic/update-flow.ts"), "utf8");
   const gradleSource = readFileSync(resolve("android/app/build.gradle"), "utf8");
 
@@ -15,8 +16,8 @@ describe("APK update flow hardening", () => {
   });
 
   it("only shows the native install button for APK URLs", () => {
-    expect(mainSource).toContain("const hasApkDownload = downloadUrl.endsWith(\".apk\")");
-    expect(mainSource).toMatch(/hasApkDownload && updateState !== "downloading" && updateState !== "checking"/);
+    expect(settingsScreenSource).toContain("const hasApkDownload = downloadUrl.endsWith(\".apk\")");
+    expect(settingsScreenSource).toMatch(/hasApkDownload && updateState !== "downloading" && updateState !== "checking"/);
   });
 
   it("derives local Android version values from package.json when CI variables are absent", () => {
