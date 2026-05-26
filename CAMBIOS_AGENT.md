@@ -4,6 +4,124 @@ Este archivo registra cambios de código hechos por agentes/modelos en este proy
 
 Cada entrada debe indicar archivos modificados, código anterior, código nuevo y por qué se cambió. Las entradas se añaden al **principio** del archivo (las más recientes arriba).
 
+## 2026-05-26 03:15 - Extraer SettingsScreen a src/screens/settings-screen.tsx
+
+**Archivos modificados:** `src/screens/settings-screen.tsx`, `src/components/settings-icons.tsx`, `src/components/summary-icons.tsx`, `src/main.tsx`
+
+### Cambio 1 - Pantalla de ajustes extraída
+
+#### Código anterior
+`No existía src/screens/settings-screen.tsx.`
+
+#### Código nuevo
+```tsx
+export const SettingsScreen: FC<SettingsScreenProps> = ({
+  isAdmin, settings, setSettings, history, setHistory, current,
+  weekOverrides, reservations, notes, activeSettingsField,
+  setActiveSettingsField, settingsValStr, setSettingsValStr,
+  showBackupMenu, setShowBackupMenu, confirmDialog, setConfirmDialog,
+  updateState, updateMsg, downloadUrl, releaseUrl,
+  setUpdateState, setUpdateMsg, setDownloadUrl, setReleaseUrl,
+  onSetScreen,
+}) => { ... }
+```
+
+#### Por qué se cambió
+Separación de responsabilidades: la pantalla de ajustes ahora está en su propio archivo.
+
+### Cambio 2 - Iconos de ajustes centralizados
+
+#### Código anterior
+`No existía src/components/settings-icons.tsx.`
+
+#### Código nuevo
+```tsx
+export const IconReceipt = ({ s = 24, c = "white" }: { s?: number; c?: string }) => ( ... );
+export const IconHoliday = ({ s = 24, c = "oklch(0.85 0.18 85)" }: { s?: number; c?: string }) => ( ... );
+```
+
+#### Por qué se cambió
+IconReceipt e IconHoliday se usan en SettingsScreen y se extrajeron a su propio archivo de iconos.
+
+### Cambio 3 - Iconos de resumen centralizados
+
+#### Código anterior
+`No existía src/components/summary-icons.tsx.`
+
+#### Código nuevo
+```tsx
+export const IconGive = ( ... );
+export const IconRoad = ( ... );
+export const IconPinNeon = ( ... );
+export const IconTaxiBadgeNeon = ( ... );
+export const IconNoteAdd = ( ... );
+```
+
+#### Por qué se cambió
+Iconos usados por SummaryScreen y posiblemente otros screens se centralizan para reutilización.
+
+### Cambio 4 - Reemplazo del bloque settings en main.tsx
+
+#### Código anterior
+```tsx
+if (screen === "settings") {
+  const backupMenuActionIds = getBackupMenuActionIds(isAdmin);
+  return (
+    <Shell burst={false}>
+      <div style={{ flex: 1, padding: "16px 20px", ... }}>
+        {/* Bloque App Info */}
+        {/* Bloque Porcentajes */}
+        {/* Bloque Total a Descontar */}
+        {/* Bloque Día Libre */}
+        {/* Botón Añadir Turno */}
+        {/* Menú Backup */}
+      </div>
+      {/* Modal de configuración de porcentaje */}
+      {confirmDialog && <ConfirmDialog ... />}
+    </Shell>
+  );
+}
+```
+
+#### Código nuevo
+```tsx
+if (screen === "settings") {
+  return (
+    <SettingsScreen
+      isAdmin={isAdmin}
+      settings={settings}
+      setSettings={setSettings}
+      history={history}
+      setHistory={setHistory}
+      current={current}
+      weekOverrides={weekOverrides}
+      reservations={reservations}
+      notes={notes}
+      activeSettingsField={activeSettingsField}
+      setActiveSettingsField={setActiveSettingsField}
+      settingsValStr={settingsValStr}
+      setSettingsValStr={setSettingsValStr}
+      showBackupMenu={showBackupMenu}
+      setShowBackupMenu={setShowBackupMenu}
+      confirmDialog={confirmDialog}
+      setConfirmDialog={setConfirmDialog}
+      updateState={updateState}
+      updateMsg={updateMsg}
+      downloadUrl={downloadUrl}
+      releaseUrl={releaseUrl}
+      setUpdateState={setUpdateState}
+      setUpdateMsg={setUpdateMsg}
+      setDownloadUrl={setDownloadUrl}
+      setReleaseUrl={setReleaseUrl}
+      onSetScreen={setScreen}
+    />
+  );
+}
+```
+
+#### Por qué se cambió
+El bloque if (screen === "settings") fue reemplazado por el componente SettingsScreen importado. Los IconReceipt e IconHoliday se mantienen en main.tsx porque SummaryScreen también los usa.
+
 ## 2026-05-26 02:00 - Extraer CalendarScreen a src/screens/calendar-screen.tsx
 
 **Archivos modificados:** `src/screens/calendar-screen.tsx`, `src/components/calendar-icons.tsx`, `src/main.tsx`
