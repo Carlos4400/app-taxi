@@ -4,6 +4,175 @@ Este archivo registra cambios de código hechos por agentes/modelos en este proy
 
 Cada entrada debe indicar archivos modificados, código anterior, código nuevo y por qué se cambió. Las entradas se añaden al **principio** del archivo (las más recientes arriba).
 
+## 2026-05-26 04:30 - Integrar pantallas extraídas en main.tsx
+
+**Archivos modificados:** `src/main.tsx`, `src/screens/PantallaTurnos.tsx`
+
+### Cambio 1 - Imports de pantallas en main.tsx
+
+#### Código anterior
+```tsx
+import { AddEntryScreen } from "./screens/add-entry-screen";
+import { Shell } from "./components/shell";
+```
+
+#### Código nuevo
+```tsx
+import { AddEntryScreen } from "./screens/add-entry-screen";
+import { PantallaTurnos } from "./screens/PantallaTurnos";
+import { TodayHistoryScreen } from "./screens/TodayHistoryScreen";
+import { ConfirmEndScreen } from "./screens/ConfirmEndScreen";
+import { Shell } from "./components/shell";
+```
+
+#### Por qué se cambió
+Las pantallas extraídas en sesiones anteriores necesitaban ser importadas para su uso.
+
+### Cambio 2 - Reemplazar bloque if PantallaTurnos con componente
+
+#### Código anterior
+```tsx
+  if (screen === "PantallaTurnos") {
+    return (
+      <Shell burst={false}>
+        <div style={{ flex: 1, padding: "16px 20px", display: "flex", flexDirection: "column", gap: 14, overflowY: "auto" }}>
+          ... (contenido completo del bloque)
+        </div>
+      </Shell>
+    );
+  }
+```
+
+#### Código nuevo
+```tsx
+  if (screen === "PantallaTurnos") {
+    return (
+      <PantallaTurnos
+        history={history}
+        settings={settings}
+        isSelectingTurnos={isSelectingTurnos}
+        setIsSelectingTurnos={setIsSelectingTurnos}
+        selectedTurnosIds={selectedTurnosIds}
+        setSelectedTurnosIds={setSelectedTurnosIds}
+        setScreen={setScreen}
+        setViewTurno={setViewTurno}
+        setReturnScreen={setReturnScreen}
+        onExportSelectedTurnosJSON={exportSelectedTurnosJSON}
+      />
+    );
+  }
+```
+
+#### Por qué se cambió
+Separación de responsabilidades: el bloque if de PantallaTurnos ahora usa el componente extraído.
+
+### Cambio 3 - Reemplazar bloque if todayHistory con componente
+
+#### Código anterior
+```tsx
+  if (screen === "todayHistory") {
+    return (
+      <Shell burst={false}>
+        <div style={{ flex: 1, padding: "16px 20px", display: "flex", flexDirection: "column", gap: 14, overflowY: "auto" }}>
+          ... (contenido completo del bloque)
+        </div>
+        {confirmDialog && <ConfirmDialog {...confirmDialog} onCancel={() => setConfirmDialog(null)} />}
+        {editEntry && (<EditEntryDialog ... />)}
+      </Shell>
+    );
+  }
+```
+
+#### Código nuevo
+```tsx
+  if (screen === "todayHistory") {
+    return (
+      <TodayHistoryScreen
+        current={current}
+        confirmDialog={confirmDialog}
+        setConfirmDialog={setConfirmDialog}
+        editEntry={editEntry}
+        editEntryAmount={editEntryAmount}
+        editEntryNote={editEntryNote}
+        setEditEntryAmount={setEditEntryAmount}
+        setEditEntryNote={setEditEntryNote}
+        openEditEntry={openEditEntry}
+        saveEditEntry={saveEditEntry}
+        deleteEditEntry={deleteEditEntry}
+        setEditEntry={setEditEntry}
+        setScreen={setScreen}
+      />
+    );
+  }
+```
+
+#### Por qué se cambió
+Separación de responsabilidades: el bloque if de todayHistory ahora usa el componente extraído.
+
+### Cambio 4 - Reemplazar bloque if confirmEnd con componente
+
+#### Código anterior
+```tsx
+  if (screen === "confirmEnd") {
+    function kpEnd(v: string) { ... }
+    return (
+      <Shell burst={false}>
+        ... (contenido completo con el teclado in-app)
+      </Shell>
+    );
+  }
+```
+
+#### Código nuevo
+```tsx
+  if (screen === "confirmEnd") {
+    return (
+      <ConfirmEndScreen
+        current={current}
+        dineroJ={dineroJ}
+        setDineroJ={setDineroJ}
+        kmJ={kmJ}
+        setKmJ={setKmJ}
+        endField={endField}
+        setEndField={setEndField}
+        totalP={totalP}
+        totalD={totalD}
+        totalA={totalA}
+        totalE={totalE}
+        totalF={totalF}
+        totalN={totalN}
+        propinas={propinas}
+        datafonos={datafonos}
+        agencias={agencias}
+        extras={extras}
+        gasolinas={gasolinas}
+        nulos={nulos}
+        onEndTurno={handleEndTurno}
+        setScreen={setScreen}
+      />
+    );
+  }
+```
+
+#### Por qué se cambió
+Separación de responsabilidades: el bloque if de confirmEnd ahora usa el componente extraído con kpEnd inlined.
+
+### Cambio 5 - Import de IconTaxiBadgeNeon e IconRoad corregido
+
+#### Código anterior
+```tsx
+import { IconPencilNeon, IconTimer, IconMoneyBag, IconTaxiBadgeNeon, IconRoad } from "../components/calendar-icons";
+```
+
+#### Código nuevo
+```tsx
+import { IconPencilNeon, IconTimer, IconMoneyBag } from "../components/calendar-icons";
+import { IconTaxiBadgeNeon, IconRoad } from "../components/summary-icons";
+```
+
+#### Por qué se cambió
+IconTaxiBadgeNeon e IconRoad estaban mal importados desde calendar-icons, deben estar en summary-icons.
+
 ## 2026-05-26 03:15 - Extraer SettingsScreen a src/screens/settings-screen.tsx
 
 **Archivos modificados:** `src/screens/settings-screen.tsx`, `src/components/settings-icons.tsx`, `src/components/summary-icons.tsx`, `src/main.tsx`
