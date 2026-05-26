@@ -2,6 +2,7 @@ import React, { type FC } from "react";
 import { signOut } from "firebase/auth";
 import { auth } from "../services/firebase";
 import { Shell } from "../components/shell";
+import { ConfirmDialog } from "../components/common";
 import { G, P, A, C, GBG, PBG, ABG, CBG } from "../shared/ui-theme";
 import { getHomeQuickActionIds } from "../shared/action-ids";
 import { IconCalendar, IconSettings, IconAdminNeon, IconLogoutNeon } from "../components/navigation-icons";
@@ -16,6 +17,7 @@ interface HomeScreenProps {
   onOpenNewReserva: () => void;
   onSetAdminMode: (mode: null | "list" | { uid: string; username: string }) => void;
   onSetConfirmDialog: (dialog: { text: string; confirmText?: string; onConfirm: () => void } | null) => void;
+  confirmDialog: { text: string; confirmText?: string; onConfirm: () => void } | null;
   renderReservaDialog: () => React.ReactElement | false;
 }
 
@@ -28,6 +30,7 @@ export const HomeScreen: FC<HomeScreenProps> = ({
   onOpenNewReserva,
   onSetAdminMode,
   onSetConfirmDialog,
+  confirmDialog,
   renderReservaDialog,
 }) => {
   const homeQuickActionIds = getHomeQuickActionIds(isAdmin);
@@ -296,6 +299,7 @@ export const HomeScreen: FC<HomeScreenProps> = ({
       >
         <IconSettings s={32} c="oklch(0.72 0.01 250)" />
       </button>
+      {confirmDialog && <ConfirmDialog {...confirmDialog} onCancel={() => onSetConfirmDialog(null)} />}
     </Shell>
   );
 };

@@ -4,6 +4,383 @@ Este archivo registra cambios de código hechos por agentes/modelos en este proy
 
 Cada entrada debe indicar archivos modificados, código anterior, código nuevo y por qué se cambió. Las entradas se añaden al **principio** del archivo (las más recientes arriba).
 
+## 2026-05-26 23:19 - Corregir regresiones del recorte
+
+**Archivos modificados:** `src/__tests__/main-antiguo-regressions.test.ts`, `src/__tests__/home-icons.test.ts`, `src/components/home-icons.tsx`, `src/main.tsx`, `src/screens/calendar-screen.tsx`, `src/screens/confirm-end-screen.tsx`, `src/screens/home-screen.tsx`, `src/screens/pantalla-turnos.tsx`, `src/screens/today-history-screen.tsx`
+
+### Cambio 1 - Test de regresiones contra main antiguo
+
+#### Código anterior
+`No existía src/__tests__/main-antiguo-regressions.test.ts.`
+
+#### Código nuevo
+```ts
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
+import { describe, expect, it } from "vitest";
+
+const readSource = (path: string) => readFileSync(resolve(path), "utf8");
+
+describe("Main antiguo regression locks", () => {
+  it("keeps home logout confirmation mounted in the extracted screen", () => {
+    const homeSource = readSource("src/screens/home-screen.tsx");
+    const mainSource = readSource("src/main.tsx");
+
+    expect(homeSource).toContain('import { ConfirmDialog } from "../components/common"');
+    expect(homeSource).toContain("confirmDialog,");
+    expect(homeSource).toContain("{confirmDialog && <ConfirmDialog");
+    expect(homeSource).toContain("onCancel={() => onSetConfirmDialog(null)}");
+    expect(mainSource).toContain("confirmDialog={confirmDialog}");
+  });
+
+  it("keeps calendar navigation and note creation handlers from mainAntiguo", () => {
+    const calendarSource = readSource("src/screens/calendar-screen.tsx");
+    const mainSource = readSource("src/main.tsx");
+
+    const openNewNotaBlock = calendarSource.match(/const openNewNota = \(date\?: string\) => \{[\s\S]*?\n  \};/)?.[0] ?? "";
+    expect(openNewNotaBlock).toContain("setEditingNota(null);");
+    expect(openNewNotaBlock).toContain("setEditingReserva(null);");
+
+    expect(calendarSource).toContain('onClick={() => setScreen("home")}');
+    expect(calendarSource).toContain('setReturnScreen("calendar");');
+    expect(calendarSource).toContain("setViewTurno(turno);");
+    expect(calendarSource).toContain('setScreen("summary");');
+
+    expect(mainSource).toContain("setScreen={setScreen}");
+    expect(mainSource).toContain("setReturnScreen={setReturnScreen}");
+    expect(mainSource).toContain("setViewTurno={setViewTurno}");
+  });
+
+  it("keeps today history note metadata and destructive confirmation behavior", () => {
+    const source = readSource("src/screens/today-history-screen.tsx");
+
+    expect(source).toContain('import { ConfirmDialog } from "../components/common"');
+    expect(source).toContain('import { getEntryTypeMeta } from "../shared/entry-type-meta"');
+    expect(source).not.toContain('nota: { color: "white", label: "Nota", icon: (s = 17) => <IconCard');
+    expect(source).toContain("{confirmDialog && <ConfirmDialog");
+    expect(source).toContain('confirmBg: "rgba(255,60,60,0.2)"');
+    expect(source).toContain('confirmColor: "#ff6b6b"');
+  });
+
+  it("keeps turnos dates formatted for display", () => {
+    const source = readSource("src/screens/pantalla-turnos.tsx");
+
+    expect(source).toContain('from "../logic/date-time"');
+    expect(source).toContain("fmtDate");
+    expect(source).toContain("{fmtDate(turno.startDate || turno.date)}");
+  });
+
+  it("keeps detailed notes outside the summary card on confirm end", () => {
+    const source = readSource("src/screens/confirm-end-screen.tsx");
+
+    expect(source).toContain('style={{ marginBottom: 12, display: "flex", flexDirection: "column", gap: 6, flexShrink: 0 }}');
+    expect(source).toContain('background: "rgba(255,255,255,0.03)"');
+    expect(source).toContain('color: "rgba(255,255,255,0.8)"');
+  });
+});
+```
+
+#### Por qué se cambió
+La auditoría detectó regresiones funcionales y visuales introducidas al extraer pantallas. Se añadió un test de bloqueo para contrastar esos contratos con el comportamiento anterior.
+
+### Cambio 2 - Cobertura de iconos de inicio
+
+#### Código anterior
+```ts
+  it("keeps the original rocket icon shape", () => {
+    expect(source).toContain('transform="rotate(45 12 12)"');
+    expect(source).toContain("M12 2 C16 3 17 9 16 14 L8 14 C7 9 8 3 12 2 Z");
+    expect(source).toContain("M8 22 L8 25");
+    expect(source).toContain("M16 22 L16 25");
+    expect(source).toContain('verticalAlign: "middle"');
+  });
+```
+
+#### Código nuevo
+```ts
+  it("keeps the original rocket icon shape", () => {
+    expect(source).toContain('transform="rotate(45 12 12)"');
+    expect(source).toContain("M12 2 C16 3 17 9 16 14 L8 14 C7 9 8 3 12 2 Z");
+    expect(source).toContain("M10 16 C10 19 12 21 12 21 C12 21 14 19 14 16");
+    expect(source).toContain("M12 23 L12 26");
+    expect(source).toContain("M8 22 L8 25");
+    expect(source).toContain("M16 22 L16 25");
+    expect(source).toContain('verticalAlign: "middle"');
+  });
+
+  it("keeps the original home quick action icons", () => {
+    expect(source).toContain('import { IconPencilNeon } from "./calendar-icons"');
+    expect(source).toContain("M6.5 3.5H14.8L18.5 7.2V19.5C18.5 20.05 18.05 20.5 17.5 20.5H6.5C5.95 20.5 5.5 20.05 5.5 19.5V4.5C5.5 3.95 5.95 3.5 6.5 3.5Z");
+    expect(source).toContain("<IconPencilNeon s={24} />");
+    expect(source).toContain('transform: "scale(0.58) rotate(-6deg)"');
+    expect(source).toContain("M10 9H17");
+    expect(source).toContain("M9 4H7C5.89543 4 5 4.89543 5 6V20C5 21.1046 5.89543 22 7 22H17C18.1046 22 19 21.1046 19 20V6C19 4.89543 18.1046 4 17 4H15");
+    expect(source).toContain("M2 22H22");
+    expect(source).toContain("M8 5.5L18.5 12L8 18.5V5.5Z");
+  });
+```
+
+#### Por qué se cambió
+El test anterior solo protegía parte del cohete. Se amplió para cubrir los trazos que faltaban y los iconos rápidos de inicio que habían cambiado durante la extracción.
+
+### Cambio 3 - Iconos de inicio restaurados
+
+#### Código anterior
+```tsx
+export const IconReservaWrite: FC<{ s?: number; c?: string }> = ({ s = 24, c = C }: { s?: number; c?: string }) => (
+  <svg width={s} height={s} viewBox="0 0 24 24" fill="none">
+    <rect x="3" y="3" width="18" height="18" rx="2.5" stroke={c} strokeWidth="1.8" />
+    <path d="M12 8V16M8 12H16" stroke={c} strokeWidth="2" strokeLinecap="round" />
+  </svg>
+);
+```
+
+#### Código nuevo
+```tsx
+export const IconReservaWrite: FC<{ s?: number; c?: string }> = ({ s = 24, c = C }: { s?: number; c?: string }) => (
+  <span
+    style={{
+      position: "relative",
+      width: s,
+      height: s,
+      display: "inline-block",
+      verticalAlign: "middle",
+    }}
+  >
+    <svg
+      width={s}
+      height={s}
+      viewBox="0 0 24 24"
+      fill="none"
+      style={{
+        position: "absolute",
+        inset: 0,
+        overflow: "visible",
+      }}
+    >
+      <path
+        d="M6.5 3.5H14.8L18.5 7.2V19.5C18.5 20.05 18.05 20.5 17.5 20.5H6.5C5.95 20.5 5.5 20.05 5.5 19.5V4.5C5.5 3.95 5.95 3.5 6.5 3.5Z"
+        stroke={c}
+        strokeWidth="1.7"
+        strokeLinejoin="round"
+        style={{
+          filter:
+            "drop-shadow(0 0 1px rgba(190,140,255,0.55)) drop-shadow(0 0 3px rgba(190,140,255,0.20))",
+        }}
+      />
+      <path
+        d="M14.8 3.5V7.2H18.5"
+        stroke={c}
+        strokeWidth="1.7"
+        strokeLinejoin="round"
+        strokeLinecap="round"
+      />
+      <path d="M8 10H14.5" stroke={c} strokeWidth="1.5" strokeLinecap="round" opacity="0.9" />
+      <path d="M8 13H13" stroke={c} strokeWidth="1.5" strokeLinecap="round" opacity="0.75" />
+      <path d="M8 16H11.5" stroke={c} strokeWidth="1.5" strokeLinecap="round" opacity="0.55" />
+    </svg>
+
+    <span
+      style={{
+        position: "absolute",
+        right: -2,
+        bottom: -1,
+        transform: "scale(0.58) rotate(-6deg)",
+        transformOrigin: "bottom right",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        pointerEvents: "none",
+      }}
+    >
+      <IconPencilNeon s={24} />
+    </span>
+  </span>
+);
+```
+
+#### Por qué se cambió
+El icono de nueva reserva había quedado reducido a un símbolo genérico de suma. Se restauró el documento con lápiz que identificaba visualmente la acción.
+
+### Cambio 4 - Confirmación de cerrar sesión en inicio
+
+#### Código anterior
+```tsx
+  onSetConfirmDialog: (dialog: { text: string; confirmText?: string; onConfirm: () => void } | null) => void;
+  renderReservaDialog: () => React.ReactElement | false;
+}
+```
+
+```tsx
+      />
+    );
+```
+
+#### Código nuevo
+```tsx
+  onSetConfirmDialog: (dialog: { text: string; confirmText?: string; onConfirm: () => void } | null) => void;
+  confirmDialog: { text: string; confirmText?: string; onConfirm: () => void } | null;
+  renderReservaDialog: () => React.ReactElement | false;
+}
+```
+
+```tsx
+        confirmDialog={confirmDialog}
+      />
+```
+
+```tsx
+      {confirmDialog && <ConfirmDialog {...confirmDialog} onCancel={() => onSetConfirmDialog(null)} />}
+    );
+```
+
+#### Por qué se cambió
+La pantalla de inicio podía crear el diálogo de cerrar sesión, pero el componente extraído no lo recibía ni lo renderizaba. Se volvió a montar la confirmación como en el bloque antiguo.
+
+### Cambio 5 - Navegación del calendario
+
+#### Código anterior
+```tsx
+  openNewReserva: (date?: string) => void;
+}
+```
+
+```tsx
+  const openNewNota = (date?: string) => {
+    setEditingReserva(null);
+    setSelectedDate(date || today());
+```
+
+```tsx
+<button style={{ background: "none", border: "none", cursor: "pointer", padding: 8, display: "flex", alignItems: "center" }} onClick={() => openNewReserva()}><IconBack /></button>
+```
+
+```tsx
+onClick={() => { openNewReserva(); }}
+```
+
+#### Código nuevo
+```tsx
+  openNewReserva: (date?: string) => void;
+  setScreen: (screen: string) => void;
+  setViewTurno: (turno: Turno) => void;
+  setReturnScreen: (screen: string | null) => void;
+}
+```
+
+```tsx
+  const openNewNota = (date?: string) => {
+    setEditingNota(null);
+    setEditingReserva(null);
+    setSelectedDate(date || today());
+```
+
+```tsx
+<button style={{ background: "none", border: "none", cursor: "pointer", padding: 8, display: "flex", alignItems: "center" }} onClick={() => setScreen("home")}><IconBack /></button>
+```
+
+```tsx
+onClick={() => { setReturnScreen("calendar"); setViewTurno(turno); setScreen("summary"); }}
+```
+
+#### Por qué se cambió
+El botón de volver y las tarjetas de turnos cerrados habían quedado conectados a nueva reserva. También faltaba limpiar `editingNota` al crear una nota nueva. Se restauraron los handlers anteriores.
+
+### Cambio 6 - Historial de hoy
+
+#### Código anterior
+```tsx
+const ENTRY_TYPE_META: Record<string, { color: string; label: string; icon: (s?: number) => React.ReactNode }> = {
+  datafono: { color: P, label: "DatÃ¡fono", icon: (s = 17) => <IconCard s={s} c={P} /> },
+  agencia_bono: { color: A, label: "Agencia/Bono", icon: (s = 17) => <IconAgency s={s} c={A} /> },
+  propina: { color: G, label: "Propina", icon: (s = 17) => <IconCoin s={s} c={G} /> },
+  extra: { color: E, label: "Extra", icon: (s = 17) => <IconExtra s={s} c={E} /> },
+  gasolina: { color: F, label: "Gasolina", icon: (s = 17) => <IconFuel s={s} c={F} /> },
+  nulo: { color: N, label: "Nulo", icon: (s = 17) => <IconNulo s={s} c={N} /> },
+  nota: { color: "white", label: "Nota", icon: (s = 17) => <IconCard s={s} c="white" /> },
+};
+```
+
+```tsx
+      {confirmDialog && <ConfirmDialogWrapper {...confirmDialog} onCancel={() => setConfirmDialog(null)} />}
+```
+
+```tsx
+            setConfirmDialog({
+              text: "¿Seguro que quieres eliminar esta entrada?",
+              onConfirm: deleteEditEntry,
+            });
+```
+
+#### Código nuevo
+```tsx
+import { ConfirmDialog } from "../components/common";
+import { getEntryTypeMeta } from "../shared/entry-type-meta";
+```
+
+```tsx
+      {confirmDialog && <ConfirmDialog {...confirmDialog} onCancel={() => setConfirmDialog(null)} />}
+```
+
+```tsx
+            setConfirmDialog({
+              text: "¿Seguro que quieres eliminar esta entrada?",
+              onConfirm: deleteEditEntry,
+              confirmBg: "rgba(255,60,60,0.2)",
+              confirmColor: "#ff6b6b",
+              confirmBorder: "1px solid rgba(255,100,100,0.35)",
+            });
+```
+
+#### Por qué se cambió
+La pantalla tenía metadata local distinta para notas y un diálogo propio que no cerraba al confirmar. Se reutilizó la metadata compartida y el diálogo común, que ejecuta confirmación y cierre.
+
+### Cambio 7 - Fecha formateada en turnos
+
+#### Código anterior
+```tsx
+import { getDiffMins } from "../logic/date-time";
+```
+
+```tsx
+<div style={{ fontWeight: 700, color: "white", fontSize: 16 }}>{turno.startDate || turno.date}</div>
+```
+
+#### Código nuevo
+```tsx
+import { getDiffMins, fmtDate } from "../logic/date-time";
+```
+
+```tsx
+<div style={{ fontWeight: 700, color: "white", fontSize: 16 }}>{fmtDate(turno.startDate || turno.date)}</div>
+```
+
+#### Por qué se cambió
+Las tarjetas de turnos mostraban la fecha ISO tras la extracción. Se restauró el formato legible usado antes.
+
+### Cambio 8 - Notas detalladas al terminar turno
+
+#### Código anterior
+```tsx
+              <div style={{ marginTop: 16, paddingTop: 14, borderTop: "1px solid rgba(255,255,255,0.06)" }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: "rgba(255,255,255,0.4)", textTransform: "uppercase", letterSpacing: "0.6px", marginBottom: 8, display: "flex", alignItems: "center", gap: 5 }}>
+                  <IconPinNeon s={18} /> Notas detalladas
+                </div>
+                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+```
+
+#### Código nuevo
+```tsx
+            <div style={{ marginBottom: 12, display: "flex", flexDirection: "column", gap: 6, flexShrink: 0 }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: "rgba(255,255,255,0.4)", textTransform: "uppercase", letterSpacing: "0.6px", marginBottom: 2, display: "flex", alignItems: "center", gap: 6 }}>
+                <IconPinNeon s={18} /> Notas detalladas
+              </div>
+              {entriesWithNotes.map(e => {
+```
+
+#### Por qué se cambió
+Las notas detalladas habían quedado integradas dentro del bloque de resumen. Se restauró su estructura visual independiente para que coincida con la jerarquía anterior.
+
 ## 2026-05-26 18:00 - Restaurar icono de cohete en inicio
 
 **Archivos modificados:** `src/components/home-icons.tsx`, `src/__tests__/home-icons.test.ts`

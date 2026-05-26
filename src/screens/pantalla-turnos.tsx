@@ -5,7 +5,7 @@ import { IconCoin, IconCard, IconAgency, IconExtra, IconFuel, IconNulo } from ".
 import { IconPencilNeon, IconTimer, IconMoneyBag } from "../components/calendar-icons";
 import { IconTaxiBadgeNeon, IconRoad } from "../components/summary-icons";
 import { fmtDuration, fmtKm, fmtKmNumber, fmt } from "../logic/formatters";
-import { getDiffMins } from "../logic/date-time";
+import { getDiffMins, fmtDate } from "../logic/date-time";
 import { calcularTurnoContable } from "../logic/accounting";
 import type { Turno, AppSettings } from "../shared/types";
 
@@ -108,7 +108,7 @@ export function PantallaTurnos({
           }}
         >
           <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-            <div style={{ fontWeight: 700, color: "white", fontSize: 16 }}>{turno.startDate || turno.date}</div>
+            <div style={{ fontWeight: 700, color: "white", fontSize: 16 }}>{fmtDate(turno.startDate || turno.date)}</div>
             <div style={{ fontSize: 13, color: "rgba(255,255,255,0.4)" }}>
               {turno.startDate && turno.startDate !== turno.date
                 ? (() => {

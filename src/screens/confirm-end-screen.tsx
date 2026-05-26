@@ -241,31 +241,30 @@ export function ConfirmEndScreen({
             );
           })()}
 
-          {(() => {
-            const entriesWithNotes = current.entries.filter(e => e.type !== "nota" && e.note && e.note.trim());
-            if (entriesWithNotes.length === 0) return null;
-            return (
-              <div style={{ marginTop: 16, paddingTop: 14, borderTop: "1px solid rgba(255,255,255,0.06)" }}>
-                <div style={{ fontSize: 11, fontWeight: 700, color: "rgba(255,255,255,0.4)", textTransform: "uppercase", letterSpacing: "0.6px", marginBottom: 8, display: "flex", alignItems: "center", gap: 5 }}>
-                  <IconPinNeon s={18} /> Notas detalladas
-                </div>
-                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                  {entriesWithNotes.map(e => {
-                    const meta = getEntryTypeMeta(e.type);
-                    return (
-                      <div key={e.id} style={{ fontSize: 13, background: "rgba(255,255,255,0.02)", padding: "10px 12px", borderRadius: 12, border: "1px solid rgba(255,255,255,0.04)", display: "grid", gridTemplateColumns: "auto auto minmax(0, 1fr) auto", alignItems: "baseline", gap: 8, minWidth: 0 }}>
-                        <span style={NOTE_TIME_STYLE}>{e.time}</span>
-                        <span style={{ fontWeight: 700, color: meta.color, fontSize: 14, whiteSpace: "nowrap", flexShrink: 0 }}>{meta.label}</span>
-                        <span style={{ color: "rgba(255,255,255,0.72)", fontSize: 12, lineHeight: 1.35, minWidth: 0, overflowWrap: "anywhere" }}>{e.note}</span>
-                        <span style={{ color: meta.color, fontSize: 15, fontWeight: 700, whiteSpace: "nowrap", flexShrink: 0 }}>{fmt(e.amount)}</span>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            );
-          })()}
         </div>
+
+        {(() => {
+          const entriesWithNotes = current.entries.filter(e => e.type !== "nota" && e.note && e.note.trim());
+          if (entriesWithNotes.length === 0) return null;
+          return (
+            <div style={{ marginBottom: 12, display: "flex", flexDirection: "column", gap: 6, flexShrink: 0 }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: "rgba(255,255,255,0.4)", textTransform: "uppercase", letterSpacing: "0.6px", marginBottom: 2, display: "flex", alignItems: "center", gap: 6 }}>
+                <IconPinNeon s={18} /> Notas detalladas
+              </div>
+              {entriesWithNotes.map(e => {
+                const meta = getEntryTypeMeta(e.type);
+                return (
+                  <div key={e.id} style={{ fontSize: 13, background: "rgba(255,255,255,0.03)", padding: "10px 12px", borderRadius: 12, border: "1px solid rgba(255,255,255,0.05)", display: "grid", gridTemplateColumns: "auto auto minmax(0, 1fr) auto", alignItems: "baseline", gap: 8, minWidth: 0 }}>
+                    <span style={NOTE_TIME_STYLE}>{e.time}</span>
+                    <span style={{ fontWeight: 700, color: meta.color, fontSize: 14, whiteSpace: "nowrap", flexShrink: 0 }}>{meta.label}</span>
+                    <span style={{ color: "rgba(255,255,255,0.8)", fontSize: 12, lineHeight: 1.4, flex: 1, minWidth: 0, overflowWrap: "anywhere" }}>{e.note}</span>
+                    <span style={{ fontSize: 15, fontWeight: 700, color: meta.color, whiteSpace: "nowrap", flexShrink: 0, alignSelf: "baseline" }}>{fmt(e.amount)}</span>
+                  </div>
+                );
+              })}
+            </div>
+          );
+        })()}
 
         <div style={{ display: "flex", flexDirection: "column", gap: 8, flexShrink: 0, marginTop: "auto" }}>
           <button onClick={onEndTurno}

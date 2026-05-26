@@ -1719,6 +1719,7 @@ function App() {
         onOpenNewReserva={openNewReserva}
         onSetAdminMode={setAdminMode}
         onSetConfirmDialog={setConfirmDialog}
+        confirmDialog={confirmDialog}
         renderReservaDialog={renderReservaDialog}
       />
     );
@@ -1770,6 +1771,9 @@ function App() {
         history={history}
         settings={settings}
         openNewReserva={openNewReserva}
+        setScreen={setScreen}
+        setViewTurno={setViewTurno}
+        setReturnScreen={setReturnScreen}
       />
     );
   }

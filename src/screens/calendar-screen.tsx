@@ -68,6 +68,9 @@ interface CalendarScreenProps {
   history: Turno[];
   settings: AppSettings;
   openNewReserva: (date?: string) => void;
+  setScreen: (screen: string) => void;
+  setViewTurno: (turno: Turno) => void;
+  setReturnScreen: (screen: string | null) => void;
 }
 
 const renderReservaCardField = (
@@ -446,6 +449,9 @@ export function CalendarScreen({
   history,
   settings,
   openNewReserva,
+  setScreen,
+  setViewTurno,
+  setReturnScreen,
 }: CalendarScreenProps) {
   const year = calendarMonth.getFullYear();
   const month = calendarMonth.getMonth();
@@ -460,6 +466,7 @@ export function CalendarScreen({
   };
 
   const openNewNota = (date?: string) => {
+    setEditingNota(null);
     setEditingReserva(null);
     setSelectedDate(date || today());
     setNotaTipo("Normal");
@@ -558,7 +565,7 @@ export function CalendarScreen({
 
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 4, flexShrink: 0, gap: 12 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-            <button style={{ background: "none", border: "none", cursor: "pointer", padding: 8, display: "flex", alignItems: "center" }} onClick={() => openNewReserva()}><IconBack /></button>
+            <button style={{ background: "none", border: "none", cursor: "pointer", padding: 8, display: "flex", alignItems: "center" }} onClick={() => setScreen("home")}><IconBack /></button>
             <div style={{ fontSize: 24, fontWeight: 800, color: "white" }}>Calendario</div>
           </div>
 
@@ -824,7 +831,7 @@ export function CalendarScreen({
                   return (
                     <div
                       key={turno.id}
-                      onClick={() => { openNewReserva(); }}
+                      onClick={() => { setReturnScreen("calendar"); setViewTurno(turno); setScreen("summary"); }}
                       style={{
                         background: "rgba(255,255,255,0.02)",
                         border: "1px solid rgba(255,255,255,0.05)",
