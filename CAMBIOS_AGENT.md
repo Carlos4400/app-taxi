@@ -4,6 +4,144 @@ Este archivo registra cambios de código hechos por agentes/modelos en este proy
 
 Cada entrada debe indicar archivos modificados, código anterior, código nuevo y por qué se cambió. Las entradas se añaden al **principio** del archivo (las más recientes arriba).
 
+## 2026-05-26 16:39 - Corregir notas detalladas al cerrar turno
+
+**Archivos modificados:** `src/screens/confirm-end-screen.tsx`, `src/shared/entry-type-meta.tsx`, `src/__tests__/detailed-notes-layout.test.ts`
+
+### Cambio 1 - Metadata completa de tipos de entrada
+
+#### Código anterior
+```tsx
+import { G, P, A, E, F, N } from "./ui-theme";
+import { IconAgency } from "../components/entry-icons";
+import { IconNoteAdd } from "../components/summary-icons";
+
+export const ENTRY_TYPE_META: Record<string, EntryTypeMeta> = {
+  agencia_bono: { color: A, label: "Agencia/Bono", icon: (s = 17) => <IconAgency s={s} c={A} /> },
+};
+
+export function getEntryTypeMeta(type: string): EntryTypeMeta {
+  return ENTRY_TYPE_META[type] || ENTRY_TYPE_META.agencia_bono;
+}
+```
+
+#### Código nuevo
+```tsx
+import { G, P, A, E, F, N } from "./ui-theme";
+import { IconCoin, IconCard, IconAgency, IconExtra, IconFuel, IconNulo } from "../components/entry-icons";
+import { IconNoteAdd } from "../components/summary-icons";
+
+export const ENTRY_TYPE_META: Record<string, EntryTypeMeta> = {
+  propina: { color: G, label: "Propina", icon: (s = 17) => <IconCoin s={s} c={G} /> },
+  datafono: { color: P, label: "Datáfono", icon: (s = 17) => <IconCard s={s} c={P} /> },
+  agencia_bono: { color: A, label: "Agencia/Bono", icon: (s = 17) => <IconAgency s={s} c={A} /> },
+  extra: { color: E, label: "Extra", icon: (s = 17) => <IconExtra s={s} c={E} /> },
+  gasolina: { color: F, label: "Gasolina", icon: (s = 17) => <IconFuel s={s} c={F} /> },
+  nulo: { color: N, label: "Nulo", icon: (s = 17) => <IconNulo s={s} c={N} /> },
+  nota: { color: "white", label: "Nota", icon: (s = 17) => <IconNoteAdd s={s} showPlus={false} /> },
+};
+
+export function getEntryTypeMeta(type: string): EntryTypeMeta {
+  return ENTRY_TYPE_META[type] || ENTRY_TYPE_META.nulo;
+}
+```
+
+#### Por qué se cambió
+`ConfirmEndScreen` usaba esta metadata compartida para mostrar notas, pero el mapa solo contenía `agencia_bono` y cualquier otro tipo se etiquetaba como Agencia/Bono. Se restauró el mapa completo equivalente al comportamiento anterior de `main.tsx`.
+
+### Cambio 2 - Notas detalladas en ConfirmEndScreen
+
+#### Código anterior
+```tsx
+import { IconNoteAdd, IconTaxiBadgeNeon, IconRoad } from "../components/summary-icons";
+```
+
+```tsx
+          {(() => {
+            const gNotes = current.entries.filter(e => e.type === "nota");
+            if (gNotes.length > 0) {
+              return (
+                <div style={{ marginTop: 16, paddingTop: 14, borderTop: "1px solid rgba(255,255,255,0.06)" }}>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: "rgba(255,255,255,0.4)", textTransform: "uppercase", letterSpacing: "0.6px", marginBottom: 8, display: "flex", alignItems: "center", gap: 5 }}>
+                    <IconNoteAdd s={17} showPlus={false} /> Notas del Turno
+                  </div>
+```
+
+#### Código nuevo
+```tsx
+import { IconNoteAdd, IconTaxiBadgeNeon, IconRoad, IconPinNeon } from "../components/summary-icons";
+```
+
+```tsx
+          {(() => {
+            const entriesWithNotes = current.entries.filter(e => e.type !== "nota" && e.note && e.note.trim());
+            if (entriesWithNotes.length === 0) return null;
+            return (
+              <div style={{ marginTop: 16, paddingTop: 14, borderTop: "1px solid rgba(255,255,255,0.06)" }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: "rgba(255,255,255,0.4)", textTransform: "uppercase", letterSpacing: "0.6px", marginBottom: 8, display: "flex", alignItems: "center", gap: 5 }}>
+                  <IconPinNeon s={18} /> Notas detalladas
+                </div>
+                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                  {entriesWithNotes.map(e => {
+                    const meta = getEntryTypeMeta(e.type);
+                    return (
+                      <div key={e.id} style={{ fontSize: 13, background: "rgba(255,255,255,0.02)", padding: "10px 12px", borderRadius: 12, border: "1px solid rgba(255,255,255,0.04)", display: "grid", gridTemplateColumns: "auto auto minmax(0, 1fr) auto", alignItems: "baseline", gap: 8, minWidth: 0 }}>
+                        <span style={NOTE_TIME_STYLE}>{e.time}</span>
+                        <span style={{ fontWeight: 700, color: meta.color, fontSize: 14, whiteSpace: "nowrap", flexShrink: 0 }}>{meta.label}</span>
+                        <span style={{ color: "rgba(255,255,255,0.72)", fontSize: 12, lineHeight: 1.35, minWidth: 0, overflowWrap: "anywhere" }}>{e.note}</span>
+                        <span style={{ color: meta.color, fontSize: 15, fontWeight: 700, whiteSpace: "nowrap", flexShrink: 0 }}>{fmt(e.amount)}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })()}
+```
+
+#### Por qué se cambió
+La extracción de `confirm-end-screen.tsx` había perdido la sección de notas detalladas para entradas con nota que no son de tipo `nota`. Se restauró esa sección siguiendo el `mainAntiguo.tsx` para que cerrar turno vuelva a mostrar notas de datáfono, propina, agencia, extras, gasolina y nulos.
+
+### Cambio 3 - Test de layout adaptado a archivos extraídos
+
+#### Código anterior
+```ts
+  const confirmEndSource = readFileSync(resolve("src/screens/confirm-end-screen.tsx"), "utf8");
+  const turnoNotasSource = readFileSync(resolve("src/components/turno-notas.tsx"), "utf8");
+```
+
+```ts
+    const detailedRows = [
+      /entriesWithNotes\.map\(\(e: any\) => \{[\s\S]*?<\/div>\s*\);\s*\}\)/,
+      /entriesWithNotes\.map\(e => \{[\s\S]*?<\/div>\s*\);\s*\}\)/,
+      /notasDetalladas\.map\(\(entry\) => \{[\s\S]*?key=\{`ticket-nota-detallada-\$\{entry\.id\}`\}[\s\S]*?<\/div>\s*\);\s*\}\)/,
+    ];
+
+    for (const rowPattern of detailedRows) {
+      const block = source.match(rowPattern)?.[0];
+```
+
+#### Código nuevo
+```ts
+  const confirmEndSource = readFileSync(resolve("src/screens/confirm-end-screen.tsx"), "utf8");
+  const entryTypeMetaSource = readFileSync(resolve("src/shared/entry-type-meta.tsx"), "utf8");
+  const turnoNotasSource = readFileSync(resolve("src/components/turno-notas.tsx"), "utf8");
+```
+
+```ts
+    const detailedRows = [
+      { source, pattern: /entriesWithNotes\.map\(\(e: any\) => \{[\s\S]*?<\/div>\s*\);\s*\}\)/ },
+      { source: confirmEndSource, pattern: /entriesWithNotes\.map\(e => \{[\s\S]*?<\/div>\s*\);\s*\}\)/ },
+      { source, pattern: /notasDetalladas\.map\(\(entry\) => \{[\s\S]*?key=\{`ticket-nota-detallada-\$\{entry\.id\}`\}[\s\S]*?<\/div>\s*\);\s*\}\)/ },
+    ];
+
+    for (const { source: rowSource, pattern } of detailedRows) {
+      const block = rowSource.match(pattern)?.[0];
+```
+
+#### Por qué se cambió
+El test seguía buscando todos los bloques en `main.tsx`, aunque parte del código ahora vive en `confirm-end-screen.tsx` y la metadata compartida vive en `entry-type-meta.tsx`. Se adaptó la fuente inspeccionada sin cambiar la expectativa funcional.
+
 ## 2026-05-26 04:30 - Integrar pantallas extraídas en main.tsx
 
 **Archivos modificados:** `src/main.tsx`, `src/screens/PantallaTurnos.tsx`
