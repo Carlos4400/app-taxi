@@ -1,5 +1,6 @@
 import { type FC } from "react";
 import { Shell } from "../components/shell";
+import { IconBack } from "../components/navigation-icons";
 import type { CurrentState } from "../shared/types";
 
 const iconBtnStyle = {
@@ -11,18 +12,6 @@ const iconBtnStyle = {
   alignItems: "center",
   cursor: "pointer",
 } as const;
-
-const IconBack: FC = () => (
-  <svg width="22" height="22" viewBox="0 0 22 22" fill="none">
-    <path
-      d="M14 18L7 11L14 4"
-      stroke="rgba(255,255,255,0.65)"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    />
-  </svg>
-);
 
 interface AddNotaGeneralScreenProps {
   noteS: string;

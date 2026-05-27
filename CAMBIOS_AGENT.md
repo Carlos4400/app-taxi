@@ -4,6 +4,234 @@ Este archivo registra cambios de código hechos por agentes/modelos en este proy
 
 Cada entrada debe indicar archivos modificados, código anterior, código nuevo y por qué se cambió. Las entradas se añaden al **principio** del archivo (las más recientes arriba).
 
+## 2026-05-26 23:48 - Corregir organizacion del recorte
+
+**Archivos modificados:** `src/__tests__/main-antiguo-regressions.test.ts`, `src/main.tsx`, `src/screens/add-entry-screen.tsx`, `src/screens/add-nota-general-screen.tsx`, `src/screens/add-single-entry-screen.tsx`, `src/screens/calendar-screen.tsx`, `src/screens/confirm-end-screen.tsx`, `src/screens/today-history-screen.tsx`
+
+### Cambio 1 - Tests de paridad del recorte
+
+#### Codigo anterior
+```ts
+expect(openNewNotaBlock).toContain("setEditingReserva(null);");
+
+expect(calendarSource).toContain('onClick={() => setScreen("home")}');
+expect(calendarSource).toContain('setReturnScreen("calendar");');
+expect(calendarSource).toContain("setViewTurno(turno);");
+expect(calendarSource).toContain('setScreen("summary");');
+
+expect(source).toContain('confirmBg: "rgba(255,60,60,0.2)"');
+expect(source).toContain('confirmColor: "#ff6b6b"');
+```
+
+#### Codigo nuevo
+```ts
+expect(openNewNotaBlock).not.toContain("setEditingReserva(null);");
+
+expect(calendarSource).toContain('onClick={() => setScreen("home")}');
+expect(calendarSource).toContain('setReturnScreen("calendar");');
+expect(calendarSource).toContain("setViewTurno(turno);");
+expect(calendarSource).toContain('setScreen("summary");');
+expect(calendarSource).toContain("style={iconBtnStyle}");
+expect(calendarSource).toContain("setShowMonthPicker(v => !v);");
+
+expect(calendarSource).toContain("renderReservaDialog: () => React.ReactElement | false;");
+expect(calendarSource).toContain("{renderReservaDialog()}");
+expect(calendarSource).not.toContain("function renderReservaDialog(");
+expect(calendarSource).not.toContain(">Cancel<");
+expect(calendarSource).not.toContain('{editingReserva ? "Actualizar" : "Reservar"}');
+expect(mainSource).toContain("renderReservaDialog={renderReservaDialog}");
+
+expect(source).not.toContain("confirmBg:");
+expect(source).not.toContain("confirmColor:");
+expect(source).not.toContain("confirmBorder:");
+```
+
+#### Por que se cambio
+Los tests bloquean que futuras extracciones vuelvan a duplicar el modal de reservas, cambien el boton de calendario, usen el toggle con estado potencialmente obsoleto o alteren la confirmacion de borrado respecto al comportamiento anterior.
+
+### Cambio 2 - Modal de reservas unico en calendario
+
+#### Codigo anterior
+```tsx
+showReservaDialog: boolean;
+setShowReservaDialog: (v: boolean) => void;
+reservaTime: string;
+setReservaTime: (t: string) => void;
+reservaOrigen: string;
+setReservaOrigen: (o: string) => void;
+reservaDestino: string;
+setReservaDestino: (d: string) => void;
+reservaCliente: string;
+setReservaCliente: (c: string) => void;
+reservaTelefono: string;
+setReservaTelefono: (t: string) => void;
+reservaNotas: string;
+setReservaNotas: (n: string) => void;
+editingReserva: Reserva | null;
+setEditingReserva: (r: Reserva | null) => void;
+reservations: Reserva[];
+setReservations: (r: Reserva[] | ((prev: Reserva[]) => Reserva[])) => void;
+```
+
+#### Codigo nuevo
+```tsx
+setShowReservaDialog: (v: boolean) => void;
+setReservaTime: (t: string) => void;
+setReservaOrigen: (o: string) => void;
+setReservaDestino: (d: string) => void;
+setReservaCliente: (c: string) => void;
+setReservaTelefono: (t: string) => void;
+setReservaNotas: (n: string) => void;
+setEditingReserva: (r: Reserva | null) => void;
+reservations: Reserva[];
+renderReservaDialog: () => React.ReactElement | false;
+```
+
+#### Por que se cambio
+La pantalla de calendario no debe tener una copia propia del formulario de reserva. Ahora recibe el renderizador central desde `src/main.tsx`, conserva solo el estado necesario para abrir o editar reservas y evita divergencias de textos, estilos y logica.
+
+### Cambio 3 - Navegacion y estado del calendario
+
+#### Codigo anterior
+```tsx
+<button style={{ background: "none", border: "none", cursor: "pointer", padding: 8, display: "flex", alignItems: "center" }} onClick={() => setScreen("home")}><IconBack /></button>
+```
+
+```tsx
+setShowMonthPicker(!showMonthPicker);
+```
+
+```tsx
+{renderReservaDialog(
+  showReservaDialog,
+  reservaTime,
+  setReservaTime,
+  reservaOrigen,
+  setReservaOrigen,
+  reservaDestino,
+  setReservaDestino,
+  reservaCliente,
+  setReservaCliente,
+  reservaTelefono,
+  setReservaTelefono,
+  reservaNotas,
+  setReservaNotas,
+  selectedDate,
+  setSelectedDate,
+  editingReserva,
+  setEditingReserva,
+  setConfirmDialog,
+  reservations,
+  setReservations,
+  setShowReservaDialog
+)}
+```
+
+#### Codigo nuevo
+```tsx
+<button style={iconBtnStyle} onClick={() => setScreen("home")}><IconBack /></button>
+```
+
+```tsx
+setShowMonthPicker(v => !v);
+```
+
+```tsx
+{renderReservaDialog()}
+```
+
+#### Por que se cambio
+El boton de volver recupera el estilo compartido de la pantalla antigua, el selector de mes usa una actualizacion funcional segura y el calendario deja de pasar todo el estado de reserva a una copia local del modal.
+
+### Cambio 4 - Iconos compartidos en pantallas extraidas
+
+#### Codigo anterior
+```tsx
+const IconBack: FC = () => (
+  <svg width="22" height="22" viewBox="0 0 22 22" fill="none">
+    <path
+      d="M14 18L7 11L14 4"
+      stroke="rgba(255,255,255,0.65)"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+  </svg>
+);
+
+const IconDel: FC = () => (
+  <svg width="20" height="16" viewBox="0 0 20 16" fill="none">
+    <path
+      d="M7 2H18C18.55 2 19 2.45 19 3V13C19 13.55 18.55 14 18 14H7L1 8L7 2Z"
+      stroke="rgba(255,255,255,0.45)"
+      strokeWidth="1.7"
+      fill="none"
+    />
+    <path
+      d="M9.5 5.5L14.5 10.5M14.5 5.5L9.5 10.5"
+      stroke="rgba(255,255,255,0.45)"
+      strokeWidth="1.7"
+      strokeLinecap="round"
+    />
+  </svg>
+);
+```
+
+#### Codigo nuevo
+```tsx
+import { IconBack, IconDel } from "../components/navigation-icons";
+```
+
+```tsx
+import { IconBack } from "../components/navigation-icons";
+```
+
+#### Por que se cambio
+`add-entry-screen.tsx`, `add-single-entry-screen.tsx` y `add-nota-general-screen.tsx` usaban copias locales de iconos ya extraidos. Ahora consumen los iconos compartidos para que la organizacion por componentes sea coherente.
+
+### Cambio 5 - Estilo de kilometros compartido
+
+#### Codigo anterior
+```tsx
+const KM_CARD_UNIT_STYLE = {
+  fontSize: "0.72em",
+  fontWeight: 900,
+  letterSpacing: "normal",
+} as const;
+```
+
+#### Codigo nuevo
+```tsx
+import { KM_CARD_UNIT_STYLE } from "../shared/card-styles";
+```
+
+#### Por que se cambio
+`confirm-end-screen.tsx` tenia una copia local del estilo de unidad de kilometros aunque ya existe en `src/shared/card-styles.ts`. Usar el valor compartido evita divergencias visuales en futuras fases.
+
+### Cambio 6 - Confirmacion de borrado en historial
+
+#### Codigo anterior
+```tsx
+setConfirmDialog({
+  text: "¿Seguro que quieres eliminar esta entrada?",
+  onConfirm: deleteEditEntry,
+  confirmBg: "rgba(255,60,60,0.2)",
+  confirmColor: "#ff6b6b",
+  confirmBorder: "1px solid rgba(255,100,100,0.35)",
+});
+```
+
+#### Codigo nuevo
+```tsx
+setConfirmDialog({
+  text: "¿Seguro que quieres eliminar esta entrada?",
+  onConfirm: deleteEditEntry,
+});
+```
+
+#### Por que se cambio
+La extraccion habia anadido estilo destructivo especifico en el historial de hoy. Se retiro para mantener el comportamiento y aspecto previos del dialogo compartido.
+
 ## 2026-05-26 23:19 - Corregir regresiones del recorte
 
 **Archivos modificados:** `src/__tests__/main-antiguo-regressions.test.ts`, `src/__tests__/home-icons.test.ts`, `src/components/home-icons.tsx`, `src/main.tsx`, `src/screens/calendar-screen.tsx`, `src/screens/confirm-end-screen.tsx`, `src/screens/home-screen.tsx`, `src/screens/pantalla-turnos.tsx`, `src/screens/today-history-screen.tsx`

@@ -25,9 +25,6 @@ type Props = {
     text: string;
     onConfirm: () => void;
     confirmText?: string;
-    confirmBg?: string;
-    confirmColor?: string;
-    confirmBorder?: string;
   } | null;
   setConfirmDialog: (dialog: any) => void;
   editEntry: Entry | null;
@@ -141,9 +138,6 @@ export function TodayHistoryScreen({
             setConfirmDialog({
               text: "¿Seguro que quieres eliminar esta entrada?",
               onConfirm: deleteEditEntry,
-              confirmBg: "rgba(255,60,60,0.2)",
-              confirmColor: "#ff6b6b",
-              confirmBorder: "1px solid rgba(255,100,100,0.35)",
             });
           }}
           onCancel={() => setEditEntry(null)}

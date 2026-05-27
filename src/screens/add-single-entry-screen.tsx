@@ -1,5 +1,6 @@
 import { type FC, type CSSProperties } from "react";
 import { Shell } from "../components/shell";
+import { IconBack, IconDel } from "../components/navigation-icons";
 import { A, ABG, E, EBG, F, FBG, N, NBG } from "../shared/ui-theme";
 import { timeNow, today } from "../logic/date-time";
 import type { Entry } from "../shared/types";
@@ -22,35 +23,6 @@ const keyBtnStyle: CSSProperties = {
   justifyContent: "center",
   cursor: "pointer",
 };
-
-const IconBack: FC = () => (
-  <svg width="22" height="22" viewBox="0 0 22 22" fill="none">
-    <path
-      d="M14 18L7 11L14 4"
-      stroke="rgba(255,255,255,0.65)"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    />
-  </svg>
-);
-
-const IconDel: FC = () => (
-  <svg width="20" height="16" viewBox="0 0 20 16" fill="none">
-    <path
-      d="M7 2H18C18.55 2 19 2.45 19 3V13C19 13.55 18.55 14 18 14H7L1 8L7 2Z"
-      stroke="rgba(255,255,255,0.45)"
-      strokeWidth="1.7"
-      fill="none"
-    />
-    <path
-      d="M9.5 5.5L14.5 10.5M14.5 5.5L9.5 10.5"
-      stroke="rgba(255,255,255,0.45)"
-      strokeWidth="1.7"
-      strokeLinecap="round"
-    />
-  </svg>
-);
 
 type SingleMode = "agencia_bono" | "extra" | "gasolina" | "nulo";
 

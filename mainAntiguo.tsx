@@ -3,10 +3,18 @@ import ReactDOM from "react-dom/client";
 import { Filesystem, Directory, Encoding } from "@capacitor/filesystem";
 import { Share } from "@capacitor/share";
 
-import { Capacitor } from "@capacitor/core";
+import { Capacitor, registerPlugin } from "@capacitor/core";
+
+export interface ApkInstallerPluginType {
+  canInstallPackages(): Promise<{ value: boolean }>;
+  openInstallPermissionSettings(): Promise<void>;
+  downloadAndInstall(options: { url: string; fileName: string }): Promise<{ success: boolean }>;
+}
+
+const ApkInstaller = registerPlugin<ApkInstallerPluginType>("ApkInstaller");
 
 import html2canvas from "html2canvas";
-import { signOut } from "firebase/auth";
+import { onAuthStateChanged, signOut, type User } from "firebase/auth";
 import {
   onSnapshot,
   doc,
@@ -14,162 +22,101 @@ import {
   setDoc,
   writeBatch,
 } from "firebase/firestore";
-import { auth, db } from "./services/firebase";
-import { AuthGate } from "./screens/auth-gate";
-import { registerServiceWorker } from "./services/service-worker-registration";
-import { APP_VERSION } from "./shared/app-version";
-import {
-  IconCoin,
-  IconPercent,
-  IconCard,
-  IconAgency,
-  IconExtra,
-  IconFuel,
-  IconNulo,
-} from "./components/entry-icons";
-import {
-  IconBack,
-  IconDel,
-  IconRefresh,
-  IconDownload,
-  IconUpload,
-  IconCalendar,
-  IconSettings,
-  IconHomeNeon,
-  IconLogoutNeon,
-  IconAdminNeon,
-} from "./components/navigation-icons";
-import { CalendarScreen } from "./screens/calendar-screen";
-import { HomeScreen } from "./screens/home-screen";
-import { SettingsScreen } from "./screens/settings-screen";
-import { fmtDuration, fmtKm, fmtKmNumber, fmtMoney, fmtMoneyNumber, fmt } from "./logic/formatters";
-import { ConfirmDialog, MainCard, SmallCard } from "./components/common";
-import { TurnoNotasCard } from "./components/turno-notas";
-import { EditEntryDialog } from "./components/edit-entry-dialog";
-import { DurationCardValue } from "./components/duration-card-value";
-import { IconPlay, IconPause } from "./components/turno-control-icons";
-import { AddSingleEntryScreen } from "./screens/add-single-entry-screen";
-import { AddNotaGeneralScreen } from "./screens/add-nota-general-screen";
-import { AddEntryScreen } from "./screens/add-entry-screen";
-import { PantallaTurnos } from "./screens/pantalla-turnos";
-import { TodayHistoryScreen } from "./screens/today-history-screen";
-import { ConfirmEndScreen } from "./screens/confirm-end-screen";
-import { Shell } from "./components/shell";
-import { ApkInstaller } from "./services/apk-installer";
-import { resolveLatestApkUpdate, type UpdateState } from "./logic/update-flow";
-import { buildBackupPayload, buildBackupPayloadFromState } from "./logic/backup";
-import { exportBackupJSON } from "./logic/backup-export";
-import {
-  ensureTurnosDiaLibreContable,
-  getTurnosByCalendarMonth,
-  getTurnosByCalendarYear,
-  mergeTurnos,
-  sortTurnosByDateDesc,
-} from "./logic/turnos";
-import { parseCSVToHistory } from "./logic/csv";
-import { getBackupMenuActionIds, getHomeQuickActionIds } from "./shared/action-ids";
-import { getTurnosNotasSemana } from "./logic/turno-notas-logic";
-import { updateTurnoEntrega } from "./logic/turno-entrega";
-import { getDaysInMonth, getStartOffset } from "./logic/calendar-date";
-import { MESES_COMPLETOS, getAccountingPeriodLabel, getMesLabel } from "./logic/date-labels";
-import { KM_CARD_UNIT_STYLE, TIME_CARD_HOUR_UNIT_STYLE, TIME_CARD_UNIT_STYLE, WEEK_LIST_CARD_TEXT_SIZES } from "./shared/card-styles";
-import { fmtDate, getDiffMins, timeNow, today } from "./logic/date-time";
-import { userStorageKey, writeUserLocalJSON } from "./services/user-storage";
-import { KEY_CURRENT, KEY_HISTORY, KEY_NOTES, KEY_RESERVATIONS, KEY_SETTINGS, KEY_WEEK_OVERRIDES } from "./shared/storage-keys";
-import { loadCurrent, loadHistory, loadNotes, loadReservations, loadSettings, loadWeekOverrides } from "./logic/state-loaders";
-import { A, ABG, C, CBG, E, EBG, F, FBG, G, GBG, N, NBG, P, PBG } from "./shared/ui-theme";
-import type {
-  AppSettings,
-  CurrentState,
-  EditTurnoState,
-  Entry,
-  NotaCalendario,
-  NotaTipo,
-  Reserva,
-  Turno,
-  TurnoNotasSemana,
-  WeekOverride,
-} from "./shared/types";
-import {
-  formatWeekRange,
-  formatWeekRangeFull,
-  getCurrentOpenWeekId,
-  getTurnoAccountingWeekId,
-  getTurnoFechaEfectiva,
-  getWeekId,
-  getWeekMonth,
-  getWeekOverride,
-  getWeekRange,
-  getWeekStartDate,
-  groupTurnosByWeek,
-  isWeekClosed,
-  selectAccountingHeroWeek,
-} from "./logic/week-logic";
-import {
-  buildTurnoConfigFromSettings,
-  calcularResumenContableTurnos,
-  calcularTotalesTurnos,
-  calcularTurnoContable,
-  getTurnoConfig,
-  roundMoney,
-} from "./logic/accounting";
+import { auth, db } from "./firebase";
+import { LoginScreen } from "./login-screen";
+import { fmtDuration, fmtKm, fmtKmNumber, fmtMoney, fmtMoneyNumber, splitDurationLabel } from "./formatters";
 import {
   userMetaDocRef,
   userSubcollectionRef,
   saveUserDoc,
   syncSubcollection,
   userHasFirestoreData,
-} from "./services/firestore-sync";
-import { AdminListScreen, AdminUserView } from "./screens/admin-screens";
+} from "./firestore-sync";
+import { AdminListScreen, AdminUserView } from "./admin-screens";
 
-export { fmtDuration, fmtKm, fmtKmNumber, fmtMoney, fmtMoneyNumber, splitDurationLabel } from "./logic/formatters";
-export { buildBackupPayload, buildBackupPayloadFromState };
-export {
-  ensureTurnosDiaLibreContable,
-  getTurnosByCalendarMonth,
-  getTurnosByCalendarYear,
-  mergeTurnos,
-  sortTurnosByDateDesc,
-};
-export { parseCSVLine, parseCSVToHistory } from "./logic/csv";
-export { getBackupMenuActionIds, getHomeQuickActionIds };
-export type { BackupMenuActionId, HomeQuickActionId } from "./shared/action-ids";
-export { getTurnosNotasSemana };
-export { updateTurnoEntrega };
-export { getAccountingPeriodLabel };
-export { KM_CARD_UNIT_STYLE, TIME_CARD_HOUR_UNIT_STYLE, TIME_CARD_UNIT_STYLE, WEEK_LIST_CARD_TEXT_SIZES };
-export type {
-  AppSettings,
-  CurrentState,
-  EditTurnoState,
-  Entry,
-  NotaCalendario,
-  NotaTipo,
-  Reserva,
-  Turno,
-  TurnoConfig,
-  TurnoNotasSemana,
-  WeekOverride,
-} from "./shared/types";
-export {
-  getCurrentOpenWeekId,
-  getTurnoAccountingWeekId,
-  getTurnoFechaEfectiva,
-  getWeekId,
-  getWeekRange,
-  getWeekStartDate,
-  groupTurnosByWeek,
-  selectAccountingHeroWeek,
-};
-export {
-  buildTurnoConfigFromSettings,
-  calcularResumenContableTurnos,
-  calcularTotalesTurnos,
-  calcularTurnoContable,
-  getTurnoConfig,
-};
+export { fmtDuration, fmtKm, fmtKmNumber, fmtMoney, fmtMoneyNumber, splitDurationLabel } from "./formatters";
 
 const { useState, useEffect, useRef } = React;
+
+export interface Entry {
+  id: number;
+  type: string;
+  amount: number;
+  note: string;
+  time: string;
+}
+
+export interface TurnoConfig {
+  porcentajeJefe: number;
+  porcentajeChofer: number;
+  descDatafono: boolean;
+  descAgencia: boolean;
+  descExtra: boolean;
+  descGasolina: boolean;
+}
+
+export interface Turno {
+  id: number;
+  date: string;
+  startTime: string | null;
+  endTime: string;
+  entries: Entry[];
+  totalP: number;
+  totalD: number;
+  totalA: number;
+  totalE: number;
+  totalF: number;
+  totalN: number;
+  dinero: number;
+  km: number;
+  notes: string;
+  startDate: string | null;
+  totalPausedMinutes?: number;
+  entregada?: boolean;
+  fechaEntrega?: string | null;
+  configTurno?: TurnoConfig;
+  diaLibreContable?: number;
+}
+
+export interface TurnoNotasSemana {
+  turno: Turno;
+  notasGenerales: Entry[];
+  notasDetalladas: Entry[];
+}
+
+interface EditTurnoState extends Turno {
+  dineroStr?: string;
+  kmStr?: string;
+  newType?: string | null;
+  newAmount?: string;
+  newNote?: string;
+  isAddingNote?: boolean;
+  tempNote?: string;
+}
+
+interface CurrentState {
+  entries: Entry[];
+  startTime: string | null;
+  startDate: string | null;
+  isPaused?: boolean;
+  pauseStartTime?: string | null;
+  totalPausedMinutes?: number;
+}
+
+const G = "oklch(0.68 0.20 145)";
+const GBG = "oklch(0.18 0.07 145)";
+const P = "oklch(0.65 0.20 280)";
+const PBG = "oklch(0.17 0.07 280)";
+const A = "oklch(0.75 0.16 70)";
+const ABG = "oklch(0.20 0.06 70)";
+const E = "oklch(0.72 0.14 200)";
+const EBG = "oklch(0.19 0.05 200)";
+const F = "oklch(0.70 0.18 25)";
+const FBG = "oklch(0.19 0.06 25)";
+const N = "oklch(0.62 0.06 260)";
+const NBG = "oklch(0.18 0.03 260)";
+const C = "oklch(0.75 0.15 290)";
+const CBG = "oklch(0.18 0.05 290 / 0.12)";
 
 type EntryTypeMeta = {
   color: string;
@@ -181,6 +128,33 @@ function getEntryTypeMeta(type: string): EntryTypeMeta {
   return ENTRY_TYPE_META[type] || ENTRY_TYPE_META.nulo;
 }
 
+const MESES_COMPLETOS = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
+const MESES_ABREVIADOS = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
+
+export const WEEK_LIST_CARD_TEXT_SIZES = {
+  range: "clamp(13px, 4.2cqw, 16px)",
+  meta: "clamp(11px, 3.4cqw, 13px)",
+  metric: "clamp(14px, 4.5cqw, 17px)",
+} as const;
+
+export const KM_CARD_UNIT_STYLE = {
+  fontSize: "0.72em",
+  fontWeight: 900,
+  letterSpacing: "normal",
+} as const;
+
+export const TIME_CARD_UNIT_STYLE = {
+  fontSize: "1em",
+  fontWeight: KM_CARD_UNIT_STYLE.fontWeight,
+  marginLeft: 2,
+  letterSpacing: KM_CARD_UNIT_STYLE.letterSpacing,
+} as const;
+
+export const TIME_CARD_HOUR_UNIT_STYLE = {
+  ...TIME_CARD_UNIT_STYLE,
+  marginRight: 6,
+} as const;
+
 const NOTE_TIME_STYLE = {
   fontSize: 12,
   color: "rgba(255,255,255,0.45)",
@@ -190,9 +164,799 @@ const NOTE_TIME_STYLE = {
   alignSelf: "baseline",
 } as const;
 
+const KEY_CURRENT = "taxi_current_v3";
+const KEY_HISTORY = "taxi_history_v3";
+const KEY_SETTINGS = "taxi_settings_v3";
+const KEY_WEEK_OVERRIDES = "taxi_week_overrides_v1";
+const KEY_RESERVATIONS = "taxi_reservations_v1";
+const KEY_NOTES = "taxi_notes_v1";
+
+function userStorageKey(baseKey: string, uid = auth.currentUser?.uid || ""): string {
+  return uid ? `${baseKey}__${uid}` : baseKey;
+}
+
+function readLocalJSON<T>(baseKey: string): T | null {
+  try {
+    return JSON.parse(localStorage.getItem(userStorageKey(baseKey)) || "null") as T | null;
+  } catch (e) {
+    return null;
+  }
+}
+
+function writeUserLocalJSON(uid: string, baseKey: string, value: unknown): void {
+  localStorage.setItem(userStorageKey(baseKey, uid), JSON.stringify(value));
+}
+
+export interface Reserva {
+  id: string;
+  date: string;        // "YYYY-MM-DD"
+  time: string;        // "HH:mm"
+  origen: string;
+  destino: string;
+  cliente: string;
+  telefono: string;    // permite llamada directa
+  notas: string;
+}
+
+export type NotaTipo = 'ITV' | 'Seguro' | 'Normal' | 'Día libre';
+
+export interface NotaCalendario {
+  id: string;
+  date: string;        // "YYYY-MM-DD"
+  tipo: NotaTipo;
+  texto: string;
+}
+
+interface WeekOverride {
+  weekId: string;
+  notes: string;
+  entregada: boolean;
+  fechaEntrega: string | null;
+}
+
+export interface AppSettings {
+  "porcentaje.jefe": number;
+  "porcentaje.chofer": number;
+  "descontar.datafono": boolean;
+  "descontar.agencia_bono": boolean;
+  "descontar.extra": boolean;
+  "descontar.gasolina": boolean;
+  diaLibre: number;              // 0=Domingo, 1=Lunes, 2=Martes, 3=Miércoles, 4=Jueves, 5=Viernes, 6=Sábado
+  diaLibreDesde: string | null;  // Fecha ISO desde la que aplica este día libre (null si nunca se ha cambiado)
+}
+// Inyectado por Vite en build a partir de process.env.APP_VERSION o package.json.
+declare const __APP_VERSION__: string;
+const APP_VERSION = __APP_VERSION__;
+
+function today(): string {
+  const d = new Date();
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+function timeNow(): string {
+  return new Date().toLocaleTimeString("es-ES", {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
+function getDiffMins(t1: string, t2: string): number {
+  const [h1, m1] = t1.split(':').map(Number);
+  const [h2, m2] = t2.split(':').map(Number);
+  let mins = (h2 * 60 + m2) - (h1 * 60 + m1);
+  if (mins < 0) mins += 24 * 60;
+  return mins;
+}
+
+function fmt(n: number): string {
+  return fmtMoney(n);
+}
+
+function DurationCardValue({ value }: { value: string }) {
+  const parts = splitDurationLabel(value);
+  return (
+    <>
+      {parts.hours}<span style={TIME_CARD_HOUR_UNIT_STYLE}>h</span>
+      {parts.minutes}<span style={TIME_CARD_UNIT_STYLE}>m</span>
+    </>
+  );
+}
+
+function fmtDate(iso: string): string {
+  return new Date(iso + "T12:00:00")
+    .toLocaleDateString("es-ES", {
+      weekday: "short",
+      day: "numeric",
+      month: "short",
+      year: "numeric",
+    })
+    .replace(/^\w/, (c) => c.toUpperCase());
+}
+
+function loadSettings(): AppSettings {
+  const defaults: AppSettings = {
+    "porcentaje.jefe": 0,
+    "porcentaje.chofer": 0,
+    "descontar.datafono": true,
+    "descontar.agencia_bono": true,
+    "descontar.extra": true,
+    "descontar.gasolina": true,
+    diaLibre: 2,           // Martes por defecto (tu día libre actual)
+    diaLibreDesde: null,
+  };
+  try {
+    const d = readLocalJSON<Partial<AppSettings>>(KEY_SETTINGS);
+    if (d) {
+      return { ...defaults, ...d };
+    }
+  } catch (e) { }
+  return defaults;
+}
+
+export function parseCSVLine(text: string): string[] {
+  const result: string[] = [];
+  let current = "";
+  let inQuotes = false;
+  for (let i = 0; i < text.length; i++) {
+    const char = text[i];
+    if (char === '"') {
+      if (inQuotes && text[i + 1] === '"') {
+        current += '"';
+        i++;
+      } else {
+        inQuotes = !inQuotes;
+      }
+    } else if (char === ';' && !inQuotes) {
+      result.push(current);
+      current = "";
+    } else {
+      current += char;
+    }
+  }
+  result.push(current);
+  return result;
+}
+
+export function sortTurnosByDateDesc(turnos: Turno[]): Turno[] {
+  return [...turnos].sort((a, b) => {
+    const dateA = a.startDate || a.date;
+    const dateB = b.startDate || b.date;
+    const byDate = dateB.localeCompare(dateA);
+    if (byDate !== 0) return byDate;
+    return (b.startTime || "").localeCompare(a.startTime || "");
+  });
+}
+
+export function getTurnosByCalendarMonth(turnos: Turno[], year: number, month: number): Turno[] {
+  const monthId = `${year}-${String(month).padStart(2, "0")}`;
+  return sortTurnosByDateDesc(
+    turnos.filter((turno) => (turno.startDate || turno.date).slice(0, 7) === monthId)
+  );
+}
+
+export function getTurnosByCalendarYear(turnos: Turno[], year: number): Turno[] {
+  const yearId = String(year);
+  return sortTurnosByDateDesc(
+    turnos.filter((turno) => (turno.startDate || turno.date).slice(0, 4) === yearId)
+  );
+}
+
+export function ensureTurnosDiaLibreContable(turnos: Turno[], diaLibre: number): Turno[] {
+  return turnos.map((turno) =>
+    typeof turno.diaLibreContable === "number"
+      ? turno
+      : { ...turno, diaLibreContable: diaLibre }
+  );
+}
+
+export function parseCSVToHistory(csvText: string): Turno[] {
+  const lines = csvText.split(/\r?\n/).filter(l => l.trim() !== "");
+  if (lines.length < 2) return [];
+
+  const newTurnosMap = new Map<string, Turno>();
+  let timeBase = Date.now();
+
+  for (let i = 1; i < lines.length; i++) {
+    const cols = parseCSVLine(lines[i]);
+    if (cols.length < 10) continue;
+
+    const [date, startTime, endTime, type, amountStr, note, time, dineroStr, kmStr] = cols;
+
+    const key = `${date}|${startTime}|${endTime}`;
+    if (!newTurnosMap.has(key)) {
+      newTurnosMap.set(key, {
+        id: timeBase++,
+        date,
+        startTime: startTime || null,
+        endTime,
+        entries: [],
+        totalP: 0, totalD: 0, totalA: 0, totalE: 0, totalF: 0, totalN: 0,
+        dinero: parseFloat(dineroStr.replace(",", ".")) || 0,
+        km: parseFloat(kmStr.replace(",", ".")) || 0,
+        notes: "",
+        startDate: date,
+        totalPausedMinutes: 0
+      });
+    }
+
+    const turno = newTurnosMap.get(key)!;
+
+    if (type) {
+      const amount = parseFloat(amountStr.replace(",", ".")) || 0;
+      turno.entries.push({
+        id: timeBase++,
+        type,
+        amount,
+        note: note || "",
+        time
+      });
+
+      if (type === 'propina') turno.totalP += amount;
+      if (type === 'datafono') turno.totalD += amount;
+      if (type === 'agencia_bono') turno.totalA += amount;
+      if (type === 'extra') turno.totalE += amount;
+      if (type === 'gasolina') turno.totalF += amount;
+      if (type === 'nulo') turno.totalN += amount;
+    }
+  }
+
+  return sortTurnosByDateDesc(Array.from(newTurnosMap.values()));
+}
+
+export function buildBackupPayload(values: {
+  history: string | null;
+  settings: string | null;
+  current: string | null;
+  weekOverrides: string | null;
+  reservations: string | null;
+  notes: string | null;
+}) {
+  return {
+    history: values.history,
+    settings: values.settings,
+    current: values.current,
+    weekOverrides: values.weekOverrides,
+    reservations: values.reservations,
+    notes: values.notes,
+  };
+}
+
+export function buildBackupPayloadFromState(values: {
+  history: Turno[];
+  settings: AppSettings;
+  current: CurrentState;
+  weekOverrides: WeekOverride[];
+  reservations: Reserva[];
+  notes: NotaCalendario[];
+}) {
+  return buildBackupPayload({
+    history: JSON.stringify(values.history),
+    settings: JSON.stringify(values.settings),
+    current: JSON.stringify(values.current),
+    weekOverrides: JSON.stringify(values.weekOverrides),
+    reservations: JSON.stringify(values.reservations),
+    notes: JSON.stringify(values.notes),
+  });
+}
+
+export type HomeQuickActionId = "new-reservation" | "agenda" | "admin-users" | "logout" | "settings";
+export type BackupMenuActionId = "export-json" | "restore-json";
+
+export function getHomeQuickActionIds(isAdmin: boolean): HomeQuickActionId[] {
+  const actions: HomeQuickActionId[] = ["new-reservation", "agenda"];
+  if (isAdmin) actions.push("admin-users");
+  actions.push("logout", "settings");
+  return actions;
+}
+
+export function getBackupMenuActionIds(_isAdmin: boolean): BackupMenuActionId[] {
+  return ["export-json", "restore-json"];
+}
+
+// El payload se construye en el call site con buildBackupPayloadFromState
+// pasando los estados React vivos (espejo de Firestore en memoria).
+// Antes había un default que leía de localStorage; eliminado para evitar
+// exportar datos obsoletos: localStorage va un tick por detrás del estado.
+async function exportBackupJSON(backup: ReturnType<typeof buildBackupPayload>) {
+  const json = JSON.stringify(backup, null, 2);
+  const fileName = `taxi_backup_${new Date().toISOString().split("T")[0]}.json`;
+
+  try {
+    const result = await Filesystem.writeFile({
+      path: fileName,
+      data: json,
+      directory: Directory.Cache,
+      encoding: Encoding.UTF8,
+    });
+
+    await Share.share({
+      title: "Copia de seguridad",
+      text: "Copia de seguridad de Mi Turno",
+      url: result.uri,
+      dialogTitle: "Compartir / Guardar copia de seguridad",
+    });
+  } catch (e) {
+    console.error("exportBackupJSON error:", e);
+    alert("No se pudo exportar la copia de seguridad.");
+  }
+}
+
+// Esta función mezcla los turnos seleccionados con los actuales sin duplicar
+function getTurnoMergeKey(t: Turno): string {
+  return [
+    t.startDate || "",
+    t.date || "",
+    t.startTime || "",
+    t.endTime || "",
+  ].join("|");
+}
+
+export function mergeTurnos(actuales: Turno[], nuevos: Turno[]) {
+  const map = new Map();
+  // Primero metemos los que ya tienes
+  actuales.forEach(t => map.set(getTurnoMergeKey(t), t));
+  // Luego añadimos los nuevos (si coinciden fecha e inicio, el map no se duplica)
+  nuevos.forEach(t => map.set(getTurnoMergeKey(t), t));
+
+  return sortTurnosByDateDesc(Array.from(map.values()));
+}
+
+function loadCurrent(): CurrentState {
+  try {
+    const d = readLocalJSON<CurrentState>(KEY_CURRENT);
+    if (d) {
+      return {
+        ...d,
+        isPaused: d.isPaused || false,
+        pauseStartTime: d.pauseStartTime || null,
+        totalPausedMinutes: d.totalPausedMinutes || 0,
+      };
+    }
+  } catch (e) { }
+  return { entries: [], startTime: null, startDate: null, isPaused: false, pauseStartTime: null, totalPausedMinutes: 0 };
+}
+function loadHistory(): Turno[] {
+  try {
+    const d = readLocalJSON<Turno[]>(KEY_HISTORY);
+    if (Array.isArray(d)) return sortTurnosByDateDesc(d);
+  } catch (e) { }
+  return [];
+}
+function loadReservations(): Reserva[] {
+  try {
+    const d = readLocalJSON<Reserva[]>(KEY_RESERVATIONS);
+    if (Array.isArray(d)) return d;
+  } catch (e) { }
+  return [];
+}
+function loadNotes(): NotaCalendario[] {
+  try {
+    const d = readLocalJSON<NotaCalendario[]>(KEY_NOTES);
+    if (Array.isArray(d)) return d;
+  } catch (e) { }
+  return [];
+}
+function getDaysInMonth(year: number, month: number): number {
+  return new Date(year, month + 1, 0).getDate();
+}
+function getStartOffset(year: number, month: number): number {
+  const firstDay = new Date(year, month, 1);
+  let offset = firstDay.getDay() - 1;
+  if (offset < 0) offset = 6;
+  return offset;
+}
+
+// ============================================================================
+// SEMANAS — Funciones lógicas (Fase 2)
+// ============================================================================
+
+export function getWeekStartDate(dateStr: string, diaLibre: number): string {
+  const d = new Date(dateStr + "T12:00:00");
+  const currentDayOfWeek = d.getDay();
+  const startDayOfWeek = (diaLibre + 1) % 7;
+  let diff = currentDayOfWeek - startDayOfWeek;
+  if (diff < 0) diff += 7;
+  d.setDate(d.getDate() - diff);
+  return d.toISOString().slice(0, 10);
+}
+
+export function getWeekId(dateStr: string, diaLibre: number): string {
+  return getWeekStartDate(dateStr, diaLibre);
+}
+
+export function getWeekRange(weekId: string): { inicio: string; fin: string } {
+  const d = new Date(weekId + "T12:00:00");
+  const inicio = weekId;
+  d.setDate(d.getDate() + 5);
+  const fin = d.toISOString().slice(0, 10);
+  return { inicio, fin };
+}
+
+export function getCurrentOpenWeekId(hoyISO: string, diaLibre: number): string | null {
+  const hoy = new Date(hoyISO + "T12:00:00");
+  if (hoy.getDay() === diaLibre) return null;
+
+  const weekId = getWeekId(hoyISO, diaLibre);
+  return isWeekClosed(weekId, hoyISO) ? null : weekId;
+}
+
+export function selectAccountingHeroWeek(
+  currentOpenWeekId: string | null,
+  recentWeekIds: string[]
+): { weekId: string; kind: "current" | "latest" } | null {
+  if (currentOpenWeekId) return { weekId: currentOpenWeekId, kind: "current" };
+  const latestWeekId = recentWeekIds[0];
+  return latestWeekId ? { weekId: latestWeekId, kind: "latest" } : null;
+}
+
+/**
+ * Devuelve la fecha "efectiva" de un turno para asignarlo a una semana.
+ *
+ * Regla:
+ *   - Si startDate cae en día laboral → usar startDate
+ *   - Si startDate cae en el día libre Y date (fin) cae en un día laboral
+ *     distinto → usar date (el turno cuenta para la semana del día de fin)
+ *   - En cualquier otro caso → startDate || date
+ */
+export function getTurnoFechaEfectiva(turno: Turno, diaLibre: number): string {
+  const fechaInicio = turno.startDate || turno.date;
+  if (!fechaInicio) return turno.date;
+
+  const diaInicio = new Date(fechaInicio + "T12:00:00").getDay();
+
+  // Si empezó en día libre y terminó en otro día (laboral) → usar fecha de fin
+  if (diaInicio === diaLibre && turno.date && turno.date !== fechaInicio) {
+    const diaFin = new Date(turno.date + "T12:00:00").getDay();
+    if (diaFin !== diaLibre) {
+      return turno.date;
+    }
+  }
+
+  return fechaInicio;
+}
+
+export function getTurnoAccountingWeekId(turno: Turno, diaLibre: number): string | null {
+  const diaLibreTurno = turno.diaLibreContable ?? diaLibre;
+  const fechaInicio = turno.startDate || turno.date;
+  if (!fechaInicio) return getWeekId(turno.date, diaLibreTurno);
+
+  const diaInicio = new Date(fechaInicio + "T12:00:00").getDay();
+  const diaFin = new Date(turno.date + "T12:00:00").getDay();
+
+  if (diaInicio === diaLibreTurno && turno.date === fechaInicio) {
+    return null;
+  }
+
+  if (diaInicio === diaLibreTurno && turno.date && turno.date !== fechaInicio && diaFin !== diaLibreTurno) {
+    return getWeekId(turno.date, diaLibreTurno);
+  }
+
+  return getWeekId(fechaInicio, diaLibreTurno);
+}
+
+export function groupTurnosByWeek(turnos: Turno[], diaLibre: number): Map<string, Turno[]> {
+  const map = new Map<string, Turno[]>();
+  const sorted = [...turnos].sort((a, b) => {
+    const dateA = getTurnoFechaEfectiva(a, diaLibre);
+    const dateB = getTurnoFechaEfectiva(b, diaLibre);
+    return dateA.localeCompare(dateB);
+  });
+  for (const t of sorted) {
+    const weekId = getTurnoAccountingWeekId(t, diaLibre);
+    if (!weekId) continue;
+    if (!map.has(weekId)) {
+      map.set(weekId, []);
+    }
+    map.get(weekId)!.push(t);
+  }
+  return map;
+}
+
+function isWeekClosed(weekId: string, hoyISO: string): boolean {
+  const { fin } = getWeekRange(weekId);
+  return hoyISO > fin;
+}
+
+export function calcularTotalesTurnos(turnos: Turno[]) {
+  let totalP = 0;
+  let totalD = 0;
+  let totalA = 0;
+  let totalE = 0;
+  let totalF = 0;
+  let totalN = 0;
+  let dinero = 0;
+  let km = 0;
+  for (const t of turnos) {
+    totalP += t.totalP || 0;
+    totalD += t.totalD || 0;
+    totalA += t.totalA || 0;
+    totalE += t.totalE || 0;
+    totalF += t.totalF || 0;
+    totalN += t.totalN || 0;
+    dinero += t.dinero || 0;
+    km += t.km || 0;
+  }
+  return { totalP, totalD, totalA, totalE, totalF, totalN, dinero, km };
+}
+
+function roundMoney(n: number): number {
+  return Math.round((n + Number.EPSILON) * 100) / 100;
+}
+
+export function buildTurnoConfigFromSettings(settings: AppSettings): TurnoConfig {
+  return {
+    porcentajeJefe: settings["porcentaje.jefe"],
+    porcentajeChofer: settings["porcentaje.chofer"],
+    descDatafono: settings["descontar.datafono"],
+    descAgencia: settings["descontar.agencia_bono"],
+    descExtra: settings["descontar.extra"],
+    descGasolina: settings["descontar.gasolina"],
+  };
+}
+
+export function getTurnoConfig(turno: Turno, settings: AppSettings): TurnoConfig {
+  return turno.configTurno || buildTurnoConfigFromSettings(settings);
+}
+
+export function calcularTurnoContable(turno: Turno, settings: AppSettings) {
+  const config = getTurnoConfig(turno, settings);
+  const dineroBase = (turno.dinero || 0) - (turno.totalN || 0);
+  const descD = config.descDatafono ? (turno.totalD || 0) : 0;
+  const descA = config.descAgencia ? (turno.totalA || 0) : 0;
+  const descE = config.descExtra ? (turno.totalE || 0) : 0;
+  const descF = config.descGasolina ? (turno.totalF || 0) : 0;
+  const totalDescontar = descD + descA + descE + descF;
+
+  return {
+    dineroBase: roundMoney(dineroBase),
+    miGanancia: roundMoney((dineroBase * (config.porcentajeChofer / 100)) + (turno.totalP || 0)),
+    descD,
+    descA,
+    descE,
+    descF,
+    totalDescontar: roundMoney(totalDescontar),
+    totalADar: roundMoney((dineroBase * (config.porcentajeJefe / 100)) - totalDescontar),
+    config,
+  };
+}
+
+export function calcularResumenContableTurnos(turnos: Turno[], settings: AppSettings) {
+  const totales = calcularTotalesTurnos(turnos);
+  let miGanancia = 0;
+  let totalDescontar = 0;
+  let totalADar = 0;
+
+  for (const turno of turnos) {
+    const calculo = calcularTurnoContable(turno, settings);
+    miGanancia += calculo.miGanancia;
+    totalDescontar += calculo.totalDescontar;
+    totalADar += calculo.totalADar;
+  }
+
+  return {
+    ...totales,
+    dineroBase: roundMoney((totales.dinero || 0) - (totales.totalN || 0)),
+    miGanancia: roundMoney(miGanancia),
+    totalDescontar: roundMoney(totalDescontar),
+    totalADar: roundMoney(totalADar),
+  };
+}
+
+export function updateTurnoEntrega(
+  turnos: Turno[],
+  turnoId: number,
+  entregada: boolean,
+  fechaEntrega: string | null
+): Turno[] {
+  return turnos.map((t) =>
+    t.id === turnoId
+      ? { ...t, entregada, fechaEntrega: entregada ? fechaEntrega : null }
+      : t
+  );
+}
+
+export function getTurnosNotasSemana(turnos: Turno[]): TurnoNotasSemana[] {
+  return turnos
+    .map((turno) => {
+      const notasGenerales = turno.entries.filter((entry) => entry.type === "nota" && !!entry.note?.trim());
+      const notasDetalladas = turno.entries.filter((entry) => entry.type !== "nota" && !!entry.note?.trim());
+      return { turno, notasGenerales, notasDetalladas };
+    })
+    .filter((item) => item.notasGenerales.length > 0 || item.notasDetalladas.length > 0);
+}
+
 // ============================================================================
 // SEMANAS — Carga y guardado en localStorage (Fase 3)
 // ============================================================================
+
+function loadWeekOverrides(): WeekOverride[] {
+  try {
+    const d = readLocalJSON<WeekOverride[]>(KEY_WEEK_OVERRIDES);
+    if (Array.isArray(d)) return d;
+  } catch (e) { }
+  return [];
+}
+
+/**
+ * Crea un override por defecto (vacío) para un weekId dado.
+ */
+/**
+ * Devuelve el override de una semana, o null si no existe.
+ */
+function getWeekOverride(overrides: WeekOverride[], weekId: string): WeekOverride | null {
+  return overrides.find((o) => o.weekId === weekId) || null;
+}
+
+const DIAS_LABORABLES_SEMANA = 6;
+/**
+ * Decide a qué mes pertenece una semana laboral.
+ *
+ * Regla:
+ *   - Cuenta los días LABORALES del calendario que caen en cada mes.
+ *   - El mes con más días gana.
+ *   - Si hay empate (3-3), devuelve "empate" con los dos meses candidatos
+ *     para que la UI pida al usuario que elija.
+ *
+ * Devuelve:
+ *   { type: "single", mesId: "2026-05" }                              // sin empate
+ *   { type: "tie", candidates: [{mesId, mesLabel}, {mesId, mesLabel}] } // empate
+ */
+function getWeekMonth(weekId: string): {
+  type: "single";
+  mesId: string;
+} | {
+  type: "tie";
+  candidates: { mesId: string; mesLabel: string }[];
+} {
+  const range = getWeekRange(weekId);
+  const start = new Date(range.inicio + "T12:00:00");
+
+  // Contar 6 días laborales (la semana completa, todos los días son laborales por construcción)
+  const conteo = new Map<string, number>(); // "YYYY-MM" → nº días
+  for (let i = 0; i < DIAS_LABORABLES_SEMANA; i++) {
+    const d = new Date(start);
+    d.setDate(start.getDate() + i);
+    const mesId = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+    conteo.set(mesId, (conteo.get(mesId) || 0) + 1);
+  }
+
+  const entradas = Array.from(conteo.entries());
+
+  // Una sola entrada → toda la semana en un mes
+  if (entradas.length === 1) {
+    return { type: "single", mesId: entradas[0][0] };
+  }
+
+  // Dos entradas → comparar
+  entradas.sort((a, b) => b[1] - a[1]); // ordena por más días desc
+  const [primera, segunda] = entradas;
+
+  if (primera[1] !== segunda[1]) {
+    return { type: "single", mesId: primera[0] };
+  }
+
+  // Empate
+  const labelOf = (mesId: string) => {
+    const [y, m] = mesId.split("-").map(Number);
+    return `${MESES_COMPLETOS[m - 1]} ${y}`;
+  };
+
+  // Ordenar candidatos cronológicamente (mes anterior primero)
+  const candidates = [primera[0], segunda[0]].sort();
+  return {
+    type: "tie",
+    candidates: candidates.map((mesId) => ({ mesId, mesLabel: labelOf(mesId) })),
+  };
+}
+
+/**
+ * Devuelve el label legible de un mesId "YYYY-MM" → "Mayo 2026"
+ */
+function getMesLabel(mesId: string): string {
+  const [y, m] = mesId.split("-").map(Number);
+  return `${MESES_COMPLETOS[m - 1]} ${y}`;
+}
+
+export function getAccountingPeriodLabel(year: number, month: number): string {
+  return getMesLabel(`${year}-${String(month).padStart(2, "0")}`);
+}
+
+/**
+ * Devuelve el rango formateado para mostrar en la tarjeta de semana.
+ * Ej: "6 - 11 May" o "29 Abr - 4 May"
+ */
+function formatWeekRange(weekId: string): string {
+  const { inicio, fin } = getWeekRange(weekId);
+  const dInicio = new Date(inicio + "T12:00:00");
+  const dFin = new Date(fin + "T12:00:00");
+  if (dInicio.getMonth() === dFin.getMonth() && dInicio.getFullYear() === dFin.getFullYear()) {
+    return `${dInicio.getDate()} - ${dFin.getDate()} ${MESES_COMPLETOS[dFin.getMonth()]}`;
+  }
+  return `${dInicio.getDate()} ${MESES_COMPLETOS[dInicio.getMonth()]} - ${dFin.getDate()} ${MESES_COMPLETOS[dFin.getMonth()]}`;
+}
+
+/**
+ * Devuelve el rango con fecha completa para cabecera de detalle.
+ * Ej: "Mié 6 May - Lun 11 May 2026"
+ */
+function formatWeekRangeFull(weekId: string): string {
+  const { inicio, fin } = getWeekRange(weekId);
+  const dInicio = new Date(inicio + "T12:00:00");
+  const dFin = new Date(fin + "T12:00:00");
+  const dias = ["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"];
+  return `${dias[dInicio.getDay()]} ${dInicio.getDate()} ${MESES_ABREVIADOS[dInicio.getMonth()]} - ${dias[dFin.getDay()]} ${dFin.getDate()} ${MESES_ABREVIADOS[dFin.getMonth()]} ${dFin.getFullYear()}`;
+}
+
+const IconCoin = ({ s = 24, c = G }: { s?: number; c?: string }) => (
+  <svg width={s} height={s} viewBox="0 0 24 24" fill="none">
+    <circle cx="12" cy="12" r="9" stroke={c} strokeWidth="1.8" />
+    <text
+      x="12"
+      y="17"
+      textAnchor="middle"
+      fill={c}
+      fontSize="11"
+      fontWeight="700"
+      fontFamily="Outfit,sans-serif"
+    >
+      €
+    </text>
+  </svg>
+);
+
+const IconPercent = ({ s = 24, c = G }: { s?: number; c?: string }) => (
+  <svg width={s} height={s} viewBox="0 0 24 24" fill="none">
+    <path d="M16 8L8 16" stroke={c} strokeWidth="2.5" strokeLinecap="round" />
+    <circle cx="9" cy="9" r="2" stroke={c} strokeWidth="2.5" />
+    <circle cx="15" cy="15" r="2" stroke={c} strokeWidth="2.5" />
+  </svg>
+);
+
+const IconCard = ({ s = 24, c = P }: { s?: number; c?: string }) => (
+  <svg width={s} height={s} viewBox="0 0 24 24" fill="none">
+    <rect
+      x="3"
+      y="6"
+      width="18"
+      height="13"
+      rx="2.5"
+      stroke={c}
+      strokeWidth="1.8"
+    />
+    <rect x="3" y="10" width="18" height="3.5" fill={c} opacity="0.35" />
+    <rect x="6" y="15.5" width="5" height="1.5" rx="0.75" fill={c} />
+  </svg>
+);
+const IconBack = () => (
+  <svg width="22" height="22" viewBox="0 0 22 22" fill="none">
+    <path
+      d="M14 18L7 11L14 4"
+      stroke="rgba(255,255,255,0.65)"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+  </svg>
+);
+
+const IconDel = () => (
+  <svg width="20" height="16" viewBox="0 0 20 16" fill="none">
+    <path
+      d="M7 2H18C18.55 2 19 2.45 19 3V13C19 13.55 18.55 14 18 14H7L1 8L7 2Z"
+      stroke="rgba(255,255,255,0.45)"
+      strokeWidth="1.7"
+      fill="none"
+    />
+    <path
+      d="M9.5 5.5L14.5 10.5M14.5 5.5L9.5 10.5"
+      stroke="rgba(255,255,255,0.45)"
+      strokeWidth="1.7"
+      strokeLinecap="round"
+    />
+  </svg>
+);
 
 const IconPencilNeon = ({ s = 28 }: { s?: number }) => (
   <svg
@@ -411,6 +1175,91 @@ const IconTaxiBadgeNeon = ({ s = 24, c = C }: { s?: number; c?: string }) => (
   </svg>
 );
 
+const IconAgency = ({ s = 24, c = A }: { s?: number; c?: string }) => (
+  <svg width={s} height={s} viewBox="0 0 24 24" fill="none">
+    <path
+      d="M4 20V9L12 4L20 9V20"
+      stroke={c}
+      strokeWidth="1.8"
+      strokeLinejoin="round"
+    />
+    <path
+      d="M9 20V14H15V20"
+      stroke={c}
+      strokeWidth="1.8"
+      strokeLinejoin="round"
+    />
+    <path d="M3 20H21" stroke={c} strokeWidth="1.8" strokeLinecap="round" />
+  </svg>
+);
+const IconExtra = ({ s = 24, c = E }: { s?: number; c?: string }) => (
+  <svg width={s} height={s} viewBox="0 0 24 24" fill="none">
+    <path
+      d="M12 4V20M4 12H20"
+      stroke={c}
+      strokeWidth="2"
+      strokeLinecap="round"
+    />
+    <circle cx="12" cy="12" r="9" stroke={c} strokeWidth="1.6" opacity="0.5" />
+  </svg>
+);
+const IconFuel = ({ s = 24, c = F }: { s?: number; c?: string }) => (
+  <svg width={s} height={s} viewBox="0 0 24 24" fill="none">
+    <rect
+      x="4"
+      y="5"
+      width="11.5"
+      height="15"
+      rx="2"
+      stroke={c}
+      strokeWidth="1.8"
+    />
+    <path
+      d="M15.5 9L19 7V17L15.5 15"
+      stroke={c}
+      strokeWidth="1.8"
+      strokeLinejoin="round"
+      strokeLinecap="round"
+    />
+    <rect x="7" y="8" width="5.5" height="4.5" rx="1" fill={c} opacity="0.4" />
+  </svg>
+);
+const IconNulo = ({ s = 24, c = N }: { s?: number; c?: string }) => (
+  <svg width={s} height={s} viewBox="0 0 24 24" fill="none">
+    <circle cx="12" cy="12" r="9" stroke={c} strokeWidth="1.8" />
+    <path d="M6 18L18 6" stroke={c} strokeWidth="1.8" strokeLinecap="round" />
+  </svg>
+);
+
+const IconRefresh = ({ s = 20, c = "currentColor" }: { s?: number; c?: string }) => (
+  <svg width={s} height={s} viewBox="0 0 24 24" fill="none">
+    <path d="M4 4V9H9" stroke={c} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+    <path d="M20 20V15H15" stroke={c} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+    <path d="M20 9C18.8289 5.50429 15.6836 3 12 3C7.02944 3 3 7.02944 3 12" stroke={c} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+    <path d="M4 15C5.17112 18.4957 8.31641 21 12 21C16.9706 21 21 16.9706 21 12" stroke={c} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+  </svg>
+);
+
+const IconDownload = ({ s = 20, c = "currentColor" }: { s?: number; c?: string }) => (
+  <svg width={s} height={s} viewBox="0 0 24 24" fill="none">
+    <path d="M12 4V16" stroke={c} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+    <path d="M7 11L12 16L17 11" stroke={c} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+    <path d="M20 20H4" stroke={c} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+  </svg>
+);
+
+const IconUpload = ({ s = 20, c = "currentColor" }: { s?: number; c?: string }) => (
+  <svg width={s} height={s} viewBox="0 0 24 24" fill="none">
+    <path d="M12 20V8" stroke={c} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+    <path d="M7 13L12 8L17 13" stroke={c} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+    <path d="M20 4H4" stroke={c} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+  </svg>
+);
+
+
+
+
+// Icono para Total Descontar (Ticket/Factura)
 const IconReceipt = ({ s = 24, c = "white" }: { s?: number; c?: string }) => (
   <svg width={s} height={s} viewBox="0 0 24 24" fill="none">
     <path d="M4.5 21V3C4.5 2.44772 4.94772 2 5.5 2H18.5C19.0523 2 19.5 2.44772 19.5 3V21L15.75 19.5L12 21L8.25 19.5L4.5 21Z" stroke={c} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
@@ -569,6 +1418,120 @@ const IconRocket = ({ s = 24, c = "white" }: { s?: number; c?: string }) => (
   </svg>
 );
 
+const IconPlay = ({ s = 24, c = "white" }: { s?: number; c?: string }) => (
+  <svg width={s} height={s} viewBox="0 0 24 24" fill="none" style={{ display: "inline-block", verticalAlign: "middle" }}>
+    <path
+      d="M8 5.5L18.5 12L8 18.5V5.5Z"
+      fill={c}
+    />
+  </svg>
+);
+
+const IconPause = ({ s = 24, c = "white" }: { s?: number; c?: string }) => (
+  <svg width={s} height={s} viewBox="0 0 24 24" fill="none" style={{ display: "inline-block", verticalAlign: "middle" }}>
+    <rect x="6.5" y="5" width="4.2" height="14" rx="1.7" fill={c} />
+    <rect x="13.3" y="5" width="4.2" height="14" rx="1.7" fill={c} />
+  </svg>
+);
+
+const IconLogoutNeon = ({ s = 24 }: { s?: number }) => (
+  <svg width={s} height={s} viewBox="0 0 24 24" fill="none" style={{ display: "inline-block", verticalAlign: "middle" }}>
+    <g transform="rotate(180 12 12)">
+      <path
+        d="M10.5 5.2H5.8C4.8 5.2 4 6 4 7V17C4 18 4.8 18.8 5.8 18.8H10.5"
+        stroke="#ff7a8a"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        style={{ filter: "drop-shadow(0 0 1.2px rgba(255,122,138,0.8)) drop-shadow(0 0 5px rgba(255,70,105,0.28))" }}
+      />
+      <path
+        d="M11 12H19"
+        stroke="#ffb1bc"
+        strokeWidth="2.2"
+        strokeLinecap="round"
+        style={{ filter: "drop-shadow(0 0 1.2px rgba(255,177,188,0.75)) drop-shadow(0 0 5px rgba(255,70,105,0.28))" }}
+      />
+      <path
+        d="M16 8.5L19.5 12L16 15.5"
+        stroke="#ffb1bc"
+        strokeWidth="2.2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        style={{ filter: "drop-shadow(0 0 1.2px rgba(255,177,188,0.75)) drop-shadow(0 0 5px rgba(255,70,105,0.28))" }}
+      />
+    </g>
+  </svg>
+);
+
+const IconAdminNeon = ({ s = 24 }: { s?: number }) => (
+  <svg width={s} height={s} viewBox="0 0 24 24" fill="none" style={{ display: "inline-block", verticalAlign: "middle" }}>
+    <path
+      d="M12 3.4L19 6.1V11.4C19 15.8 16.2 19.4 12 20.8C7.8 19.4 5 15.8 5 11.4V6.1L12 3.4Z"
+      stroke="#7dd3ff"
+      strokeWidth="2"
+      strokeLinejoin="round"
+      style={{ filter: "drop-shadow(0 0 1.2px rgba(125,211,255,0.8)) drop-shadow(0 0 5px rgba(66,165,245,0.32))" }}
+    />
+    <path
+      d="M9 12.2L11 14.2L15.4 9.8"
+      stroke="#b9f6ff"
+      strokeWidth="2.2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      style={{ filter: "drop-shadow(0 0 1.2px rgba(185,246,255,0.78)) drop-shadow(0 0 5px rgba(66,165,245,0.28))" }}
+    />
+  </svg>
+);
+
+const IconHomeNeon = ({ s = 24 }: { s?: number }) => (
+  <svg width={s} height={s} viewBox="0 0 24 24" fill="none" style={{ display: "inline-block", verticalAlign: "middle" }}>
+    <path
+      d="M4.2 11.2L12 5.2L19.8 11.2"
+      stroke="#ffb347"
+      strokeWidth="2.15"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      style={{
+        filter:
+          "drop-shadow(0 0 1.2px rgba(255,190,77,0.75)) drop-shadow(0 0 4px rgba(255,139,61,0.28))",
+      }}
+    />
+    <path
+      d="M6.7 10.3V19H17.3V10.3"
+      stroke="#ffb347"
+      strokeWidth="2"
+      strokeLinejoin="round"
+      style={{
+        filter:
+          "drop-shadow(0 0 1.2px rgba(255,190,77,0.75)) drop-shadow(0 0 4px rgba(255,139,61,0.28))",
+      }}
+    />
+    <path d="M10 19V14.2H14V19" stroke="#ffe071" strokeWidth="1.8" strokeLinejoin="round" />
+    <path d="M9 11.7H15" stroke="#ffd56a" strokeWidth="1.5" strokeLinecap="round" opacity="0.75" />
+  </svg>
+);
+
+const IconCalendar = ({ s = 24, c = "white" }: { s?: number; c?: string }) => (
+  <svg width={s} height={s} viewBox="0 0 24 24" fill="none" style={{ display: "inline-block", verticalAlign: "middle" }}>
+    <rect x="3" y="4" width="18" height="16" rx="3" stroke={c} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+    <path d="M16 2V6M8 2V6" stroke={c} strokeWidth="1.8" strokeLinecap="round" />
+    <path d="M3 9H21" stroke={c} strokeWidth="1.8" strokeLinecap="round" />
+    <circle cx="7.5" cy="13.5" r="1" fill={c} />
+    <circle cx="12" cy="13.5" r="1" fill={c} />
+    <circle cx="16.5" cy="13.5" r="1" fill={c} />
+    <circle cx="7.5" cy="17.5" r="1" fill={c} opacity="0.6" />
+    <circle cx="12" cy="17.5" r="1" fill={c} opacity="0.6" />
+    <circle cx="16.5" cy="17.5" r="1" fill={c} opacity="0.6" />
+  </svg>
+);
+
+const IconSettings = ({ s = 24, c = "white" }: { s?: number; c?: string }) => (
+  <svg width={s} height={s} viewBox="0 0 24 24" fill="none" style={{ display: "inline-block", verticalAlign: "middle" }}>
+    <path d="M12 15C13.6569 15 15 13.6569 15 12C15 10.3431 13.6569 9 12 9C10.3431 9 9 10.3431 9 12C9 13.6569 10.3431 15 12 15Z" stroke={c} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+    <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1Z" stroke={c} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+  </svg>
+);
 
 const ENTRY_TYPE_META: Record<string, EntryTypeMeta> = {
   propina: { color: G, label: "Propina", icon: (s = 17) => <IconCoin s={s} c={G} /> },
@@ -579,6 +1542,65 @@ const ENTRY_TYPE_META: Record<string, EntryTypeMeta> = {
   nulo: { color: N, label: "Nulo", icon: (s = 17) => <IconNulo s={s} c={N} /> },
   nota: { color: "white", label: "Nota", icon: (s = 17) => <IconNoteAdd s={s} showPlus={false} /> },
 };
+
+function Shell({
+  children,
+  burst,
+}: {
+  children: React.ReactNode;
+  burst: boolean;
+}) {
+  return (
+    <div
+      style={{
+        width: "100%",
+        maxWidth: 460,
+        height: "100dvh",
+        display: "flex",
+        flexDirection: "column",
+        background: "#0d0d14",
+        overflow: "hidden",
+        position: "relative",
+        paddingTop: "env(safe-area-inset-top)",
+        paddingBottom: "env(safe-area-inset-bottom)",
+      }}
+    >
+      {burst && <Burst />}
+      {children}
+    </div>
+  );
+}
+
+function Burst() {
+  return (
+    <div
+      style={{
+        position: "absolute",
+        inset: 0,
+        pointerEvents: "none",
+        zIndex: 99,
+        overflow: "hidden",
+      }}
+    >
+      {Array.from({ length: 22 }).map((_, i) => (
+        <div
+          key={i}
+          style={{
+            position: "absolute",
+            top: "-8px",
+            left: `${5 + Math.random() * 90}%`,
+            width: 7,
+            height: 7,
+            borderRadius: Math.random() > 0.5 ? "50%" : "2px",
+            background: [G, P, "white", "oklch(0.85 0.18 80)"][i % 4],
+            animation: `fall ${0.55 + Math.random() * 0.45}s ease-in forwards`,
+            animationDelay: `${Math.random() * 0.25}s`,
+          }}
+        />
+      ))}
+    </div>
+  );
+}
 
 // ============================================================================
 // MIGRACIÓN DE LOCALSTORAGE A FIRESTORE
@@ -737,7 +1759,7 @@ function App() {
     confirmBorder?: string;
   } | null>(null);
   const [updateMsg, setUpdateMsg] = useState("");
-  const [updateState, setUpdateState] = useState<UpdateState>("idle");
+  const [updateState, setUpdateState] = useState<"idle" | "checking" | "available" | "downloading" | "permission_required" | "error" | "installed">("idle");
   const [downloadUrl, setDownloadUrl] = useState("");
   const [releaseUrl, setReleaseUrl] = useState("");
   const [editEntry, setEditEntry] = useState<Entry | null>(null);
@@ -1316,11 +2338,24 @@ function App() {
       const res = await fetch("https://api.github.com/repos/Carlos4400/app-taxi/releases/latest");
       if (!res.ok) throw new Error("No se encontró el release");
       const data = await res.json();
-      const result = resolveLatestApkUpdate(data, APP_VERSION);
-      setDownloadUrl(result.downloadUrl);
-      setReleaseUrl(result.releaseUrl);
-      setUpdateState(result.updateState);
-      setUpdateMsg(result.updateMsg);
+      const latestVersion = data.tag_name ? data.tag_name.replace(/[^0-9.]/g, '') : null;
+
+      if (latestVersion && latestVersion !== APP_VERSION) {
+        let apkAsset = data.assets?.find((asset: any) => asset.name && asset.name.endsWith(".apk"));
+        if (apkAsset) {
+          setDownloadUrl(apkAsset.browser_download_url);
+          setUpdateState("available");
+          setUpdateMsg(`¡Nueva versión ${latestVersion} disponible!`);
+        } else {
+          setDownloadUrl("");
+          setReleaseUrl(data.html_url || "https://github.com/Carlos4400/app-taxi/releases/latest");
+          setUpdateState("error");
+          setUpdateMsg("No se encontró APK en el último release.");
+        }
+      } else {
+        setUpdateState("idle");
+        setUpdateMsg("Tienes la última versión instalada.");
+      }
     } catch (e) {
       setUpdateState("error");
       setUpdateMsg("Error al conectar con GitHub.");
@@ -1709,97 +2744,1492 @@ function App() {
   );
 
   if (screen === "home") {
+    const homeQuickActionIds = getHomeQuickActionIds(isAdmin);
     return (
-      <HomeScreen
-        isPaused={current.isPaused}
-        isAdmin={isAdmin}
-        active={active}
-        onSetScreen={setScreen}
-        onSetCalendarView={setCalendarView}
-        onOpenNewReserva={openNewReserva}
-        onSetAdminMode={setAdminMode}
-        onSetConfirmDialog={setConfirmDialog}
-        confirmDialog={confirmDialog}
-        renderReservaDialog={renderReservaDialog}
-      />
+      <Shell burst={false}>
+        <div
+          style={{
+            flex: 1,
+            display: "flex",
+            flexDirection: "column",
+            justifyContent: "center",
+            padding: "32px 28px 110px",
+          }}
+        >
+          <div style={{ textAlign: "center", marginBottom: 52 }}>
+            <div style={{ fontSize: 88, lineHeight: 1, marginBottom: 18 }}>
+              🚕
+            </div>
+            <div
+              style={{
+                fontSize: 40,
+                fontWeight: 900,
+                color: "white",
+                letterSpacing: "-1.5px",
+              }}
+            >
+              Mi Turno
+            </div>
+            <div
+              style={{
+                fontSize: 15,
+                color: "rgba(255,255,255,0.5)",
+                marginTop: 10,
+                textTransform: "none",
+              }}
+            >
+              {new Date().toLocaleDateString("es-ES", {
+                weekday: "long",
+                day: "numeric",
+                month: "long",
+                year: "numeric",
+              }).replace(/^\w/, (c) => c.toUpperCase())}
+            </div>
+          </div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+            <button
+              onClick={() => {
+                setScreen("main");
+              }}
+              style={{
+                height: 68,
+                padding: 0,
+                whiteSpace: "nowrap",
+                borderRadius: 20,
+                border: current.isPaused ? "2px solid #3b82f6" : `2px solid ${G}`,
+                background: current.isPaused ? "rgba(59, 130, 246, 0.08)" : GBG,
+                color: current.isPaused ? "#3b82f6" : G,
+                fontSize: 18,
+                fontWeight: 800,
+                cursor: "pointer",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: 12,
+              }}
+            >
+              {active ? (
+                <>
+                  <IconRocket s={30} c={G} />
+                  <IconPlay s={40} c="#3b82f6" />
+                </>
+              ) : (
+                <IconRocket s={30} c={G} />
+              )}
+              {active ? "Continuar Turno" : "Iniciar Turno"}
+            </button>
+            <button
+              onClick={() => setScreen("PantallaTurnos")}
+              style={{
+                height: 68,
+                padding: 0,
+                whiteSpace: "nowrap",
+                borderRadius: 20,
+                border: `2px solid ${P}`,
+                background: PBG,
+                color: P,
+                fontSize: 18,
+                fontWeight: 800,
+                cursor: "pointer",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: 12,
+              }}
+            >
+              <IconClipboard s={30} c={P} />
+              Turnos
+            </button>
+            <button
+              onClick={() => setScreen("contabilidad")}
+              style={{
+                height: 68,
+                padding: 0,
+                whiteSpace: "nowrap",
+                borderRadius: 20,
+                border: `2px solid ${A}`,
+                background: ABG,
+                color: A,
+                fontSize: 18,
+                fontWeight: 800,
+                cursor: "pointer",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: 12,
+              }}
+            >
+              <IconChart s={30} c={A} />
+              Contabilidad
+            </button>
+            <button
+              onClick={() => setScreen("calendar")}
+              style={{
+                height: 68,
+                padding: 0,
+                whiteSpace: "nowrap",
+                borderRadius: 20,
+                border: `2px solid ${C}`,
+                background: CBG,
+                color: C,
+                fontSize: 18,
+                fontWeight: 800,
+                cursor: "pointer",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: 12,
+              }}
+            >
+              <IconCalendar s={30} c={C} />
+              Calendario
+            </button>
+          </div>
+        </div>
+        <button
+          onClick={() => openNewReserva()}
+          aria-label="Nueva reserva"
+          style={{
+            position: "absolute",
+            top: 24,
+            left: 28,
+            width: 54,        // <-- Ancho fijo igual al tamaño original
+            height: 54,       // <-- Alto fijo igual al tamaño original
+            background: "rgba(0, 200, 220, 0.08)",
+            border: "1px solid rgba(0, 200, 220, 0.28)",
+            borderRadius: 16,
+            cursor: "pointer",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            fontSize: 22,
+            padding: 0        // <-- Quitamos el padding para que no empuje
+          }}
+        >
+          <IconReservaWrite s={32} />
+        </button>
+        <button
+          onClick={() => { setCalendarView('agenda'); setScreen("calendar"); }}
+          style={{
+            position: "absolute",
+            top: 24,
+            right: 28,
+            width: 54,        // <-- Ancho fijo igual al tamaño original
+            height: 54,       // <-- Alto fijo igual al tamaño original
+            background: "rgba(180, 120, 255, 0.08)",
+            border: "1px solid rgba(180, 120, 255, 0.28)",
+            borderRadius: 16,
+            cursor: "pointer",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            fontSize: 22,
+            padding: 0        // <-- Quitamos el padding para que no empuje
+          }}
+        >
+          <IconAgenda s={32} c="oklch(0.75 0.15 290)" />
+        </button>
+        {renderReservaDialog()}
+        {homeQuickActionIds.includes("admin-users") && (
+          <button
+            onClick={() => setAdminMode("list")}
+            aria-label="Ver datos de otro usuario"
+            title="Ver datos de otro usuario"
+            style={{
+              position: "absolute",
+              bottom: 32,
+              left: 28,
+              width: 54,
+              height: 54,
+              background: "rgba(75, 190, 255, 0.08)",
+              border: "1px solid rgba(75, 190, 255, 0.28)",
+              borderRadius: 16,
+              cursor: "pointer",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              fontSize: 22,
+              padding: 0
+            }}
+          >
+            <IconAdminNeon s={32} />
+          </button>
+        )}
+        <button
+          onClick={() => {
+            setConfirmDialog({
+              text: "\u00bfCerrar sesi\u00f3n? Tus datos seguir\u00e1n guardados y podr\u00e1s volver a entrar m\u00e1s tarde.",
+              confirmText: "Cerrar sesi\u00f3n",
+              onConfirm: () => {
+                signOut(auth).catch((err) => {
+                  console.error("signOut error:", err);
+                });
+              },
+            });
+          }}
+          aria-label="Cerrar sesi\u00f3n"
+          title="Cerrar sesi\u00f3n"
+          style={{
+            position: "absolute",
+            bottom: 32,
+            right: 94,
+            width: 54,
+            height: 54,
+            background: "rgba(255, 95, 95, 0.08)",
+            border: "1px solid rgba(255, 95, 95, 0.28)",
+            borderRadius: 16,
+            cursor: "pointer",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            fontSize: 22,
+            padding: 0
+          }}
+        >
+          <IconLogoutNeon s={32} />
+        </button>
+        <button
+          onClick={() => { setConfirmDialog(null); setScreen("settings"); }}
+          style={{
+            position: "absolute",
+            bottom: 32,
+            right: 28,
+            width: 54,
+            height: 54,
+            background: "rgba(0, 220, 180, 0.08)",
+            border: "1px solid rgba(0, 220, 180, 0.28)",
+            borderRadius: 16,
+            cursor: "pointer",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            fontSize: 22,
+            padding: 0
+          }}
+        >
+          <IconSettings s={32} c="oklch(0.72 0.01 250)" />
+        </button>
+        {confirmDialog && <ConfirmDialog {...confirmDialog} onCancel={() => setConfirmDialog(null)} />}
+      </Shell>
     );
   }
 
   if (screen === "calendar") {
+    const year = calendarMonth.getFullYear();
+    const month = calendarMonth.getMonth();
+    const startOffset = getStartOffset(year, month);
+    const daysInMonth = getDaysInMonth(year, month);
+
+    const prevMonth = () => {
+      setCalendarMonth(new Date(year, month - 1, 1));
+    };
+    const nextMonth = () => {
+      setCalendarMonth(new Date(year, month + 1, 1));
+    };
+
+    const openNewNota = (date?: string) => {
+      setEditingNota(null);
+      setSelectedDate(date || today());
+      setNotaTipo("Normal");
+      setNotaTexto("");
+      setShowNotaDialog(true);
+    };
+
+    const openEditReserva = (r: Reserva) => {
+      setEditingReserva(r);
+      setSelectedDate(r.date);
+      setReservaTime(r.time);
+      setReservaOrigen(r.origen);
+      setReservaDestino(r.destino);
+      setReservaCliente(r.cliente);
+      setReservaTelefono(r.telefono);
+      setReservaNotas(r.notas);
+      setShowReservaDialog(true);
+    };
+
+    const openEditNota = (n: NotaCalendario) => {
+      setEditingNota(n);
+      setSelectedDate(n.date);
+      setNotaTipo(n.tipo);
+      setNotaTexto(n.texto);
+      setShowNotaDialog(true);
+    };
+
+    const saveNota = () => {
+      if (!notaTexto.trim()) {
+        alert("Por favor escribe el texto de la nota.");
+        return;
+      }
+      if (editingNota) {
+        setNotes(prev => prev.map(n => n.id === editingNota.id ? {
+          ...n,
+          date: selectedDate,
+          tipo: notaTipo,
+          texto: notaTexto
+        } : n));
+      } else {
+        const newNote: NotaCalendario = {
+          id: Date.now().toString() + Math.random().toString(36).substring(2, 7),
+          date: selectedDate,
+          tipo: notaTipo,
+          texto: notaTexto
+        };
+        setNotes(prev => [...prev, newNote]);
+      }
+      setShowNotaDialog(false);
+    };
+
+    // Eventos del día seleccionado
+    const dayReservations = reservations.filter(r => r.date === selectedDate).sort((a, b) => a.time.localeCompare(b.time));
+    const dayNotes = notes.filter(n => n.date === selectedDate);
+    const dayTurnos = history.filter(t => (t.startDate || t.date) === selectedDate);
+
+    // Agenda 14 días
+    const agendaDays = Array.from({ length: 14 }).map((_, i) => {
+      const d = new Date();
+      d.setDate(d.getDate() + i);
+      return d.toISOString().slice(0, 10);
+    });
+
+    const daysWithEvents = agendaDays.filter(dayStr => {
+      const dayRes = reservations.some(r => r.date === dayStr);
+      const dayN = notes.some(n => n.date === dayStr);
+      const dayT = history.some(t => (t.startDate || t.date) === dayStr);
+      return dayRes || dayN || dayT;
+    });
+
+    const MONTHS_ES = [
+      "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
+      "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"
+    ];
+
+    const getNotaTipoColor = (t: NotaTipo) => {
+      switch (t) {
+        case 'ITV': return 'oklch(0.70 0.18 25)';
+        case 'Seguro': return 'oklch(0.75 0.16 70)';
+        case 'Normal': return 'oklch(0.65 0.20 280)';
+        case 'Día libre': return 'oklch(0.68 0.20 145)';
+        default: return 'white';
+      }
+    };
+
+    const formatAgendaDate = (dStr: string) => {
+      if (dStr === today()) return "Hoy";
+      const tomorrow = new Date();
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      if (dStr === tomorrow.toISOString().slice(0, 10)) return "Mañana";
+      const d = new Date(dStr + "T12:00:00");
+      return d.toLocaleDateString("es-ES", { weekday: "long", day: "numeric", month: "short" }).replace(/^\w/, c => c.toUpperCase());
+    };
+
     return (
-      <CalendarScreen
-        calendarMonth={calendarMonth}
-        setCalendarMonth={setCalendarMonth}
-        calendarView={calendarView}
-        setCalendarView={setCalendarView}
-        showMonthPicker={showMonthPicker}
-        setShowMonthPicker={setShowMonthPicker}
-        pickerYear={pickerYear}
-        setPickerYear={setPickerYear}
-        selectedDate={selectedDate}
-        setSelectedDate={setSelectedDate}
-        showNotaDialog={showNotaDialog}
-        setShowNotaDialog={setShowNotaDialog}
-        notaTipo={notaTipo}
-        setNotaTipo={setNotaTipo}
-        notaTexto={notaTexto}
-        setNotaTexto={setNotaTexto}
-        editingNota={editingNota}
-        setEditingNota={setEditingNota}
-        notes={notes}
-        setNotes={setNotes}
-        setShowReservaDialog={setShowReservaDialog}
-        setReservaTime={setReservaTime}
-        setReservaOrigen={setReservaOrigen}
-        setReservaDestino={setReservaDestino}
-        setReservaCliente={setReservaCliente}
-        setReservaTelefono={setReservaTelefono}
-        setReservaNotas={setReservaNotas}
-        setEditingReserva={setEditingReserva}
-        reservations={reservations}
-        confirmDialog={confirmDialog}
-        setConfirmDialog={setConfirmDialog}
-        history={history}
-        settings={settings}
-        openNewReserva={openNewReserva}
-        renderReservaDialog={renderReservaDialog}
-        setScreen={setScreen}
-        setViewTurno={setViewTurno}
-        setReturnScreen={setReturnScreen}
-      />
+      <Shell burst={false}>
+        <div style={{ flex: 1, padding: "16px 20px", display: "flex", flexDirection: "column", gap: 16, overflowY: "auto", position: "relative" }}>
+
+          {/* Cabecera superior: volver + título + toggle Mes/Agenda */}
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 4, flexShrink: 0, gap: 12 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+              <button style={S.iconBtn} onClick={() => setScreen("home")}><IconBack /></button>
+              <div style={{ fontSize: 24, fontWeight: 800, color: "white" }}>Calendario</div>
+            </div>
+
+            {/* Botón intercambio de vista (Mes <-> Agenda) */}
+            <button
+              onClick={() => setCalendarView(calendarView === 'month' ? 'agenda' : 'month')}
+              style={{
+                height: 44,
+                border: "1px solid rgba(255, 255, 255, 0.08)",
+                borderRadius: 12,
+                padding: "0 22px",
+                background: "rgba(255, 255, 255, 0.08)",
+                color: "white",
+                fontSize: 16,
+                fontWeight: 800,
+                cursor: "pointer",
+                display: "flex",
+                alignItems: "center",
+                gap: 10,
+                transition: "all 0.15s"
+              }}
+            >
+              <span style={{ fontSize: 18 }}>⇄</span>
+              <span>{calendarView === 'month' ? 'Agenda' : 'Calendario'}</span>
+            </button>
+          </div>
+
+          {/* Fila inferior: + Reserva | + Nota */}
+          <div style={{ display: "flex", gap: 8, flexShrink: 0 }}>
+            <button
+              onClick={() => openNewReserva()}
+              style={{
+                flex: 1,
+                height: 44,
+                borderRadius: 12,
+                border: "2px solid rgba(255,255,255,0.16)",
+                background: C,
+                color: "white",
+                fontSize: 14,
+                fontWeight: 800,
+                cursor: "pointer",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: 8
+              }}
+            >
+              <span>+ 📅</span>
+              <span>Reserva</span>
+            </button>
+            <button
+              onClick={() => openNewNota()}
+              style={{
+                flex: 1,
+                height: 44,
+                borderRadius: 12,
+                border: "2px solid rgba(255,255,255,0.16)",
+                background: C,
+                color: "white",
+                fontSize: 14,
+                fontWeight: 800,
+                cursor: "pointer",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: 8
+              }}
+            >
+              <span>+ 📝</span>
+              <span>Nota</span>
+            </button>
+          </div>
+
+          {/* Vistas condicionales */}
+          {calendarView === 'month' ? (
+            <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+              {/* Selector de Mes */}
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: "rgba(255,255,255,0.03)", borderRadius: 16, padding: "8px 12px", border: "1px solid rgba(255,255,255,0.05)" }}>
+                <button onClick={prevMonth} style={{ background: "none", border: "none", color: C, fontSize: 18, cursor: "pointer", padding: "8px 12px" }}>◀</button>
+                <button
+                  onClick={() => {
+                    setPickerYear(year);
+                    setShowMonthPicker(v => !v);
+                  }}
+                  style={{ background: "none", border: "none", color: "white", fontSize: 16, fontWeight: 800, cursor: "pointer", padding: "4px 8px", display: "flex", alignItems: "center", gap: 6 }}
+                >
+                  {MONTHS_ES[month]} {year}
+                  <span style={{ fontSize: 11, color: "rgba(255,255,255,0.5)" }}>{showMonthPicker ? "▲" : "▼"}</span>
+                </button>
+                <button onClick={nextMonth} style={{ background: "none", border: "none", color: C, fontSize: 18, cursor: "pointer", padding: "8px 12px" }}>▶</button>
+              </div>
+
+              {/* Picker de mes/año */}
+              {showMonthPicker && (
+                <div style={{ background: "rgba(255,255,255,0.03)", borderRadius: 16, padding: 14, border: "1px solid rgba(255,255,255,0.05)", display: "flex", flexDirection: "column", gap: 12 }}>
+                  {/* Selector de año */}
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                    <button
+                      onClick={() => setPickerYear(y => y - 1)}
+                      style={{ background: "rgba(255,255,255,0.06)", border: "none", color: C, fontSize: 16, cursor: "pointer", width: 36, height: 36, borderRadius: 10 }}
+                    >◀</button>
+                    <div style={{ fontSize: 18, fontWeight: 800, color: "white" }}>{pickerYear}</div>
+                    <button
+                      onClick={() => setPickerYear(y => y + 1)}
+                      style={{ background: "rgba(255,255,255,0.06)", border: "none", color: C, fontSize: 16, cursor: "pointer", width: 36, height: 36, borderRadius: 10 }}
+                    >▶</button>
+                  </div>
+
+                  {/* Rejilla 12 meses (4 cols x 3 filas) */}
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 6 }}>
+                    {MONTHS_ES.map((mLabel, mIdx) => {
+                      const isCurrent = mIdx === month && pickerYear === year;
+                      const isToday = mIdx === new Date().getMonth() && pickerYear === new Date().getFullYear();
+                      return (
+                        <button
+                          key={mIdx}
+                          onClick={() => {
+                            setCalendarMonth(new Date(pickerYear, mIdx, 1));
+                            setShowMonthPicker(false);
+                          }}
+                          style={{
+                            padding: "10px 0",
+                            borderRadius: 10,
+                            border: isToday ? `1px solid ${C}` : "1px solid rgba(255,255,255,0.06)",
+                            background: isCurrent ? C : "rgba(255,255,255,0.04)",
+                            color: isCurrent ? "black" : "rgba(255,255,255,0.85)",
+                            fontSize: 13,
+                            fontWeight: isCurrent ? 800 : 700,
+                            cursor: "pointer",
+                            transition: "all 0.15s"
+                          }}
+                        >
+                          {mLabel.slice(0, 3)}
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  {/* Botón Hoy */}
+                  <button
+                    onClick={() => {
+                      const now = new Date();
+                      setCalendarMonth(new Date(now.getFullYear(), now.getMonth(), 1));
+                      setSelectedDate(today());
+                      setShowMonthPicker(false);
+                    }}
+                    style={{
+                      padding: "10px 0",
+                      borderRadius: 10,
+                      border: "1px solid rgba(255,255,255,0.12)",
+                      background: "rgba(255,255,255,0.06)",
+                      color: "white",
+                      fontSize: 13,
+                      fontWeight: 700,
+                      cursor: "pointer"
+                    }}
+                  >
+                    Ir a Hoy
+                  </button>
+                </div>
+              )}
+
+              {/* Cabecera L-M-X-J-V-S-D */}
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 4, textAlign: "center" }}>
+                {["L", "M", "X", "J", "V", "S", "D"].map((day, idx) => (
+                  <div key={idx} style={{ fontSize: 11, fontWeight: 700, color: "rgba(255,255,255,0.4)", textTransform: "uppercase" }}>
+                    {day}
+                  </div>
+                ))}
+              </div>
+
+              {/* Cuadrícula de días */}
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 6, marginBottom: 8 }}>
+                {Array.from({ length: startOffset }).map((_, idx) => (
+                  <div key={`offset-${idx}`} style={{ aspectRatio: "1" }} />
+                ))}
+
+                {Array.from({ length: daysInMonth }).map((_, idx) => {
+                  const dayNum = idx + 1;
+                  const dayStr = `${year}-${String(month + 1).padStart(2, "0")}-${String(dayNum).padStart(2, "0")}`;
+                  const isSelected = selectedDate === dayStr;
+                  const isToday = dayStr === today();
+
+                  const hasTurno = history.some(t => (t.startDate || t.date) === dayStr);
+                  const dayResList = reservations.filter(r => r.date === dayStr);
+                  const dayNoteList = notes.filter(n => n.date === dayStr);
+
+                  return (
+                    <div
+                      key={dayNum}
+                      onClick={() => {
+                        const clickedDate = `${year}-${String(month + 1).padStart(2, "0")}-${String(dayNum).padStart(2, "0")}`;
+                        setSelectedDate(clickedDate);
+                      }}
+                      style={{
+                        aspectRatio: "1",
+                        background: isSelected ? "rgba(180, 120, 255, 0.12)" : isToday ? "rgba(0, 220, 180, 0.08)" : "rgba(255,255,255,0.02)",
+                        border: isSelected
+                          ? `1.5px solid ${C}`
+                          : isToday
+                            ? `1.5px solid ${G}`
+                            : "1px solid rgba(255,255,255,0.05)",
+                        borderRadius: 12,
+                        display: "flex",
+                        flexDirection: "column",
+                        justifyContent: "space-between",
+                        alignItems: "center",
+                        padding: "6px 2px",
+                        cursor: "pointer",
+                        position: "relative",
+                        transition: "all 0.15s"
+                      }}
+                    >
+                      <span style={{
+                        fontSize: 14,
+                        fontWeight: isSelected || isToday ? 800 : 500,
+                        color: isSelected ? C : isToday ? G : "white"
+                      }}>
+                        {dayNum}
+                      </span>
+
+                      <div style={{ display: "flex", gap: 2, justifyContent: "center", flexWrap: "wrap", width: "100%" }}>
+                        {hasTurno && <span style={{ fontSize: 8 }}>🚖</span>}
+                        {dayResList.length > 0 && (
+                          <span style={{ fontSize: 8, background: C, color: "black", borderRadius: 4, padding: "0 2px", fontWeight: "bold" }}>
+                            {dayResList.length}
+                          </span>
+                        )}
+                        {dayNoteList.length > 0 && <span style={{ fontSize: 8 }}>📝</span>}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Detalle del Día Seleccionado (Panel inferior con fadeUp) */}
+              <div
+                key={selectedDate}
+                style={{
+                  background: "rgba(255,255,255,0.03)",
+                  borderRadius: 20,
+                  padding: 16,
+                  border: "1px solid rgba(255,255,255,0.07)",
+                  animation: "fadeUp 0.25s ease"
+                }}
+              >
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
+                  <div style={{ fontSize: 15, fontWeight: 800, color: "white" }}>
+                    {new Date(selectedDate + "T12:00:00").toLocaleDateString("es-ES", { weekday: "long", day: "numeric", month: "long" }).replace(/^\w/, c => c.toUpperCase())}
+                  </div>
+                  <div style={{ display: "flex", gap: 6 }}>
+                    <button onClick={() => openNewReserva(selectedDate)} style={{ border: "none", background: "rgba(180, 120, 255, 0.1)", color: C, borderRadius: 8, padding: "6px 10px", fontSize: 11, fontWeight: 700, cursor: "pointer" }}>+ Reserva</button>
+                    <button onClick={() => openNewNota(selectedDate)} style={{ border: "none", background: "rgba(255,255,255,0.06)", color: "rgba(255,255,255,0.7)", borderRadius: 8, padding: "6px 10px", fontSize: 11, fontWeight: 700, cursor: "pointer" }}>+ Nota</button>
+                  </div>
+                </div>
+
+                {/* Lista de Eventos */}
+                <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                  {dayTurnos.length === 0 && dayReservations.length === 0 && dayNotes.length === 0 && (
+                    <div style={{ textAlign: "center", color: "rgba(255,255,255,0.3)", padding: "16px 0", fontSize: 13, fontStyle: "italic" }}>
+                      Sin eventos para este día
+                    </div>
+                  )}
+
+                  {/* Turno Cerrado */}
+                  {dayTurnos.map(turno => {
+                    const gananciaTurno = calcularTurnoContable(turno, settings).miGanancia;
+
+                    let tiempoTurno = fmtDuration(0);
+                    if (turno.startTime && turno.endTime) {
+                      let totalMins = getDiffMins(turno.startTime, turno.endTime);
+                      if (turno.totalPausedMinutes) totalMins = Math.max(0, totalMins - turno.totalPausedMinutes);
+                      tiempoTurno = fmtDuration(totalMins);
+                    }
+
+                    return (
+                      <div
+                        key={turno.id}
+                        onClick={() => { setReturnScreen("calendar"); setViewTurno(turno); setScreen("summary"); }}
+                        style={{
+                          background: "rgba(255,255,255,0.02)",
+                          border: "1px solid rgba(255,255,255,0.05)",
+                          borderRadius: 14,
+                          padding: 12,
+                          display: "flex",
+                          justifyContent: "space-between",
+                          alignItems: "center",
+                          cursor: "pointer"
+                        }}
+                      >
+                        <div style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 13, color: "rgba(255,255,255,0.72)", flexWrap: "wrap" }}>
+                          <span style={{ fontSize: 16 }}>🚖</span>
+                          <span style={{ fontWeight: 800, color: "rgba(255,255,255,0.8)" }}>Turno cerrado</span>
+                          <span style={{ display: "flex", alignItems: "center", gap: 4, fontWeight: 900, color: "oklch(0.78 0.18 150)" }}>
+                            <IconMoneyBag s={16} c="oklch(0.78 0.18 150)" />
+                            {fmt(gananciaTurno)}
+                          </span>
+                          <span style={{ display: "flex", alignItems: "center", gap: 4, fontWeight: 900, color: "oklch(0.85 0.12 210)" }}>
+                            <IconTimer s={16} c="oklch(0.85 0.12 210)" />
+                            {tiempoTurno}
+                          </span>
+                        </div>
+                        <span style={{ fontSize: 16, color: "rgba(255,255,255,0.3)" }}>➔</span>
+                      </div>
+                    );
+                  })}
+
+                  {/* Reservas */}
+                  {dayReservations.map(res => (
+                    <div key={res.id} style={{ background: "rgba(180, 120, 255, 0.07)", border: "1px solid rgba(180, 120, 255, 0.26)", borderRadius: 16, padding: 12, display: "flex", flexDirection: "column", gap: 10 }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10 }}>
+                        <div style={{ fontSize: 12, fontWeight: 900, color: C, textTransform: "uppercase", letterSpacing: "0.4px" }}>
+                          Reserva
+                        </div>
+                        <button
+                          onClick={() => openEditReserva(res)}
+                          style={{
+                            width: 34,
+                            height: 34,
+                            flex: "0 0 34px",
+                            background: "rgba(255,255,255,0.06)",
+                            border: "1px solid rgba(255,255,255,0.08)",
+                            borderRadius: 10,
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            cursor: "pointer",
+                            padding: 0
+                          }}
+                          title="Editar reserva"
+                          aria-label="Editar reserva"
+                        >
+                          <IconPencilNeon s={24} />
+                        </button>
+                      </div>
+
+                      <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 8 }}>
+                        {renderReservaCardField("Time", res.time, { full: true, center: true })}
+                        {renderReservaCardField("Client", res.cliente)}
+                        {renderReservaCardField("Phone", res.telefono, { href: `tel:${res.telefono}` })}
+                        {renderReservaCardField("Pickup", res.origen, { full: true })}
+                        {renderReservaCardField("Destination", res.destino, { full: true })}
+                        {res.notas && renderReservaCardField("Notes", res.notas, { full: true, muted: true })}
+                      </div>
+                    </div>
+                  ))}
+
+                  {/* Notas */}
+                  {dayNotes.map(note => {
+                    const col = getNotaTipoColor(note.tipo);
+                    return (
+                      <div key={note.id} style={{ background: "rgba(255,255,255,0.02)", border: `1px solid rgba(255,255,255,0.06)`, borderLeft: `4px solid ${col}`, borderRadius: 12, padding: "10px 12px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                        <div>
+                          <div style={{ fontSize: 10, fontWeight: 700, color: col, textTransform: "uppercase", marginBottom: 3 }}>{note.tipo}</div>
+                          <div style={{ fontSize: 14, color: "white", lineHeight: 1.3 }}>{note.texto}</div>
+                        </div>
+                        <div style={{ display: "flex", gap: 6 }}>
+                          <button
+                            onClick={() => openEditNota(note)}
+                            style={{
+                              width: 34,
+                              height: 34,
+                              flex: "0 0 34px",
+                              background: "rgba(255,255,255,0.06)",
+                              border: "1px solid rgba(255,255,255,0.08)",
+                              borderRadius: 10,
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "center",
+                              cursor: "pointer",
+                              padding: 0
+                            }}
+                            title="Editar nota"
+                            aria-label="Editar nota"
+                          >
+                            <IconPencilNeon s={22} />
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+          ) : (
+            /* Vista Agenda (Próximos 14 días con eventos) */
+            <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+              {daysWithEvents.length === 0 ? (
+                <div style={{ textAlign: "center", padding: "40px 20px", background: "rgba(255,255,255,0.02)", borderRadius: 20, border: "1px solid rgba(255,255,255,0.05)" }}>
+                  <div style={{ fontSize: 32, marginBottom: 12 }}>📅</div>
+                  <div style={{ fontSize: 15, fontWeight: 700, color: "white", marginBottom: 4 }}>Sin eventos próximos</div>
+                  <div style={{ fontSize: 13, color: "rgba(255,255,255,0.45)" }}>No hay reservas ni notas planificadas para los próximos 14 días.</div>
+                </div>
+              ) : (
+                daysWithEvents.map(dayStr => {
+                  const dayRes = reservations.filter(r => r.date === dayStr).sort((a, b) => a.time.localeCompare(b.time));
+                  const dayN = notes.filter(n => n.date === dayStr);
+                  const dayT = history.filter(t => (t.startDate || t.date) === dayStr);
+
+                  return (
+                    <div key={dayStr} style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.05)", borderRadius: 18, padding: 14 }}>
+                      <div style={{ fontSize: 14, fontWeight: 800, color: C, borderBottom: "1px solid rgba(255,255,255,0.06)", paddingBottom: 6, marginBottom: 10 }}>
+                        {formatAgendaDate(dayStr)}
+                      </div>
+
+                      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                        {/* Turno */}
+                        {dayT.map(t => {
+                          const gananciaTurno = calcularTurnoContable(t, settings).miGanancia;
+
+                          let tiempoTurno = fmtDuration(0);
+                          if (t.startTime && t.endTime) {
+                            let totalMins = getDiffMins(t.startTime, t.endTime);
+                            if (t.totalPausedMinutes) totalMins = Math.max(0, totalMins - t.totalPausedMinutes);
+                            tiempoTurno = fmtDuration(totalMins);
+                          }
+
+                          return (
+                            <div key={t.id} style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 13, color: "rgba(255,255,255,0.72)", flexWrap: "wrap" }}>
+                              <span>🚖</span>
+                              <span style={{ fontWeight: 800, color: "rgba(255,255,255,0.8)" }}>Turno cerrado</span>
+                              <span style={{ display: "flex", alignItems: "center", gap: 4, fontWeight: 900, color: "oklch(0.78 0.18 150)" }}>
+                                <IconMoneyBag s={16} c="oklch(0.78 0.18 150)" />
+                                {fmt(gananciaTurno)}
+                              </span>
+                              <span style={{ display: "flex", alignItems: "center", gap: 4, fontWeight: 900, color: "oklch(0.85 0.12 210)" }}>
+                                <IconTimer s={16} c="oklch(0.85 0.12 210)" />
+                                {tiempoTurno}
+                              </span>
+                            </div>
+                          );
+                        })}
+
+                        {/* Reservas */}
+                        {dayRes.map(res => (
+                          <div key={res.id} style={{ display: "flex", flexDirection: "column", gap: 8, background: "rgba(180, 120, 255, 0.07)", border: "1px solid rgba(180, 120, 255, 0.22)", padding: 10, borderRadius: 12 }}>
+                            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
+                              <div style={{ fontSize: 11, fontWeight: 900, color: C, textTransform: "uppercase", letterSpacing: "0.35px" }}>
+                                Reserva
+                              </div>
+                              <button
+                                onClick={() => openEditReserva(res)}
+                                style={{
+                                  width: 32,
+                                  height: 32,
+                                  flex: "0 0 32px",
+                                  background: "rgba(255,255,255,0.06)",
+                                  border: "1px solid rgba(255,255,255,0.08)",
+                                  borderRadius: 9,
+                                  display: "flex",
+                                  alignItems: "center",
+                                  justifyContent: "center",
+                                  cursor: "pointer",
+                                  padding: 0
+                                }}
+                                title="Editar reserva"
+                                aria-label="Editar reserva"
+                              >
+                                <IconPencilNeon s={22} />
+                              </button>
+                            </div>
+                            <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 6 }}>
+                              {renderReservaCardField("Time", res.time, { full: true, center: true, compact: true })}
+                              {renderReservaCardField("Client", res.cliente, { compact: true })}
+                              {renderReservaCardField("Phone", res.telefono, { href: `tel:${res.telefono}`, compact: true })}
+                              {renderReservaCardField("Pickup", res.origen, { full: true, compact: true })}
+                              {renderReservaCardField("Destination", res.destino, { full: true, compact: true })}
+                              {res.notas && renderReservaCardField("Notes", res.notas, { full: true, muted: true, compact: true })}
+                            </div>
+                          </div>
+                        ))}
+
+                        {/* Notas */}
+                        {dayN.map(n => {
+                          const col = getNotaTipoColor(n.tipo);
+                          return (
+                            <div key={n.id} style={{ display: "flex", alignItems: "baseline", gap: 8, fontSize: 13 }}>
+                              <span style={{ fontSize: 9, fontWeight: 700, color: col, textTransform: "uppercase" }}>[{n.tipo}]</span>
+                              <span style={{ color: "white" }}>{n.texto}</span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          )}
+
+          {/* Dialogo Añadir/Editar Reserva (renderizado a nivel de App) */}
+          {renderReservaDialog()}
+
+          {/* Dialogo Añadir/Editar Nota */}
+          {showNotaDialog && (
+            <div
+              role="dialog"
+              aria-modal="true"
+              aria-label="Formulario Nota"
+              style={{
+                position: "fixed",
+                top: 0, left: 0, right: 0, bottom: 0,
+                background: "rgba(0,0,0,0.65)",
+                backdropFilter: "blur(4px)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                zIndex: 10000,
+                animation: "fadeUp 0.2s ease"
+              }}
+            >
+              <div
+                style={{
+                  background: "oklch(0.18 0.03 260)",
+                  borderRadius: 20,
+                  padding: 24,
+                  width: "90%",
+                  maxWidth: 340,
+                  border: "1px solid rgba(255,255,255,0.1)",
+                  boxShadow: "0 20px 40px rgba(0,0,0,0.5)",
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: 12
+                }}
+              >
+                <div style={{ fontSize: 16, fontWeight: 800, color: "white", textTransform: "uppercase", marginBottom: 4 }}>
+                  {editingNota ? "Editar Nota" : "Nueva Nota"}
+                </div>
+
+                <div>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: "rgba(255,255,255,0.4)", textTransform: "uppercase", marginBottom: 6 }}>Categoría</div>
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                    {(['ITV', 'Seguro', 'Normal', 'Día libre'] as const).map(t => {
+                      const isSelected = notaTipo === t;
+                      const col = getNotaTipoColor(t);
+                      return (
+                        <button
+                          key={t}
+                          onClick={() => setNotaTipo(t)}
+                          style={{
+                            border: isSelected ? `2.5px solid ${col}` : "1px solid rgba(255,255,255,0.1)",
+                            borderRadius: 10,
+                            padding: "6px 10px",
+                            background: isSelected ? "rgba(255,255,255,0.08)" : "rgba(255,255,255,0.02)",
+                            color: isSelected ? col : "rgba(255,255,255,0.6)",
+                            fontSize: 12,
+                            fontWeight: isSelected ? 800 : 600,
+                            cursor: "pointer",
+                            transition: "all 0.1s"
+                          }}
+                        >
+                          {t}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                <div>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: "rgba(255,255,255,0.4)", textTransform: "uppercase", marginBottom: 4 }}>Descripción</div>
+                  <input
+                    type="text"
+                    placeholder="Escribe el detalle aquí..."
+                    value={notaTexto}
+                    onChange={e => setNotaTexto(e.target.value)}
+                    style={{
+                      width: "100%",
+                      background: "rgba(0,0,0,0.3)",
+                      border: "1px solid rgba(255,255,255,0.1)",
+                      borderRadius: 12,
+                      color: "white",
+                      padding: "10px 14px",
+                      fontSize: 14,
+                      outline: "none",
+                      boxSizing: "border-box"
+                    }}
+                  />
+                </div>
+
+                <div style={{ display: "flex", gap: 10, marginTop: 8 }}>
+                  {editingNota && (
+                    <button
+                      onClick={() => {
+                        const id = editingNota.id;
+                        setConfirmDialog({
+                          text: "¿Seguro que quieres eliminar esta nota?",
+                          onConfirm: () => {
+                            setNotes(prev => prev.filter(n => n.id !== id));
+                            setShowNotaDialog(false);
+                          }
+                        });
+                      }}
+                      aria-label="Eliminar nota"
+                      style={{
+                        width: 48,
+                        padding: "12px 0",
+                        borderRadius: 12,
+                        border: "1px solid rgba(255, 100, 100, 0.3)",
+                        background: "rgba(255, 80, 80, 0.12)",
+                        color: "#ff6b6b",
+                        fontSize: 16,
+                        fontWeight: 700,
+                        cursor: "pointer"
+                      }}
+                    >
+                      🗑️
+                    </button>
+                  )}
+                  <button
+                    onClick={() => setShowNotaDialog(false)}
+                    style={{
+                      flex: 1,
+                      padding: "12px 0",
+                      borderRadius: 12,
+                      border: "none",
+                      background: "rgba(255,255,255,0.08)",
+                      color: "rgba(255,255,255,0.7)",
+                      fontSize: 14,
+                      fontWeight: 700,
+                      cursor: "pointer"
+                    }}
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    onClick={saveNota}
+                    style={{
+                      flex: 1.2,
+                      padding: "12px 0",
+                      borderRadius: 12,
+                      border: "none",
+                      background: C,
+                      color: "black",
+                      fontSize: 14,
+                      fontWeight: 800,
+                      cursor: "pointer"
+                    }}
+                  >
+                    Guardar
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {confirmDialog && <ConfirmDialog {...confirmDialog} onCancel={() => setConfirmDialog(null)} />}
+
+        </div>
+      </Shell>
     );
   }
 
   if (screen === "settings") {
+    const backupMenuActionIds = getBackupMenuActionIds(isAdmin);
     return (
-      <SettingsScreen
-        isAdmin={isAdmin}
-        settings={settings}
-        setSettings={setSettings}
-        history={history}
-        setHistory={setHistory}
-        current={current}
-        weekOverrides={weekOverrides}
-        reservations={reservations}
-        notes={notes}
-        activeSettingsField={activeSettingsField}
-        setActiveSettingsField={setActiveSettingsField}
-        settingsValStr={settingsValStr}
-        setSettingsValStr={setSettingsValStr}
-        showBackupMenu={showBackupMenu}
-        setShowBackupMenu={setShowBackupMenu}
-        confirmDialog={confirmDialog}
-        setConfirmDialog={setConfirmDialog}
-        updateState={updateState}
-        updateMsg={updateMsg}
-        downloadUrl={downloadUrl}
-        releaseUrl={releaseUrl}
-        setUpdateState={setUpdateState}
-        setUpdateMsg={setUpdateMsg}
-        setDownloadUrl={setDownloadUrl}
-        setReleaseUrl={setReleaseUrl}
-        onSetScreen={setScreen}
-      />
+      <Shell burst={false}>
+        <div style={{ flex: 1, padding: "16px 20px", display: "flex", flexDirection: "column", gap: 16, overflowY: "auto" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 16 }}>
+            <button style={S.iconBtn} onClick={() => { setScreen("home"); setUpdateMsg(""); setDownloadUrl(""); setReleaseUrl(""); }}><IconBack /></button>
+            <div style={{ fontSize: 24, fontWeight: 800, color: "white" }}>Ajustes de Usuario</div>
+          </div>
+
+          {/* Bloque App Info */}
+          <div style={{ background: "rgba(255,255,255,0.03)", borderRadius: 20, padding: 24, border: "1px solid rgba(255,255,255,0.07)", textAlign: "center" }}>
+            <div style={{ fontSize: 48, marginBottom: 12 }}>🚕</div>
+            <div style={{ fontSize: 20, fontWeight: 800, color: "white", marginBottom: 4 }}>Mi Turno</div>
+            <div style={{ fontSize: 14, color: "rgba(255,255,255,0.4)", marginBottom: 24 }}>Versión {APP_VERSION}</div>
+            <button onClick={checkUpdate} style={{ width: "100%", padding: "16px 0", borderRadius: 16, border: "none", background: "rgba(255,255,255,0.1)", color: "white", fontSize: 16, fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 10 }}>
+              <IconRefresh s={20} c={G} /> Buscar actualizaciones
+            </button>
+
+            {updateMsg && (
+              <div style={{ marginTop: 16, fontSize: 14, color: "rgba(255,255,255,0.6)", background: "rgba(0,0,0,0.2)", padding: "12px", borderRadius: 12 }}>
+                {updateMsg}
+              </div>
+            )}
+
+            {(() => {
+              const hasApkDownload = downloadUrl.endsWith(".apk");
+              return hasApkDownload && updateState !== "downloading" && updateState !== "checking" && (
+              <button
+                onClick={handleInstallUpdate}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: 10,
+                  width: "100%",
+                  marginTop: 16,
+                  padding: "14px",
+                  borderRadius: 14,
+                  border: "none",
+                  background: updateState === "permission_required" ? "#facc15" : G,
+                  color: "black",
+                  fontSize: 15,
+                  fontWeight: 800,
+                  cursor: "pointer",
+                  textAlign: "center"
+                }}
+              >
+                <IconDownload s={20} c="black" />
+                {Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'android'
+                  ? (updateState === "permission_required" ? "Continuar instalación" : "Descargar e instalar")
+                  : "Descargar actualización"}
+              </button>
+              );
+            })()}
+
+            {!Capacitor.isNativePlatform() && releaseUrl && (
+              <button
+                onClick={handleOpenRelease}
+                style={{
+                  width: "100%",
+                  marginTop: 12,
+                  padding: "14px",
+                  borderRadius: 14,
+                  border: "1px solid rgba(255,255,255,0.12)",
+                  background: "rgba(255,255,255,0.06)",
+                  color: "white",
+                  fontSize: 15,
+                  fontWeight: 800,
+                  cursor: "pointer",
+                  textAlign: "center"
+                }}
+              >
+                Abrir release
+              </button>
+            )}
+          </div>
+
+          {/* Bloque Porcentajes */}
+          <div style={{ background: "rgba(255,255,255,0.03)", borderRadius: 22, padding: "20px", border: "1px solid rgba(255,255,255,0.07)" }}>
+            <div style={{ fontSize: 12, fontWeight: 800, color: G, textTransform: "uppercase", letterSpacing: "1px", marginBottom: 14, display: "flex", alignItems: "center", gap: 8 }}>
+              <IconPercent s={22} c={G} /> Reparto de Porcentajes
+            </div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+              <div onClick={() => { setActiveSettingsField("porcentaje.jefe"); setSettingsValStr(settings["porcentaje.jefe"].toString().replace(".", ",")); }} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: "rgba(0,0,0,0.2)", padding: "12px 16px", borderRadius: 16, border: "1px solid rgba(255,255,255,0.05)", cursor: "pointer" }}>
+                <span style={{ color: "white", fontWeight: 600 }}>Jefe</span>
+                <span style={{ color: A, fontSize: 20, fontWeight: 800 }}>{settings["porcentaje.jefe"]} %</span>
+              </div>
+              <div onClick={() => { setActiveSettingsField("porcentaje.chofer"); setSettingsValStr(settings["porcentaje.chofer"].toString().replace(".", ",")); }} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: "rgba(0,0,0,0.2)", padding: "12px 16px", borderRadius: 16, border: "1px solid rgba(255,255,255,0.05)", cursor: "pointer" }}>
+                <span style={{ color: "white", fontWeight: 600 }}>Chofer</span>
+                <span style={{ color: G, fontSize: 20, fontWeight: 800 }}>{settings["porcentaje.chofer"]} %</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Bloque Total a Descontar (Seguridad + Neón Rojo) */}
+          <div style={{ background: "rgba(255,255,255,0.03)", borderRadius: 22, padding: "20px", border: "1px solid rgba(255,255,255,0.07)" }}>
+            <div style={{ fontSize: 13, fontWeight: 800, color: '#ff6b6b', textTransform: "uppercase", letterSpacing: "1px", marginBottom: 14, display: "flex", alignItems: "center", gap: 9 }}>
+              <IconReceipt s={22} c="#ff6b6b" /> Total a Descontar
+            </div>
+            <div style={{ fontSize: 13, color: "rgba(255,255,255,0.5)", marginBottom: 16, lineHeight: 1.4 }}>
+              Selecciona qué categorías se restan del Total a Dar al jefe.
+            </div>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
+              {([
+                { key: "descontar.datafono", label: "Datáfono", color: P, bg: PBG },
+                { key: "descontar.agencia_bono", label: "Agencias/Bonos", color: A, bg: ABG },
+                { key: "descontar.extra", label: "Extras", color: E, bg: EBG },
+                { key: "descontar.gasolina", label: "Gasolina", color: F, bg: FBG },
+              ] as const).map((item) => {
+                const isActive = settings[item.key as keyof AppSettings] as boolean;
+                return (
+                  <button
+                    key={item.key}
+                    onClick={() => {
+                      setConfirmDialog({
+                        text: `¿Seguro que quieres ${isActive ? "dejar de descontar" : "empezar a descontar"} la categoría ${item.label}?`,
+                        onConfirm: () => {
+                          setSettings({ ...settings, [item.key]: !isActive });
+                        }
+                      });
+                    }}
+                    style={{
+                      padding: "10px 18px",
+                      borderRadius: 20,
+                      border: isActive ? `1.5px solid ${item.color}` : `1.5px solid rgba(255,255,255,0.1)`,
+                      background: isActive ? item.bg : 'transparent',
+                      color: isActive ? item.color : 'rgba(255,255,255,0.4)',
+                      fontSize: 14,
+                      fontWeight: isActive ? 800 : 600,
+                      cursor: "pointer",
+                      transition: "all 0.2s"
+                    }}
+                  >
+                    {item.label}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Bloque Día Libre (Cuadrícula Original + Neón Oro) */}
+          <div style={{ background: "rgba(255,255,255,0.03)", borderRadius: 22, padding: "20px", border: "1px solid rgba(255,255,255,0.07)" }}>
+            <div style={{ fontSize: 13, fontWeight: 800, color: 'oklch(0.85 0.18 85)', textTransform: "uppercase", letterSpacing: "1px", marginBottom: 14, display: "flex", alignItems: "center", gap: 9 }}>
+              <IconHoliday s={22} c="oklch(0.85 0.18 85)" /> Día libre semanal
+            </div>
+
+            <div style={{ fontSize: 13, color: "rgba(255,255,255,0.5)", marginBottom: 16, lineHeight: 1.4 }}>
+              Selecciona tu día libre. La semana laboral termina el día anterior y se reinicia al día siguiente.
+            </div>
+
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 6, marginBottom: 16 }}>
+              {[
+                { idx: 1, lbl: "L" },
+                { idx: 2, lbl: "M" },
+                { idx: 3, lbl: "X" },
+                { idx: 4, lbl: "J" },
+                { idx: 5, lbl: "V" },
+                { idx: 6, lbl: "S" },
+                { idx: 0, lbl: "D" },
+              ].map((d) => {
+                const selected = settings.diaLibre === d.idx;
+                return (
+                  <button
+                    key={d.idx}
+                    onClick={() => {
+                      if (selected) return;
+                      const nombres = ["Domingo", "Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado"];
+                      setConfirmDialog({
+                        text: `¿Cambiar tu día libre a ${nombres[d.idx]}?`,
+                        onConfirm: () => {
+                          setSettings({
+                            ...settings,
+                            diaLibre: d.idx,
+                            diaLibreDesde: today(),
+                          });
+                          setConfirmDialog(null);
+                        },
+                      });
+                    }}
+                    style={{
+                      padding: "16px 0",
+                      borderRadius: 14,
+                      border: selected ? `2px solid ${A}` : "1px solid rgba(255,255,255,0.08)",
+                      background: selected ? ABG : "rgba(0,0,0,0.2)",
+                      color: selected ? A : "rgba(255,255,255,0.7)",
+                      fontSize: 16,
+                      fontWeight: 800,
+                      cursor: "pointer",
+                      transition: "all 0.2s",
+                    }}
+                  >
+                    {d.lbl}
+                  </button>
+                );
+              })}
+            </div>
+
+            <div style={{ textAlign: 'center', fontSize: 12, color: "rgba(255,255,255,0.5)", fontWeight: 600 }}>
+              {(() => {
+                const nombres = ["Domingo", "Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado"];
+                const diaLibreTxt = nombres[settings.diaLibre];
+                const inicioSemana = nombres[(settings.diaLibre + 1) % 7];
+                const finSemana = nombres[(settings.diaLibre + 6) % 7];
+                return `Día libre: ${diaLibreTxt} · Semana laboral: ${inicioSemana} → ${finSemana}`;
+              })()}
+            </div>
+          </div>
+
+          {/* Botón Independiente: Añadir Turno (Importar) */}
+          <button
+            id="btn_import_turno_fusion"
+            onClick={() => {
+              const input = document.createElement('input');
+              input.type = 'file';
+              input.accept = '.json, .csv';
+              input.onchange = (e: any) => {
+                const file = e.target.files?.[0];
+                if (!file) return;
+                const reader = new FileReader();
+                reader.onload = (evt) => {
+                  let nuevosTurnos: Turno[] = [];
+                  const text = evt.target?.result as string;
+                  try {
+                    if (file.name.endsWith('.json')) {
+                      const backup = JSON.parse(text);
+                      nuevosTurnos = JSON.parse(backup.history || "[]");
+                    } else {
+                      nuevosTurnos = parseCSVToHistory(text);
+                    }
+                    if (nuevosTurnos.length > 0) {
+                      setConfirmDialog({
+                        text: `Se han detectado ${nuevosTurnos.length} turnos en el archivo. ¿Quieres añadirlos a tu historial actual?`,
+                        onConfirm: () => {
+                          const merged = mergeTurnos(history, nuevosTurnos);
+                          setHistory(merged);
+                          alert("Turnos añadidos correctamente");
+                        },
+                        confirmText: "Añadir todos",
+                        confirmBg: "rgba(80,220,140,0.15)",
+                        confirmColor: "#50dc8c",
+                        confirmBorder: "1px solid rgba(80,220,140,0.3)"
+                      });
+                    }
+                  } catch (e) {
+                    alert("Error al procesar el archivo.");
+                  }
+                };
+                reader.readAsText(file);
+              };
+              input.click();
+            }}
+            style={{
+              width: "100%",
+              background: "rgba(255,255,255,0.03)",
+              borderRadius: 22,
+              padding: "16px 20px",
+              border: "1px solid rgba(255,255,255,0.07)",
+              display: "flex",
+              alignItems: "center",
+              gap: 12,
+              cursor: "pointer",
+              color: "white",
+              textAlign: "left",
+              outline: "none"
+            }}
+          >
+            <IconUpload s={22} c="#50dc8c" />
+            <span style={{ fontSize: 16, fontWeight: 700 }}>Añadir Turno</span>
+          </button>
+
+          {/* Menú Desplegable: Gestión de Backup */}
+          <div>
+            <div
+              onClick={() => setShowBackupMenu(!showBackupMenu)}
+              style={{
+                background: "rgba(255,255,255,0.03)",
+                borderRadius: 22,
+                padding: "16px 20px",
+                border: "1px solid rgba(255,255,255,0.07)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                cursor: "pointer"
+              }}
+            >
+              <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                <IconDownload s={22} c="oklch(0.75 0.16 70)" />
+                <span style={{ fontSize: 16, fontWeight: 700, color: "white" }}>Copia de Seguridad</span>
+              </div>
+              <span style={{
+                color: "rgba(255,255,255,0.5)",
+                transform: showBackupMenu ? "rotate(180deg)" : "rotate(0deg)",
+                transition: "transform 0.2s"
+              }}>▼</span>
+            </div>
+
+            {showBackupMenu && (
+              <div style={{
+                marginTop: 8,
+                padding: "0 4px",
+                display: "flex",
+                flexDirection: "column",
+                gap: 8
+              }}>
+                {backupMenuActionIds.includes("export-json") && (
+                  <button
+                    onClick={() => exportBackupJSON(buildBackupPayloadFromState({
+                      history,
+                      settings,
+                      current,
+                      weekOverrides,
+                      reservations,
+                      notes,
+                    }))}
+                    style={S.backupSubBtn}
+                  >
+                    <IconDownload s={18} c="white" /> Exportar todo a JSON
+                  </button>
+                )}
+
+                {backupMenuActionIds.includes("restore-json") && (
+                  <button
+                    onClick={() => {
+                      const input = document.createElement('input');
+                      input.type = 'file';
+                      input.accept = '.json';
+                      input.onchange = (e: any) => {
+                        const file = e.target.files?.[0];
+                        if (!file) return;
+                        const reader = new FileReader();
+                        reader.onload = (evt) => {
+                          const backup = JSON.parse(evt.target?.result as string);
+                          setConfirmDialog({
+                            text: "RESTAURAR TOTAL: Esto borrará tus datos actuales y pondrá los del archivo. ¿Continuar?",
+                            onConfirm: () => {
+                              const uid = auth.currentUser?.uid || "";
+                              if (backup.history) localStorage.setItem(userStorageKey(KEY_HISTORY, uid), backup.history);
+                              if (backup.settings) localStorage.setItem(userStorageKey(KEY_SETTINGS, uid), backup.settings);
+                              if (backup.current) localStorage.setItem(userStorageKey(KEY_CURRENT, uid), backup.current);
+                              if (backup.weekOverrides) localStorage.setItem(userStorageKey(KEY_WEEK_OVERRIDES, uid), backup.weekOverrides);
+                              if (backup.reservations) localStorage.setItem(userStorageKey(KEY_RESERVATIONS, uid), backup.reservations);
+                              if (backup.notes) localStorage.setItem(userStorageKey(KEY_NOTES, uid), backup.notes);
+                              window.location.reload();
+                            }
+                          });
+                        };
+                        reader.readAsText(file);
+                      };
+                      input.click();
+                    }}
+                    style={S.backupSubBtn}
+                  >
+                    <span style={{ fontSize: 16 }}>⚠️</span> Restaurar copia completa
+                  </button>
+                )}
+
+              </div>
+            )}
+          </div>
+        </div>
+
+        {activeSettingsField && (
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-label="Configuración"
+            onClick={() => setActiveSettingsField(null)}
+            style={{
+              position: "fixed",
+              top: 0, left: 0, right: 0, bottom: 0,
+              background: "rgba(0,0,0,0.65)",
+              backdropFilter: "blur(4px)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              padding: "0 20px",
+              zIndex: 9999,
+              animation: "fadeIn 0.2s ease",
+            }}
+          >
+            <div
+              onClick={(e) => e.stopPropagation()}
+              style={{
+                width: "100%",
+                maxWidth: 400,
+                background: "#0d0d14",
+                borderRadius: 28,
+                padding: "24px",
+                border: "1px solid rgba(255,255,255,0.08)",
+                animation: "fadeUp 0.3s ease",
+              }}
+            >
+              <div style={{ marginBottom: 12 }}>
+                <span style={{ fontSize: 13, fontWeight: 700, color: activeSettingsField === "porcentaje.jefe" ? A : G, textTransform: "uppercase", letterSpacing: "0.6px" }}>
+                  Porcentaje {activeSettingsField === "porcentaje.jefe" ? "Jefe" : "Chofer"}
+                </span>
+              </div>
+              <div style={{ fontSize: 36, fontWeight: 900, color: activeSettingsField === "porcentaje.jefe" ? A : G, marginBottom: 14, textAlign: "center", letterSpacing: "-0.5px" }}>
+                {settingsValStr || "0"} %
+              </div>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8 }}>
+                {["1", "2", "3", "4", "5", "6", "7", "8", "9", "DEL", "0", ","].map((k) => (
+                  <button key={k} aria-label={k === "DEL" ? "Borrar" : k === "," ? "Coma decimal" : k}
+                    onClick={() => {
+                      let next = settingsValStr;
+                      if (k === "DEL") next = next.slice(0, -1);
+                      else if (k === ",") { if (!next.includes(",")) next = next + ","; else return; }
+                      else { if (next.replace(",", "").length >= 3) return; next = next + k; }
+                      setSettingsValStr(next);
+                    }}
+                    style={{ ...S.keyBtn, padding: "20px 0", background: "rgba(255,255,255,0.05)", color: "white", fontSize: 22, fontWeight: 700 }}>
+                    {k === "DEL" ? <IconDel /> : k}
+                  </button>
+                ))}
+              </div>
+              <button
+                onClick={() => {
+                  const val = parseFloat(settingsValStr.replace(",", ".")) || 0;
+                  setConfirmDialog({
+                    text: `¿Seguro que quieres cambiar el porcentaje de ${activeSettingsField === "porcentaje.jefe" ? "Jefe" : "Chofer"} a ${val}%?`,
+                    onConfirm: () => {
+                      setSettings({ ...settings, [activeSettingsField!]: val });
+                      setActiveSettingsField(null);
+                      setConfirmDialog(null);
+                    }
+                  });
+                }}
+                style={{
+                  width: "100%",
+                  padding: "16px 0",
+                  marginTop: 12,
+                  borderRadius: 14,
+                  border: "none",
+                  background: activeSettingsField === "porcentaje.jefe" ? A : G,
+                  color: "black",
+                  fontSize: 17,
+                  fontWeight: 800,
+                  cursor: "pointer",
+                }}
+              >
+                Guardar
+              </button>
+            </div>
+          </div>
+        )}
+        {confirmDialog && <ConfirmDialog {...confirmDialog} onCancel={() => setConfirmDialog(null)} />}
+      </Shell>
     );
   }
 
@@ -2486,8 +4916,6 @@ function App() {
             onAmountChange={setEditEntryAmount}
             onNoteChange={setEditEntryNote}
             onSave={saveEditEntry}
-            getEntryTypeMeta={getEntryTypeMeta}
-            deleteIcon={<IconDel />}
             onDelete={() => {
               setConfirmDialog({
                 text: "¿Seguro que quieres eliminar esta entrada?",
@@ -2571,47 +4999,248 @@ function App() {
   }
 
   if (screen === "addSingle" && singleMode) {
+    const cfg = {
+      agencia_bono: { accent: A, bg: ABG, label: "Agencia/Bono", Icon: IconAgency },
+      extra: { accent: E, bg: EBG, label: "Extra", Icon: IconExtra },
+      gasolina: { accent: F, bg: FBG, label: "Gasolina", Icon: IconFuel },
+      nulo: { accent: N, bg: NBG, label: "Nulo", Icon: IconNulo },
+    }[singleMode] || { accent: E, bg: EBG, label: "Extra", Icon: IconExtra };
+    const { accent } = cfg;
+    const label = cfg.label;
+
+    function kpS(v: string) {
+      if (v === "DEL") {
+        setValS((p) => p.slice(0, -1));
+        return;
+      }
+      if (v === ",") {
+        if (!valS.includes(",")) setValS((p) => p + ",");
+        return;
+      }
+      if (valS.replace(",", "").length >= 6) return;
+      setValS((p) => p + v);
+    }
+    const validS = valS && parseFloat(valS.replace(",", ".")) > 0;
+    function saveS() {
+      if (!validS) return;
+      const now = timeNow();
+      const entry: Entry = {
+        id: Date.now(),
+        type: singleMode!,
+        amount: parseFloat(valS.replace(",", ".")),
+        note: noteS.trim(),
+        time: now,
+      };
+      setCurrent((prev) => ({
+        ...prev,
+        startTime: prev.startTime || now,
+        startDate: prev.startDate || today(),
+        entries: [...prev.entries, entry],
+      }));
+      setValS("");
+      setNoteS("");
+      setSingleMode(null);
+      setScreen("main");
+    }
+
     return (
-      <AddSingleEntryScreen
-        singleMode={singleMode as "agencia_bono" | "extra" | "gasolina" | "nulo"}
-        valS={valS}
-        setValS={setValS}
-        noteS={noteS}
-        setNoteS={setNoteS}
-        setCurrent={setCurrent}
-        setSingleMode={setSingleMode}
-        setScreen={setScreen}
-      />
+      <Shell burst={false}>
+        <div style={{ flex: 1, padding: "12px 20px", display: "flex", flexDirection: "column", minHeight: 0, overflow: "hidden" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 16, flexShrink: 0 }}>
+            <button style={S.iconBtn} onClick={() => { setScreen("main"); setSingleMode(null); setValS(""); setNoteS(""); }}>
+              <IconBack />
+            </button>
+            <div style={{ fontSize: 24, fontWeight: 800, color: "white" }}>
+              Añadir {label}
+            </div>
+          </div>
+          <div style={{ fontSize: 40, fontWeight: 900, color: accent, marginBottom: 16, flexShrink: 0 }}>
+            {valS || "0"} €
+          </div>
+          <input
+            placeholder="Nota (opcional)"
+            value={noteS}
+            onChange={(e) => setNoteS(e.target.value)}
+            style={{ width: "100%", padding: 10, borderRadius: 8, background: "rgba(255,255,255,0.05)", border: "none", color: "white", outline: "none", flexShrink: 0, marginBottom: 12 }}
+          />
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8, flexShrink: 0 }}>
+            {["1", "2", "3", "4", "5", "6", "7", "8", "9", "DEL", "0", ","].map((k) => (
+              <button key={k} aria-label={k === "DEL" ? "Borrar" : k === "," ? "Coma decimal" : k} onClick={() => kpS(k)} style={{ ...S.keyBtn, padding: "20px 0", background: "rgba(255,255,255,0.05)", color: "white", fontSize: 22, fontWeight: 700 }}>
+                {k === "DEL" ? <IconDel /> : k}
+              </button>
+            ))}
+          </div>
+          <button onClick={saveS} style={{ width: "100%", padding: 15, marginTop: 12, borderRadius: 12, border: "none", background: accent, color: "black", fontWeight: 700, flexShrink: 0 }}>
+            Guardar
+          </button>
+        </div>
+      </Shell>
     );
   }
 
   if (screen === "addNotaGeneral") {
     return (
-      <AddNotaGeneralScreen
-        noteS={noteS}
-        setNoteS={setNoteS}
-        setCurrent={setCurrent}
-        setScreen={setScreen}
-      />
+      <Shell burst={false}>
+        <div style={{ flex: 1, padding: "12px 20px 16px", display: "flex", flexDirection: "column", minHeight: 0, overflow: "hidden", animation: "slideIn 0.25s ease" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 24, flexShrink: 0 }}>
+            <button style={S.iconBtn} onClick={() => { setScreen("main"); setNoteS(""); }}>
+              <IconBack />
+            </button>
+            <div style={{ fontSize: 24, fontWeight: 800, color: "white" }}>
+              Añadir Nota
+            </div>
+          </div>
+
+          <div style={{ flex: 1, display: "flex", flexDirection: "column" }}>
+            <textarea
+              placeholder="Escribe algo sobre el Turno..."
+              value={noteS}
+              onChange={(e) => setNoteS(e.target.value)}
+              style={{
+                flex: 1,
+                background: "rgba(255,255,255,0.05)",
+                border: "none",
+                borderRadius: 16,
+                padding: 16,
+                color: "white",
+                fontSize: 16,
+                outline: "none",
+                resize: "none",
+                fontFamily: "inherit",
+                lineHeight: 1.5
+              }}
+            />
+          </div>
+
+          <button
+            onClick={() => {
+              if (noteS.trim()) {
+                const newEntry = {
+                  id: Date.now(),
+                  type: "nota",
+                  amount: 0,
+                  note: noteS.trim(),
+                  time: new Date().toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" })
+                };
+                setCurrent(prev => ({ ...prev, entries: [...prev.entries, newEntry] }));
+              }
+              setNoteS("");
+              setScreen("main");
+            }}
+            style={{ width: "100%", padding: 18, marginTop: 16, borderRadius: 16, border: "none", background: "white", color: "black", fontWeight: 800, fontSize: 18, cursor: "pointer", flexShrink: 0 }}
+          >
+            Añadir al Turno
+          </button>
+        </div>
+      </Shell>
     );
   }
 
   if (screen === "add") {
+    const setVal = activeField === "propina" ? setValP : setValD;
+    const curVal = activeField === "propina" ? valP : valD;
+
+    function kpAdd(v: string) {
+      if (v === "DEL") {
+        setVal((p) => p.slice(0, -1));
+        return;
+      }
+      if (v === ",") {
+        if (!curVal.includes(",")) setVal((p) => p + ",");
+        return;
+      }
+      if (curVal.replace(",", "").length >= 6) return;
+      setVal((p) => p + v);
+    }
+
+    function handleSaveAdd() {
+      const p = parseFloat(valP.replace(",", "."));
+      const d = parseFloat(valD.replace(",", "."));
+      if (isNaN(p) && isNaN(d)) return;
+      const now = timeNow();
+      const newEntries: Entry[] = [];
+      if (!isNaN(p) && p > 0)
+        newEntries.push({ id: Date.now(), type: "propina", amount: p, note: noteP.trim(), time: now });
+      if (!isNaN(d) && d > 0)
+        newEntries.push({ id: Date.now() + 1, type: "datafono", amount: d, note: noteD.trim(), time: now });
+      if (newEntries.length === 0) return;
+      setCurrent((prev) => ({
+        ...prev,
+        startTime: prev.startTime || now,
+        startDate: prev.startDate || today(),
+        entries: [...prev.entries, ...newEntries],
+      }));
+      setValP(""); setValD(""); setNoteP(""); setNoteD("");
+      setScreen("main");
+    }
+
     return (
-      <AddEntryScreen
-        activeField={activeField}
-        setActiveField={setActiveField}
-        valP={valP}
-        setValP={setValP}
-        valD={valD}
-        setValD={setValD}
-        noteP={noteP}
-        setNoteP={setNoteP}
-        noteD={noteD}
-        setNoteD={setNoteD}
-        setCurrent={setCurrent}
-        setScreen={setScreen}
-      />
+      <Shell burst={false}>
+        <div style={{ flex: 1, padding: "16px 20px", display: "flex", flexDirection: "column", minHeight: 0, overflow: "hidden" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 16, flexShrink: 0 }}>
+            <button style={S.iconBtn} onClick={() => setScreen("main")}>
+              <IconBack />
+            </button>
+            <div style={{ fontSize: 24, fontWeight: 800, color: "white" }}>
+              Añadir {activeField === "propina" ? "Propina" : "Datáfono"}
+            </div>
+          </div>
+
+          <div style={{ display: "flex", gap: 10, marginBottom: 20 }}>
+            <div
+              onClick={() => setActiveField("datafono")}
+              style={{
+                flex: 1,
+                padding: "16px",
+                borderRadius: 16,
+                background: activeField === "datafono" ? "rgba(255,255,255,0.1)" : "rgba(255,255,255,0.03)",
+                border: `1px solid ${activeField === "datafono" ? P : "transparent"}`,
+                cursor: "pointer",
+                textAlign: "center",
+                transition: "all 0.2s"
+              }}
+            >
+              <div style={{ fontSize: 12, fontWeight: 700, color: "rgba(255,255,255,0.5)", marginBottom: 4 }}>DATÁFONO</div>
+              <div style={{ fontSize: 24, fontWeight: 900, color: activeField === "datafono" ? P : "white" }}>{valD || "0"} €</div>
+            </div>
+            <div
+              onClick={() => setActiveField("propina")}
+              style={{
+                flex: 1,
+                padding: "16px",
+                borderRadius: 16,
+                background: activeField === "propina" ? "rgba(255,255,255,0.1)" : "rgba(255,255,255,0.03)",
+                border: `1px solid ${activeField === "propina" ? G : "transparent"}`,
+                cursor: "pointer",
+                textAlign: "center",
+                transition: "all 0.2s"
+              }}
+            >
+              <div style={{ fontSize: 12, fontWeight: 700, color: "rgba(255,255,255,0.5)", marginBottom: 4 }}>PROPINA</div>
+              <div style={{ fontSize: 24, fontWeight: 900, color: activeField === "propina" ? G : "white" }}>{valP || "0"} €</div>
+            </div>
+          </div>
+
+          <input
+            placeholder={`Nota para ${activeField} (opcional)`}
+            value={activeField === "propina" ? noteP : noteD}
+            onChange={(e) => activeField === "propina" ? setNoteP(e.target.value) : setNoteD(e.target.value)}
+            style={{ width: "100%", padding: 14, borderRadius: 12, background: "rgba(255,255,255,0.05)", border: "none", color: "white", marginBottom: 12, outline: "none", flexShrink: 0 }}
+          />
+
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8, flexShrink: 0 }}>
+            {["1", "2", "3", "4", "5", "6", "7", "8", "9", "DEL", "0", ","].map((k) => (
+              <button key={k} aria-label={k === "DEL" ? "Borrar" : k === "," ? "Coma decimal" : k} onClick={() => kpAdd(k)} style={{ ...S.keyBtn, padding: "20px 0", background: "rgba(255,255,255,0.05)", fontSize: 22, fontWeight: 700, color: "white" }}>
+                {k === "DEL" ? <IconDel /> : k}
+              </button>
+            ))}
+          </div>
+
+          <button onClick={handleSaveAdd} style={{ width: "100%", padding: 18, marginTop: 12, borderRadius: 16, border: "none", background: activeField === "propina" ? G : P, color: "black", fontWeight: 800, fontSize: 18, cursor: "pointer", flexShrink: 0 }}>
+            Guardar
+          </button>
+        </div>
+      </Shell>
     );
   }
 
@@ -3627,10 +6256,6 @@ function App() {
                   <TurnoNotasCard
                     key={`notas-${data.turno.id}`}
                     data={data}
-                    formatDate={fmtDate}
-                    formatMoney={fmt}
-                    getEntryTypeMeta={getEntryTypeMeta}
-                    noteTimeStyle={NOTE_TIME_STYLE}
                     onClick={() => { setReturnScreen("detalleMes"); setViewTurno(data.turno); setScreen("summary"); }}
                   />
                 ))}
@@ -3858,10 +6483,6 @@ function App() {
                   <TurnoNotasCard
                     key={`notas-${data.turno.id}`}
                     data={data}
-                    formatDate={fmtDate}
-                    formatMoney={fmt}
-                    getEntryTypeMeta={getEntryTypeMeta}
-                    noteTimeStyle={NOTE_TIME_STYLE}
                     onClick={() => { setReturnScreen("detalleSemana"); setViewTurno(data.turno); setScreen("summary"); }}
                   />
                 ))}
@@ -4511,66 +7132,450 @@ function App() {
 
   if (screen === "PantallaTurnos") {
     return (
-      <PantallaTurnos
-        history={history}
-        settings={settings}
-        isSelectingTurnos={isSelectingTurnos}
-        setIsSelectingTurnos={setIsSelectingTurnos}
-        selectedTurnosIds={selectedTurnosIds}
-        setSelectedTurnosIds={setSelectedTurnosIds}
-        setScreen={setScreen}
-        setViewTurno={setViewTurno}
-        setReturnScreen={setReturnScreen}
-        onExportSelectedTurnosJSON={exportSelectedTurnosJSON}
-      />
+      <Shell burst={false}>
+        <div style={{ flex: 1, padding: "16px 20px", display: "flex", flexDirection: "column", gap: 14, overflowY: "auto" }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
+            <button style={S.iconBtn} onClick={() => {
+              setIsSelectingTurnos(false);
+              setSelectedTurnosIds([]);
+              setScreen("home");
+            }}>
+              <IconBack />
+            </button>
+            <div style={{ fontSize: 24, fontWeight: 800, color: "white", textAlign: "center" }}>
+              Turnos
+            </div>
+
+            {/* Controles de Selección */}
+            {history.length > 0 && (
+              <button
+                onClick={() => {
+                  if (isSelectingTurnos) {
+                    exportSelectedTurnosJSON();
+                  } else {
+                    setIsSelectingTurnos(true);
+                  }
+                }}
+                style={{
+                  background: isSelectingTurnos ? "rgba(80,220,140,0.15)" : "rgba(255,255,255,0.07)",
+                  border: isSelectingTurnos ? "1px solid rgba(80,220,140,0.3)" : "1px solid rgba(255,255,255,0.1)",
+                  borderRadius: 12,
+                  color: isSelectingTurnos ? "#50dc8c" : "rgba(255,255,255,0.75)",
+                  padding: "8px 14px",
+                  fontSize: 13,
+                  fontWeight: 700,
+                  cursor: "pointer",
+                }}
+              >
+                {isSelectingTurnos ? `Exportar (${selectedTurnosIds.length})` : "Seleccionar"}
+              </button>
+            )}
+          </div>
+
+          {/* Botón cancelar si estamos en modo selección */}
+          {isSelectingTurnos && (
+            <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 10 }}>
+              <button
+                onClick={() => {
+                  setIsSelectingTurnos(false);
+                  setSelectedTurnosIds([]);
+                }}
+                style={{ background: "none", border: "none", color: "rgba(255,255,255,0.5)", fontSize: 13, textDecoration: "underline", cursor: "pointer" }}
+              >
+                Cancelar selección
+              </button>
+            </div>
+          )}
+          {history.length === 0 ? (
+            <div style={{ textAlign: "center", color: "rgba(255,255,255,0.5)", marginTop: 40, fontSize: 15 }}>
+              No hay Turnos Anteriores.
+            </div>
+          ) : (
+            history.map((j) => (
+              renderTurnoCard(j, {
+                onClick: () => {
+                  if (isSelectingTurnos) {
+                    if (selectedTurnosIds.includes(j.id)) {
+                      setSelectedTurnosIds(selectedTurnosIds.filter(id => id !== j.id));
+                    } else {
+                      setSelectedTurnosIds([...selectedTurnosIds, j.id]);
+                    }
+                  } else {
+                    setReturnScreen("PantallaTurnos");
+                    setViewTurno(j);
+                    setScreen("summary");
+                  }
+                },
+                isSelecting: isSelectingTurnos,
+                isSelected: selectedTurnosIds.includes(j.id),
+                onToggleSelect: (checked) => {
+                  if (checked) {
+                    setSelectedTurnosIds([...selectedTurnosIds, j.id]);
+                  } else {
+                    setSelectedTurnosIds(selectedTurnosIds.filter(id => id !== j.id));
+                  }
+                },
+                showEntriesCount: true,
+              })
+            ))
+          )}
+        </div>
+      </Shell>
     );
   }
 
   if (screen === "todayHistory") {
     return (
-      <TodayHistoryScreen
-        current={current}
-        confirmDialog={confirmDialog}
-        setConfirmDialog={setConfirmDialog}
-        editEntry={editEntry}
-        editEntryAmount={editEntryAmount}
-        editEntryNote={editEntryNote}
-        setEditEntryAmount={setEditEntryAmount}
-        setEditEntryNote={setEditEntryNote}
-        openEditEntry={openEditEntry}
-        saveEditEntry={saveEditEntry}
-        deleteEditEntry={deleteEditEntry}
-        setEditEntry={setEditEntry}
-        setScreen={setScreen}
-      />
+      <Shell burst={false}>
+        <div style={{ flex: 1, padding: "16px 20px", display: "flex", flexDirection: "column", gap: 14, overflowY: "auto" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 10 }}>
+            <button style={S.iconBtn} onClick={() => setScreen("main")}>
+              <IconBack />
+            </button>
+            <div style={{ fontSize: 24, fontWeight: 800, color: "white" }}>
+              Entradas de hoy
+            </div>
+          </div>
+          {current.entries.length > 0 && (
+            <div style={{
+              fontSize: 13,
+              color: "rgba(255,255,255,0.4)",
+              marginTop: -8,
+              marginBottom: 2,
+              fontStyle: "italic",
+            }}>
+              Toca una entrada para editar
+            </div>
+          )}
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            {[...current.entries].reverse().map((e) => {
+              const meta = getEntryTypeMeta(e.type);
+              return (
+                <div
+                  key={e.id}
+                  onClick={() => openEditEntry(e)}
+                  role="button"
+                  tabIndex={0}
+                  title="Editar entrada"
+                  aria-label="Editar entrada"
+                  onKeyDown={(ev) => {
+                    if (ev.key === "Enter" || ev.key === " ") {
+                      ev.preventDefault();
+                      openEditEntry(e);
+                    }
+                  }}
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: "auto minmax(0, 1fr) auto auto",
+                    alignItems: "center",
+                    gap: 10,
+                    background: "rgba(255,255,255,0.04)",
+                    borderRadius: 13,
+                    padding: "10px 14px",
+                    cursor: "pointer",
+                    transition: "background 0.15s",
+                  }}
+                  onMouseEnter={(ev) => {
+                    (ev.currentTarget as HTMLDivElement).style.background = "rgba(255,255,255,0.08)";
+                  }}
+                  onMouseLeave={(ev) => {
+                    (ev.currentTarget as HTMLDivElement).style.background = "rgba(255,255,255,0.04)";
+                  }}
+                >
+                  <span style={{ display: "inline-flex", alignItems: "center", gap: 7, whiteSpace: "nowrap", flexShrink: 0 }}>
+                    {meta.icon(17)}
+                    <span style={{ color: meta.color, fontSize: 14, fontWeight: 700 }}>{meta.label}</span>
+                  </span>
+                  <span style={{ color: "rgba(255,255,255,0.6)", fontSize: 12, lineHeight: 1.35, minWidth: 0, overflowWrap: "anywhere" }}>{e.note}</span>
+                  <span style={{ fontSize: 12, color: "rgba(255,255,255,0.5)", flexShrink: 0 }}>{e.time}</span>
+                  <span style={{ fontSize: 14, fontWeight: 700, color: meta.color, whiteSpace: "nowrap", flexShrink: 0 }}>{e.type !== "nota" && `+${fmt(e.amount)}`}</span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+        {confirmDialog && <ConfirmDialog {...confirmDialog} onCancel={() => setConfirmDialog(null)} />}
+        {editEntry && (
+          <EditEntryDialog
+            entry={editEntry}
+            amount={editEntryAmount}
+            note={editEntryNote}
+            onAmountChange={setEditEntryAmount}
+            onNoteChange={setEditEntryNote}
+            onSave={saveEditEntry}
+            onDelete={() => {
+              setConfirmDialog({
+                text: "¿Seguro que quieres eliminar esta entrada?",
+                onConfirm: deleteEditEntry,
+              });
+            }}
+            onCancel={() => setEditEntry(null)}
+          />
+        )}
+      </Shell>
     );
   }
 
   if (screen === "confirmEnd") {
+    function kpEnd(v: string) {
+      if (!endField) return;
+      const cur = endField === "dinero" ? dineroJ : kmJ;
+      const setVal = endField === "dinero" ? setDineroJ : setKmJ;
+      if (v === "DEL") { setVal(cur.slice(0, -1)); return; }
+      if (v === ",") { if (!cur.includes(",")) setVal(cur + ","); return; }
+      if (cur.replace(",", "").length >= 7) return;
+      setVal(cur + v);
+    }
     return (
-      <ConfirmEndScreen
-        current={current}
-        dineroJ={dineroJ}
-        setDineroJ={setDineroJ}
-        kmJ={kmJ}
-        setKmJ={setKmJ}
-        endField={endField}
-        setEndField={setEndField}
-        totalP={totalP}
-        totalD={totalD}
-        totalA={totalA}
-        totalE={totalE}
-        totalF={totalF}
-        totalN={totalN}
-        propinas={propinas}
-        datafonos={datafonos}
-        agencias={agencias}
-        extras={extras}
-        gasolinas={gasolinas}
-        nulos={nulos}
-        onEndTurno={handleEndTurno}
-        setScreen={setScreen}
-      />
+      <Shell burst={false}>
+        <div style={{ flex: 1, display: "flex", flexDirection: "column", padding: "12px 20px 16px", overflowY: "auto", animation: "slideIn 0.25s ease", WebkitOverflowScrolling: "touch" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 16, flexShrink: 0 }}>
+            <button style={S.iconBtn} onClick={() => { setScreen("main"); setEndField(null); }}><IconBack /></button>
+            <span style={{ fontSize: 20, fontWeight: 700, color: "white" }}>Terminar Turno</span>
+          </div>
+
+          {/* Dinero / KM cards (clickables — abren el teclado in-app) */}
+          <div style={{ display: "flex", gap: 10, marginBottom: 12, flexShrink: 0 }}>
+            <div onClick={() => setEndField("dinero")}
+              style={{
+                flex: 1,
+                background: 'rgba(255, 180, 0, 0.06)', // Fondo Oro suave
+                borderRadius: 16,
+                padding: "14px",
+                border: `1.5px solid ${endField === "dinero" ? "oklch(0.85 0.18 85)" : "rgba(255, 180, 0, 0.2)"}`,
+                cursor: "pointer",
+                transition: "border 0.15s",
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+                justifyContent: "center",
+                textAlign: "center"
+              }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: "rgba(255,255,255,0.5)", textTransform: "uppercase", letterSpacing: "0.6px", marginBottom: 8, display: "flex", alignItems: "center", gap: 6, justifyContent: "center" }}>
+                <IconTaxiBadgeNeon s={28} c="oklch(0.85 0.18 85)" /> Total Taxímetro
+              </div>
+              <div style={{ color: "oklch(0.85 0.18 85)", fontSize: 22, fontWeight: 900, letterSpacing: "-0.5px", minHeight: 28 }}>
+                {dineroJ ? `${dineroJ} €` : "€"}
+              </div>
+            </div>
+            <div onClick={() => setEndField("km")}
+              style={{
+                flex: 1,
+                background: "oklch(0.19 0.05 220)",
+                borderRadius: 16,
+                padding: "14px",
+                border: `1.5px solid ${endField === "km" ? "oklch(0.80 0.14 220)" : "oklch(0.65 0.14 220 / 0.35)"}`,
+                cursor: "pointer",
+                transition: "border 0.15s",
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+                justifyContent: "center",
+                textAlign: "center"
+              }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: "rgba(255,255,255,0.5)", textTransform: "uppercase", letterSpacing: "0.6px", marginBottom: 8, display: "flex", alignItems: "center", gap: 6, justifyContent: "center" }}>
+                <IconRoad s={24} c="oklch(0.80 0.14 220)" /> Total KM
+              </div>
+              <div style={{ color: "oklch(0.80 0.14 220)", fontSize: 22, fontWeight: 900, letterSpacing: "-0.5px", minHeight: 28 }}>
+                {kmJ ? <>{kmJ} <span style={KM_CARD_UNIT_STYLE}>KM</span></> : <span style={KM_CARD_UNIT_STYLE}>KM</span>}
+              </div>
+            </div>
+          </div>
+
+          {/* Resumen previo */}
+          <div style={{ background: "rgba(255,255,255,0.04)", borderRadius: 22, padding: "16px", border: "1px solid rgba(255,255,255,0.07)", marginBottom: 12, flexShrink: 0 }}>
+            <div style={{ fontSize: 12, fontWeight: 600, color: "rgba(255,255,255,0.5)", textTransform: "uppercase", letterSpacing: "0.8px", marginBottom: 12 }}>
+              Resumen de hoy
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+              <div style={{ background: PBG, borderRadius: 14, padding: "12px", border: `1px solid ${P}33` }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 6 }}>
+                  <IconCard s={15} c={P} />
+                  <span style={{ fontSize: 12, fontWeight: 600, color: "rgba(255,255,255,0.4)" }}>Datáfono</span>
+                </div>
+                <div style={{ fontSize: 20, fontWeight: 900, color: P, letterSpacing: "-0.5px" }}>{fmt(totalD)}</div>
+                <div style={{ fontSize: 11, color: "rgba(255,255,255,0.5)", marginTop: 2 }}>{datafonos.length} entrada{datafonos.length !== 1 ? "s" : ""}</div>
+              </div>
+              <div style={{ background: GBG, borderRadius: 14, padding: "12px", border: `1px solid ${G}33` }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 6 }}>
+                  <IconCoin s={15} c={G} />
+                  <span style={{ fontSize: 12, fontWeight: 600, color: "rgba(255,255,255,0.4)" }}>Propinas</span>
+                </div>
+                <div style={{ fontSize: 20, fontWeight: 900, color: G, letterSpacing: "-0.5px" }}>{fmt(totalP)}</div>
+                <div style={{ fontSize: 11, color: "rgba(255,255,255,0.5)", marginTop: 2 }}>{propinas.length} entrada{propinas.length !== 1 ? "s" : ""}</div>
+              </div>
+              <div style={{ background: ABG, borderRadius: 14, padding: "12px", border: `1px solid ${A}33` }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 6 }}>
+                  <IconAgency s={15} c={A} />
+                  <span style={{ fontSize: 12, fontWeight: 600, color: "rgba(255,255,255,0.4)" }}>Agencias/Bonos</span>
+                </div>
+                <div style={{ fontSize: 20, fontWeight: 900, color: A, letterSpacing: "-0.5px" }}>{fmt(totalA)}</div>
+                <div style={{ fontSize: 11, color: "rgba(255,255,255,0.5)", marginTop: 2 }}>{agencias.length} entrada{agencias.length !== 1 ? "s" : ""}</div>
+              </div>
+              <div style={{ background: EBG, borderRadius: 14, padding: "12px", border: `1px solid ${E}33` }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 6 }}>
+                  <IconExtra s={15} c={E} />
+                  <span style={{ fontSize: 12, fontWeight: 600, color: "rgba(255,255,255,0.4)" }}>Extras</span>
+                </div>
+                <div style={{ fontSize: 20, fontWeight: 900, color: E, letterSpacing: "-0.5px" }}>{fmt(totalE)}</div>
+                <div style={{ fontSize: 11, color: "rgba(255,255,255,0.5)", marginTop: 2 }}>{extras.length} entrada{extras.length !== 1 ? "s" : ""}</div>
+              </div>
+              <div style={{ background: FBG, borderRadius: 14, padding: "12px", border: `1px solid ${F}33` }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 6 }}>
+                  <IconFuel s={15} c={F} />
+                  <span style={{ fontSize: 12, fontWeight: 600, color: "rgba(255,255,255,0.4)" }}>Gasolina</span>
+                </div>
+                <div style={{ fontSize: 20, fontWeight: 900, color: F, letterSpacing: "-0.5px" }}>{fmt(totalF)}</div>
+                <div style={{ fontSize: 11, color: "rgba(255,255,255,0.5)", marginTop: 2 }}>{gasolinas.length} entrada{gasolinas.length !== 1 ? "s" : ""}</div>
+              </div>
+              <div style={{ background: NBG, borderRadius: 14, padding: "12px", border: `1px solid ${N}33` }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 6 }}>
+                  <IconNulo s={15} c={N} />
+                  <span style={{ fontSize: 12, fontWeight: 600, color: "rgba(255,255,255,0.4)" }}>Nulos</span>
+                </div>
+                <div style={{ fontSize: 20, fontWeight: 900, color: N, letterSpacing: "-0.5px" }}>{fmt(totalN)}</div>
+                <div style={{ fontSize: 11, color: "rgba(255,255,255,0.5)", marginTop: 2 }}>{nulos.length} entrada{nulos.length !== 1 ? "s" : ""}</div>
+              </div>
+            </div>
+
+            {/* Notas añadidas durante el turno */}
+            {(() => {
+              const gNotes = current.entries.filter(e => e.type === 'nota');
+              if (gNotes.length > 0) {
+                return (
+                  <div style={{ marginTop: 16, paddingTop: 14, borderTop: "1px solid rgba(255,255,255,0.06)" }}>
+                    <div style={{ fontSize: 11, fontWeight: 700, color: "rgba(255,255,255,0.4)", textTransform: "uppercase", letterSpacing: "0.6px", marginBottom: 8, display: "flex", alignItems: "center", gap: 5 }}>
+                      <IconNoteAdd s={17} showPlus={false} /> Notas del Turno
+                    </div>
+                    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                      {gNotes.map(e => {
+                        const meta = getEntryTypeMeta(e.type);
+                        return (
+                          <div key={e.id} style={{ display: "grid", gridTemplateColumns: "auto auto minmax(0, 1fr)", alignItems: "baseline", gap: 9, color: "rgba(255,255,255,0.8)", fontSize: 13, lineHeight: 1.4, background: "rgba(255,255,255,0.025)", padding: "8px 10px", borderRadius: 9, minWidth: 0 }}>
+                            <span style={NOTE_TIME_STYLE}>{e.time}</span>
+                            <span style={{ fontWeight: 700, color: meta.color, fontSize: 14, whiteSpace: "nowrap", flexShrink: 0 }}>{meta.label}</span>
+                            <span style={{ color: "rgba(255,255,255,0.82)", fontSize: 12, lineHeight: 1.38, minWidth: 0, overflowWrap: "anywhere" }}>{e.note}</span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              }
+              return (
+                <div style={{ marginTop: 16, paddingTop: 14, borderTop: "1px solid rgba(255,255,255,0.06)", textAlign: 'center' }}>
+                  <div style={{ fontSize: 12, color: "rgba(255,255,255,0.5)", fontStyle: 'italic' }}>Sin notas del turno</div>
+                </div>
+              );
+            })()}
+
+          </div>
+
+          {(() => {
+            const entriesWithNotes = current.entries.filter(e => e.type !== 'nota' && e.note && e.note.trim());
+            if (entriesWithNotes.length === 0) return null;
+            return (
+              <div style={{ marginBottom: 12, display: "flex", flexDirection: "column", gap: 6, flexShrink: 0 }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: "rgba(255,255,255,0.4)", textTransform: "uppercase", letterSpacing: "0.6px", marginBottom: 2, display: "flex", alignItems: "center", gap: 6 }}>
+                  <IconPinNeon s={18} /> Notas detalladas
+                </div>
+                {entriesWithNotes.map(e => {
+                  const meta = getEntryTypeMeta(e.type);
+                  return (
+                    <div key={e.id} style={{ fontSize: 13, background: "rgba(255,255,255,0.03)", padding: "10px 12px", borderRadius: 12, border: "1px solid rgba(255,255,255,0.05)", display: "grid", gridTemplateColumns: "auto auto minmax(0, 1fr) auto", alignItems: "baseline", gap: 8, minWidth: 0 }}>
+                      <span style={NOTE_TIME_STYLE}>{e.time}</span>
+                      <span style={{ fontWeight: 700, color: meta.color, fontSize: 14, whiteSpace: "nowrap", flexShrink: 0 }}>{meta.label}</span>
+                      <span style={{ color: "rgba(255,255,255,0.8)", fontSize: 12, lineHeight: 1.4, flex: 1, minWidth: 0, overflowWrap: "anywhere" }}>{e.note}</span>
+                      <span style={{ fontSize: 15, fontWeight: 700, color: meta.color, whiteSpace: "nowrap", flexShrink: 0, alignSelf: "baseline" }}>{fmt(e.amount)}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            );
+          })()}
+
+
+          <div style={{ display: "flex", flexDirection: "column", gap: 8, flexShrink: 0, marginTop: "auto" }}>
+            <button onClick={handleEndTurno}
+              style={{ padding: "15px 0", borderRadius: 16, border: "none", background: "rgba(255,60,60,0.12)", color: "rgba(255,110,110,0.9)", fontSize: 16, fontWeight: 800, cursor: "pointer", outline: "1.5px solid rgba(255,60,60,0.25)" }}>
+              Terminar Turno
+            </button>
+            <button onClick={() => setScreen("main")}
+              style={{ padding: "13px 0", borderRadius: 16, border: "none", background: "rgba(255,255,255,0.06)", color: "rgba(255,255,255,0.5)", fontSize: 15, fontWeight: 700, cursor: "pointer" }}>
+              Cancelar
+            </button>
+          </div>
+        </div>
+
+        {/* Teclado in-app para Dinero / KM */}
+        {endField && (
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-label="Teclado numérico"
+            onClick={() => setEndField(null)}
+            style={{
+              position: "fixed",
+              top: 0, left: 0, right: 0, bottom: 0,
+              background: "rgba(0,0,0,0.65)",
+              backdropFilter: "blur(4px)",
+              display: "flex",
+              alignItems: "flex-end",
+              justifyContent: "center",
+              zIndex: 9999,
+              animation: "fadeIn 0.2s ease",
+            }}
+          >
+            <div
+              onClick={(e) => e.stopPropagation()}
+              style={{
+                width: "100%",
+                maxWidth: 460,
+                background: "#0d0d14",
+                borderTopLeftRadius: 24,
+                borderTopRightRadius: 24,
+                padding: "16px 16px 20px",
+                borderTop: "1px solid rgba(255,255,255,0.08)",
+                animation: "slideUp 0.25s ease",
+              }}
+            >
+              <div style={{ marginBottom: 12 }}>
+                <span style={{ fontSize: 13, fontWeight: 700, color: endField === "dinero" ? "oklch(0.78 0.18 150)" : "oklch(0.80 0.14 220)", textTransform: "uppercase", letterSpacing: "0.6px" }}>
+                  {endField === "dinero" ? "Total Taxímetro" : "Total KM"}
+                </span>
+              </div>
+              <div style={{ fontSize: 36, fontWeight: 900, color: endField === "dinero" ? "oklch(0.78 0.18 150)" : "oklch(0.80 0.14 220)", marginBottom: 14, textAlign: "center", letterSpacing: "-0.5px" }}>
+                {(endField === "dinero" ? dineroJ : kmJ) || "0"} {endField === "dinero" ? "€" : "KM"}
+              </div>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8 }}>
+                {["1", "2", "3", "4", "5", "6", "7", "8", "9", "DEL", "0", ","].map((k) => (
+                  <button key={k} aria-label={k === "DEL" ? "Borrar" : k === "," ? "Coma decimal" : k} onClick={() => kpEnd(k)}
+                    style={{ ...S.keyBtn, padding: "20px 0", background: "rgba(255,255,255,0.05)", color: "white", fontSize: 22, fontWeight: 700 }}>
+                    {k === "DEL" ? <IconDel /> : k}
+                  </button>
+                ))}
+              </div>
+              <button
+                onClick={() => setEndField(null)}
+                style={{
+                  width: "100%",
+                  padding: "16px 0",
+                  marginTop: 12,
+                  borderRadius: 14,
+                  border: "none",
+                  background: endField === "dinero" ? "oklch(0.78 0.18 150)" : "oklch(0.80 0.14 220)",
+                  color: "black",
+                  fontSize: 17,
+                  fontWeight: 800,
+                  cursor: "pointer",
+                }}
+              >
+                Guardar
+              </button>
+            </div>
+          </div>
+        )}
+      </Shell>
     );
   }
 
@@ -5030,8 +8035,6 @@ function App() {
           onAmountChange={setEditEntryAmount}
           onNoteChange={setEditEntryNote}
           onSave={saveEditEntry}
-          getEntryTypeMeta={getEntryTypeMeta}
-          deleteIcon={<IconDel />}
           onDelete={() => {
             setConfirmDialog({
               text: "¿Seguro que quieres eliminar esta entrada?",
@@ -5045,9 +8048,542 @@ function App() {
   );
 }
 
-const rootElement = document.getElementById("root");
-if (rootElement) {
-  ReactDOM.createRoot(rootElement).render(<AuthGate AppComponent={App} />);
+function SmallCard({
+  label,
+  color,
+  bg,
+  total,
+  icon,
+  onClick,
+  disabled,
+  ariaLabel,
+}: {
+  label: string;
+  color: string;
+  bg: string;
+  total: number;
+  icon: React.ReactNode;
+  onClick?: () => void;
+  disabled?: boolean;
+  ariaLabel?: string;
+}) {
+  return (
+    <div
+      onClick={!disabled ? onClick : undefined}
+      {...(onClick && !disabled ? { role: "button", tabIndex: 0 } : {})}
+      aria-label={ariaLabel || label}
+      style={{
+        flex: 1,
+        background: bg,
+        borderRadius: 16,
+        padding: "12px 14px",
+        border: `1px solid ${color}33`,
+        display: "flex",
+        alignItems: "center",
+        gap: 10,
+        cursor: disabled ? "default" : onClick ? "pointer" : "default",
+        transition: "all 0.15s",
+        opacity: disabled ? 0.35 : 1,
+        pointerEvents: disabled ? "none" : "auto",
+        filter: disabled ? "grayscale(0.4)" : "none",
+      }}
+    >
+      {icon}
+      <div style={{ flex: 1 }}>
+        <div
+          style={{
+            fontSize: 11,
+            fontWeight: 600,
+            color: "rgba(255,255,255,0.45)",
+            letterSpacing: "0.5px",
+          }}
+        >
+          {label}
+        </div>
+        <div
+          style={{
+            fontSize: 18,
+            fontWeight: 800,
+            color,
+            letterSpacing: "-0.3px",
+            marginTop: 2,
+          }}
+        >
+          {fmt(total)}
+        </div>
+      </div>
+    </div>
+  );
 }
 
-registerServiceWorker();
+function MainCard({
+  label,
+  color,
+  bg,
+  total,
+  count,
+  icon,
+  onClick,
+  disabled,
+  ariaLabel,
+}: {
+  label: string;
+  color: string;
+  bg: string;
+  total: number;
+  count: number;
+  icon: React.ReactNode;
+  onClick?: () => void;
+  disabled?: boolean;
+  ariaLabel?: string;
+}) {
+  return (
+    <div
+      onClick={!disabled ? onClick : undefined}
+      {...(onClick && !disabled ? { role: "button", tabIndex: 0 } : {})}
+      aria-label={ariaLabel || label}
+      style={{
+        flex: 1,
+        background: bg,
+        borderRadius: 22,
+        padding: "20px 18px",
+        border: `1px solid ${color}33`,
+        cursor: disabled ? "default" : onClick ? "pointer" : "default",
+        opacity: disabled ? 0.35 : 1,
+        pointerEvents: disabled ? "none" : "auto",
+        filter: disabled ? "grayscale(0.4)" : "none",
+        transition: "all 0.15s",
+      }}
+    >
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 8,
+          marginBottom: 14,
+        }}
+      >
+        {icon}
+        <span
+          style={{
+            fontSize: 15,
+            fontWeight: 700,
+            color: "rgba(255,255,255,0.50)",
+          }}
+        >
+          {label}
+        </span>
+      </div>
+      <div
+        style={{
+          fontSize: "clamp(24px, 7vw, 34px)",
+          fontWeight: 900,
+          color,
+          letterSpacing: "-1px",
+          lineHeight: 1,
+        }}
+      >
+        {fmt(total)}
+      </div>
+      <div
+        style={{ fontSize: 12, color: "rgba(255,255,255,0.5)", marginTop: 8 }}
+      >
+        {count} entrada{count !== 1 ? "s" : ""}
+      </div>
+    </div>
+  );
+}
+
+function EditEntryDialog({
+  entry,
+  amount,
+  note,
+  onAmountChange,
+  onNoteChange,
+  onSave,
+  onDelete,
+  onCancel,
+}: {
+  entry: Entry;
+  amount: string;
+  note: string;
+  onAmountChange: (v: string) => void;
+  onNoteChange: (v: string) => void;
+  onSave: () => void;
+  onDelete: () => void;
+  onCancel: () => void;
+}) {
+  const [showKP, setShowKP] = React.useState(false);
+  const meta = getEntryTypeMeta(entry.type);
+
+  function kpAmount(k: string) {
+    if (k === "DEL") { onAmountChange(amount.slice(0, -1)); return; }
+    if (k === ",") { if (!amount.includes(",")) onAmountChange(amount + ","); return; }
+    if (amount.replace(",", "").length >= 7) return;
+    onAmountChange(amount + k);
+  }
+
+  return (
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-label="Editar entrada"
+      style={{
+        position: "fixed",
+        top: 0, left: 0, right: 0, bottom: 0,
+        background: "rgba(0,0,0,0.6)",
+        backdropFilter: "blur(4px)",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        zIndex: 9999,
+      }}
+    >
+      <div
+        style={{
+          background: "oklch(0.18 0.03 260)",
+          borderRadius: 20,
+          padding: 20,
+          width: "92%",
+          maxWidth: 380,
+          border: "1px solid rgba(255,255,255,0.1)",
+          boxShadow: "0 20px 40px rgba(0,0,0,0.5)",
+          animation: "fadeUp 0.25s ease",
+        }}
+      >
+        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 14 }}>
+          <span style={{ fontSize: 13, fontWeight: 700, color: meta.color, textTransform: "uppercase", letterSpacing: "0.5px" }}>
+            Editar {meta.label}
+          </span>
+          <span style={{ fontSize: 12, color: "rgba(255,255,255,0.5)", marginLeft: "auto" }}>{entry.time}</span>
+        </div>
+
+        {/* Importe (display + teclado in-app) - Oculto para Notas */}
+        {entry.type !== "nota" && (
+          <div style={{ marginBottom: 12, cursor: "pointer" }} onClick={() => setShowKP(true)}>
+            <div style={{ fontSize: 11, fontWeight: 700, color: "rgba(255,255,255,0.5)", marginBottom: 6, textTransform: "uppercase", letterSpacing: "0.6px", display: "flex", justifyContent: "space-between" }}>
+              <span>Importe (€)</span>
+              {!showKP && <span style={{ color: meta.color, fontSize: 10 }}>Toca para editar</span>}
+            </div>
+            <div style={{
+              width: "100%",
+              background: "rgba(0,0,0,0.3)",
+              border: `1px solid ${showKP ? meta.color : "rgba(255,255,255,0.1)"}`,
+              borderRadius: 12,
+              color: showKP ? meta.color : "white",
+              padding: "12px 14px",
+              fontSize: 26,
+              fontWeight: 900,
+              textAlign: "center",
+              minHeight: 32,
+              letterSpacing: "-0.5px",
+              transition: "all 0.2s"
+            }}>
+              {amount || "0"}
+            </div>
+          </div>
+        )}
+
+        {/* Teclado in-app */}
+        {showKP && (
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 6, marginBottom: 14, animation: "fadeUp 0.2s ease" }}>
+            {["1", "2", "3", "4", "5", "6", "7", "8", "9", "DEL", "0", ","].map((k) => (
+              <button key={k} aria-label={k === "DEL" ? "Borrar" : k === "," ? "Coma decimal" : k} onClick={(e) => { e.stopPropagation(); kpAmount(k); }}
+                style={{
+                  border: "none",
+                  borderRadius: 10,
+                  padding: "14px 0",
+                  background: "rgba(255,255,255,0.05)",
+                  color: "white",
+                  fontSize: 20,
+                  fontWeight: 700,
+                  cursor: "pointer",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                }}>
+                {k === "DEL" ? <IconDel /> : k}
+              </button>
+            ))}
+          </div>
+        )}
+
+        <div style={{ marginBottom: 14 }}>
+          <div style={{ fontSize: 11, fontWeight: 700, color: "rgba(255,255,255,0.5)", marginBottom: 6, textTransform: "uppercase", letterSpacing: "0.6px" }}>Nota</div>
+          <input
+            value={note}
+            onChange={(ev) => onNoteChange(ev.target.value)}
+            placeholder="Nota opcional"
+            style={{
+              width: "100%",
+              background: "rgba(0,0,0,0.3)",
+              border: "1px solid rgba(255,255,255,0.1)",
+              borderRadius: 12,
+              color: "white",
+              padding: "10px 14px",
+              fontSize: 14,
+              outline: "none",
+            }}
+          />
+        </div>
+
+        <div style={{ display: "flex", gap: 8 }}>
+          <button
+            onClick={onCancel}
+            style={{
+              flex: 1,
+              padding: "14px",
+              borderRadius: 12,
+              border: "none",
+              background: "rgba(255,255,255,0.08)",
+              color: "rgba(255,255,255,0.7)",
+              fontWeight: 700,
+              fontSize: 14,
+              cursor: "pointer",
+            }}
+          >
+            Cancelar
+          </button>
+          <button
+            onClick={onDelete}
+            style={{
+              flex: 1,
+              padding: "14px",
+              borderRadius: 12,
+              border: "none",
+              background: "rgba(255,60,60,0.15)",
+              color: "#ff7b7b",
+              fontWeight: 700,
+              fontSize: 14,
+              cursor: "pointer",
+            }}
+          >
+            Eliminar
+          </button>
+          <button
+            onClick={onSave}
+            style={{
+              flex: 1.2,
+              padding: "14px",
+              borderRadius: 12,
+              border: "none",
+              background: meta.color,
+              color: "black",
+              fontWeight: 800,
+              fontSize: 14,
+              cursor: "pointer",
+            }}
+          >
+            Guardar
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+interface ConfirmDialogProps {
+  text: string;
+  onConfirm: () => void;
+  onCancel: () => void;
+  confirmText?: string;
+  confirmBg?: string;
+  confirmColor?: string;
+  confirmBorder?: string;
+}
+
+function ConfirmDialog({ text, onConfirm, onCancel, confirmText, confirmBg, confirmColor, confirmBorder }: ConfirmDialogProps) {
+  return (
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-label={text}
+      style={{
+        position: "fixed",
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        background: "rgba(0,0,0,0.6)",
+        backdropFilter: "blur(4px)",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        zIndex: 10000,
+        animation: "fadeIn 0.2s ease",
+      }}
+    >
+      <div
+        style={{
+          background: "oklch(0.18 0.03 260)",
+          borderRadius: 20,
+          padding: 24,
+          width: "85%",
+          maxWidth: 320,
+          border: "1px solid rgba(255,255,255,0.1)",
+          boxShadow: "0 20px 40px rgba(0,0,0,0.5)",
+          animation: "fadeUp 0.3s ease",
+        }}
+      >
+        <div style={{ fontSize: 20, fontWeight: 800, color: "white", marginBottom: 12 }}>
+          Confirmar acción
+        </div>
+        <div style={{ fontSize: 15, color: "rgba(255,255,255,0.6)", marginBottom: 24, lineHeight: 1.4 }}>
+          {text}
+        </div>
+        <div style={{ display: "flex", gap: 12 }}>
+          <button
+            onClick={onCancel}
+            style={{
+              flex: 1,
+              padding: "14px",
+              borderRadius: 12,
+              border: "none",
+              background: "rgba(255,255,255,0.1)",
+              color: "white",
+              fontWeight: 700,
+              cursor: "pointer",
+            }}
+          >
+            Cancelar
+          </button>
+          <button
+            onClick={() => {
+              onConfirm();
+              onCancel();
+            }}
+            style={{
+              flex: 1,
+              padding: "14px",
+              borderRadius: 12,
+              border: confirmBorder || "none",
+              background: confirmBg || "rgba(255,60,60,0.2)",
+              color: confirmColor || "#ff6b6b",
+              fontWeight: 700,
+              cursor: "pointer",
+            }}
+          >
+            {confirmText || "Confirmar"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function TurnoNotasCard({
+  data,
+  onClick
+}: {
+  data: TurnoNotasSemana;
+  onClick: () => void;
+}) {
+  const { turno, notasGenerales, notasDetalladas } = data;
+  return (
+    <div
+      onClick={onClick}
+      style={{ background: "rgba(255,255,255,0.035)", borderRadius: 14, padding: "12px", border: "1px solid rgba(255,255,255,0.06)", cursor: "pointer" }}
+    >
+      <div style={{ display: "flex", justifyContent: "space-between", gap: 10, alignItems: "baseline", marginBottom: 10 }}>
+        <div style={{ fontSize: 15, fontWeight: 800, color: "white" }}>{fmtDate(turno.date)}</div>
+        <div style={{ fontSize: 12, fontWeight: 700, color: "rgba(255,255,255,0.42)", whiteSpace: "nowrap" }}>
+          {turno.startTime} - {turno.endTime}
+        </div>
+      </div>
+
+      {notasGenerales.length > 0 && (
+        <div style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: notasDetalladas.length ? 10 : 0 }}>
+          <div style={{ fontSize: 10, fontWeight: 800, color: "rgba(255,255,255,0.38)", textTransform: "uppercase", letterSpacing: "0.6px" }}>
+            Notas del turno
+          </div>
+          {notasGenerales.map((entry) => {
+            const meta = getEntryTypeMeta(entry.type);
+            return (
+              <div key={entry.id} style={{ fontSize: 13, color: "rgba(255,255,255,0.82)", background: "rgba(255,255,255,0.025)", borderRadius: 10, padding: "8px 10px", lineHeight: 1.35, display: "grid", gridTemplateColumns: "auto auto minmax(0, 1fr)", alignItems: "baseline", gap: 7, minWidth: 0 }}>
+                <span style={NOTE_TIME_STYLE}>{entry.time}</span>
+                <span style={{ fontWeight: 700, color: meta.color, fontSize: 14, whiteSpace: "nowrap", flexShrink: 0 }}>{meta.label}</span>
+                <span style={{ color: "rgba(255,255,255,0.82)", fontSize: 12, lineHeight: 1.35, minWidth: 0, overflowWrap: "anywhere" }}>{entry.note}</span>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {notasDetalladas.length > 0 && (
+        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+          <div style={{ fontSize: 10, fontWeight: 800, color: "rgba(255,255,255,0.38)", textTransform: "uppercase", letterSpacing: "0.6px" }}>
+            Notas detalladas
+          </div>
+          {notasDetalladas.map((entry) => {
+            const meta = getEntryTypeMeta(entry.type);
+            return (
+              <div key={entry.id} style={{ fontSize: 13, background: "rgba(255,255,255,0.025)", padding: "8px 10px", borderRadius: 10, display: "grid", gridTemplateColumns: "auto auto minmax(0, 1fr) auto", alignItems: "baseline", gap: 7, minWidth: 0 }}>
+                <span style={NOTE_TIME_STYLE}>{entry.time}</span>
+                <span style={{ fontWeight: 700, color: meta.color, fontSize: 14, whiteSpace: "nowrap", flexShrink: 0 }}>{meta.label}</span>
+                <span style={{ color: "rgba(255,255,255,0.82)", fontSize: 12, lineHeight: 1.35, flex: 1, minWidth: 0, overflowWrap: "anywhere" }}>{entry.note}</span>
+                <span style={{ fontSize: 15, fontWeight: 700, color: meta.color, whiteSpace: "nowrap", flexShrink: 0, alignSelf: "baseline" }}>{fmt(entry.amount)}</span>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// AuthGate: decide qué pintar en función del estado de autenticación.
+//   - Mientras Firebase comprueba si hay sesión guardada → "Cargando…".
+//   - Sin usuario          → LoginScreen.
+//   - Con usuario          → App. Se usa key={user.uid} para forzar un remount
+//                             completo si cambia el usuario, asegurando que el
+//                             estado interno de App se reinicia entre usuarios.
+function AuthGate() {
+  const [user, setUser] = useState<User | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const unsub = onAuthStateChanged(auth, (u) => {
+      setUser(u);
+      setLoading(false);
+    });
+    return unsub;
+  }, []);
+
+  if (loading) {
+    return (
+      <div
+        style={{
+          minHeight: "100vh",
+          background: "oklch(0.14 0.02 260)",
+          color: "oklch(0.92 0.02 260)",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          fontSize: 16,
+        }}
+      >
+        Cargando…
+      </div>
+    );
+  }
+
+  if (!user) {
+    return <LoginScreen />;
+  }
+
+  return <App key={user.uid} />;
+}
+
+const rootElement = document.getElementById("root");
+if (rootElement) {
+  ReactDOM.createRoot(rootElement).render(<AuthGate />);
+}
+
+if ("serviceWorker" in navigator) {
+  window.addEventListener("load", () => {
+    navigator.serviceWorker
+      .register("./sw.js")
+      .then(() => console.log("SW registered"))
+      .catch((err) => console.warn("SW registration failed", err));
+  });
+}
