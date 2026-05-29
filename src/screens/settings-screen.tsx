@@ -8,7 +8,7 @@ import { IconPercent } from "../components/entry-icons";
 import { IconReceipt, IconHoliday } from "../components/settings-icons";
 import { getBackupMenuActionIds, type BackupMenuActionId } from "../shared/action-ids";
 import { buildBackupPayloadFromState } from "../logic/backup";
-import { exportBackupJSON } from "../logic/backup-export";
+import { exportBackupJSON } from "../services/backup-export";
 import { mergeTurnos } from "../logic/turnos";
 import { parseCSVToHistory } from "../logic/csv";
 import { today } from "../logic/date-time";

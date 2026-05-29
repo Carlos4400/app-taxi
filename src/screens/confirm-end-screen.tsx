@@ -6,14 +6,10 @@ import { IconNoteAdd, IconTaxiBadgeNeon, IconRoad, IconPinNeon } from "../compon
 import { fmt } from "../logic/formatters";
 import { getEntryTypeMeta } from "../shared/entry-type-meta";
 import { A, ABG, E, EBG, F, FBG, G, GBG, N, NBG, P, PBG } from "../shared/ui-theme";
+import { KM_CARD_UNIT_STYLE } from "../shared/card-styles";
 import type { CurrentState, AppSettings, Entry } from "../shared/types";
 
 const C = "white";
-const KM_CARD_UNIT_STYLE = {
-  fontSize: "0.72em",
-  fontWeight: 900,
-  letterSpacing: "normal",
-} as const;
 
 const NOTE_TIME_STYLE = {
   fontSize: 12,

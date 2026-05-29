@@ -28,6 +28,7 @@ describe("src folder reorganization", () => {
       "user-storage.ts",
       "apk-installer.ts",
       "service-worker-registration.ts",
+      "backup-export.ts",
     ]) {
       expect(existsSync(resolve("src/services", file))).toBe(true);
     }
@@ -44,7 +45,6 @@ describe("src folder reorganization", () => {
       "turno-notas-logic.ts",
       "csv.ts",
       "backup.ts",
-      "backup-export.ts",
       "update-flow.ts",
       "date-time.ts",
       "calendar-date.ts",

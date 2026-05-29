@@ -22,16 +22,30 @@ describe("Main antiguo regression locks", () => {
 
     const openNewNotaBlock = calendarSource.match(/const openNewNota = \(date\?: string\) => \{[\s\S]*?\n  \};/)?.[0] ?? "";
     expect(openNewNotaBlock).toContain("setEditingNota(null);");
-    expect(openNewNotaBlock).toContain("setEditingReserva(null);");
+    expect(openNewNotaBlock).not.toContain("setEditingReserva(null);");
 
     expect(calendarSource).toContain('onClick={() => setScreen("home")}');
     expect(calendarSource).toContain('setReturnScreen("calendar");');
     expect(calendarSource).toContain("setViewTurno(turno);");
     expect(calendarSource).toContain('setScreen("summary");');
+    expect(calendarSource).toContain("style={iconBtnStyle}");
+    expect(calendarSource).toContain("setShowMonthPicker(v => !v);");
 
     expect(mainSource).toContain("setScreen={setScreen}");
     expect(mainSource).toContain("setReturnScreen={setReturnScreen}");
     expect(mainSource).toContain("setViewTurno={setViewTurno}");
+  });
+
+  it("keeps the booking dialog centralized instead of duplicating it in calendar", () => {
+    const calendarSource = readSource("src/screens/calendar-screen.tsx");
+    const mainSource = readSource("src/main.tsx");
+
+    expect(calendarSource).toContain("renderReservaDialog: () => React.ReactElement | false;");
+    expect(calendarSource).toContain("{renderReservaDialog()}");
+    expect(calendarSource).not.toContain("function renderReservaDialog(");
+    expect(calendarSource).not.toContain(">Cancel<");
+    expect(calendarSource).not.toContain('{editingReserva ? "Actualizar" : "Reservar"}');
+    expect(mainSource).toContain("renderReservaDialog={renderReservaDialog}");
   });
 
   it("keeps today history note metadata and destructive confirmation behavior", () => {
@@ -41,8 +55,9 @@ describe("Main antiguo regression locks", () => {
     expect(source).toContain('import { getEntryTypeMeta } from "../shared/entry-type-meta"');
     expect(source).not.toContain('nota: { color: "white", label: "Nota", icon: (s = 17) => <IconCard');
     expect(source).toContain("{confirmDialog && <ConfirmDialog");
-    expect(source).toContain('confirmBg: "rgba(255,60,60,0.2)"');
-    expect(source).toContain('confirmColor: "#ff6b6b"');
+    expect(source).not.toContain("confirmBg:");
+    expect(source).not.toContain("confirmColor:");
+    expect(source).not.toContain("confirmBorder:");
   });
 
   it("keeps turnos dates formatted for display", () => {
@@ -59,5 +74,23 @@ describe("Main antiguo regression locks", () => {
     expect(source).toContain('style={{ marginBottom: 12, display: "flex", flexDirection: "column", gap: 6, flexShrink: 0 }}');
     expect(source).toContain('background: "rgba(255,255,255,0.03)"');
     expect(source).toContain('color: "rgba(255,255,255,0.8)"');
+  });
+
+  it("keeps extracted screens using shared visual building blocks", () => {
+    const addEntrySource = readSource("src/screens/add-entry-screen.tsx");
+    const addSingleSource = readSource("src/screens/add-single-entry-screen.tsx");
+    const addNotaSource = readSource("src/screens/add-nota-general-screen.tsx");
+    const confirmEndSource = readSource("src/screens/confirm-end-screen.tsx");
+
+    expect(addEntrySource).toContain('import { IconBack, IconDel } from "../components/navigation-icons"');
+    expect(addEntrySource).not.toContain("const IconBack:");
+    expect(addEntrySource).not.toContain("const IconDel:");
+    expect(addSingleSource).toContain('import { IconBack, IconDel } from "../components/navigation-icons"');
+    expect(addSingleSource).not.toContain("const IconBack:");
+    expect(addSingleSource).not.toContain("const IconDel:");
+    expect(addNotaSource).toContain('import { IconBack } from "../components/navigation-icons"');
+    expect(addNotaSource).not.toContain("const IconBack:");
+    expect(confirmEndSource).toContain('import { KM_CARD_UNIT_STYLE } from "../shared/card-styles"');
+    expect(confirmEndSource).not.toContain("const KM_CARD_UNIT_STYLE = {");
   });
 });

@@ -4,17 +4,19 @@ import { describe, expect, it } from "vitest";
 
 describe("Detailed notes layout", () => {
   const source = readFileSync(resolve("src/main.tsx"), "utf8");
+
   const summaryIconsSource = readFileSync(resolve("src/components/summary-icons.tsx"), "utf8");
   const confirmEndSource = readFileSync(resolve("src/screens/confirm-end-screen.tsx"), "utf8");
   const entryTypeMetaSource = readFileSync(resolve("src/shared/entry-type-meta.tsx"), "utf8");
   const turnoNotasSource = readFileSync(resolve("src/components/turno-notas.tsx"), "utf8");
+  const liquidacionSemanaSource = readFileSync(resolve("src/screens/liquidacion-semana-screen.tsx"), "utf8");
 
   it("centralizes entry metadata with labels, colors and icons", () => {
-    expect(source).toMatch(/type EntryTypeMeta = \{[\s\S]*?color: string;[\s\S]*?label: string;[\s\S]*?icon: \(size\?: number\) => React\.ReactNode;[\s\S]*?\};/);
-    expect(source).toMatch(/const ENTRY_TYPE_META: Record<string, EntryTypeMeta> = \{/);
-    expect(source).toMatch(/agencia_bono:\s*\{ color: A,\s*label: "Agencia\/Bono",\s*icon: \(s = 17\) => <IconAgency s=\{s\} c=\{A\} \/> \}/);
-    expect(source).toMatch(/nota:\s*\{ color: "white", label: "Nota",\s*icon: \(s = 17\) => <IconNoteAdd s=\{s\} showPlus=\{false\} \/> \}/);
-    expect(source).toMatch(/function getEntryTypeMeta\(type: string\): EntryTypeMeta \{/);
+    expect(entryTypeMetaSource).toMatch(/(?:type|export interface) EntryTypeMeta\s*=?\s*\{[\s\S]*?color: string;[\s\S]*?label: string;[\s\S]*?icon: \(size\?: number\) => React\.ReactNode;[\s\S]*?\}/);
+    expect(entryTypeMetaSource).toMatch(/const ENTRY_TYPE_META: Record<string, EntryTypeMeta> = \{/);
+    expect(entryTypeMetaSource).toMatch(/agencia_bono:\s*\{ color: A,\s*label: "Agencia\/Bono",\s*icon: \(s = 17\) => <IconAgency s=\{s\} c=\{A\} \/> \}/);
+    expect(entryTypeMetaSource).toMatch(/nota:\s*\{ color: "white", label: "Nota",\s*icon: \(s = 17\) => <IconNoteAdd s=\{s\} showPlus=\{false\} \/> \}/);
+    expect(entryTypeMetaSource).toMatch(/function getEntryTypeMeta\(type: string\): EntryTypeMeta \{/);
     expect(entryTypeMetaSource).toMatch(/datafono:\s*\{ color: P,\s*label: "Datáfono",\s*icon: \(s = 17\) => <IconCard s=\{s\} c=\{P\} \/> \}/);
     expect(entryTypeMetaSource).toMatch(/nota:\s*\{ color: "white", label: "Nota",\s*icon: \(s = 17\) => <IconNoteAdd s=\{s\} showPlus=\{false\} \/> \}/);
     expect(entryTypeMetaSource).toMatch(/return ENTRY_TYPE_META\[type\] \|\| ENTRY_TYPE_META\.nulo/);
@@ -24,7 +26,7 @@ describe("Detailed notes layout", () => {
   });
 
   it("uses the completed note icon without the add badge for saved notes", () => {
-    const iconNoteAddBlock = source.match(/const IconNoteAdd = \([\s\S]*?\n\);/)?.[0];
+    const iconNoteAddBlock = summaryIconsSource.match(/(?:export )?const IconNoteAdd = \([\s\S]*?\n\);/)?.[0];
 
     expect(iconNoteAddBlock).toBeDefined();
     expect(iconNoteAddBlock).toMatch(/showPlus = true/);
@@ -59,7 +61,7 @@ describe("Detailed notes layout", () => {
     const detailedRows = [
       { source, pattern: /entriesWithNotes\.map\(\(e: any\) => \{[\s\S]*?<\/div>\s*\);\s*\}\)/ },
       { source: confirmEndSource, pattern: /entriesWithNotes\.map\(e => \{[\s\S]*?<\/div>\s*\);\s*\}\)/ },
-      { source, pattern: /notasDetalladas\.map\(\(entry\) => \{[\s\S]*?key=\{`ticket-nota-detallada-\$\{entry\.id\}`\}[\s\S]*?<\/div>\s*\);\s*\}\)/ },
+      { source: liquidacionSemanaSource, pattern: /notasDetalladas\.map\(\(entry\) => \{[\s\S]*?key=\{`ticket-nota-detallada-\$\{entry\.id\}`\}[\s\S]*?<\/div>\s*\);\s*\}\)/ },
     ];
 
     for (const { source: rowSource, pattern } of detailedRows) {

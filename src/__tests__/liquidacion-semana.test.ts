@@ -3,40 +3,41 @@ import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 
 describe("Liquidación Semanal screen and typography", () => {
-  const source = readFileSync(resolve("src/main.tsx"), "utf8");
+  const mainSource = readFileSync(resolve("src/main.tsx"), "utf8");
+  const detalleSemanaSource = readFileSync(resolve("src/screens/detalle-semana-screen.tsx"), "utf8");
+  const liquidacionSemanaSource = readFileSync(resolve("src/screens/liquidacion-semana-screen.tsx"), "utf8");
   const themeSource = readFileSync(resolve("src/shared/ui-theme.ts"), "utf8");
 
   it("applies fluid typography to the week detail title", () => {
-    expect(source).toMatch(
+    expect(detalleSemanaSource).toMatch(
       /fontSize:\s*"clamp\(16px,\s*4\.5vw,\s*20px\)"/
     );
-    expect(source).toContain('Detalle de Semana');
+    expect(detalleSemanaSource).toContain('Detalle de Semana');
   });
 
   it("defines the navigation state liquidacionSemana", () => {
-    expect(source).toContain('screen === "liquidacionSemana"');
+    expect(mainSource).toContain('screen === "liquidacionSemana"');
   });
 
   it("contains the Liquidación button that triggers navigation", () => {
-    expect(source).toMatch(
-      /onClick=\{\(\)\s*=>\s*setScreen\("liquidacionSemana"\)\}/
-    );
+    const combined = mainSource + detalleSemanaSource;
+    expect(combined).toMatch(/onClick=\{\(\)\s*=>\s*setScreen\("liquidacionSemana"\)\}/);
   });
 
   it("builds the ticket layout structure with dashed borders and monospace font for numbers", () => {
-    expect(source).not.toContain('Recibo Digital');
-    expect(source).toContain('Comisión Bruta Jefe');
-    expect(source).toContain('Total Descuentos');
-    expect(source).toContain('Neto a Entregar');
-    expect(source).toContain('fontFamily: "monospace"');
-    expect(source).toContain('borderBottom: "1px dashed');
+    expect(liquidacionSemanaSource).not.toContain('Recibo Digital');
+    expect(liquidacionSemanaSource).toContain('Comisión Bruta Jefe');
+    expect(liquidacionSemanaSource).toContain('Total Descuentos');
+    expect(liquidacionSemanaSource).toContain('Neto a Entregar');
+    expect(liquidacionSemanaSource).toContain('fontFamily: "monospace"');
+    expect(liquidacionSemanaSource).toContain('borderBottom: "1px dashed');
   });
 
   it("applies default names and neon colors in swapped order", () => {
-    expect(source).toContain('Total Taxímetro');
-    expect(source).toContain('Total KM');
-    expect(source).toContain('oklch(0.85 0.18 85)'); // Yellow/orange neon for Taxímetro
-    expect(source).toContain('oklch(0.80 0.14 220)'); // Cyan/blue neon for KM
+    expect(liquidacionSemanaSource).toContain('Total Taxímetro');
+    expect(liquidacionSemanaSource).toContain('Total KM');
+    expect(liquidacionSemanaSource).toContain('oklch(0.85 0.18 85)'); // Yellow/orange neon for Taxímetro
+    expect(liquidacionSemanaSource).toContain('oklch(0.80 0.14 220)'); // Cyan/blue neon for KM
   });
 
   it("uses faithful sRGB colors only for the copied liquidation image", () => {
@@ -44,7 +45,7 @@ describe("Liquidación Semanal screen and typography", () => {
     expect(themeSource).toContain('oklch(0.70 0.18 25)');
     expect(themeSource).toContain('oklch(0.72 0.14 200)');
 
-    const exportColorBlock = source.match(
+    const exportColorBlock = liquidacionSemanaSource.match(
       /const replaceOklch = \(str: string\) => \{[\s\S]*?return match;/
     )?.[0] || "";
 
@@ -66,7 +67,7 @@ describe("Liquidación Semanal screen and typography", () => {
   });
 
   it("sharpens copied liquidation image without changing the visible UI styles", () => {
-    const copyBlock = source.match(
+    const copyBlock = liquidacionSemanaSource.match(
       /const copyToClipboard = async \(\) => \{[\s\S]*?html2canvas\(element, \{[\s\S]*?\}\)\.then/
     )?.[0] || "";
 
@@ -81,25 +82,23 @@ describe("Liquidación Semanal screen and typography", () => {
     expect(copyBlock).toContain('rgba(255, 255, 255, 0.50)');
     expect(copyBlock).toContain('rgba(38, 182, 61, 0.28)');
 
-    expect(source).toContain('background: "rgba(255, 255, 255, 0.015)"');
-    expect(source).toContain('textShadow: "0 0 12px rgba(80, 220, 140, 0.25)"');
+    expect(liquidacionSemanaSource).toContain('background: "rgba(255, 255, 255, 0.015)"');
+    expect(liquidacionSemanaSource).toContain('textShadow: "0 0 12px rgba(80, 220, 140, 0.25)"');
   });
 
   it("implements the WhatsApp markdown template for copy to clipboard", () => {
-    expect(source).toContain("LIQUIDACIÓN SEMANAL");
-    expect(source).toContain("Total KM:");
-    expect(source).toContain("Total Taxímetro:");
-    expect(source).toContain("Comisión Bruta Jefe:");
-    expect(source).toContain("DESCONTAR:");
-    expect(source).toContain("NETO A ENTREGAR:");
-    expect(source).not.toContain("Nulos acumulados:");
-    expect(source).not.toContain("Total Nulos acumulados:");
-    expect(source).not.toContain("totalNulosAcumulado");
+    expect(liquidacionSemanaSource).toContain("LIQUIDACIÓN SEMANAL");
+    expect(liquidacionSemanaSource).toContain("Total KM:");
+    expect(liquidacionSemanaSource).toContain("Total Taxímetro:");
+    expect(liquidacionSemanaSource).toContain("Comisión Bruta Jefe:");
+    expect(liquidacionSemanaSource).toContain("DESCONTAR:");
+    expect(liquidacionSemanaSource).toContain("NETO A ENTREGAR:");
+    expect(liquidacionSemanaSource).not.toContain("Nulos acumulados:");
+    expect(liquidacionSemanaSource).not.toContain("Total Nulos acumulados:");
+    expect(liquidacionSemanaSource).not.toContain("totalNulosAcumulado");
   });
   it("adds weekly notes to the liquidation ticket and text fallback", () => {
-    const liquidacionBlock = source.match(
-      /if \(screen === "liquidacionSemana" && selectedWeekId\) \{[\s\S]*?if \(screen === "PantallaTurnos"\)/
-    )?.[0] || "";
+    const liquidacionBlock = liquidacionSemanaSource;
 
     expect(liquidacionBlock).toContain("const turnosConNotas = getTurnosNotasSemana(turnosSemana);");
     expect(liquidacionBlock).toContain("*NOTAS DE LA SEMANA:*");
@@ -110,7 +109,7 @@ describe("Liquidación Semanal screen and typography", () => {
     expect(liquidacionBlock).toContain("getEntryTypeMeta(entry.type)");
     expect(liquidacionBlock).toContain('gridTemplateColumns: "auto auto minmax(0, 1fr)", alignItems: "baseline"');
     expect(liquidacionBlock).toContain('{meta.label}</span>');
-    expect(source).toMatch(/const NOTE_TIME_STYLE = \{[\s\S]*?fontSize: 12,[\s\S]*?color: "rgba\(255,255,255,0\.45\)",[\s\S]*?fontWeight: 700,[\s\S]*?whiteSpace: "nowrap",[\s\S]*?flexShrink: 0,[\s\S]*?alignSelf: "baseline",[\s\S]*?\} as const;/);
+    expect(liquidacionSemanaSource).toMatch(/const NOTE_TIME_STYLE = \{[\s\S]*?fontSize: 12,[\s\S]*?color: "rgba\(255,255,255,0\.45\)",[\s\S]*?fontWeight: 700,[\s\S]*?whiteSpace: "nowrap",[\s\S]*?flexShrink: 0,[\s\S]*?alignSelf: "baseline",[\s\S]*?\} as const;/);
     expect(liquidacionBlock).toMatch(/notasGenerales\.map[\s\S]*?<span style=\{NOTE_TIME_STYLE\}>\{entry\.time\}<\/span>/);
     expect(liquidacionBlock).toMatch(/notasDetalladas\.map[\s\S]*?<span style=\{NOTE_TIME_STYLE\}>\{entry\.time\}<\/span>/);
     expect(liquidacionBlock).not.toMatch(/ticket-nota-general[\s\S]*?background: "rgba\(150,130,255,0\.10\)"/);
@@ -130,9 +129,7 @@ describe("Liquidación Semanal screen and typography", () => {
   });
 
   it("keeps the liquidation ticket and actions scrollable on short desktop viewports", () => {
-    const liquidacionBlock = source.match(
-      /if \(screen === "liquidacionSemana" && selectedWeekId\) \{[\s\S]*?if \(screen === "PantallaTurnos"\)/
-    )?.[0] || "";
+    const liquidacionBlock = liquidacionSemanaSource;
 
     expect(liquidacionBlock).toMatch(
       /padding: "16px 20px 32px"[\s\S]*?minHeight: 0[\s\S]*?overflowY: "auto"/
@@ -146,9 +143,7 @@ describe("Liquidación Semanal screen and typography", () => {
   });
 
   it("valida los tamaños, grosores y envoltura de notas del ticket de impresora térmica", () => {
-    const liquidacionBlock = source.match(
-      /if \(screen === "liquidacionSemana" && selectedWeekId\) \{[\s\S]*?if \(screen === "PantallaTurnos"\)/
-    )?.[0] || "";
+    const liquidacionBlock = liquidacionSemanaSource;
 
     expect(liquidacionBlock).toContain('id="ticket-impresora"');
     expect(liquidacionBlock).toContain("fontSize: 16");

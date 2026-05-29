@@ -1,8 +1,1340 @@
+## 2026-05-29 16:45 - Cablear useFirestoreSync y eliminar Firebase inline de main.tsx
+
+**Archivos modificados:** src/main.tsx, .gitignore
+
+### Cambio 1 - Invocar el hook useFirestoreSync
+
+#### Código anterior
+```tsx
+  const [dataLoaded, setDataLoaded] = useState(false);
+  const [loadTimedOut, setLoadTimedOut] = useState(false);
+  const lastCurrentRef = useRef<CurrentState | null>(null);
+  const lastSettingsRef = useRef<AppSettings | null>(null);
+  const lastHistoryRef = useRef<Turno[]>([]);
+  const lastReservationsRef = useRef<Reserva[]>([]);
+  const lastNotesRef = useRef<NotaCalendario[]>([]);
+  const lastWeekOverridesRef = useRef<WeekOverride[]>([]);
+```
+
+#### Código nuevo
+```tsx
+  const { dataLoaded, loadTimedOut } = useFirestoreSync({
+    current, setCurrent,
+    settings, setSettings,
+    history, setHistory,
+    reservations, setReservations,
+    notes, setNotes,
+    weekOverrides, setWeekOverrides,
+    setIsAdmin,
+  });
+```
+
+#### Por qué se cambió
+El hook `useFirestoreSync` estaba importado pero nunca se invocaba (código muerto), y los estados `dataLoaded`/`loadTimedOut` y los 6 refs `lastXRef` seguían declarados en `main.tsx`. Ahora esos estados y refs viven dentro del hook; el componente solo consume su valor de retorno.
+
+### Cambio 2 - Eliminar la función de migración duplicada en main.tsx
+
+#### Código anterior
+```tsx
+const LOCAL_MIGRATION_KEY = "taxi_migration_done_v2";
+
+const LOAD_TIMEOUT_MS = 15000;
+
+async function migrarLocalStorageAFirestore(uid: string): Promise<void> {
+  // ... (sube localStorage a Firestore, batch writes y limpieza de claves)
+}
+```
+
+#### Código nuevo
+```tsx
+// Eliminado: la migración localStorage → Firestore vive ahora en
+// src/hooks/use-firestore-sync.ts.
+```
+
+#### Por qué se cambió
+`migrarLocalStorageAFirestore`, `LOCAL_MIGRATION_KEY` y `LOAD_TIMEOUT_MS` estaban duplicados literalmente en `main.tsx` y en el hook. Se elimina la copia de `main.tsx` para tener una única fuente de verdad.
+
+### Cambio 3 - Eliminar los useEffect de Firestore de main.tsx
+
+#### Código anterior
+```tsx
+  useEffect(() => {
+    if (!dataLoaded || !auth.currentUser) return;
+    // ... saveUserDoc / syncSubcollection para current, settings, turnos,
+    //     reservations, notes, weekOverrides
+  }, [/* deps */]);
+
+  useEffect(() => {
+    // ... inicialización con onSnapshot de las 6 colecciones + marcar dataLoaded
+  }, []);
+
+  useEffect(() => {
+    // ... timeout de carga (setLoadTimedOut)
+  }, [dataLoaded]);
+
+  useEffect(() => {
+    // ... getDoc(admins/{uid}) → setIsAdmin
+  }, []);
+```
+
+#### Código nuevo
+```tsx
+// Eliminados: toda la lógica de escritura reactiva, suscripción onSnapshot,
+// timeout de carga y detección de admin se movió a useFirestoreSync.
+// El useEffect del Service Worker permanece en main.tsx por no ser de Firebase.
+```
+
+#### Por qué se cambió
+Eran exactamente los mismos efectos que ya contiene el hook. Mantenerlos en `main.tsx` los ejecutaba por duplicado y contradecía la extracción.
+
+### Cambio 4 - Reducir los imports de Firestore en main.tsx
+
+#### Código anterior
+```tsx
+import {
+  onSnapshot,
+  doc,
+  getDoc,
+  setDoc,
+  writeBatch,
+} from "firebase/firestore";
+import { auth, db } from "./services/firebase";
+```
+
+#### Código nuevo
+```tsx
+import { auth } from "./services/firebase";
+```
+
+#### Por qué se cambió
+Tras mover la lógica al hook, `onSnapshot`, `doc`, `getDoc`, `setDoc`, `writeBatch` y `db` quedaron sin uso en `main.tsx`.
+
+### Cambio 5 - Pasar renderReservaDialog a CalendarScreen
+
+#### Código anterior
+```tsx
+        notes={notes}
+        setNotes={setNotes}
+        
+        setShowReservaDialog={setShowReservaDialog}
+```
+
+#### Código nuevo
+```tsx
+        notes={notes}
+        setNotes={setNotes}
+        renderReservaDialog={renderReservaDialog}
+        setShowReservaDialog={setShowReservaDialog}
+```
+
+#### Por qué se cambió
+`CalendarScreenProps` exige `renderReservaDialog` y no se estaba pasando, lo que rompía `tsc --noEmit` (error TS2741). La función ya existía en `main.tsx`.
+
+### Cambio 6 - Ignorar artefactos de trabajo del agente
+
+#### Código anterior
+```
+No existía la sección de artefactos del agente en .gitignore.
+```
+
+#### Código nuevo
+```
+# Artefactos de trabajo del agente
+scratch/
+test_failures.txt
+scratch_verify_results.txt
+```
+
+#### Por qué se cambió
+`test_failures.txt`, `scratch_verify_results.txt` y `scratch/` son residuos de depuración que no deben acabar en el repositorio.
+
+## 2026-05-29 17:41 - Extraer pantallas de contabilidad y sincronizacion
+
+**Archivos modificados:** src/main.tsx, src/hooks/use-firestore-sync.ts, src/screens/contabilidad-screen.tsx, src/screens/detalle-anual-screen.tsx, src/screens/detalle-mes-screen.tsx, src/screens/detalle-semana-screen.tsx, src/screens/liquidacion-semana-screen.tsx, ESTRUCTURA.md, src/__tests__/responsive-title-fonts.test.ts
+
+### Cambio 1 - Extraer logica de sincronizacion Firestore
+
+#### Codigo anterior
+```tsx
+// Lógica inline gigante en main.tsx dentro de App()
+useEffect(() => {
+  if (!user) return;
+  const unsubs = [];
+  unsubs.push(onSnapshot(...));
+  // ... (cientos de lineas)
+});
+```
+
+#### Codigo nuevo
+```tsx
+// En main.tsx
+import { useFirestoreSync } from "./hooks/use-firestore-sync";
+
+  useFirestoreSync({
+    current, setCurrent,
+    settings, setSettings,
+    history, setHistory,
+    reservations, setReservations,
+    notes, setNotes,
+    weekOverrides, setWeekOverrides,
+    setIsAdmin
+  });
+```
+
+#### Por que se cambio
+Aislar la complejidad de Firebase en un hook custom, limpiando main.tsx y reduciendo el acoplamiento.
+
+### Cambio 2 - Extraer pantallas de contabilidad
+
+#### Codigo anterior
+```tsx
+// Múltiples bloques if (screen === ...) gigantes en main.tsx renderizando contabilidad inline
+```
+
+#### Codigo nuevo
+```tsx
+// Archivos nuevos creados en src/screens/
+<ContabilidadScreen history={history} settings={settings} current={current} weekOverrides={weekOverrides} ... />
+<DetalleSemanaScreen history={history} settings={settings} weekOverrides={weekOverrides} selectedWeekId={selectedWeekId} ... />
+<LiquidacionSemanaScreen ... />
+// y otros para Mes y Anual
+```
+
+#### Por que se cambio
+Reducir el tamaño de main.tsx y encapsular la lógica de visualización de contabilidad en pantallas independientes.
+
+### Cambio 3 - Documentar hooks en ESTRUCTURA.md
+
+#### Codigo anterior
+```md
+| `src/logic/` | Lógica de negocio y utilidades **puras**... |
+| `src/services/` | Todo lo que habla con el exterior... |
+```
+
+#### Codigo nuevo
+```md
+| `src/logic/` | Lógica de negocio y utilidades **puras**... |
+| `src/hooks/` | Custom Hooks de React. Todo código que use estados... |
+| `src/services/` | Todo lo que habla con el exterior... |
+```
+
+#### Por que se cambio
+Para mantener la guía de arquitectura actualizada con la nueva carpeta introducida.
+
 # Cambios del Agente
 
 Este archivo registra cambios de código hechos por agentes/modelos en este proyecto.
 
 Cada entrada debe indicar archivos modificados, código anterior, código nuevo y por qué se cambió. Las entradas se añaden al **principio** del archivo (las más recientes arriba).
+
+## 2026-05-29 15:50 - Extraer sincronización de Firestore a useFirestoreSync
+
+**Archivos modificados:** `src/main.tsx`, `src/hooks/use-firestore-sync.ts`
+
+### Cambio 1 - Creación del hook useFirestoreSync
+
+#### Código anterior
+`No existía el archivo src/hooks/use-firestore-sync.ts.`
+
+#### Código nuevo
+```ts
+// Se creó src/hooks/use-firestore-sync.ts conteniendo la lógica de onSnapshot y persistencia local (ver archivo para detalles completos).
+```
+
+#### Por qué se cambió
+Se extrae la lógica de inicialización y suscripción a Firestore fuera de `main.tsx` para reducir su tamaño y delegar responsabilidades, de acuerdo al plan de refactorización.
+
+### Cambio 2 - Reemplazo en App()
+
+#### Código anterior
+```ts
+Código anterior no verificable: Fragmento demasiado largo de inicialización de estados (dataLoaded, etc.) y múltiples useEffects de sincronización con Firestore.
+```
+
+#### Código nuevo
+```ts
+  const { dataLoaded, loadTimedOut } = useFirestoreSync({
+    current, setCurrent,
+    settings, setSettings,
+    history, setHistory,
+    reservations, setReservations,
+    notes, setNotes,
+    weekOverrides, setWeekOverrides,
+    setIsAdmin,
+  });
+```
+
+#### Por qué se cambió
+Simplifica `App()` delegando las llamadas de base de datos a un custom hook.
+
+## 2026-05-29 15:34 - Mover backup-export de logic a services
+
+**Archivos modificados:** `src/main.tsx`, `src/screens/settings-screen.tsx`, `src/services/backup-export.ts`, `src/__tests__/backup-export-extraction.test.ts`, `src/__tests__/src-reorganization.test.ts`
+
+### Cambio 1 - Mover backup-export.ts a services
+
+#### Código anterior
+```tsx
+// Ubicado en src/logic/backup-export.ts
+import { Directory, Encoding, Filesystem } from "@capacitor/filesystem";
+import { Share } from "@capacitor/share";
+import type { buildBackupPayload } from "./backup";
+```
+
+#### Código nuevo
+```tsx
+// Ubicado en src/services/backup-export.ts
+import { Directory, Encoding, Filesystem } from "@capacitor/filesystem";
+import { Share } from "@capacitor/share";
+import type { buildBackupPayload } from "../logic/backup";
+```
+
+#### Por qué se cambió
+La carpeta `logic/` está destinada a funciones puras. Como la exportación interactúa directamente con plugins de Capacitor (efectos secundarios del dispositivo), el archivo debe pertenecer a `services/`.
+
+### Cambio 2 - Actualizar rutas de importación en main y settings
+
+#### Código anterior
+```tsx
+// En main.tsx
+import { exportBackupJSON } from "./logic/backup-export"; 
+
+// En settings-screen.tsx
+import { exportBackupJSON } from "../logic/backup-export";
+```
+
+#### Código nuevo
+```tsx
+// En main.tsx
+import { exportBackupJSON } from "./services/backup-export"; 
+
+// En settings-screen.tsx
+import { exportBackupJSON } from "../services/backup-export";
+```
+
+#### Por qué se cambió
+Adaptar los archivos importadores al nuevo destino del servicio de backup en la arquitectura.
+
+## 2026-05-29 15:30 - Eliminar IconNoteAdd duplicado en main y consolidar en components
+
+**Archivos modificados:** `src/main.tsx`, `src/components/summary-icons.tsx`, `src/__tests__/detailed-notes-layout.test.ts`, `src/__tests__/main-note-button.test.ts`
+
+### Cambio 1 - Eliminar componente inline en main.tsx
+
+#### Código anterior
+```tsx
+const IconNoteAdd = ({ s = 20, c = C, showPlus = true }: { s?: number; c?: string; showPlus?: boolean }) => (
+  <svg width={s} height={s} viewBox="0 0 24 24" fill="none" style={{ overflow: "visible" }}>
+    {/* ... (rutas del icono) */}
+    {!showPlus && (
+      <path
+        stroke={c}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        d="M15.25 2.75V7.25H19.75"
+        strokeWidth="1.7"
+        opacity="0.9"
+      />
+    )}
+  </svg>
+);
+```
+
+#### Código nuevo
+```tsx
+import { IconNoteAdd } from "./components/summary-icons";
+```
+
+#### Por qué se cambió
+Eliminar la definición duplicada de `IconNoteAdd` y utilizar el import existente en `src/components/summary-icons.tsx` para reducir el tamaño de `main.tsx` y mantener una única fuente de verdad para el icono.
+
+### Cambio 2 - Completar IconNoteAdd en summary-icons
+
+#### Código anterior
+```tsx
+    <path stroke={c} strokeLinecap="round" strokeLinejoin="round" d={showPlus ? "M7.5 20.25H2.25c-0.39782 0 -0.77936 -0.158 -1.06066 -0.4393C0.908035 19.5294 0.75 19.1478 0.75 18.75V2.25c0 -0.39782 0.158035 -0.77936 0.43934 -1.06066C1.47064 0.908035 1.85218 0.75 2.25 0.75h10.629c0.3975 0.000085 0.7788 0.157982 1.06 0.439l2.872 2.872c0.281 0.2812 0.4389 0.66245 0.439 1.06V7.5" : "M5 21.25H19c0.4142 0 0.75 -0.3358 0.75 -0.75V7.25L15.25 2.75H5c-0.4142 0 -0.75 0.3358 -0.75 0.75v17c0 0.4142 0.3358 0.75 0.75 0.75Z"} strokeWidth="1.7" style={{ filter: `drop-shadow(0 0 1px ${c})` }} />
+  </svg>
+);
+```
+
+#### Código nuevo
+```tsx
+    <path stroke={c} strokeLinecap="round" strokeLinejoin="round" d={showPlus ? "M7.5 20.25H2.25c-0.39782 0 -0.77936 -0.158 -1.06066 -0.4393C0.908035 19.5294 0.75 19.1478 0.75 18.75V2.25c0 -0.39782 0.158035 -0.77936 0.43934 -1.06066C1.47064 0.908035 1.85218 0.75 2.25 0.75h10.629c0.3975 0.000085 0.7788 0.157982 1.06 0.439l2.872 2.872c0.281 0.2812 0.4389 0.66245 0.439 1.06V7.5" : "M5 21.25H19c0.4142 0 0.75 -0.3358 0.75 -0.75V7.25L15.25 2.75H5c-0.4142 0 -0.75 0.3358 -0.75 0.75v17c0 0.4142 0.3358 0.75 0.75 0.75Z"} strokeWidth="1.7" style={{ filter: `drop-shadow(0 0 1px ${c})` }} />
+    {!showPlus && (
+      <path stroke={c} strokeLinecap="round" strokeLinejoin="round" d="M15.25 2.75V7.25H19.75" strokeWidth="1.7" opacity="0.9" />
+    )}
+  </svg>
+);
+```
+
+#### Por qué se cambió
+La versión duplicada en `main.tsx` contenía un trazo extra para el caso `!showPlus` (el clip superior del portapapeles) que faltaba en el componente compartido original. Se consolidan ambos para mantener la fidelidad visual completa.
+
+### Cambio 3 - Actualizar tests de layouts y de botón
+
+#### Código anterior
+```tsx
+    const iconNoteAddBlock = source.match(/const IconNoteAdd = \([\s\S]*?\n\);/)?.[0];
+// ...
+    expect(source).toContain("const IconNoteAdd =");
+```
+
+#### Código nuevo
+```tsx
+    const iconNoteAddBlock = summaryIconsSource.match(/(?:export )?const IconNoteAdd = \([\s\S]*?\n\);/)?.[0];
+// ...
+    expect(summaryIconsSource).toContain("export const IconNoteAdd =");
+```
+
+#### Por qué se cambió
+Los tests de caracterización estaban acoplados a la definición inline en `main.tsx`. Se actualizan para buscar en el origen compartido `summary-icons.tsx`.
+
+## 2026-05-29 15:28 - Extraer entry-type-meta y remover diccionario duplicado en main
+
+**Archivos modificados:** `src/main.tsx`, `src/__tests__/detailed-notes-layout.test.ts`
+
+### Cambio 1 - Importar centralizado en main.tsx
+
+#### Código anterior
+```tsx
+type EntryTypeMeta = {
+  color: string;
+  label: string;
+  icon: (size?: number) => React.ReactNode;
+};
+
+function getEntryTypeMeta(type: string): EntryTypeMeta {
+  return ENTRY_TYPE_META[type] || ENTRY_TYPE_META.nulo;
+}
+
+const ENTRY_TYPE_META: Record<string, EntryTypeMeta> = {
+  propina: { color: G, label: "Propina", icon: (s = 17) => <IconCoin s={s} c={G} /> },
+  datafono: { color: P, label: "Datáfono", icon: (s = 17) => <IconCard s={s} c={P} /> },
+  agencia_bono: { color: A, label: "Agencia/Bono", icon: (s = 17) => <IconAgency s={s} c={A} /> },
+  extra: { color: E, label: "Extra", icon: (s = 17) => <IconExtra s={s} c={E} /> },
+  gasolina: { color: F, label: "Gasolina", icon: (s = 17) => <IconFuel s={s} c={F} /> },
+  nulo: { color: N, label: "Nulo", icon: (s = 17) => <IconNulo s={s} c={N} /> },
+  nota: { color: "white", label: "Nota", icon: (s = 17) => <IconNoteAdd s={s} showPlus={false} /> },
+};
+```
+
+#### Código nuevo
+```tsx
+import { getEntryTypeMeta, ENTRY_TYPE_META, type EntryTypeMeta } from "./shared/entry-type-meta";
+```
+
+#### Por qué se cambió
+Se elimina la duplicación local redundante de los tipos de entrada y funciones asociadas, importándolas de forma centralizada desde `shared/entry-type-meta.tsx` para mantener una única fuente de verdad.
+
+### Cambio 2 - Ajustar test de extracción a shared
+
+#### Código anterior
+```tsx
+  it("centralizes entry metadata with labels, colors and icons", () => {
+    expect(source).toMatch(/type EntryTypeMeta = \{[\s\S]*?color: string;[\s\S]*?label: string;[\s\S]*?icon: \(size\?: number\) => React\.ReactNode;[\s\S]*?\};/);
+    expect(source).toMatch(/const ENTRY_TYPE_META: Record<string, EntryTypeMeta> = \{/);
+```
+
+#### Código nuevo
+```tsx
+  it("centralizes entry metadata with labels, colors and icons", () => {
+    expect(entryTypeMetaSource).toMatch(/(?:type|export interface) EntryTypeMeta\s*=?\s*\{[\s\S]*?color: string;[\s\S]*?label: string;[\s\S]*?icon: \(size\?: number\) => React\.ReactNode;[\s\S]*?\}/);
+    expect(entryTypeMetaSource).toMatch(/const ENTRY_TYPE_META: Record<string, EntryTypeMeta> = \{/);
+```
+
+#### Por qué se cambió
+El test de layout/extracción buscaba explícitamente en el `source` de `main.tsx`. Se actualiza para validar el origen compartido y la sintaxis `interface` usada allí.
+
+## 2026-05-28 15:40 - Corregir consistencia de tarjetas y diccionario de tipos
+
+**Archivos modificados:** `src/screens/detalle-mes-screen.tsx`, `src/screens/pantalla-turnos.tsx`, `src/main.tsx`
+
+### Cambio 1 - Importar getEntryTypeMeta y remover diccionario duplicado en DetalleMesScreen
+
+#### Código anterior
+```tsx
+interface EntryTypeMeta {
+  color: string;
+  label: string;
+  icon: (size?: number) => React.ReactNode;
+}
+
+function getEntryTypeMeta(type: string): EntryTypeMeta {
+  return ENTRY_TYPE_META[type] || ENTRY_TYPE_META.nulo;
+}
+
+const ENTRY_TYPE_META: Record<string, EntryTypeMeta> = {
+  datafono: { color: P, label: "Datáfono", icon: (s) => <IconCard s={s} c={P} /> },
+  impuesto: { color: F, label: "Impuesto", icon: (s) => <IconFuel s={s} c={F} /> },
+  agencia: { color: A, label: "Agencia", icon: (s) => <IconAgency s={s} c={A} /> },
+  bonus: { color: A, label: "Bono", icon: (s) => <IconAgency s={s} c={A} /> },
+  extra: { color: E, label: "Extra", icon: (s) => <IconExtra s={s} c={E} /> },
+  gasolina: { color: F, label: "Gasolina", icon: (s) => <IconFuel s={s} c={F} /> },
+  nulo: { color: N, label: "Nulo", icon: (s) => <IconNulo s={s} c={N} /> },
+  明细笔记: { color: G, label: "Propina", icon: (s) => <IconCoin s={s} c={G} /> },
+};
+```
+
+#### Código nuevo
+```tsx
+import { getEntryTypeMeta } from "../shared/entry-type-meta";
+```
+
+#### Por qué se cambió
+El diccionario local contenía la clave en chino `明细笔记` en vez de `propina`, rompiendo la visualización de notas asociadas a propinas. Centralizar en la función compartida evita este error y simplifica la pantalla.
+
+### Cambio 2 - Eliminar renderTurnoCardLocal en PantallaTurnos y usar renderTurnoCard global
+
+#### Código anterior
+```tsx
+  function renderTurnoCardLocal(turno: Turno) {
+    let durationStr = fmtDuration(0);
+    if (turno.startTime && turno.endTime) {
+      let totalMins = getDiffMins(turno.startTime, turno.endTime);
+      if (turno.totalPausedMinutes) {
+        totalMins = Math.max(0, totalMins - turno.totalPausedMinutes);
+      }
+      durationStr = fmtDuration(totalMins);
+    }
+    const taximetroTurno = (turno.dinero || 0) - (turno.totalN || 0);
+    const miGanancia = calcularTurnoContable(turno, settings).miGanancia;
+    const entregado = turno.entregada || false;
+
+    return (
+      <div key={turno.id} style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
+        {isSelectingTurnos && (
+          <input
+            type="checkbox"
+            checked={selectedTurnosIds.includes(turno.id)}
+            onChange={(e) => {
+              if (e.target.checked) {
+                setSelectedTurnosIds([...selectedTurnosIds, turno.id]);
+              } else {
+                setSelectedTurnosIds(selectedTurnosIds.filter(id => id !== turno.id));
+              }
+            }}
+            style={{ width: 20, height: 20, accentColor: "#50dc8c", cursor: "pointer" }}
+          />
+        )}
+        <div
+          onClick={() => {
+            if (isSelectingTurnos) {
+              if (selectedTurnosIds.includes(turno.id)) {
+                setSelectedTurnosIds(selectedTurnosIds.filter(id => id !== turno.id));
+              } else {
+                setSelectedTurnosIds([...selectedTurnosIds, turno.id]);
+              }
+            } else {
+              setReturnScreen("PantallaTurnos");
+              setViewTurno(turno);
+              setScreen("summary");
+            }
+          }}
+          style={{
+            flex: 1,
+            background: "rgba(255,255,255,0.05)",
+            borderRadius: 16,
+            padding: 16,
+            cursor: "pointer",
+            border: "1px solid rgba(255,255,255,0.1)",
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center"
+          }}
+        >
+          <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+            <div style={{ fontWeight: 700, color: "white", fontSize: 16 }}>{fmtDate(turno.startDate || turno.date)}</div>
+            <div style={{ fontSize: 13, color: "rgba(255,255,255,0.4)" }}>
+              {turno.startDate && turno.startDate !== turno.date
+                ? (() => {
+                  const startStr = new Date(turno.startDate + "T12:00:00").toLocaleDateString("es-ES");
+                  const endStr = new Date(turno.date + "T12:00:00").toLocaleDateString("es-ES");
+                  return `${startStr} ${turno.startTime} - ${endStr} ${turno.endTime}`;
+                })()
+                : `${turno.startTime} - ${turno.endTime}`}
+            </div>
+            <div style={{ fontSize: 13, color: "rgba(255,255,255,0.4)" }}>
+              {turno.entries.length} {turno.entries.length === 1 ? "entrada" : "entradas"}
+            </div>
+          </div>
+          <div style={{ display: "flex", gap: 10, textAlign: "right" }}>
+            <div style={{ display: "flex", flexDirection: "column", gap: 8, justifyContent: "center" }}>
+              <div style={{ fontSize: 17, fontWeight: 900, color: "oklch(0.78 0.18 150)", display: "flex", alignItems: "center", gap: 6, whiteSpace: "nowrap" }}>
+                <IconTaxiBadgeNeon s={20} c="oklch(0.85 0.18 85)" /> {fmt(taximetroTurno)}
+              </div>
+              <div style={{ fontSize: 17, fontWeight: 900, color: "oklch(0.80 0.14 220)", display: "flex", alignItems: "center", gap: 6, whiteSpace: "nowrap" }}>
+                <IconRoad s={18} c="oklch(0.80 0.14 220)" /> {fmtKm(turno.km || 0)}
+              </div>
+            </div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 8, alignItems: "flex-end", justifyContent: "center" }}>
+              <div style={{ fontSize: 17, fontWeight: 900, color: "oklch(0.78 0.18 150)", display: "flex", alignItems: "center", gap: 6, whiteSpace: "nowrap" }}>
+                <IconMoneyBag s={20} c="oklch(0.78 0.18 150)" /> {fmt(miGanancia)}
+              </div>
+              <div style={{ fontSize: 17, fontWeight: 900, color: "oklch(0.85 0.12 210)", display: "flex", alignItems: "center", gap: 6, whiteSpace: "nowrap" }}>
+                <IconTimer s={18} c="oklch(0.85 0.12 210)" /> {durationStr}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+```
+
+#### Código nuevo
+```tsx
+`No existía renderTurnoCardLocal en pantalla-turnos.tsx`
+```
+
+#### Por qué se cambió
+Se elimina la duplicación local redundante de la tarjeta de turnos en favor de usar el renderizador global renderTurnoCard recibido a través de props, garantizando consistencia visual y de comportamiento.
+
+### Cambio 3 - Pasar renderTurnoCard a PantallaTurnos en main.tsx
+
+#### Código anterior
+```tsx
+  if (screen === "PantallaTurnos") {
+    return (
+      <PantallaTurnos
+        history={history}
+        settings={settings}
+        isSelectingTurnos={isSelectingTurnos}
+        setIsSelectingTurnos={setIsSelectingTurnos}
+        selectedTurnosIds={selectedTurnosIds}
+        setSelectedTurnosIds={setSelectedTurnosIds}
+        setScreen={setScreen}
+        setViewTurno={setViewTurno}
+        setReturnScreen={setReturnScreen}
+        onExportSelectedTurnosJSON={exportSelectedTurnosJSON}
+      />
+    );
+  }
+```
+
+#### Código nuevo
+```tsx
+  if (screen === "PantallaTurnos") {
+    return (
+      <PantallaTurnos
+        history={history}
+        settings={settings}
+        isSelectingTurnos={isSelectingTurnos}
+        setIsSelectingTurnos={setIsSelectingTurnos}
+        selectedTurnosIds={selectedTurnosIds}
+        setSelectedTurnosIds={setSelectedTurnosIds}
+        setScreen={setScreen}
+        setViewTurno={setViewTurno}
+        setReturnScreen={setReturnScreen}
+        onExportSelectedTurnosJSON={exportSelectedTurnosJSON}
+        renderTurnoCard={renderTurnoCard}
+      />
+    );
+  }
+```
+
+#### Por qué se cambió
+Permite que la pantalla de turnos anteriores renderice las tarjetas mediante el componente global reutilizable, manteniendo la coherencia de estilos y bordes de estado.
+
+
+## 2026-05-28 15:30 - Corregir tarjeta y navegación de detalle de semana
+
+**Archivos modificados:** `src/main.tsx`, `src/screens/detalle-semana-screen.tsx`
+
+### Cambio 1 - Props de DetalleSemanaScreen actualizadas
+
+#### Código anterior
+```tsx
+type Props = {
+  history: Turno[];
+  settings: AppSettings;
+  weekOverrides: WeekOverride[];
+  selectedWeekId: string;
+  setSelectedWeekId: (id: string | null) => void;
+  setScreen: (screen: string) => void;
+  updateWeekOverride: (weekId: string, partial: Partial<Omit<WeekOverride, "weekId">>) => void;
+};
+
+export function DetalleSemanaScreen({
+  history,
+  settings,
+  weekOverrides,
+  selectedWeekId,
+  setSelectedWeekId,
+  setScreen,
+  updateWeekOverride,
+}: Props) {
+```
+
+#### Código nuevo
+```tsx
+type Props = {
+  history: Turno[];
+  settings: AppSettings;
+  weekOverrides: WeekOverride[];
+  selectedWeekId: string;
+  setSelectedWeekId: (id: string | null) => void;
+  setScreen: (screen: string) => void;
+  updateWeekOverride: (weekId: string, partial: Partial<Omit<WeekOverride, "weekId">>) => void;
+  setReturnScreen: (screen: string | null) => void;
+  setViewTurno: (turno: Turno | null) => void;
+  renderTurnoCard: (
+    turno: Turno,
+    options: {
+      onClick: () => void;
+      showEntriesCount?: boolean;
+      showStatus?: boolean;
+      isSelecting?: boolean;
+      isSelected?: boolean;
+      onToggleSelect?: (checked: boolean) => void;
+    }
+  ) => React.ReactNode;
+};
+
+export function DetalleSemanaScreen({
+  history,
+  settings,
+  weekOverrides,
+  selectedWeekId,
+  setSelectedWeekId,
+  setScreen,
+  updateWeekOverride,
+  setReturnScreen,
+  setViewTurno,
+  renderTurnoCard,
+}: Props) {
+```
+
+#### Por qué se cambió
+Para corregir el bug de navegación y restaurar la tarjeta de turnos con los iconos del diseño original, es necesario pasar renderTurnoCard, setReturnScreen y setViewTurno como props a DetalleSemanaScreen.
+
+### Cambio 2 - Renderizador de turno local eliminado en DetalleSemanaScreen
+
+#### Código anterior
+```tsx
+  function renderTurnoCard(
+    turno: Turno,
+    options: {
+      onClick: () => void;
+      showEntriesCount?: boolean;
+      showStatus?: boolean;
+    }
+  ) {
+    let durStr = fmtDuration(0);
+    if (turno.startTime && turno.endTime) {
+      let totalM = getDiffMins(turno.startTime, turno.endTime);
+      if (turno.totalPausedMinutes) {
+        totalM = Math.max(0, totalM - turno.totalPausedMinutes);
+      }
+      durStr = fmtDuration(totalM);
+    }
+    const taximetroTurno = (turno.dinero || 0) - (turno.totalN || 0);
+    const miGan = calcularTurnoContable(turno, settings).miGanancia;
+    const totalEnt = calcularTurnoContable(turno, settings).totalDescontar;
+    const totalDar = calcularTurnoContable(turno, settings).totalADar;
+    const entregado = turno.entregada || false;
+
+    return (
+      <div key={turno.id} style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
+        <div
+          onClick={options.onClick}
+          style={{
+            flex: 1,
+            background: "rgba(255,255,255,0.05)",
+            borderRadius: 16,
+            padding: 16,
+            cursor: "pointer",
+            border: options.showStatus && entregado
+              ? "1px solid rgba(59, 130, 246, 0.5)"
+              : "1px solid rgba(255,255,255,0.1)",
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center"
+          }}
+        >
+          <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+            <div style={{ fontWeight: 700, color: "white", fontSize: 16 }}>{fmtDate(turno.startDate || turno.date)}</div>
+            <div style={{ fontSize: 13, color: "rgba(255,255,255,0.4)" }}>
+              {turno.startDate && turno.startDate !== turno.date
+                ? (() => {
+                  const startStr = new Date(turno.startDate + "T12:00:00").toLocaleDateString("es-ES");
+                  const endStr = new Date(turno.date + "T12:00:00").toLocaleDateString("es-ES");
+                  return `${startStr} ${turno.startTime} - ${endStr} ${turno.endTime}`;
+                })()
+                : `${turno.startTime} - ${turno.endTime}`}
+            </div>
+            <div style={{ display: "flex", gap: 8, marginTop: 2 }}>
+              <span style={{ fontSize: 11, color: "oklch(0.85 0.18 85)", fontWeight: 700 }}>
+                {fmt(taximetroTurno)}
+              </span>
+              <span style={{ fontSize: 11, color: "oklch(0.80 0.14 220)", fontWeight: 700 }}>
+                {fmtKmNumber(turno.km || 0)} KM
+              </span>
+              <span style={{ fontSize: 11, color: "oklch(0.78 0.18 150)", fontWeight: 700 }}>
+                {fmt(miGan)}
+              </span>
+              <span style={{ fontSize: 11, color: "oklch(0.85 0.12 210)", fontWeight: 700 }}>
+                {durStr}
+              </span>
+            </div>
+          </div>
+          <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 4 }}>
+            {entregado && (
+              <div style={{ fontSize: 10, fontWeight: 700, color: "oklch(0.78 0.18 145)", background: "rgba(80,220,140,0.12)", padding: "2px 8px", borderRadius: 6 }}>
+                ENTREGADA
+              </div>
+            )}
+            {options.showEntriesCount && (
+              <div style={{ fontSize: 12, color: "rgba(255,255,255,0.4)", fontWeight: 600 }}>
+                {(turno.entries || []).length} movimientos
+              </div>
+            )}
+            <div style={{ fontSize: 11, color: "oklch(0.70 0.18 25)", fontWeight: 700 }}>
+              -{fmt(totalEnt)}
+            </div>
+            <div style={{ fontSize: 11, color: "oklch(0.68 0.20 145)", fontWeight: 700 }}>
+              {fmt(totalDar)}
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+```
+
+#### Código nuevo
+`El bloque renderTurnoCard fue eliminado de src/screens/detalle-semana-screen.tsx.`
+
+#### Por qué se cambió
+Se elimina la función duplicada local que causaba divergencia de diseño y no propagaba correctamente el estado de turno seleccionado a la pantalla de resumen.
+
+### Cambio 3 - Invocación del renderizador de turnos restaurada
+
+#### Código anterior
+```tsx
+            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              {[...turnosSemana].sort((a, b) => (getTurnoFechaEfectiva(a, settings.diaLibre) < getTurnoFechaEfectiva(b, settings.diaLibre) ? 1 : -1)).map((t) => (
+                renderTurnoCard(t, {
+                  onClick: () => setScreen("summary"),
+                  showEntriesCount: true,
+                })
+              ))}
+            </div>
+```
+
+#### Código nuevo
+```tsx
+            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              {[...turnosSemana].sort((a, b) => (getTurnoFechaEfectiva(a, settings.diaLibre) < getTurnoFechaEfectiva(b, settings.diaLibre) ? 1 : -1)).map((t) => (
+                renderTurnoCard(t, {
+                  onClick: () => {
+                    setReturnScreen("detalleSemana");
+                    setViewTurno(t);
+                    setScreen("summary");
+                  },
+                  showEntriesCount: true,
+                })
+              ))}
+            </div>
+```
+
+#### Por qué se cambió
+Para que el click sobre un turno en el detalle semanal navegue correctamente asignando el turno a visualizar y permitiendo volver a la pantalla de detalle de semana al presionar atrás.
+
+### Cambio 4 - Invocación de DetalleSemanaScreen adaptada en main.tsx
+
+#### Código anterior
+```tsx
+  if (screen === "detalleSemana" && selectedWeekId) {
+    return (
+      <DetalleSemanaScreen
+        history={history}
+        settings={settings}
+        weekOverrides={weekOverrides}
+        selectedWeekId={selectedWeekId}
+        setSelectedWeekId={setSelectedWeekId}
+        setScreen={setScreen}
+        updateWeekOverride={updateWeekOverride}
+      />
+    );
+  }
+```
+
+#### Código nuevo
+```tsx
+  if (screen === "detalleSemana" && selectedWeekId) {
+    return (
+      <DetalleSemanaScreen
+        history={history}
+        settings={settings}
+        weekOverrides={weekOverrides}
+        selectedWeekId={selectedWeekId}
+        setSelectedWeekId={setSelectedWeekId}
+        setScreen={setScreen}
+        updateWeekOverride={updateWeekOverride}
+        setReturnScreen={setReturnScreen}
+        setViewTurno={setViewTurno}
+        renderTurnoCard={renderTurnoCard}
+      />
+    );
+  }
+```
+
+#### Por qué se cambió
+Se pasan las props setReturnScreen, setViewTurno y renderTurnoCard para corregir la navegación y la visualización de tarjetas.
+
+## 2026-05-28 14:57 - Reorganizar main.tsx extrayendo 5 bloques inline restantes
+
+**Archivos modificados:** `src/main.tsx`, `src/screens/contabilidad-screen.tsx`, `src/screens/detalle-semana-screen.tsx`, `src/screens/detalle-mes-screen.tsx`, `src/screens/detalle-anual-screen.tsx`, `src/screens/liquidacion-semana-screen.tsx`, `src/__tests__/liquidacion-semana.test.ts`, `src/__tests__/detailed-notes-layout.test.ts`
+
+### Cambio 1 - ContabilidadScreen extraída
+
+#### Código anterior
+`No existía src/screens/contabilidad-screen.tsx.`
+
+#### Código nuevo
+```tsx
+export interface ContabilidadScreenProps {
+  history: Turno[];
+  settings: AppSettings;
+  // ... todas las props necesarias
+}
+
+export function ContabilidadScreen({ ... }: ContabilidadScreenProps) {
+  // Bloque if (screen === "contabilidad") ~580 líneas
+}
+```
+
+#### Por qué se cambió
+Separación de responsabilidades: el bloque de contabilidad (~580 líneas) se extrae a su propio componente. main.tsx pasa de 3909 a ~2770 líneas. La pantalla usa módulos compartidos (week-logic, accounting, formatters, entry-icons, summary-icons, calendar-icons, shell).
+
+### Cambio 2 - DetalleSemanaScreen extraída
+
+#### Código anterior
+`No existía src/screens/detalle-semana-screen.tsx.`
+
+#### Código nuevo
+```tsx
+export function DetalleSemanaScreen({
+  history, settings, weekOverrides, selectedWeekId,
+  setSelectedWeekId, setScreen, updateWeekOverride,
+}: Props) {
+  // Bloque if (screen === "detalleSemana" && selectedWeekId)
+}
+```
+
+#### Por qué se cambió
+El bloque de detalle de semana (turnos de una semana, con cálculo de totales, marca de entregada, notas) se extrae como componente independiente. Props: `history: Turno[]` (no `CurrentState`).
+
+### Cambio 3 - DetalleMesScreen extraída
+
+#### Código anterior
+`No existía src/screens/detalle-mes-screen.tsx.`
+
+#### Código nuevo
+```tsx
+export function DetalleMesScreen({
+  history, settings, selectedAccountingYear, selectedAccountingMonth,
+  setSelectedAccountingYear, setSelectedAccountingMonth, setScreen,
+}: Props) {
+  // Bloque if (screen === "detalleMes")
+}
+```
+
+#### Por qué se cambió
+El bloque de detalle mensual (resumen de mes con breakdown por categorías) se extrae. Import corregido: `calcularResumenContableTurnos` viene de `../logic/accounting` (no de `../logic/turnos`).
+
+### Cambio 4 - DetalleAnualScreen extraída
+
+#### Código anterior
+`No existía src/screens/detalle-anual-screen.tsx.`
+
+#### Código nuevo
+```tsx
+export function DetalleAnualScreen({
+  history, settings, selectedAccountingYear, setSelectedAccountingYear,
+  selectedAccountingMonth, setSelectedAccountingMonth, setScreen,
+}: Props) {
+  // Bloque if (screen === "detalleAnual")
+}
+```
+
+#### Por qué se cambió
+El bloque de resumen anual (todos los meses del año con sus totales) se extrae como componente independiente.
+
+### Cambio 5 - Iconos compartidos corregidos en pantallas extraídas
+
+#### Código anterior
+```tsx
+// contabilidad-screen.tsx (incorrecto)
+import { IconTaxiBadgeNeon, IconRoad, IconMoneyBag, IconTimer } from "../components/entry-icons";
+```
+
+```tsx
+// detalle-anual-screen.tsx (incorrecto)
+import { IconTaxiBadgeNeon, IconRoad, IconMoneyBag, IconTimer } from "../components/summary-icons";
+```
+
+```tsx
+// detalle-semana-screen.tsx (incorrecto)
+import { IconTaxiBadgeNeon, IconRoad, IconMoneyBag, IconTimer, IconReceipt, IconGive } from "../components/summary-icons";
+```
+
+#### Código nuevo
+```tsx
+// contabilidad-screen.tsx
+import { IconTaxiBadgeNeon, IconRoad } from "../components/summary-icons";
+import { IconMoneyBag, IconTimer } from "../components/calendar-icons";
+
+// detalle-anual-screen.tsx
+import { IconTaxiBadgeNeon, IconRoad } from "../components/summary-icons";
+import { IconMoneyBag, IconTimer } from "../components/calendar-icons";
+
+// detalle-semana-screen.tsx
+import { IconTaxiBadgeNeon, IconRoad, IconGive } from "../components/summary-icons";
+import { IconMoneyBag, IconTimer } from "../components/calendar-icons";
+import { IconReceipt } from "../components/settings-icons";
+```
+
+#### Por qué se cambió
+Cada icono vive en su módulo correcto: IconMoneyBag e IconTimer están en calendar-icons, IconReceipt en settings-icons, IconTaxiBadgeNeon/IconRoad/IconGive en summary-icons. Las pantallas extraídas tenían los imports incorrectos.
+
+### Cambio 6 - Tipos corregidos en pantallas extraídas
+
+#### Código anterior
+```tsx
+// detalle-semana-screen.tsx
+import type { Turno, WeekOverride, AppSettings, CurrentState } from "../shared/types";
+type Props = { history: CurrentState; ... };
+
+// liquidacion-semana-screen.tsx
+import type { AppSettings, CurrentState, Turno, WeekOverride } from "../shared/types";
+type Props = { history: CurrentState; ... };
+```
+
+#### Código nuevo
+```tsx
+// detalle-semana-screen.tsx
+import type { Turno, WeekOverride, AppSettings } from "../shared/types";
+type Props = { history: Turno[]; ... };
+
+// liquidacion-semana-screen.tsx
+import type { AppSettings, Turno, WeekOverride } from "../shared/types";
+type Props = { history: Turno[]; ... };
+```
+
+#### Por qué se cambió
+`CurrentState` tiene campos `startTime` y `startDate` que `Turno[]` no tiene. El tipo correcto para `history` en estas pantallas es `Turno[]`, no `CurrentState`.
+
+### Cambio 7 - Props corregidas en liquidacionSemanaScreen
+
+#### Código anterior
+```tsx
+type Props = {
+  history: CurrentState;
+  settings: AppSettings;
+  // ...
+};
+
+export function LiquidacionSemanaScreen({
+  history, settings, selectedWeekId, setScreen,
+}: Props) {
+  //faltaban weekOverrides, setSelectedWeekId, updateWeekOverride
+```
+
+#### Código nuevo
+```tsx
+export function LiquidacionSemanaScreen({
+  history, settings, weekOverrides, selectedWeekId,
+  setSelectedWeekId, setScreen, updateWeekOverride,
+}: Props) {
+```
+
+#### Por qué se cambió
+La pantalla de liquidación necesita `weekOverrides`, `setSelectedWeekId` e `updateWeekOverride` que antes no se pasaban correctamente.
+
+## 2026-05-28 14:44 - Extraer bloque liquidacionSemana a componente separado
+
+**Archivos modificados:** `src/main.tsx`, `src/screens/liquidacion-semana-screen.tsx`, `src/__tests__/liquidacion-semana.test.ts`, `src/__tests__/detailed-notes-layout.test.ts`
+
+### Cambio 1 - Extraer bloque liquidacionSemana
+
+#### Código anterior
+```ts
+if (screen === "liquidacionSemana" && selectedWeekId) {
+  const weekId = selectedWeekId;
+  const grupos = groupTurnosByWeek(history, settings.diaLibre);
+  const turnosSemana = grupos.get(weekId) || [];
+  // ... (~580 líneas de código JSX)
+}
+```
+
+#### Código nuevo
+```tsx
+if (screen === "liquidacionSemana" && selectedWeekId) {
+  return (
+    <LiquidacionSemanaScreen
+      history={history}
+      settings={settings}
+      weekOverrides={weekOverrides}
+      selectedWeekId={selectedWeekId}
+      setSelectedWeekId={setSelectedWeekId}
+      setScreen={setScreen}
+      updateWeekOverride={updateWeekOverride}
+    />
+  );
+}
+```
+
+#### Por qué se cambió
+El bloque `liquidacionSemana` de ~600 líneas contenía lógica de presentación que no dependía del estado local de `App`. Extraerlo a su propio componente permite mejor organización del código, reutilización y mantenimiento.
+
+### Cambio 2 - Tests actualizados para buscar en nuevo archivo
+
+#### Código anterior
+```ts
+const mainSource = readFileSync(resolve("src/main.tsx"), "utf8");
+const detalleSemanaSource = readFileSync(resolve("src/screens/detalle-semana-screen.tsx"), "utf8");
+const themeSource = readFileSync(resolve("src/shared/ui-theme.ts"), "utf8");
+```
+
+#### Código nuevo
+```ts
+const mainSource = readFileSync(resolve("src/main.tsx"), "utf8");
+const detalleSemanaSource = readFileSync(resolve("src/screens/detalle-semana-screen.tsx"), "utf8");
+const liquidacionSemanaSource = readFileSync(resolve("src/screens/liquidacion-semana-screen.tsx"), "utf8");
+const themeSource = readFileSync(resolve("src/shared/ui-theme.ts"), "utf8");
+```
+
+#### Por qué se cambió
+Los tests que verificaban el código del bloque `liquidacionSemana` ahora deben buscar en el nuevo archivo `liquidacion-semana-screen.tsx` en lugar de `main.tsx`.
+
+## 2026-05-26 23:48 - Corregir organizacion del recorte
+
+**Archivos modificados:** `src/__tests__/main-antiguo-regressions.test.ts`, `src/main.tsx`, `src/screens/add-entry-screen.tsx`, `src/screens/add-nota-general-screen.tsx`, `src/screens/add-single-entry-screen.tsx`, `src/screens/calendar-screen.tsx`, `src/screens/confirm-end-screen.tsx`, `src/screens/today-history-screen.tsx`
+
+### Cambio 1 - Tests de paridad del recorte
+
+#### Codigo anterior
+```ts
+expect(openNewNotaBlock).toContain("setEditingReserva(null);");
+
+expect(calendarSource).toContain('onClick={() => setScreen("home")}');
+expect(calendarSource).toContain('setReturnScreen("calendar");');
+expect(calendarSource).toContain("setViewTurno(turno);");
+expect(calendarSource).toContain('setScreen("summary");');
+
+expect(source).toContain('confirmBg: "rgba(255,60,60,0.2)"');
+expect(source).toContain('confirmColor: "#ff6b6b"');
+```
+
+#### Codigo nuevo
+```ts
+expect(openNewNotaBlock).not.toContain("setEditingReserva(null);");
+
+expect(calendarSource).toContain('onClick={() => setScreen("home")}');
+expect(calendarSource).toContain('setReturnScreen("calendar");');
+expect(calendarSource).toContain("setViewTurno(turno);");
+expect(calendarSource).toContain('setScreen("summary");');
+expect(calendarSource).toContain("style={iconBtnStyle}");
+expect(calendarSource).toContain("setShowMonthPicker(v => !v);");
+
+expect(calendarSource).toContain("renderReservaDialog: () => React.ReactElement | false;");
+expect(calendarSource).toContain("{renderReservaDialog()}");
+expect(calendarSource).not.toContain("function renderReservaDialog(");
+expect(calendarSource).not.toContain(">Cancel<");
+expect(calendarSource).not.toContain('{editingReserva ? "Actualizar" : "Reservar"}');
+expect(mainSource).toContain("renderReservaDialog={renderReservaDialog}");
+
+expect(source).not.toContain("confirmBg:");
+expect(source).not.toContain("confirmColor:");
+expect(source).not.toContain("confirmBorder:");
+```
+
+#### Por que se cambio
+Los tests bloquean que futuras extracciones vuelvan a duplicar el modal de reservas, cambien el boton de calendario, usen el toggle con estado potencialmente obsoleto o alteren la confirmacion de borrado respecto al comportamiento anterior.
+
+### Cambio 2 - Modal de reservas unico en calendario
+
+#### Codigo anterior
+```tsx
+showReservaDialog: boolean;
+setShowReservaDialog: (v: boolean) => void;
+reservaTime: string;
+setReservaTime: (t: string) => void;
+reservaOrigen: string;
+setReservaOrigen: (o: string) => void;
+reservaDestino: string;
+setReservaDestino: (d: string) => void;
+reservaCliente: string;
+setReservaCliente: (c: string) => void;
+reservaTelefono: string;
+setReservaTelefono: (t: string) => void;
+reservaNotas: string;
+setReservaNotas: (n: string) => void;
+editingReserva: Reserva | null;
+setEditingReserva: (r: Reserva | null) => void;
+reservations: Reserva[];
+setReservations: (r: Reserva[] | ((prev: Reserva[]) => Reserva[])) => void;
+```
+
+#### Codigo nuevo
+```tsx
+setShowReservaDialog: (v: boolean) => void;
+setReservaTime: (t: string) => void;
+setReservaOrigen: (o: string) => void;
+setReservaDestino: (d: string) => void;
+setReservaCliente: (c: string) => void;
+setReservaTelefono: (t: string) => void;
+setReservaNotas: (n: string) => void;
+setEditingReserva: (r: Reserva | null) => void;
+reservations: Reserva[];
+renderReservaDialog: () => React.ReactElement | false;
+```
+
+#### Por que se cambio
+La pantalla de calendario no debe tener una copia propia del formulario de reserva. Ahora recibe el renderizador central desde `src/main.tsx`, conserva solo el estado necesario para abrir o editar reservas y evita divergencias de textos, estilos y logica.
+
+### Cambio 3 - Navegacion y estado del calendario
+
+#### Codigo anterior
+```tsx
+<button style={{ background: "none", border: "none", cursor: "pointer", padding: 8, display: "flex", alignItems: "center" }} onClick={() => setScreen("home")}><IconBack /></button>
+```
+
+```tsx
+setShowMonthPicker(!showMonthPicker);
+```
+
+```tsx
+{renderReservaDialog(
+  showReservaDialog,
+  reservaTime,
+  setReservaTime,
+  reservaOrigen,
+  setReservaOrigen,
+  reservaDestino,
+  setReservaDestino,
+  reservaCliente,
+  setReservaCliente,
+  reservaTelefono,
+  setReservaTelefono,
+  reservaNotas,
+  setReservaNotas,
+  selectedDate,
+  setSelectedDate,
+  editingReserva,
+  setEditingReserva,
+  setConfirmDialog,
+  reservations,
+  setReservations,
+  setShowReservaDialog
+)}
+```
+
+#### Codigo nuevo
+```tsx
+<button style={iconBtnStyle} onClick={() => setScreen("home")}><IconBack /></button>
+```
+
+```tsx
+setShowMonthPicker(v => !v);
+```
+
+```tsx
+{renderReservaDialog()}
+```
+
+#### Por que se cambio
+El boton de volver recupera el estilo compartido de la pantalla antigua, el selector de mes usa una actualizacion funcional segura y el calendario deja de pasar todo el estado de reserva a una copia local del modal.
+
+### Cambio 4 - Iconos compartidos en pantallas extraidas
+
+#### Codigo anterior
+```tsx
+const IconBack: FC = () => (
+  <svg width="22" height="22" viewBox="0 0 22 22" fill="none">
+    <path
+      d="M14 18L7 11L14 4"
+      stroke="rgba(255,255,255,0.65)"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+  </svg>
+);
+
+const IconDel: FC = () => (
+  <svg width="20" height="16" viewBox="0 0 20 16" fill="none">
+    <path
+      d="M7 2H18C18.55 2 19 2.45 19 3V13C19 13.55 18.55 14 18 14H7L1 8L7 2Z"
+      stroke="rgba(255,255,255,0.45)"
+      strokeWidth="1.7"
+      fill="none"
+    />
+    <path
+      d="M9.5 5.5L14.5 10.5M14.5 5.5L9.5 10.5"
+      stroke="rgba(255,255,255,0.45)"
+      strokeWidth="1.7"
+      strokeLinecap="round"
+    />
+  </svg>
+);
+```
+
+#### Codigo nuevo
+```tsx
+import { IconBack, IconDel } from "../components/navigation-icons";
+```
+
+```tsx
+import { IconBack } from "../components/navigation-icons";
+```
+
+#### Por que se cambio
+`add-entry-screen.tsx`, `add-single-entry-screen.tsx` y `add-nota-general-screen.tsx` usaban copias locales de iconos ya extraidos. Ahora consumen los iconos compartidos para que la organizacion por componentes sea coherente.
+
+### Cambio 5 - Estilo de kilometros compartido
+
+#### Codigo anterior
+```tsx
+const KM_CARD_UNIT_STYLE = {
+  fontSize: "0.72em",
+  fontWeight: 900,
+  letterSpacing: "normal",
+} as const;
+```
+
+#### Codigo nuevo
+```tsx
+import { KM_CARD_UNIT_STYLE } from "../shared/card-styles";
+```
+
+#### Por que se cambio
+`confirm-end-screen.tsx` tenia una copia local del estilo de unidad de kilometros aunque ya existe en `src/shared/card-styles.ts`. Usar el valor compartido evita divergencias visuales en futuras fases.
+
+### Cambio 6 - Confirmacion de borrado en historial
+
+#### Codigo anterior
+```tsx
+setConfirmDialog({
+  text: "¿Seguro que quieres eliminar esta entrada?",
+  onConfirm: deleteEditEntry,
+  confirmBg: "rgba(255,60,60,0.2)",
+  confirmColor: "#ff6b6b",
+  confirmBorder: "1px solid rgba(255,100,100,0.35)",
+});
+```
+
+#### Codigo nuevo
+```tsx
+setConfirmDialog({
+  text: "¿Seguro que quieres eliminar esta entrada?",
+  onConfirm: deleteEditEntry,
+});
+```
+
+#### Por que se cambio
+La extraccion habia anadido estilo destructivo especifico en el historial de hoy. Se retiro para mantener el comportamiento y aspecto previos del dialogo compartido.
 
 ## 2026-05-26 23:19 - Corregir regresiones del recorte
 

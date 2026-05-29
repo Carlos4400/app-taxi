@@ -1,6 +1,6 @@
 import { Directory, Encoding, Filesystem } from "@capacitor/filesystem";
 import { Share } from "@capacitor/share";
-import type { buildBackupPayload } from "./backup";
+import type { buildBackupPayload } from "../logic/backup";
 
 export async function exportBackupJSON(backup: ReturnType<typeof buildBackupPayload>) {
   const json = JSON.stringify(backup, null, 2);

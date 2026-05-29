@@ -43,3 +43,8 @@ icons/
 # ── Archivos de datos / Contabilidad ─────────────────────────
 *.ods
 *.csv
+
+# Artefactos de trabajo del agente
+scratch/
+test_failures.txt
+scratch_verify_results.txt

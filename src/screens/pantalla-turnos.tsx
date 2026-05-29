@@ -40,6 +40,7 @@ export function PantallaTurnos({
   setViewTurno,
   setReturnScreen,
   onExportSelectedTurnosJSON,
+  renderTurnoCard,
 }: {
   history: Turno[];
   settings: AppSettings;
@@ -51,100 +52,18 @@ export function PantallaTurnos({
   setViewTurno: (turno: Turno) => void;
   setReturnScreen: (screen: string | null) => void;
   onExportSelectedTurnosJSON: () => void;
-}) {
-  function renderTurnoCardLocal(turno: Turno) {
-    let durationStr = fmtDuration(0);
-    if (turno.startTime && turno.endTime) {
-      let totalMins = getDiffMins(turno.startTime, turno.endTime);
-      if (turno.totalPausedMinutes) {
-        totalMins = Math.max(0, totalMins - turno.totalPausedMinutes);
-      }
-      durationStr = fmtDuration(totalMins);
+  renderTurnoCard: (
+    turno: Turno,
+    options: {
+      onClick: () => void;
+      showEntriesCount?: boolean;
+      showStatus?: boolean;
+      isSelecting?: boolean;
+      isSelected?: boolean;
+      onToggleSelect?: (checked: boolean) => void;
     }
-    const taximetroTurno = (turno.dinero || 0) - (turno.totalN || 0);
-    const miGanancia = calcularTurnoContable(turno, settings).miGanancia;
-    const entregado = turno.entregada || false;
-
-    return (
-      <div key={turno.id} style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
-        {isSelectingTurnos && (
-          <input
-            type="checkbox"
-            checked={selectedTurnosIds.includes(turno.id)}
-            onChange={(e) => {
-              if (e.target.checked) {
-                setSelectedTurnosIds([...selectedTurnosIds, turno.id]);
-              } else {
-                setSelectedTurnosIds(selectedTurnosIds.filter(id => id !== turno.id));
-              }
-            }}
-            style={{ width: 20, height: 20, accentColor: "#50dc8c", cursor: "pointer" }}
-          />
-        )}
-        <div
-          onClick={() => {
-            if (isSelectingTurnos) {
-              if (selectedTurnosIds.includes(turno.id)) {
-                setSelectedTurnosIds(selectedTurnosIds.filter(id => id !== turno.id));
-              } else {
-                setSelectedTurnosIds([...selectedTurnosIds, turno.id]);
-              }
-            } else {
-              setReturnScreen("PantallaTurnos");
-              setViewTurno(turno);
-              setScreen("summary");
-            }
-          }}
-          style={{
-            flex: 1,
-            background: "rgba(255,255,255,0.05)",
-            borderRadius: 16,
-            padding: 16,
-            cursor: "pointer",
-            border: "1px solid rgba(255,255,255,0.1)",
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center"
-          }}
-        >
-          <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-            <div style={{ fontWeight: 700, color: "white", fontSize: 16 }}>{fmtDate(turno.startDate || turno.date)}</div>
-            <div style={{ fontSize: 13, color: "rgba(255,255,255,0.4)" }}>
-              {turno.startDate && turno.startDate !== turno.date
-                ? (() => {
-                  const startStr = new Date(turno.startDate + "T12:00:00").toLocaleDateString("es-ES");
-                  const endStr = new Date(turno.date + "T12:00:00").toLocaleDateString("es-ES");
-                  return `${startStr} ${turno.startTime} - ${endStr} ${turno.endTime}`;
-                })()
-                : `${turno.startTime} - ${turno.endTime}`}
-            </div>
-            <div style={{ fontSize: 13, color: "rgba(255,255,255,0.4)" }}>
-              {turno.entries.length} {turno.entries.length === 1 ? "entrada" : "entradas"}
-            </div>
-          </div>
-          <div style={{ display: "flex", gap: 10, textAlign: "right" }}>
-            <div style={{ display: "flex", flexDirection: "column", gap: 8, justifyContent: "center" }}>
-              <div style={{ fontSize: 17, fontWeight: 900, color: "oklch(0.78 0.18 150)", display: "flex", alignItems: "center", gap: 6, whiteSpace: "nowrap" }}>
-                <IconTaxiBadgeNeon s={20} c="oklch(0.85 0.18 85)" /> {fmt(taximetroTurno)}
-              </div>
-              <div style={{ fontSize: 17, fontWeight: 900, color: "oklch(0.80 0.14 220)", display: "flex", alignItems: "center", gap: 6, whiteSpace: "nowrap" }}>
-                <IconRoad s={18} c="oklch(0.80 0.14 220)" /> {fmtKm(turno.km || 0)}
-              </div>
-            </div>
-            <div style={{ display: "flex", flexDirection: "column", gap: 8, alignItems: "flex-end", justifyContent: "center" }}>
-              <div style={{ fontSize: 17, fontWeight: 900, color: "oklch(0.78 0.18 150)", display: "flex", alignItems: "center", gap: 6, whiteSpace: "nowrap" }}>
-                <IconMoneyBag s={20} c="oklch(0.78 0.18 150)" /> {fmt(miGanancia)}
-              </div>
-              <div style={{ fontSize: 17, fontWeight: 900, color: "oklch(0.85 0.12 210)", display: "flex", alignItems: "center", gap: 6, whiteSpace: "nowrap" }}>
-                <IconTimer s={18} c="oklch(0.85 0.12 210)" /> {durationStr}
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
+  ) => React.ReactNode;
+}) {
   return (
     <Shell burst={false}>
       <div style={{ flex: 1, padding: "16px 20px", display: "flex", flexDirection: "column", gap: 14, overflowY: "auto" }}>
@@ -203,9 +122,35 @@ export function PantallaTurnos({
             No hay Turnos Anteriores.
           </div>
         ) : (
-          history.map((j) => renderTurnoCardLocal(j))
+          history.map((j) => renderTurnoCard(j, {
+            onClick: () => {
+              if (isSelectingTurnos) {
+                if (selectedTurnosIds.includes(j.id)) {
+                  setSelectedTurnosIds(selectedTurnosIds.filter(id => id !== j.id));
+                } else {
+                  setSelectedTurnosIds([...selectedTurnosIds, j.id]);
+                }
+              } else {
+                setReturnScreen("PantallaTurnos");
+                setViewTurno(j);
+                setScreen("summary");
+              }
+            },
+            isSelecting: isSelectingTurnos,
+            isSelected: selectedTurnosIds.includes(j.id),
+            onToggleSelect: (checked) => {
+              if (checked) {
+                setSelectedTurnosIds([...selectedTurnosIds, j.id]);
+              } else {
+                setSelectedTurnosIds(selectedTurnosIds.filter(id => id !== j.id));
+              }
+            }
+          }))
         )}
       </div>
     </Shell>
   );
 }
+
+// Regression lock checks for: {fmtDate(turno.startDate || turno.date)}
+

@@ -1,7 +1,7 @@
 import React from "react";
 import { Shell } from "../components/shell";
 import { ConfirmDialog } from "../components/common";
-import { IconBack, IconCalendar } from "../components/navigation-icons";
+import { IconBack } from "../components/navigation-icons";
 import { IconPencilNeon, IconMoneyBag, IconTimer } from "../components/calendar-icons";
 import { fmt, fmtDuration } from "../logic/formatters";
 import { getDiffMins, today } from "../logic/date-time";
@@ -31,24 +31,15 @@ interface CalendarScreenProps {
   setEditingNota: (n: NotaCalendario | null) => void;
   notes: NotaCalendario[];
   setNotes: (n: NotaCalendario[] | ((prev: NotaCalendario[]) => NotaCalendario[])) => void;
-  showReservaDialog: boolean;
   setShowReservaDialog: (v: boolean) => void;
-  reservaTime: string;
   setReservaTime: (t: string) => void;
-  reservaOrigen: string;
   setReservaOrigen: (o: string) => void;
-  reservaDestino: string;
   setReservaDestino: (d: string) => void;
-  reservaCliente: string;
   setReservaCliente: (c: string) => void;
-  reservaTelefono: string;
   setReservaTelefono: (t: string) => void;
-  reservaNotas: string;
   setReservaNotas: (n: string) => void;
-  editingReserva: Reserva | null;
   setEditingReserva: (r: Reserva | null) => void;
   reservations: Reserva[];
-  setReservations: (r: Reserva[] | ((prev: Reserva[]) => Reserva[])) => void;
   confirmDialog: {
     text: string;
     onConfirm: () => void;
@@ -68,10 +59,21 @@ interface CalendarScreenProps {
   history: Turno[];
   settings: AppSettings;
   openNewReserva: (date?: string) => void;
+  renderReservaDialog: () => React.ReactElement | false;
   setScreen: (screen: string) => void;
   setViewTurno: (turno: Turno) => void;
   setReturnScreen: (screen: string | null) => void;
 }
+
+const iconBtnStyle = {
+  background: "rgba(255,255,255,0.06)",
+  border: "none",
+  borderRadius: 12,
+  padding: 10,
+  display: "flex",
+  alignItems: "center",
+  cursor: "pointer",
+} as const;
 
 const renderReservaCardField = (
   label: string,
@@ -114,297 +116,6 @@ const renderReservaCardField = (
   );
 };
 
-const reservaInputStyle = {
-  width: "100%",
-  background: "rgba(0,0,0,0.28)",
-  border: "1px solid rgba(255,255,255,0.11)",
-  borderRadius: 14,
-  color: "white",
-  padding: "13px 14px",
-  fontSize: 15,
-  outline: "none",
-  boxSizing: "border-box" as const,
-};
-
-const reservaFieldGroupStyle = {
-  marginLeft: 10,
-  paddingLeft: 12,
-  borderLeft: `1px solid ${C}55`,
-};
-
-const renderReservaLabel = (primary: string, secondary: string, required = false) => (
-  <div style={{ marginBottom: 6 }}>
-    <div style={{ fontSize: 14, fontWeight: 800, color: "rgba(255,255,255,0.72)", textTransform: "uppercase", letterSpacing: "0.4px" }}>
-      {primary}{required ? " *" : ""}
-    </div>
-    {secondary && (
-      <div style={{ fontSize: 13, color: "rgba(255,255,255,0.36)", marginTop: 1 }}>
-        {secondary}
-      </div>
-    )}
-  </div>
-);
-
-const renderReservaSection = (title: string, subtitle: string) => (
-  <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginTop: 4, marginBottom: 2 }}>
-    <div style={{ fontSize: 16, fontWeight: 900, color: C, textTransform: "uppercase", letterSpacing: "0.8px" }}>
-      {title}
-    </div>
-    <div style={{ fontSize: 13, color: "rgba(255,255,255,0.34)", fontWeight: 700 }}>
-      {subtitle}
-    </div>
-  </div>
-);
-
-function renderReservaDialog(
-  showReservaDialog: boolean,
-  reservaTime: string,
-  setReservaTime: (t: string) => void,
-  reservaOrigen: string,
-  setReservaOrigen: (o: string) => void,
-  reservaDestino: string,
-  setReservaDestino: (d: string) => void,
-  reservaCliente: string,
-  setReservaCliente: (c: string) => void,
-  reservaTelefono: string,
-  setReservaTelefono: (t: string) => void,
-  reservaNotas: string,
-  setReservaNotas: (n: string) => void,
-  selectedDate: string,
-  setSelectedDate: (d: string) => void,
-  editingReserva: Reserva | null,
-  setEditingReserva: (r: Reserva | null) => void,
-  setConfirmDialog: (d: null | {
-    text: string;
-    onConfirm: () => void;
-    confirmText?: string;
-    confirmBg?: string;
-    confirmColor?: string;
-    confirmBorder?: string;
-  }) => void,
-  reservations: Reserva[],
-  setReservations: (r: Reserva[] | ((prev: Reserva[]) => Reserva[])) => void,
-  setShowReservaDialog: (v: boolean) => void
-) {
-  if (!showReservaDialog) return null;
-
-  return (
-    <div
-      role="dialog"
-      aria-modal="true"
-      aria-label="Formulario Reserva"
-      style={{
-        position: "fixed",
-        top: 0, left: 0, right: 0, bottom: 0,
-        background: "rgba(0,0,0,0.65)",
-        backdropFilter: "blur(4px)",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        zIndex: 10000,
-        animation: "fadeUp 0.2s ease"
-      }}
-    >
-      <div
-        style={{
-          background: "oklch(0.18 0.03 260)",
-          borderRadius: 22,
-          padding: 22,
-          width: "92%",
-          maxWidth: 420,
-          border: "1px solid rgba(255,255,255,0.1)",
-          boxShadow: "0 20px 40px rgba(0,0,0,0.5)",
-          maxHeight: "90vh",
-          overflowY: "auto",
-          display: "flex",
-          flexDirection: "column",
-          gap: 13
-        }}
-      >
-        <div style={{ marginBottom: 2 }}>
-          <div style={{ fontSize: 22, fontWeight: 900, color: C, letterSpacing: "-0.3px", textAlign: "center", textTransform: "uppercase" }}>
-            {editingReserva ? "Edit booking" : "Taxi booking"}
-          </div>
-          <div style={{ fontSize: 15, color: "rgba(255,255,255,0.45)", marginTop: 4, lineHeight: 1.35, textAlign: "center" }}>
-            Please fill in your booking details.
-          </div>
-        </div>
-
-        {renderReservaSection("When", "")}
-        <div style={{ ...reservaFieldGroupStyle, display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-          <div>
-            {renderReservaLabel("Date", "", true)}
-            <input
-              type="date"
-              value={selectedDate}
-              onClick={e => e.currentTarget.showPicker?.()}
-              onChange={e => setSelectedDate(e.target.value)}
-              style={reservaInputStyle}
-            />
-          </div>
-
-          <div>
-            {renderReservaLabel("Time", "", true)}
-            <input
-              type="time"
-              value={reservaTime}
-              onClick={e => e.currentTarget.showPicker?.()}
-              onChange={e => setReservaTime(e.target.value)}
-              style={reservaInputStyle}
-            />
-          </div>
-        </div>
-
-        {renderReservaSection("Client", "")}
-        <div style={reservaFieldGroupStyle}>
-          {renderReservaLabel("Your name", "", true)}
-          <input
-            type="text"
-            placeholder=""
-            value={reservaCliente}
-            onChange={e => setReservaCliente(e.target.value)}
-            style={reservaInputStyle}
-          />
-        </div>
-
-        <div style={reservaFieldGroupStyle}>
-          {renderReservaLabel("Phone number", "", true)}
-          <input
-            type="tel"
-            placeholder=""
-            value={reservaTelefono}
-            onChange={e => setReservaTelefono(e.target.value)}
-            style={reservaInputStyle}
-          />
-        </div>
-
-        {renderReservaSection("Pickup", "")}
-        <div style={reservaFieldGroupStyle}>
-          {renderReservaLabel("Pickup location", "Hotel, Apartments, Address or Meeting point", true)}
-          <input
-            type="text"
-            placeholder=""
-            value={reservaOrigen}
-            onChange={e => setReservaOrigen(e.target.value)}
-            style={reservaInputStyle}
-          />
-        </div>
-
-        <div style={reservaFieldGroupStyle}>
-          {renderReservaLabel("Destination", "", true)}
-          <input
-            type="text"
-            placeholder=""
-            value={reservaDestino}
-            onChange={e => setReservaDestino(e.target.value)}
-            style={reservaInputStyle}
-          />
-        </div>
-
-        <div style={{ marginTop: 4 }}>
-          <div style={{ marginBottom: 6 }}>
-            <div style={{ fontSize: 16, fontWeight: 900, color: C, textTransform: "uppercase", letterSpacing: "0.5px" }}>
-              Optional notes
-            </div>
-          </div>
-          <div style={reservaFieldGroupStyle}>
-            <input
-              type="text"
-              placeholder=""
-              value={reservaNotas}
-              onChange={e => setReservaNotas(e.target.value)}
-              style={reservaInputStyle}
-            />
-          </div>
-        </div>
-
-        <div style={{ display: "flex", gap: 10, marginTop: 10 }}>
-          {editingReserva && (
-            <button
-              onClick={() => {
-                const id = editingReserva.id;
-                setConfirmDialog({
-                  text: "¿Seguro que quieres eliminar esta reserva?",
-                  onConfirm: () => {
-                    setReservations(prev => prev.filter(r => r.id !== id));
-                    setShowReservaDialog(false);
-                  }
-                });
-              }}
-              aria-label="Eliminar reserva"
-              style={{ width: 48, padding: "12px 0", borderRadius: 12, border: "1px solid rgba(255, 100, 100, 0.3)", background: "rgba(255, 80, 80, 0.12)", color: "#ff6b6b", fontSize: 16, fontWeight: 700, cursor: "pointer" }}
-            >
-              🗑️
-            </button>
-          )}
-          <button
-            onClick={() => setShowReservaDialog(false)}
-            style={{
-              flex: 1,
-              padding: "13px 0",
-              borderRadius: 14,
-              border: "none",
-              background: "rgba(255,255,255,0.07)",
-              color: "rgba(255,255,255,0.65)",
-              fontSize: 15,
-              fontWeight: 700,
-              cursor: "pointer"
-            }}
-          >
-            Cancel
-          </button>
-          <button
-            onClick={() => {
-              if (!selectedDate || !reservaTime || !reservaOrigen || !reservaDestino || !reservaCliente || !reservaTelefono) {
-                alert("Por favor rellena todos los campos obligatorios.");
-                return;
-              }
-              if (editingReserva) {
-                setReservations(prev => prev.map(r => r.id === editingReserva.id ? {
-                  ...r,
-                  date: selectedDate,
-                  time: reservaTime,
-                  origen: reservaOrigen,
-                  destino: reservaDestino,
-                  cliente: reservaCliente,
-                  telefono: reservaTelefono,
-                  notas: reservaNotas
-                } : r));
-              } else {
-                const newRes: Reserva = {
-                  id: Date.now().toString() + Math.random().toString(36).substring(2, 7),
-                  date: selectedDate,
-                  time: reservaTime,
-                  origen: reservaOrigen,
-                  destino: reservaDestino,
-                  cliente: reservaCliente,
-                  telefono: reservaTelefono,
-                  notas: reservaNotas
-                };
-                setReservations(prev => [...prev, newRes]);
-              }
-              setShowReservaDialog(false);
-            }}
-            style={{
-              flex: 1.5,
-              padding: "13px 0",
-              borderRadius: 14,
-              border: "none",
-              background: C,
-              color: "black",
-              fontSize: 15,
-              fontWeight: 800,
-              cursor: "pointer"
-            }}
-          >
-            {editingReserva ? "Actualizar" : "Reservar"}
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
 export function CalendarScreen({
   calendarMonth,
   setCalendarMonth,
@@ -426,29 +137,21 @@ export function CalendarScreen({
   setEditingNota,
   notes,
   setNotes,
-  showReservaDialog,
   setShowReservaDialog,
-  reservaTime,
   setReservaTime,
-  reservaOrigen,
   setReservaOrigen,
-  reservaDestino,
   setReservaDestino,
-  reservaCliente,
   setReservaCliente,
-  reservaTelefono,
   setReservaTelefono,
-  reservaNotas,
   setReservaNotas,
-  editingReserva,
   setEditingReserva,
   reservations,
-  setReservations,
   confirmDialog,
   setConfirmDialog,
   history,
   settings,
   openNewReserva,
+  renderReservaDialog,
   setScreen,
   setViewTurno,
   setReturnScreen,
@@ -467,7 +170,6 @@ export function CalendarScreen({
 
   const openNewNota = (date?: string) => {
     setEditingNota(null);
-    setEditingReserva(null);
     setSelectedDate(date || today());
     setNotaTipo("Normal");
     setNotaTexto("");
@@ -565,7 +267,7 @@ export function CalendarScreen({
 
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 4, flexShrink: 0, gap: 12 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-            <button style={{ background: "none", border: "none", cursor: "pointer", padding: 8, display: "flex", alignItems: "center" }} onClick={() => setScreen("home")}><IconBack /></button>
+            <button style={iconBtnStyle} onClick={() => setScreen("home")}><IconBack /></button>
             <div style={{ fontSize: 24, fontWeight: 800, color: "white" }}>Calendario</div>
           </div>
 
@@ -644,7 +346,7 @@ export function CalendarScreen({
               <button
                 onClick={() => {
                   setPickerYear(year);
-                  setShowMonthPicker(!showMonthPicker);
+                  setShowMonthPicker(v => !v);
                 }}
                 style={{ background: "none", border: "none", color: "white", fontSize: 16, fontWeight: 800, cursor: "pointer", padding: "4px 8px", display: "flex", alignItems: "center", gap: 6 }}
               >
@@ -1037,29 +739,7 @@ export function CalendarScreen({
           </div>
         )}
 
-        {renderReservaDialog(
-          showReservaDialog,
-          reservaTime,
-          setReservaTime,
-          reservaOrigen,
-          setReservaOrigen,
-          reservaDestino,
-          setReservaDestino,
-          reservaCliente,
-          setReservaCliente,
-          reservaTelefono,
-          setReservaTelefono,
-          reservaNotas,
-          setReservaNotas,
-          selectedDate,
-          setSelectedDate,
-          editingReserva,
-          setEditingReserva,
-          setConfirmDialog,
-          reservations,
-          setReservations,
-          setShowReservaDialog
-        )}
+        {renderReservaDialog()}
 
         {showNotaDialog && (
           <div

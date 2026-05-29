@@ -8,6 +8,7 @@ Esta guía explica cómo está organizado el proyecto y dónde colocar cada cosa
 |---|---|---|
 | `src/main.tsx` | Punto de entrada de la app. No se mueve de la raíz. | `main.tsx` |
 | `src/logic/` | Lógica de negocio y utilidades **puras**: funciones que calculan, transforman o formatean datos. No tocan Firebase, ni el navegador, ni React. | `accounting.ts`, `week-logic.ts`, `csv.ts`, `date-time.ts`, `formatters.ts` |
+| `src/hooks/` | Custom Hooks de React. Todo código que use estados, efectos o referencias y encapsule lógica ligada a React sin renderizar UI. | `use-firestore-sync.ts` |
 | `src/services/` | Todo lo que habla con el exterior: Firebase, almacenamiento del dispositivo, plugins nativos. | `firebase.ts`, `firestore-sync.ts`, `user-storage.ts`, `apk-installer.ts` |
 | `src/screens/` | Pantallas completas de la app. | `add-entry-screen.tsx`, `add-nota-general-screen.tsx`, `add-single-entry-screen.tsx`, `login-screen.tsx`, `admin-screens.tsx`, `auth-gate.tsx` |
 | `src/components/` | Piezas de interfaz reutilizables que se usan dentro de las pantallas. | `shell.tsx`, `edit-entry-dialog.tsx`, `turno-notas.tsx` |
