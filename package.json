@@ -10,7 +10,8 @@
     "android": "cap run android",
     "android:build": "cap build android",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@capacitor/core": "^6.2.0",

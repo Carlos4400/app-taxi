@@ -1,3 +1,71 @@
+## 2026-05-29 16:49 - Añadir check de tipos y tests al CI
+
+**Archivos modificados:** package.json, .github/workflows/ci.yml
+
+### Cambio 1 - Script typecheck en package.json
+
+#### Código anterior
+```json
+    "test": "vitest run",
+    "test:watch": "vitest"
+```
+
+#### Código nuevo
+```json
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit"
+```
+
+#### Por qué se cambió
+No existía forma estandarizada de ejecutar la comprobación de tipos. El script `typecheck` permite invocarla igual en local y en CI.
+
+### Cambio 2 - Workflow de CI
+
+#### Código anterior
+```yaml
+No existía .github/workflows/ci.yml en el proyecto.
+```
+
+#### Código nuevo
+```yaml
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  quality:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Tests
+        run: npm test
+```
+
+#### Por qué se cambió
+La suite de tests es de extracción (coincidencia de strings) y no detecta errores de compilación; un error de tipos (TS2741 en CalendarScreen) pasó desapercibido. El workflow ejecuta `tsc --noEmit` y los tests en cada push y PR a main para impedir que vuelva a ocurrir.
+
 ## 2026-05-29 16:45 - Cablear useFirestoreSync y eliminar Firebase inline de main.tsx
 
 **Archivos modificados:** src/main.tsx, .gitignore
