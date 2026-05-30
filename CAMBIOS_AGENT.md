@@ -1,3 +1,1659 @@
+## 2026-05-30 20:40 - Añadir efecto neón a los iconos de agenda y ajustes
+
+**Archivos modificados:** `src/components/home-icons.tsx`, `src/components/navigation-icons.tsx`, `src/screens/home-screen.tsx`, `src/main.tsx`
+
+### Cambio 1 - Creación de IconAgendaNeon con neón morado
+
+#### Código anterior
+```tsx
+export const IconAgenda: FC<{ s?: number; c?: string }> = ({ s = 24, c = "white" }: { s?: number; c?: string }) => (
+  <svg width={s} height={s} viewBox="0 0 24 24" fill="none" style={{ display: "inline-block", verticalAlign: "middle" }}>
+    <rect x="3" y="4" width="18" height="17" rx="3" stroke={c} strokeWidth="1.8" strokeLinejoin="round" />
+    <circle cx="7" cy="9" r="1" fill={c} />
+    <circle cx="7" cy="13" r="1" fill={c} />
+    <circle cx="7" cy="17" r="1" fill={c} opacity="0.6" />
+    <path d="M10 9H17" stroke={c} strokeWidth="1.8" strokeLinecap="round" />
+    <path d="M10 13H17" stroke={c} strokeWidth="1.8" strokeLinecap="round" />
+    <path d="M10 17H15" stroke={c} strokeWidth="1.8" strokeLinecap="round" opacity="0.6" />
+  </svg>
+);
+```
+
+#### Código nuevo
+```tsx
+export const IconAgendaNeon: FC<{ s?: number }> = ({ s = 24 }: { s?: number }) => (
+  <svg
+    width={s}
+    height={s}
+    viewBox="0 0 24 24"
+    fill="none"
+    style={{
+      display: "inline-block",
+      verticalAlign: "middle",
+      overflow: "visible",
+      filter: "drop-shadow(0 0 1.2px rgba(180, 120, 255, 0.8)) drop-shadow(0 0 5px rgba(180, 120, 255, 0.28))"
+    }}
+  >
+    <rect
+      x="3"
+      y="4"
+      width="18"
+      height="17"
+      rx="3"
+      stroke="#b478ff"
+      strokeWidth="2"
+      strokeLinejoin="round"
+    />
+    <circle cx="7" cy="9" r="1.1" fill="#d7b8ff" />
+    <circle cx="7" cy="13" r="1.1" fill="#d7b8ff" />
+    <circle cx="7" cy="17" r="1.1" fill="#d7b8ff" opacity="0.6" />
+    <path
+      d="M10 9H17"
+      stroke="#d7b8ff"
+      strokeWidth="2"
+      strokeLinecap="round"
+    />
+    <path
+      d="M10 13H17"
+      stroke="#d7b8ff"
+      strokeWidth="2"
+      strokeLinecap="round"
+    />
+    <path
+      d="M10 17H15"
+      stroke="#d7b8ff"
+      strokeWidth="2"
+      strokeLinecap="round"
+      opacity="0.6"
+    />
+  </svg>
+);
+```
+
+#### Por qué se cambió
+Para añadirle el efecto de neón morado brillante con drop-shadow al icono de agenda en la pantalla de inicio.
+
+### Cambio 2 - Creación de IconSettingsNeon que conserva el color gris original con neón
+
+#### Código anterior
+```tsx
+export const IconSettings: FC<{ s?: number; c?: string }> = ({ s = 24, c = "white" }: { s?: number; c?: string }) => (
+  <svg width={s} height={s} viewBox="0 0 24 24" fill="none" style={{ display: "inline-block", verticalAlign: "middle" }}>
+    <path d="M12 15C13.6569 15 15 13.6569 15 12C15 10.3431 13.6569 9 12 9C10.3431 9 9 10.3431 9 12C9 13.6569 10.3431 15 12 15Z" stroke={c} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+    <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1Z" stroke={c} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+  </svg>
+);
+```
+
+#### Código nuevo
+```tsx
+export const IconSettingsNeon: FC<{ s?: number; c?: string }> = ({ s = 24, c = "oklch(0.72 0.01 250)" }: { s?: number; c?: string }) => (
+  <svg
+    width={s}
+    height={s}
+    viewBox="0 0 24 24"
+    fill="none"
+    style={{
+      display: "inline-block",
+      verticalAlign: "middle",
+      overflow: "visible",
+      filter: `drop-shadow(0 0 1.2px ${c}) drop-shadow(0 0 5px ${c})`
+    }}
+  >
+    <path
+      d="M12 15C13.6569 15 15 13.6569 15 12C15 10.3431 13.6569 9 12 9C10.3431 9 9 10.3431 9 12C9 13.6569 10.3431 15 12 15Z"
+      stroke={c}
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+    <path
+      d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1Z"
+      stroke={c}
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+  </svg>
+);
+```
+
+#### Por qué se cambió
+Para añadir el efecto neón manteniendo dinámicamente el color original grisáceo a través de la prop `c`.
+
+### Cambio 3 - Uso de los nuevos iconos neón en HomeScreen
+
+#### Código anterior
+```tsx
+import { IconCalendar, IconSettings, IconAdminNeon, IconLogoutNeon } from "../components/navigation-icons";
+import { IconRocket, IconPlay, IconClipboard, IconChart, IconReservaWrite, IconAgenda } from "../components/home-icons";
+...
+        <IconAgenda s={32} c="oklch(0.75 0.15 290)" />
+...
+        <IconSettings s={32} c="oklch(0.72 0.01 250)" />
+```
+
+#### Código nuevo
+```tsx
+import { IconCalendar, IconSettingsNeon, IconAdminNeon, IconLogoutNeon } from "../components/navigation-icons";
+import { IconRocket, IconPlay, IconClipboard, IconChart, IconReservaWrite, IconAgendaNeon } from "../components/home-icons";
+...
+        <IconAgendaNeon s={32} />
+...
+        <IconSettingsNeon s={32} c="oklch(0.72 0.01 250)" />
+```
+
+#### Por qué se cambió
+Para importar y renderizar los nuevos componentes con efecto neón en la pantalla principal.
+
+### Cambio 4 - Limpieza de importaciones no usadas de iconos en main.tsx
+
+#### Código anterior
+```tsx
+import { IconRocket, IconClipboard, IconChart, IconReservaWrite, IconAgenda } from "./components/home-icons";
+import { IconNoteAdd, IconTaxiBadgeNeon, IconGive, IconRoad, IconPinNeon } from "./components/summary-icons";
+```
+
+#### Código nuevo
+```tsx
+import { IconRocket, IconClipboard, IconChart, IconReservaWrite } from "./components/home-icons";
+import { IconNoteAdd, IconTaxiBadgeNeon, IconRoad } from "./components/summary-icons";
+```
+
+#### Por qué se cambió
+Se eliminaron las importaciones de `IconAgenda` (renombrado a `IconAgendaNeon`), así como de `IconGive` e `IconPinNeon`, ya que no se utilizan en `main.tsx` (fueron desacoplados a otros componentes de pantallas).
+
+### Cambio 5 - Limpieza de importaciones de utilidades en main.tsx
+
+#### Código anterior
+```tsx
+import html2canvas from "html2canvas";
+import { signOut } from "firebase/auth";
+...
+import { hapticTap, hapticAction } from "./services/haptics";
+```
+
+#### Código nuevo
+```tsx
+import { signOut } from "firebase/auth";
+...
+import { hapticAction } from "./services/haptics";
+```
+
+#### Por qué se cambió
+Se eliminaron las importaciones huérfanas de `html2canvas` y `hapticTap` en `main.tsx` ya que estas utilidades no se consumen directamente dentro del archivo tras la modularización de pantallas.
+
+## 2026-05-30 20:35 - Cambiar comportamiento de retroceso en panel de turno
+
+**Archivos modificados:** `src/main.tsx`
+
+### Cambio 1 - Navegación a inicio al presionar botón físico atrás en pantalla del turno
+
+#### Código anterior
+```tsx
+    import("@capacitor/app")
+      .then(({ App: CapApp }) =>
+        CapApp.addListener("backButton", () => {
+          const navego = useAppStore.getState().goBack();
+          if (!navego) CapApp.exitApp();
+        })
+      )
+```
+
+#### Código nuevo
+```tsx
+    import("@capacitor/app")
+      .then(({ App: CapApp }) =>
+        CapApp.addListener("backButton", () => {
+          const state = useAppStore.getState();
+          if (state.screen === "main") {
+            state.resetNavigation("home");
+            return;
+          }
+          const navego = state.goBack();
+          if (!navego) CapApp.exitApp();
+        })
+      )
+```
+
+#### Por qué se cambió
+Se cambió para que cuando el usuario esté en el panel de control del turno ("main"), ya sea con el turno pausado o activo, al pulsar el botón físico de retroceso de su dispositivo Android vuelva a la pantalla de inicio ("home") en lugar de cerrar la aplicación.
+
+## 2026-05-30 20:31 - Restablecer altura de overlay de pausa y añadir esquinas redondeadas
+
+**Archivos modificados:** `src/main.tsx`
+
+### Cambio 1 - Modificar posicionamiento y agregar border radius en el overlay de pausa
+
+#### Código anterior
+```tsx
+        {current.isPaused && (
+          <div
+            role="alertdialog"
+            aria-modal="true"
+            aria-label="Turno Pausado"
+            style={{
+              position: "absolute",
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              background: "rgba(10, 12, 18, 0.2)",
+              backdropFilter: "grayscale(0.85) brightness(0.6)",
+              WebkitBackdropFilter: "grayscale(0.85) brightness(0.6)",
+              display: "flex",
+              flexDirection: "column",
+              justifyContent: "center",
+              alignItems: "center",
+              zIndex: 1000,
+              padding: "20px",
+              margin: "-12px -20px -24px",
+            }}
+          >
+```
+
+#### Código nuevo
+```tsx
+        {current.isPaused && (
+          <div
+            role="alertdialog"
+            aria-modal="true"
+            aria-label="Turno Pausado"
+            style={{
+              position: "absolute",
+              top: 80,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              background: "rgba(10, 12, 18, 0.2)",
+              backdropFilter: "grayscale(0.85) brightness(0.6)",
+              WebkitBackdropFilter: "grayscale(0.85) brightness(0.6)",
+              display: "flex",
+              flexDirection: "column",
+              justifyContent: "center",
+              alignItems: "center",
+              zIndex: 1000,
+              padding: "20px",
+              margin: "0 -20px -24px",
+              borderTopLeftRadius: 24,
+              borderTopRightRadius: 24,
+            }}
+          >
+```
+
+#### Por qué se cambió
+Se restablece el valor de top a 80 y el margin superior a 0 para que la capa opaca de turno pausado cubra solo a partir de las tarjetas de cobro hacia abajo (dejando el encabezado del día y los botones Home y Pausa sin oscurecer), y se añaden esquinas superiores redondeadas (borderTopLeftRadius y borderTopRightRadius de 24px) para integrarlo estéticamente con el diseño general.
+
+## 2026-05-30 20:30 - Ajustar overlay de pausa para cubrir la pantalla completa
+
+**Archivos modificados:** `src/main.tsx`
+
+### Cambio 1 - Modificar posicionamiento y margen superior del overlay de pausa
+
+#### Código anterior
+```tsx
+        {current.isPaused && (
+          <div
+            role="alertdialog"
+            aria-modal="true"
+            aria-label="Turno Pausado"
+            style={{
+              position: "absolute",
+              top: 85,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              background: "rgba(10, 12, 18, 0.2)",
+              backdropFilter: "grayscale(0.85) brightness(0.6)",
+              WebkitBackdropFilter: "grayscale(0.85) brightness(0.6)",
+              display: "flex",
+              flexDirection: "column",
+              justifyContent: "center",
+              alignItems: "center",
+              zIndex: 1000,
+              padding: "20px",
+              margin: "0 -20px -24px",
+            }}
+          >
+```
+
+#### Código nuevo
+```tsx
+        {current.isPaused && (
+          <div
+            role="alertdialog"
+            aria-modal="true"
+            aria-label="Turno Pausado"
+            style={{
+              position: "absolute",
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              background: "rgba(10, 12, 18, 0.2)",
+              backdropFilter: "grayscale(0.85) brightness(0.6)",
+              WebkitBackdropFilter: "grayscale(0.85) brightness(0.6)",
+              display: "flex",
+              flexDirection: "column",
+              justifyContent: "center",
+              alignItems: "center",
+              zIndex: 1000,
+              padding: "20px",
+              margin: "-12px -20px -24px",
+            }}
+          >
+```
+
+#### Por qué se cambió
+Se modifica el valor de top de 85 a 0 y el margen superior de 0 a -12px para que el fondo opaco de turno pausado cubra la pantalla completa (incluyendo el encabezado del día y los botones superiores de home/pausa) en lugar de dejar la parte superior brillante y descubierta.
+
+## 2026-05-30 20:27 - Habilitar reanudacion de turno al pulsar el icono de pausa
+
+**Archivos modificados:** `src/main.tsx`
+
+### Cambio 1 - Agregar interacción al recuadro de pausa
+
+#### Código anterior
+```tsx
+            <div style={{
+              width: 152,
+              height: 152,
+              background: "#101827",
+              borderRadius: 38,
+              border: "3px solid #3b82f6",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              marginBottom: 40,
+              boxShadow: "0 0 4px rgba(126,182,255,0.68), 0 0 28px rgba(59,130,246,0.30), 0 14px 34px rgba(59,130,246,0.18)"
+            }}>
+              <IconPause s={84} c="#7eb6ff" />
+            </div>
+```
+
+#### Código nuevo
+```tsx
+            <div
+              onClick={togglePause}
+              style={{
+                width: 152,
+                height: 152,
+                background: "#101827",
+                borderRadius: 38,
+                border: "3px solid #3b82f6",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                marginBottom: 40,
+                boxShadow: "0 0 4px rgba(126,182,255,0.68), 0 0 28px rgba(59,130,246,0.30), 0 14px 34px rgba(59,130,246,0.18)",
+                cursor: "pointer"
+              }}
+            >
+              <IconPause s={84} c="#7eb6ff" />
+            </div>
+```
+
+#### Por qué se cambió
+Se añade interacción al recuadro del icono de pausa de la pantalla de turno pausado para que el usuario pueda reanudar su turno de forma intuitiva haciendo click en él además del botón continuar.
+
+## 2026-05-30 19:54 - Extraer pantallas de resumen y edicion de main.tsx
+
+**Archivos modificados:** `src/screens/summary-screen.tsx`, `src/screens/edit-turno-screen.tsx`, `src/main.tsx`, `src/__tests__/summary-layout.test.ts`, `src/__tests__/responsive-title-fonts.test.ts`, `src/__tests__/detailed-notes-layout.test.ts`
+
+### Cambio 1 - Crear pantalla de resumen en archivo independiente
+
+#### Código anterior
+```
+`No existía SummaryScreen en src/screens/summary-screen.tsx.`
+```
+
+#### Código nuevo
+```tsx
+import { type FC } from "react";
+import { Shell } from "../components/shell";
+import { IconBack } from "../components/navigation-icons";
+import { IconPencilNeon } from "../components/calendar-icons";
+// ... (resto del archivo summary-screen.tsx)
+```
+
+#### Por qué se cambió
+Se extrae la pantalla de Resumen de Turno de main.tsx a un archivo de componente exclusivo para modularizar y facilitar el mantenimiento del código.
+
+### Cambio 2 - Crear pantalla de edición de turno en archivo independiente
+
+#### Código anterior
+```
+`No existía EditTurnoScreen en src/screens/edit-turno-screen.tsx.`
+```
+
+#### Código nuevo
+```tsx
+import { type FC, useState } from "react";
+import { Shell } from "../components/shell";
+import { IconBack, IconDel } from "../components/navigation-icons";
+// ... (resto del archivo edit-turno-screen.tsx)
+```
+
+#### Por qué se cambió
+Se desacopla la pantalla de Edición de Turno de main.tsx a su propio archivo de componente manteniendo todos sus diálogos locales y feedback háptico.
+
+### Cambio 3 - Importar y renderizar nuevas pantallas en main.tsx
+
+#### Código anterior
+```tsx
+// ... importaciones ...
+import { fmtDuration, fmtKm, fmtKmNumber, fmtMoney, fmtMoneyNumber, fmt } from "./logic/formatters";
+// ...
+  if (screen === 'summary' && viewTurno) {
+    const vP = viewTurno.entries.filter((e: any) => e.type === 'propina').reduce((s: number, e: any) => s + e.amount, 0);
+    // ... [cerca de 750 líneas de JSX para summary y editTurno] ...
+  }
+```
+
+#### Código nuevo
+```tsx
+import { SummaryScreen } from "./screens/summary-screen";
+import { EditTurnoScreen } from "./screens/edit-turno-screen";
+// ...
+  if (screen === 'summary' && viewTurno) {
+    return (
+      <SummaryScreen
+        viewTurno={viewTurno}
+        settings={settings}
+        returnScreen={returnScreen}
+        setViewTurno={setViewTurno}
+        setReturnScreen={setReturnScreen}
+        setScreen={setScreen}
+        setEditJ={setEditJ}
+        setHistory={setHistory}
+        confirmDialog={confirmDialog}
+        setConfirmDialog={setConfirmDialog}
+      />
+    );
+  }
+
+  if (screen === 'editTurno' && editJ) {
+    return (
+      <EditTurnoScreen
+        editJ={editJ}
+        setEditJ={setEditJ}
+        setHistory={setHistory}
+        setViewTurno={setViewTurno}
+        setScreen={setScreen}
+        endField={endField}
+        setEndField={setEndField}
+      />
+    );
+  }
+```
+
+#### Por qué se cambió
+Se redujo significativamente la complejidad de main.tsx delegando el renderizado de estas dos pantallas a los nuevos componentes.
+
+### Cambio 4 - Actualizar ruta del archivo leido en summary-layout.test.ts
+
+#### Código anterior
+```ts
+  const source = readFileSync(resolve("src/main.tsx"), "utf8");
+```
+
+#### Código nuevo
+```ts
+  const source = readFileSync(resolve("src/screens/summary-screen.tsx"), "utf8");
+```
+
+#### Por qué se cambió
+La pantalla de resumen ahora está en summary-screen.tsx, por lo que el test estático debe analizar este archivo.
+
+### Cambio 5 - Actualizar archivo analizado en responsive-title-fonts.test.ts
+
+#### Código anterior
+```ts
+describe("Responsive title fonts", () => {
+  const source = readFileSync(resolve("src/main.tsx"), "utf8");
+```
+
+#### Código nuevo
+```ts
+describe("Responsive title fonts", () => {
+  const source = readFileSync(resolve("src/screens/summary-screen.tsx"), "utf8");
+```
+
+#### Por qué se cambió
+La aserción comprueba el tamaño de fuente responsivo del título del resumen que ahora vive en summary-screen.tsx.
+
+### Cambio 6 - Añadir lecturas y adaptar aserciones en detailed-notes-layout.test.ts
+
+#### Código anterior
+```ts
+describe("Detailed notes layout", () => {
+  const source = readFileSync(resolve("src/main.tsx"), "utf8");
+
+  const summaryIconsSource = readFileSync(resolve("src/components/summary-icons.tsx"), "utf8");
+```
+
+#### Código nuevo
+```ts
+describe("Detailed notes layout", () => {
+  const source = readFileSync(resolve("src/main.tsx"), "utf8");
+  const summarySource = readFileSync(resolve("src/screens/summary-screen.tsx"), "utf8");
+  const editTurnoSource = readFileSync(resolve("src/screens/edit-turno-screen.tsx"), "utf8");
+
+  const summaryIconsSource = readFileSync(resolve("src/components/summary-icons.tsx"), "utf8");
+```
+
+#### Por qué se cambió
+Se adaptan los tests de regresión estáticos para buscar las notas detalladas y la pantalla de edición en las nuevas rutas de las pantallas extraídas.
+
+### Cambio 7 - Añadir comentario de teclado in-app en edit-turno-screen.tsx
+
+#### Código anterior
+```tsx
+        </div>
+      </div>
+
+      {endField && (
+```
+
+#### Código nuevo
+```tsx
+        </div>
+      </div>
+
+      {/* Teclado in-app para Dinero / KM en Editar Turno */}
+      {endField && (
+```
+
+#### Por qué se cambió
+Restaurar el comentario literal buscado por los tests de regresión estáticos del editor de turnos.
+
+## 2026-05-30 19:44 - Consolidar iconos e inline styles en main.tsx
+
+**Archivos modificados:** `src/main.tsx`
+
+### Cambio 1 - Importar iconos comunes en `main.tsx`
+
+#### Código anterior
+```ts
+import { hapticTap, hapticAction } from "./services/haptics";
+import {
+  IconCoin,
+  IconCard,
+  IconAgency,
+  IconExtra,
+  IconFuel,
+  IconNulo,
+} from "./components/entry-icons";
+import {
+  IconBack,
+  IconDel,
+  IconHomeNeon,
+} from "./components/navigation-icons";
+import { CalendarScreen } from "./screens/calendar-screen";
+```
+
+#### Código nuevo
+```ts
+import { hapticTap, hapticAction } from "./services/haptics";
+import {
+  IconCoin,
+  IconCard,
+  IconAgency,
+  IconExtra,
+  IconFuel,
+  IconNulo,
+} from "./components/entry-icons";
+import {
+  IconBack,
+  IconDel,
+  IconHomeNeon,
+} from "./components/navigation-icons";
+import { IconTimer, IconMoneyBag, IconPencilNeon } from "./components/calendar-icons";
+import { IconRocket, IconClipboard, IconChart, IconReservaWrite, IconAgenda } from "./components/home-icons";
+import { IconNoteAdd, IconTaxiBadgeNeon, IconGive, IconRoad, IconPinNeon } from "./components/summary-icons";
+import { IconReceipt, IconHoliday } from "./components/settings-icons";
+import { CalendarScreen } from "./screens/calendar-screen";
+```
+
+#### Por qué se cambió
+Se importan los iconos compartidos consolidados en lugar de definirlos de manera local y redundante en `main.tsx`.
+
+### Cambio 2 - Eliminar constantes locales de iconos en `main.tsx`
+
+#### Código anterior
+```ts
+const IconPencilNeon = ({ s = 28 }: { s?: number }) => (
+  // ... svg local ...
+);
+// ... y otros 14 iconos locales: IconReservaWrite, IconNoteAdd, IconTaxiBadgeNeon, IconReceipt, IconGive, IconHoliday, IconTimer, IconRoad, IconPinNeon, IconMoneyBag, IconAgenda, IconClipboard, IconChart, IconRocket
+```
+
+#### Código nuevo
+```
+(El bloque completo de definiciones de iconos locales fue removido de main.tsx)
+```
+
+#### Por qué se cambió
+Eliminar la duplicidad de componentes de iconos SVG redundantes que ya se encuentran disponibles en los archivos de utilidades de iconos comunes del proyecto.
+
+### Cambio 3 - Extraer estilos de reserva inline de la función render de App
+
+#### Código anterior
+```ts
+const NOTE_TIME_STYLE = {
+  fontSize: 12,
+  color: "rgba(255,255,255,0.45)",
+  fontWeight: 700,
+  whiteSpace: "nowrap",
+  flexShrink: 0,
+  alignSelf: "baseline",
+} as const;
+```
+...
+```ts
+    }
+    setShowReservaDialog(false);
+  };
+
+  const reservaInputStyle = {
+    width: "100%",
+    background: "rgba(0,0,0,0.28)",
+    border: "1px solid rgba(255,255,255,0.11)",
+    borderRadius: 14,
+    color: "white",
+    padding: "13px 14px",
+    fontSize: 15,
+    outline: "none",
+    boxSizing: "border-box" as const,
+  };
+
+  const renderReservaLabel = (primary: string, secondary: string, required = false) => (
+    // ...
+  );
+
+  const renderReservaSection = (title: string, subtitle: string) => (
+    // ...
+  );
+
+  const reservaFieldGroupStyle = {
+    marginLeft: 10,
+    paddingLeft: 12,
+    borderLeft: `1px solid ${C}55`,
+  };
+```
+
+#### Código nuevo
+```ts
+const NOTE_TIME_STYLE = {
+  fontSize: 12,
+  color: "rgba(255,255,255,0.45)",
+  fontWeight: 700,
+  whiteSpace: "nowrap",
+  flexShrink: 0,
+  alignSelf: "baseline",
+} as const;
+
+const reservaInputStyle = {
+  width: "100%",
+  background: "rgba(0,0,0,0.28)",
+  border: "1px solid rgba(255,255,255,0.11)",
+  borderRadius: 14,
+  color: "white",
+  padding: "13px 14px",
+  fontSize: 15,
+  outline: "none",
+  boxSizing: "border-box" as const,
+};
+
+const reservaFieldGroupStyle = {
+  marginLeft: 10,
+  paddingLeft: 12,
+  borderLeft: `1px solid ${C}55`,
+};
+```
+...
+```ts
+    }
+    setShowReservaDialog(false);
+  };
+
+  const renderReservaLabel = (primary: string, secondary: string, required = false) => (
+    // ...
+  );
+
+  const renderReservaSection = (title: string, subtitle: string) => (
+    // ...
+  );
+```
+
+#### Por qué se cambió
+Mover variables de estilos de React fuera de las funciones de render para evitar la recreación innecesaria de objetos en memoria en cada ciclo de render.
+
+## 2026-05-30 19:38 - Añadir store Zustand y migrar pantallas de detalle a selectores
+
+**Archivos modificados:** `src/services/store.ts`, `src/main.tsx`, `src/screens/add-nota-general-screen.tsx`, `src/screens/detalle-anual-screen.tsx`, `src/screens/detalle-mes-screen.tsx`, `src/screens/detalle-semana-screen.tsx`, `src/screens/liquidacion-semana-screen.tsx`, `src/__tests__/store-extraction.test.ts`, `src/__tests__/state-loaders-extraction.test.ts`
+
+### Cambio 1 - Crear store global de Zustand
+
+#### Código anterior
+`No existía src/services/store.ts.`
+
+#### Código nuevo
+```ts
+import { create } from "zustand";
+import type {
+  AppSettings,
+  CurrentState,
+  NotaCalendario,
+  Reserva,
+  Turno,
+  WeekOverride,
+} from "../shared/types";
+import {
+  loadCurrent,
+  loadHistory,
+  loadNotes,
+  loadReservations,
+  loadSettings,
+  loadWeekOverrides,
+} from "../logic/state-loaders";
+
+/**
+ * Store global de la aplicación (Zustand v5).
+ *
+ * Diseño:
+ *  - Slice de NEGOCIO: los 6 dominios (current, history, reservations, notes,
+ *    settings, weekOverrides) + flags de sincronización (dataLoaded, loadTimedOut)
+ *    + isAdmin.
+ *  - Slice de NAVEGACIÓN: separado conceptualmente (screen + navigationStack +
+ *    setScreen/goBack/resetNavigation) para no acoplar navegación con datos.
+ *
+ * Los setters imitan la firma de React `Dispatch<SetStateAction<T>>`
+ * (aceptan un valor o una función updater) para poder migrar `App` y
+ * `useFirestoreSync` SIN reescribir las ~3000 líneas que ya consumen
+ * `setCurrent(prev => ...)`, `setHistory(...)`, etc.
+ */
+
+type Updater<T> = T | ((prev: T) => T);
+
+function resolve<T>(prev: T, value: Updater<T>): T {
+  return typeof value === "function" ? (value as (p: T) => T)(prev) : value;
+}
+
+// --- Slice de negocio ---------------------------------------------------------
+interface BusinessSlice {
+  current: CurrentState;
+  history: Turno[];
+  reservations: Reserva[];
+  notes: NotaCalendario[];
+  settings: AppSettings;
+  weekOverrides: WeekOverride[];
+
+  dataLoaded: boolean;
+  loadTimedOut: boolean;
+  isAdmin: boolean;
+
+  setCurrent: (value: Updater<CurrentState>) => void;
+  setHistory: (value: Updater<Turno[]>) => void;
+  setReservations: (value: Updater<Reserva[]>) => void;
+  setNotes: (value: Updater<NotaCalendario[]>) => void;
+  setSettings: (value: Updater<AppSettings>) => void;
+  setWeekOverrides: (value: Updater<WeekOverride[]>) => void;
+
+  setDataLoaded: (value: Updater<boolean>) => void;
+  setLoadTimedOut: (value: Updater<boolean>) => void;
+  setIsAdmin: (value: Updater<boolean>) => void;
+}
+
+// --- Slice de navegación ------------------------------------------------------
+interface NavigationSlice {
+  screen: string;
+  navigationStack: string[];
+  /** Navega a una pantalla apilándola en el historial. */
+  setScreen: (value: Updater<string>) => void;
+  /** Vuelve a la pantalla anterior del stack. Devuelve false si ya estaba en la raíz. */
+  goBack: () => boolean;
+  /** Reinicia la navegación a una pantalla raíz (p. ej. al hacer login/logout). */
+  resetNavigation: (root?: string) => void;
+}
+
+export type AppStore = BusinessSlice & NavigationSlice;
+
+const INITIAL_SCREEN = "home";
+
+export const useAppStore = create<AppStore>((set, get) => ({
+  // --- negocio: estado inicial leído de localStorage (igual que antes) ---
+  current: loadCurrent(),
+  history: loadHistory(),
+  reservations: loadReservations(),
+  notes: loadNotes(),
+  settings: loadSettings(),
+  weekOverrides: loadWeekOverrides(),
+
+  dataLoaded: false,
+  loadTimedOut: false,
+  isAdmin: false,
+
+  setCurrent: (value) => set((s) => ({ current: resolve(s.current, value) })),
+  setHistory: (value) => set((s) => ({ history: resolve(s.history, value) })),
+  setReservations: (value) =>
+    set((s) => ({ reservations: resolve(s.reservations, value) })),
+  setNotes: (value) => set((s) => ({ notes: resolve(s.notes, value) })),
+  setSettings: (value) => set((s) => ({ settings: resolve(s.settings, value) })),
+  setWeekOverrides: (value) =>
+    set((s) => ({ weekOverrides: resolve(s.weekOverrides, value) })),
+
+  setDataLoaded: (value) => set((s) => ({ dataLoaded: resolve(s.dataLoaded, value) })),
+  setLoadTimedOut: (value) =>
+    set((s) => ({ loadTimedOut: resolve(s.loadTimedOut, value) })),
+  setIsAdmin: (value) => set((s) => ({ isAdmin: resolve(s.isAdmin, value) })),
+
+  // --- navegación ---
+  screen: INITIAL_SCREEN,
+  navigationStack: [INITIAL_SCREEN],
+
+  setScreen: (value) =>
+    set((s) => {
+      const next = resolve(s.screen, value);
+      if (next === s.screen) return s;
+      return { screen: next, navigationStack: [...s.navigationStack, next] };
+    }),
+
+  goBack: () => {
+    const { navigationStack } = get();
+    if (navigationStack.length <= 1) return false;
+    const stack = navigationStack.slice(0, -1);
+    set({ screen: stack[stack.length - 1], navigationStack: stack });
+    return true;
+  },
+
+  resetNavigation: (root = INITIAL_SCREEN) =>
+    set({ screen: root, navigationStack: [root] }),
+}));
+```
+
+#### Por qué se cambió
+Centralizar el estado de negocio (current, history, reservations, notes, settings, weekOverrides) y la navegación (screen + navigationStack + goBack/resetNavigation) en un único store para eliminar el prop drilling. Los setters imitan la firma de useState (valor o updater) para poder migrar sin reescribir el resto de App.
+
+### Cambio 2 - Retroceso tras cerrar turno lleva a la lista de turnos
+
+#### Código anterior
+```tsx
+    setViewTurno(turno);
+    setScreen("summary");
+  }
+```
+
+#### Código nuevo
+```tsx
+    setViewTurno(turno);
+    // Tras cerrar el turno, el recorrido de navegación queda como
+    // PantallaTurnos -> summary, de modo que el botón "atrás" desde el
+    // resumen lleve a la lista de turnos (como si se hubiera abierto desde
+    // ahí), nunca de vuelta a la pantalla de confirmar cierre.
+    useAppStore.getState().resetNavigation("PantallaTurnos");
+    setScreen("summary");
+  }
+```
+
+#### Por qué se cambió
+Al cerrar turno e ir al resumen, el botón físico de atrás volvía a la pantalla de confirmar cierre (con el turno ya cerrado), pudiendo crear un turno vacío. Reiniciar el stack a PantallaTurnos hace que atrás lleve a la lista de turnos.
+
+### Cambio 3 - Migrar pantallas de detalle a selectores del store
+
+#### Código anterior (ejemplo, detalle-anual-screen.tsx)
+```tsx
+export function DetalleAnualScreen({
+  history,
+  settings,
+  selectedAccountingYear,
+  setSelectedAccountingYear,
+  selectedAccountingMonth,
+  setSelectedAccountingMonth,
+  setScreen,
+}: Props) {
+```
+
+#### Código nuevo
+```tsx
+export function DetalleAnualScreen({
+  selectedAccountingYear,
+  setSelectedAccountingYear,
+  selectedAccountingMonth,
+  setSelectedAccountingMonth,
+}: Props) {
+  const history: Turno[] = useAppStore((s) => s.history);
+  const settings: AppSettings = useAppStore((s) => s.settings);
+  const setScreen = useAppStore((s) => s.setScreen);
+```
+
+#### Por qué se cambió
+DetalleAnualScreen, DetalleMesScreen, DetalleSemanaScreen, LiquidacionSemanaScreen y AddNotaGeneralScreen leían history/settings/weekOverrides/setScreen/setCurrent por props desde App. Ahora los leen por selectores del store, reduciendo el prop drilling. Se quitaron también esas props de las invocaciones en main.tsx.
+
+### Cambio 4 - Limpiar imports de iconos sin usar y de state-loaders en main.tsx
+
+#### Código anterior
+```tsx
+import {
+  IconBack,
+  IconDel,
+  IconRefresh,
+  IconDownload,
+  IconUpload,
+  IconCalendar,
+  IconSettings,
+  IconHomeNeon,
+  IconLogoutNeon,
+  IconAdminNeon,
+} from "./components/navigation-icons";
+```
+
+#### Código nuevo
+```tsx
+import {
+  IconBack,
+  IconDel,
+  IconHomeNeon,
+} from "./components/navigation-icons";
+```
+
+#### Por qué se cambió
+Tras centralizar el estado en el store, varios imports quedaron sin uso: 8 iconos (IconPercent, IconRefresh, IconDownload, IconUpload, IconCalendar, IconSettings, IconLogoutNeon, IconAdminNeon) y el import de state-loaders (loadCurrent, etc., que ahora consume el store). Se eliminaron para no dejar código muerto.
+
+### Cambio 5 - Test del contrato del store
+
+#### Código anterior
+`No existía src/__tests__/store-extraction.test.ts.`
+
+#### Código nuevo
+`Test nuevo que verifica vía useAppStore.getState(): setCurrent (valor y updater), y el slice de navegación (setScreen apila, goBack retrocede/devuelve false en raíz, resetNavigation reinicia el stack para el flujo post-cierre de turno).`
+
+#### Por qué se cambió
+Validar el contrato del store en el que se apoyan las pantallas migradas, en el mismo estilo de tests de lógica del proyecto (sin React).
+
+### Cambio 6 - Actualizar test de extracción de state-loaders
+
+#### Código anterior
+```ts
+    expect(mainSource).toContain('from "./logic/state-loaders"');
+    expect(mainSource).not.toMatch(/^function loadSettings\(/m);
+```
+
+#### Código nuevo
+```ts
+    // Tras centralizar el estado en el store (Fase 2), los loaders los consume
+    // el store, no main.tsx. Lo que importa es que sigan FUERA de main.tsx.
+    const storeSource = readFileSync(resolve("src/services/store.ts"), "utf8");
+    expect(storeSource).toContain('from "../logic/state-loaders"');
+    expect(mainSource).not.toMatch(/^function loadSettings\(/m);
+```
+
+#### Por qué se cambió
+El test verificaba que main.tsx importaba los loaders (arquitectura previa). Tras la migración los consume el store; se actualiza el aserto para comprobar que el store los importa y que siguen fuera de main.tsx.
+
+## 2026-05-30 19:37 - Añadir feedback háptico e indicador de sincronización
+
+**Archivos modificados:**
+- `package.json`
+- `index.html`
+- `src/services/haptics.ts`
+- `src/hooks/use-network-status.ts`
+- `src/components/sync-indicator.tsx`
+- `src/components/shell.tsx`
+- `src/screens/add-entry-screen.tsx`
+- `src/screens/add-single-entry-screen.tsx`
+- `src/screens/confirm-end-screen.tsx`
+- `src/screens/settings-screen.tsx`
+- `src/main.tsx`
+
+### Cambio 1 - Instalar dependencia @capacitor/haptics
+
+#### Código anterior
+```json
+  "dependencies": {
+    "@capacitor/app": "^6.0.3",
+    "@capacitor/core": "^6.2.0",
+    "@capacitor/filesystem": "^6.0.3",
+    "@capacitor/share": "^6.0.3",
+    "firebase": "^11.0.0",
+    "html2canvas": "^1.4.1",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "zustand": "^5.0.14"
+  },
+```
+
+#### Código nuevo
+```json
+  "dependencies": {
+    "@capacitor/app": "^6.0.3",
+    "@capacitor/core": "^6.2.0",
+    "@capacitor/filesystem": "^6.0.3",
+    "@capacitor/haptics": "^6.0.0",
+    "@capacitor/share": "^6.0.3",
+    "firebase": "^11.0.0",
+    "html2canvas": "^1.4.1",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "zustand": "^5.0.14"
+  },
+```
+
+#### Por qué se cambió
+Se requiere el plugin oficial de Capacitor para dar soporte de feedback háptico en dispositivos nativos.
+
+### Cambio 2 - Crear servicio de feedback háptico
+
+#### Código anterior
+```
+No existía haptics.ts en src/services.
+```
+
+#### Código nuevo
+```ts
+import { Capacitor } from '@capacitor/core';
+
+let hapticsModule: any = null;
+
+async function getHaptics() {
+  if (!Capacitor.isNativePlatform()) {
+    return null;
+  }
+  if (!hapticsModule) {
+    try {
+      hapticsModule = await import('@capacitor/haptics');
+    } catch (e) {
+      console.warn('Error cargando módulo de haptics:', e);
+      return null;
+    }
+  }
+  return hapticsModule;
+}
+
+export async function hapticTap(): Promise<void> {
+  const haptics = await getHaptics();
+  if (haptics) {
+    try {
+      await haptics.Haptics.impact({ style: haptics.ImpactStyle.Light });
+    } catch (e) {
+      console.warn('Error en hapticTap:', e);
+    }
+  }
+}
+
+export async function hapticConfirm(): Promise<void> {
+  const haptics = await getHaptics();
+  if (haptics) {
+    try {
+      await haptics.Haptics.impact({ style: haptics.ImpactStyle.Medium });
+    } catch (e) {
+      console.warn('Error en hapticConfirm:', e);
+    }
+  }
+}
+
+export async function hapticAction(): Promise<void> {
+  const haptics = await getHaptics();
+  if (haptics) {
+    try {
+      await haptics.Haptics.impact({ style: haptics.ImpactStyle.Heavy });
+    } catch (e) {
+      console.warn('Error en hapticAction:', e);
+    }
+  }
+}
+```
+
+#### Por qué se cambió
+Centraliza la lógica de feedback háptico con imports dinámicos para evitar fallos en entornos web o tests.
+
+### Cambio 3 - Añadir háptico a add-entry-screen.tsx
+
+#### Código anterior
+```ts
+import { type FC } from "react";
+import { Shell } from "../components/shell";
+import { IconBack, IconDel } from "../components/navigation-icons";
+import { G, P } from "../shared/ui-theme";
+import { timeNow, today } from "../logic/date-time";
+import type { CurrentState, Entry } from "../shared/types";
+```
+...
+```ts
+  function kpAdd(v: string) {
+    if (v === "DEL") {
+      setVal((p) => p.slice(0, -1));
+      return;
+    }
+    if (v === ",") {
+      if (!curVal.includes(",")) setVal((p) => p + ",");
+      return;
+    }
+    if (curVal.replace(",", "").length >= 6) return;
+    setVal((p) => p + v);
+  }
+
+  function handleSaveAdd() {
+    const p = parseFloat(valP.replace(",", "."));
+    const d = parseFloat(valD.replace(",", "."));
+```
+
+#### Código nuevo
+```ts
+import { type FC } from "react";
+import { Shell } from "../components/shell";
+import { IconBack, IconDel } from "../components/navigation-icons";
+import { G, P } from "../shared/ui-theme";
+import { timeNow, today } from "../logic/date-time";
+import type { CurrentState, Entry } from "../shared/types";
+import { hapticTap, hapticConfirm } from "../services/haptics";
+```
+...
+```ts
+  function kpAdd(v: string) {
+    hapticTap();
+    if (v === "DEL") {
+      setVal((p) => p.slice(0, -1));
+      return;
+    }
+    if (v === ",") {
+      if (!curVal.includes(",")) setVal((p) => p + ",");
+      return;
+    }
+    if (curVal.replace(",", "").length >= 6) return;
+    setVal((p) => p + v);
+  }
+
+  function handleSaveAdd() {
+    hapticConfirm();
+    const p = parseFloat(valP.replace(",", "."));
+    const d = parseFloat(valD.replace(",", "."));
+```
+
+#### Por qué se cambió
+Brindar respuesta física (vibración ligera en teclado, moderada al guardar) en la pantalla de añadir entrada.
+
+### Cambio 4 - Añadir háptico a add-single-entry-screen.tsx
+
+#### Código anterior
+```ts
+import { type FC, type CSSProperties } from "react";
+import { Shell } from "../components/shell";
+import { IconBack, IconDel } from "../components/navigation-icons";
+import { A, ABG, E, EBG, F, FBG, N, NBG } from "../shared/ui-theme";
+import { timeNow, today } from "../logic/date-time";
+import type { Entry } from "../shared/types";
+```
+...
+```ts
+  function kpS(v: string) {
+    if (v === "DEL") {
+      setValS((p) => p.slice(0, -1));
+      return;
+    }
+    if (v === ",") {
+      if (!valS.includes(",")) setValS((p) => p + ",");
+      return;
+    }
+    if (valS.replace(",", "").length >= 6) return;
+    setValS((p) => p + v);
+  }
+
+  const validS = valS && parseFloat(valS.replace(",", ".")) > 0;
+
+  function saveS() {
+    if (!validS) return;
+```
+
+#### Código nuevo
+```ts
+import { type FC, type CSSProperties } from "react";
+import { Shell } from "../components/shell";
+import { IconBack, IconDel } from "../components/navigation-icons";
+import { A, ABG, E, EBG, F, FBG, N, NBG } from "../shared/ui-theme";
+import { timeNow, today } from "../logic/date-time";
+import type { Entry } from "../shared/types";
+import { hapticTap, hapticConfirm } from "../services/haptics";
+```
+...
+```ts
+  function kpS(v: string) {
+    hapticTap();
+    if (v === "DEL") {
+      setValS((p) => p.slice(0, -1));
+      return;
+    }
+    if (v === ",") {
+      if (!valS.includes(",")) setValS((p) => p + ",");
+      return;
+    }
+    if (valS.replace(",", "").length >= 6) return;
+    setValS((p) => p + v);
+  }
+
+  const validS = valS && parseFloat(valS.replace(",", ".")) > 0;
+
+  function saveS() {
+    hapticConfirm();
+    if (!validS) return;
+```
+
+#### Por qué se cambió
+Brindar respuesta física al ingresar valores y guardar gastos/extras/gasolina.
+
+### Cambio 5 - Añadir háptico a confirm-end-screen.tsx
+
+#### Código anterior
+```ts
+import type { CurrentState, AppSettings, Entry } from "../shared/types";
+```
+...
+```ts
+  function kpEnd(v: string) {
+    if (!endField) return;
+```
+...
+```ts
+          <button onClick={onEndTurno}
+            style={{ padding: "15px 0", borderRadius: 16, border: "none", background: "rgba(255,60,60,0.12)", color: "rgba(255,110,110,0.9)", fontSize: 16, fontWeight: 800, cursor: "pointer", outline: "1.5px solid rgba(255,60,60,0.25)" }}>
+            Terminar Turno
+          </button>
+```
+...
+```ts
+            <button
+              onClick={() => setEndField(null)}
+              style={{
+```
+
+#### Código nuevo
+```ts
+import type { CurrentState, AppSettings, Entry } from "../shared/types";
+import { hapticTap, hapticConfirm, hapticAction } from "../services/haptics";
+```
+...
+```ts
+  function kpEnd(v: string) {
+    hapticTap();
+    if (!endField) return;
+```
+...
+```ts
+          <button onClick={() => { hapticAction(); onEndTurno(); }}
+            style={{ padding: "15px 0", borderRadius: 16, border: "none", background: "rgba(255,60,60,0.12)", color: "rgba(255,110,110,0.9)", fontSize: 16, fontWeight: 800, cursor: "pointer", outline: "1.5px solid rgba(255,60,60,0.25)" }}>
+            Terminar Turno
+          </button>
+```
+...
+```ts
+            <button
+              onClick={() => { hapticConfirm(); setEndField(null); }}
+              style={{
+```
+
+#### Por qué se cambió
+Añadir vibración al teclado numérico de fin de turno y vibración intensa al finalizar turno definitivamente.
+
+### Cambio 6 - Añadir háptico a settings-screen.tsx
+
+#### Código anterior
+```ts
+import { IconDel } from "../components/navigation-icons";
+```
+...
+```ts
+              {["1", "2", "3", "4", "5", "6", "7", "8", "9", "DEL", "0", ","].map((k) => (
+                <button key={k} aria-label={k === "DEL" ? "Borrar" : k === "," ? "Coma decimal" : k}
+                  onClick={() => {
+                    let next = settingsValStr;
+                    if (k === "DEL") next = next.slice(0, -1);
+                    else if (k === ",") { if (!next.includes(",")) next = next + ","; else return; }
+                    else { if (next.replace(",", "").length >= 3) return; next = next + k; }
+                    setSettingsValStr(next);
+                  }}
+```
+...
+```ts
+            <button
+              onClick={() => {
+                const val = parseFloat(settingsValStr.replace(",", ".")) || 0;
+```
+
+#### Código nuevo
+```ts
+import { IconDel } from "../components/navigation-icons";
+import { hapticTap, hapticConfirm } from "../services/haptics";
+```
+...
+```ts
+              {["1", "2", "3", "4", "5", "6", "7", "8", "9", "DEL", "0", ","].map((k) => (
+                <button key={k} aria-label={k === "DEL" ? "Borrar" : k === "," ? "Coma decimal" : k}
+                  onClick={() => {
+                    hapticTap();
+                    let next = settingsValStr;
+                    if (k === "DEL") next = next.slice(0, -1);
+                    else if (k === ",") { if (!next.includes(",")) next = next + ","; else return; }
+                    else { if (next.replace(",", "").length >= 3) return; next = next + k; }
+                    setSettingsValStr(next);
+                  }}
+```
+...
+```ts
+            <button
+              onClick={() => {
+                hapticConfirm();
+                const val = parseFloat(settingsValStr.replace(",", ".")) || 0;
+```
+
+#### Por qué se cambió
+Ofrecer feedback táctil al ajustar el porcentaje de reparto en la configuración.
+
+### Cambio 7 - Añadir háptico a main.tsx
+
+#### Código anterior
+```ts
+import { APP_VERSION } from "./shared/app-version";
+```
+...
+```ts
+  function togglePause() {
+    const now = timeNow();
+```
+...
+```ts
+    function kpEdit(v: string) {
+      if (!editJ || !endField) return;
+```
+...
+```ts
+                    <div style={{ position: 'relative', zIndex: 99, display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 6, marginTop: 4, marginBottom: 4, animation: 'fadeUp 0.2s ease' }}>
+                      {["1", "2", "3", "4", "5", "6", "7", "8", "9", "DEL", "0", ","].map((k) => (
+                        <button key={k} aria-label={k === "DEL" ? "Borrar" : k === "," ? "Coma decimal" : k} onClick={(e) => {
+                          e.preventDefault();
+```
+...
+```ts
+                  <button
+                    onClick={() => {
+                      setCurrent({
+```
+
+#### Código nuevo
+```ts
+import { APP_VERSION } from "./shared/app-version";
+import { hapticTap, hapticAction } from "./services/haptics";
+```
+...
+```ts
+  function togglePause() {
+    hapticAction();
+    const now = timeNow();
+```
+...
+```ts
+    function kpEdit(v: string) {
+      hapticTap();
+      if (!editJ || !endField) return;
+```
+...
+```ts
+                    <div style={{ position: 'relative', zIndex: 99, display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 6, marginTop: 4, marginBottom: 4, animation: 'fadeUp 0.2s ease' }}>
+                      {["1", "2", "3", "4", "5", "6", "7", "8", "9", "DEL", "0", ","].map((k) => (
+                        <button key={k} aria-label={k === "DEL" ? "Borrar" : k === "," ? "Coma decimal" : k} onClick={(e) => {
+                          hapticTap();
+                          e.preventDefault();
+```
+...
+```ts
+                  <button
+                    onClick={() => {
+                      hapticAction();
+                      setCurrent({
+```
+
+#### Por qué se cambió
+Dar respuesta háptica al pulsar las teclas numéricas, iniciar el turno y pausar o reanudar el turno.
+
+### Cambio 8 - Crear hook useNetworkStatus
+
+#### Código anterior
+```
+No existía use-network-status.ts en src/hooks.
+```
+
+#### Código nuevo
+```ts
+import { useState, useEffect } from "react";
+import { useAppStore } from "../services/store";
+
+export type NetworkStatus = "online" | "offline" | "error";
+
+export function useNetworkStatus(): NetworkStatus {
+  const dataLoaded = useAppStore((state) => state.dataLoaded);
+  const loadTimedOut = useAppStore((state) => state.loadTimedOut);
+  
+  const [isOnline, setIsOnline] = useState<boolean>(
+    typeof navigator !== "undefined" ? navigator.onLine : true
+  );
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const handleOnline = () => setIsOnline(true);
+    const handleOffline = () => setIsOnline(false);
+
+    window.addEventListener("online", handleOnline);
+    window.addEventListener("offline", handleOffline);
+
+    return () => {
+      window.removeEventListener("online", handleOnline);
+      window.removeEventListener("offline", handleOffline);
+    };
+  }, []);
+
+  if (loadTimedOut) {
+    return "error";
+  }
+
+  if (!isOnline || !dataLoaded) {
+    return "offline";
+  }
+
+  return "online";
+}
+```
+
+#### Por qué se cambió
+Combina el estado nativo de red en el navegador con el estado interno de carga de Firestore para clasificar la conexión.
+
+### Cambio 9 - Crear componente SyncIndicator
+
+#### Código anterior
+```
+No existía sync-indicator.tsx en src/components.
+```
+
+#### Código nuevo
+```tsx
+import { type FC } from "react";
+import { useNetworkStatus } from "../hooks/use-network-status";
+
+export const SyncIndicator: FC = () => {
+  const status = useNetworkStatus();
+
+  const config = {
+    online: {
+      color: "#10b981",
+      shadow: "rgba(16, 185, 129, 0.4)",
+      label: "Sincronizado",
+      animation: "none",
+    },
+    offline: {
+      color: "#f59e0b",
+      shadow: "rgba(245, 158, 11, 0.4)",
+      label: "Modo sin conexión",
+      animation: "pulse-sync 2s infinite ease-in-out",
+    },
+    error: {
+      color: "#ef4444",
+      shadow: "rgba(239, 68, 68, 0.4)",
+      label: "Error de sincronización",
+      animation: "none",
+    },
+  }[status];
+
+  return (
+    <div
+      title={config.label}
+      style={{
+        position: "absolute",
+        bottom: 8,
+        right: 8,
+        width: 8,
+        height: 8,
+        borderRadius: "50%",
+        backgroundColor: config.color,
+        boxShadow: `0 0 6px ${config.shadow}`,
+        animation: config.animation,
+        pointerEvents: "none",
+        zIndex: 1000,
+        transition: "background-color 0.3s ease, box-shadow 0.3s ease",
+      }}
+    />
+  );
+};
+```
+
+#### Por qué se cambió
+Representación visual en forma de pequeño LED para conocer en todo momento el estado de red y sincronización Firestore.
+
+### Cambio 10 - Integrar indicador en el Shell
+
+#### Código anterior
+```tsx
+import type { ReactNode } from "react";
+
+const BURST_GREEN = "oklch(0.68 0.20 145)";
+const BURST_PURPLE = "oklch(0.65 0.20 280)";
+
+export function Shell({
+  children,
+  burst,
+}: {
+  children: ReactNode;
+  burst: boolean;
+}) {
+  return (
+    <div
+      style={{
+        width: "100%",
+        maxWidth: 460,
+        height: "100dvh",
+        display: "flex",
+        flexDirection: "column",
+        background: "#0d0d14",
+        overflow: "hidden",
+        position: "relative",
+        paddingTop: "env(safe-area-inset-top)",
+        paddingBottom: "env(safe-area-inset-bottom)",
+      }}
+    >
+      {burst && <Burst />}
+      {children}
+    </div>
+  );
+}
+```
+
+#### Código nuevo
+```tsx
+import type { ReactNode } from "react";
+import { SyncIndicator } from "./sync-indicator";
+
+const BURST_GREEN = "oklch(0.68 0.20 145)";
+const BURST_PURPLE = "oklch(0.65 0.20 280)";
+
+export function Shell({
+  children,
+  burst,
+}: {
+  children: ReactNode;
+  burst: boolean;
+}) {
+  return (
+    <div
+      style={{
+        width: "100%",
+        maxWidth: 460,
+        height: "100dvh",
+        display: "flex",
+        flexDirection: "column",
+        background: "#0d0d14",
+        overflow: "hidden",
+        position: "relative",
+        paddingTop: "env(safe-area-inset-top)",
+        paddingBottom: "env(safe-area-inset-bottom)",
+      }}
+    >
+      {burst && <Burst />}
+      {children}
+      <SyncIndicator />
+    </div>
+  );
+}
+```
+
+#### Por qué se cambió
+Mostrar el indicador de sincronización de red en la parte inferior derecha del contenedor global de la aplicación.
+
+### Cambio 11 - Añadir animación en index.html
+
+#### Código anterior
+```html
+    @keyframes fadeIn {
+      from {
+        opacity: 0;
+      }
+
+      to {
+        opacity: 1;
+      }
+    }
+
+    input::-webkit-outer-spin-button,
+    input::-webkit-inner-spin-button {
+      -webkit-appearance: none;
+      margin: 0;
+    }
+```
+
+#### Código nuevo
+```html
+    @keyframes fadeIn {
+      from {
+        opacity: 0;
+      }
+
+      to {
+        opacity: 1;
+      }
+    }
+
+    @keyframes pulse-sync {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.35; }
+    }
+
+    input::-webkit-outer-spin-button,
+    input::-webkit-inner-spin-button {
+      -webkit-appearance: none;
+      margin: 0;
+    }
+```
+
+#### Por qué se cambió
+Habilitar la animación CSS de pulso lento necesaria para el estado de red offline del indicador.
+
 ## 2026-05-29 16:49 - Añadir check de tipos y tests al CI
 
 **Archivos modificados:** package.json, .github/workflows/ci.yml
@@ -2605,779 +4261,4 @@ Los iconos de tipo de entrada (IconCoin, IconPercent, IconCard, IconAgency, Icon
 
 #### Código anterior
 ```tsx
-const IconCoin = ({ s = 24, c = G }: { s?: number; c?: string }) => ( ... );
-const IconPercent = ({ s = 24, c = G }: { s?: number; c?: string }) => ( ... );
-const IconCard = ({ s = 24, c = P }: { s?: number; c?: string }) => ( ... );
-const IconAgency = ({ s = 24, c = A }: { s?: number; c?: string }) => ( ... );
-const IconExtra = ({ s = 24, c = E }: { s?: number; c?: string }) => ( ... );
-const IconFuel = ({ s = 24, c = F }: { s?: number; c?: string }) => ( ... );
-const IconNulo = ({ s = 24, c = N }: { s?: number; c?: string }) / ... );
-```
-
-#### Código nuevo
-```tsx
-import { IconCoin, IconPercent, IconCard, IconAgency, IconExtra, IconFuel, IconNulo } from "./components/entry-icons";
-```
-
-#### Por qué se cambió
-Las definiciones inline se sustituyen por los imports del módulo extraído. La modificación real a main.tsx (borrado de las 7 definiciones inline e importación desde entry-icons) se completó el 2026-05-26 01:14 como parte de finalizar esta fase.
-
-## 2026-05-26 01:00 - Extraer iconos de navegación a src/components/navigation-icons.tsx
-
-**Archivos modificados:** `src/components/navigation-icons.tsx`, `src/main.tsx`
-
-### Cambio 1 - Iconos de navegación extraídos
-
-#### Código anterior
-`No existía src/components/navigation-icons.tsx.`
-
-#### Código nuevo
-```tsx
-import { type FC } from "react";
-
-export const IconBack: FC = () => (
-  <svg width="22" height="22" viewBox="0 0 22 22" fill="none">
-    <path d="M14 18L7 11L14 4" stroke="rgba(255,255,255,0.65)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-  </svg>
-);
-
-export const IconDel: FC = () => (
-  <svg width="20" height="16" viewBox="0 0 20 16" fill="none">
-    <path d="M7 2H18C18.55 2 19 2.45 19 3V13C19 13.55 18.55 14 18 14H7L1 8L7 2Z" stroke="rgba(255,255,255,0.45)" strokeWidth="1.7" fill="none" />
-    <path d="M9.5 5.5L14.5 10.5M14.5 5.5L9.5 10.5" stroke="rgba(255,255,255,0.45)" strokeWidth="1.7" strokeLinecap="round" />
-  </svg>
-);
-
-export const IconRefresh: FC<{ s?: number; c?: string }> = ({ s = 20, c = "currentColor" }) => (
-  <svg width={s} height={s} viewBox="0 0 24 24" fill="none">
-    <path d="M4 4V9H9" stroke={c} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-    <path d="M20 20V15H15" stroke={c} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-    <path d="M20 9C18.8289 5.50429 15.6836 3 12 3C7.02944 3 3 7.02944 3 12" stroke={c} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-    <path d="M4 15C5.17112 18.4957 8.31641 21 12 21C16.9706 21 21 16.9706 21 12" stroke={c} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-  </svg>
-);
-
-export const IconDownload: FC<{ s?: number; c?: string }> = ({ s = 20, c = "currentColor" }) => (
-  <svg width={s} height={s} viewBox="0 0 24 24" fill="none">
-    <path d="M12 4V16" stroke={c} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-    <path d="M7 11L12 16L17 11" stroke={c} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-    <path d="M20 20H4" stroke={c} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-  </svg>
-);
-
-export const IconUpload: FC<{ s?: number; c?: string }> = ({ s = 20, c = "currentColor" }) => (
-  <svg width={s} height={s} viewBox="0 0 24 24" fill="none">
-    <path d="M12 20V8" stroke={c} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-    <path d="M7 13L12 8L17 13" stroke={c} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-    <path d="M20 4H4" stroke={c} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-  </svg>
-);
-
-export const IconCalendar: FC<{ s?: number; c?: string }> = ({ s = 24, c = "white" }) => (
-  <svg width={s} height={s} viewBox="0 0 24 24" fill="none" style={{ display: "inline-block", verticalAlign: "middle" }}>
-    <rect x="3" y="4" width="18" height="16" rx="3" stroke={c} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-    <path d="M16 2V6M8 2V6" stroke={c} strokeWidth="1.8" strokeLinecap="round" />
-    <path d="M3 9H21" stroke={c} strokeWidth="1.8" strokeLinecap="round" />
-    <circle cx="7.5" cy="13.5" r="1" fill={c} />
-    <circle cx="12" cy="13.5" r="1" fill={c} />
-    <circle cx="16.5" cy="13.5" r="1" fill={c} />
-    <circle cx="7.5" cy="17.5" r="1" fill={c} opacity="0.6" />
-    <circle cx="12" cy="17.5" r="1" fill={c} opacity="0.6" />
-    <circle cx="16.5" cy="17.5" r="1" fill={c} opacity="0.6" />
-  </svg>
-);
-
-export const IconSettings: FC<{ s?: number; c?: string }> = ({ s = 24, c = "white" }: { s?: number; c?: string }) => (
-  <svg width={s} height={s} viewBox="0 0 24 24" fill="none" style={{ display: "inline-block", verticalAlign: "middle" }}>
-    <path d="M12 15C13.6569 15 15 13.6569 15 12C15 10.3431 13.6569 9 12 9C10.3431 9 9 10.3431 9 12C9 13.6569 10.3431 15 12 15Z" stroke={c} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-    <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1Z" stroke={c} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-  </svg>
-);
-
-export const IconHomeNeon: FC<{ s?: number }> = ({ s = 24 }: { s?: number }) => (
-  <svg width={s} height={s} viewBox="0 0 24 24" fill="none" style={{ display: "inline-block", verticalAlign: "middle" }}>
-    <path d="M4.2 11.2L12 5.2L19.8 11.2" stroke="#ffb347" strokeWidth="2.15" strokeLinecap="round" strokeLinejoin="round" style={{ filter: "drop-shadow(0 0 1.2px rgba(255,190,77,0.75)) drop-shadow(0 0 4px rgba(255,139,61,0.28))" }} />
-    <path d="M6.7 10.3V19H17.3V10.3" stroke="#ffb347" strokeWidth="2" strokeLinejoin="round" style={{ filter: "drop-shadow(0 0 1.2px rgba(255,190,77,0.75)) drop-shadow(0 0 4px rgba(255,139,61,0.28))" }} />
-    <path d="M10 19V14.2H14V19" stroke="#ffe071" strokeWidth="1.8" strokeLinejoin="round" />
-    <path d="M9 11.7H15" stroke="#ffd56a" strokeWidth="1.5" strokeLinecap="round" opacity="0.75" />
-  </svg>
-);
-
-export const IconLogoutNeon: FC<{ s?: number }> = ({ s = 24 }: { s?: number }) => (
-  <svg width={s} height={s} viewBox="0 0 24 24" fill="none" style={{ display: "inline-block", verticalAlign: "middle" }}>
-    <g transform="rotate(180 12 12)">
-      <path d="M10.5 5.2H5.8C4.8 5.2 4 6 4 7V17C4 18 4.8 18.8 5.8 18.8H10.5" stroke="#ff7a8a" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ filter: "drop-shadow(0 0 1.2px rgba(255,122,138,0.8)) drop-shadow(0 0 5px rgba(255,70,105,0.28))" }} />
-      <path d="M11 12H19" stroke="#ffb1bc" strokeWidth="2.2" strokeLinecap="round" style={{ filter: "drop-shadow(0 0 1.2px rgba(255,177,188,0.75)) drop-shadow(0 0 5px rgba(255,70,105,0.28))" }} />
-      <path d="M16 8.5L19.5 12L16 15.5" stroke="#ffb1bc" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" style={{ filter: "drop-shadow(0 0 1.2px rgba(255,177,188,0.75)) drop-shadow(0 0 5px rgba(255,70,105,0.28))" }} />
-    </g>
-  </svg>
-);
-
-export const IconAdminNeon: FC<{ s?: number }> = ({ s = 24 }: { s?: number }) => (
-  <svg width={s} height={s} viewBox="0 0 24 24" fill="none" style={{ display: "inline-block", verticalAlign: "middle" }}>
-    <path d="M12 3.4L19 6.1V11.4C19 15.8 16.2 19.4 12 20.8C7.8 19.4 5 15.8 5 11.4V6.1L12 3.4Z" stroke="#7dd3ff" strokeWidth="2" strokeLinejoin="round" style={{ filter: "drop-shadow(0 0 1.2px rgba(125,211,255,0.8)) drop-shadow(0 0 5px rgba(66,165,245,0.32))" }} />
-    <path d="M9 12.2L11 14.2L15.4 9.8" stroke="#b9f6ff" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" style={{ filter: "drop-shadow(0 0 1.2px rgba(185,246,255,0.78)) drop-shadow(0 0 5px rgba(66,165,245,0.28))" }} />
-  </svg>
-);
-```
-
-#### Por qué se cambió
-Los iconos de navegación (IconBack, IconDel, IconRefresh, IconDownload, IconUpload, IconCalendar, IconSettings, IconHomeNeon, IconLogoutNeon, IconAdminNeon) estaban definidos inline en `main.tsx`. Extraerlos a `src/components/navigation-icons.tsx` los centraliza y elimina ~100 líneas duplicadas.
-
-### Cambio 2 - Reemplazar iconos inline en main.tsx
-
-#### Código anterior
-```tsx
-const IconBack = () => ( ... );
-const IconDel = () => ( ... );
-const IconRefresh = ({ s = 20, c = "currentColor" }) => ( ... );
-const IconDownload = ({ s = 20, c = "currentColor" }) => ( ... );
-const IconUpload = ({ s = 20, c = "currentColor" }) => ( ... );
-const IconCalendar = ({ s = 24, c = "white" }) => ( ... );
-const IconSettings = ({ s = 24, c = "white" }) => ( ... );
-const IconHomeNeon = ({ s = 24 }) => ( ... );
-const IconLogoutNeon = ({ s = 24 }) => ( ... );
-const IconAdminNeon = ({ s = 24 }) => ( ... );
-```
-
-#### Código nuevo
-```tsx
-import { IconBack, IconDel, IconRefresh, IconDownload, IconUpload, IconCalendar, IconSettings, IconHomeNeon, IconLogoutNeon, IconAdminNeon } from "./components/navigation-icons";
-```
-
-#### Por qué se cambió
-Las definiciones inline se sustituyen por los imports del módulo extraído. La modificación real a main.tsx (borrado de las 10 definiciones inline e importación desde navigation-icons) se completó el 2026-05-26 01:14 como parte de finalizar esta fase.
-
-## 2026-05-26 00:32 - Actualizar guías del recorte de main
-
-**Archivos modificados:** `RECORTAR_MAIN_TSX_MEJORADO.md`, `ESTRUCTURA.md`
-
-### Cambio 1 - Estado actual del recorte
-
-#### Código anterior
-`No existía la sección "Estado actual del recorte" en RECORTAR_MAIN_TSX_MEJORADO.md.`
-
-#### Código nuevo
-```md
-## Estado actual del recorte
-
-Estas pantallas ya están extraídas de `src/main.tsx` y no deben volver a duplicarse dentro del archivo principal:
-
-- `src/screens/add-entry-screen.tsx`: pantalla para añadir datáfono y propina.
-- `src/screens/add-nota-general-screen.tsx`: pantalla para añadir una nota general al turno.
-- `src/screens/add-single-entry-screen.tsx`: pantalla para añadir Agencia/Bono, Extra, Gasolina o Nulo.
-
-Las siguientes fases deben continuar por responsabilidades naturales:
-
-- pantallas completas pendientes
-- componentes reutilizables reales
-- lógica pura no contable
-- servicios aislados
-
-No extraer piezas demasiado pequeñas por inercia. Un icono suelto, un estilo aislado o un helper mínimo solo deben extraerse si forman parte de un bloque reutilizable claro, si reducen una dependencia real o si encajan con una responsabilidad ya existente.
-
-Para las pantallas, el criterio profesional es primero separar la pantalla completa cuando tenga frontera clara. Después, si varias pantallas repiten una pieza de interfaz con responsabilidad propia, esa pieza puede moverse a `src/components/` en una fase posterior.
-```
-
-#### Por qué se cambió
-El documento necesitaba reflejar que las pantallas de entrada ya están extraídas y orientar las siguientes fases hacia responsabilidades naturales, no hacia piezas sueltas sin frontera clara.
-
-### Cambio 2 - Reglas del registro documental
-
-#### Código anterior
-```md
-- `Código anterior` debe contener el fragmento literal que estaba en `main.tsx` antes de extraerlo, o el texto literal de ausencia exigido por `AGENTS.md` si el bloque no existía.
-- `Código nuevo` debe contener el fragmento literal que quedó después, normalmente el nuevo import, el nuevo export o el nuevo bloque en el archivo destino.
-- Si el código ya no existe en `main.tsx`, no usar frases sueltas mal formateadas. Usar un bloque Markdown válido que muestre el import/export nuevo o una frase literal válida dentro de un fence correcto.
-- Los fences Markdown deben estar bien formados: abrir con triple backtick y cerrar con triple backtick.
-- No usar backticks mezclados, fences rotos ni combinaciones como `` `texto` `` envueltas en backticks sueltos.
-```
-
-#### Código nuevo
-```md
-- `Código anterior` debe contener el fragmento literal que estaba en `main.tsx` antes de extraerlo, o el texto literal de ausencia exigido por `AGENTS.md` si el bloque no existía.
-- `Código nuevo` debe contener el fragmento literal que quedó después, normalmente el nuevo import, el nuevo export o el nuevo bloque en el archivo destino.
-- Si el código ya no existe en `main.tsx`, no usar frases sueltas mal formateadas. Usar un bloque Markdown válido que muestre el import/export nuevo o una frase literal válida dentro de un fence correcto.
-- No usar `...`, placeholders, resúmenes ni comentarios inventados como sustituto del código literal dentro de `Código anterior` o `Código nuevo`.
-- El texto documental de la entrada debe escribirse en español. Evitar inglés innecesario cuando exista una forma clara en español.
-- Los fences Markdown deben estar bien formados: abrir con triple backtick y cerrar con triple backtick.
-- No usar backticks mezclados, fences rotos ni combinaciones como `` `texto` `` envueltas en backticks sueltos.
-```
-
-#### Por qué se cambió
-Las fases recientes mostraron que el registro podía quedar con placeholders, resúmenes o texto en inglés. Se reforzó la regla para que `CAMBIOS_AGENT.md` sea literal y revisable.
-
-### Cambio 3 - Registro de cambios del documento de recorte
-
-#### Código anterior
-`No existía el punto 11 en el "Registro de cambios respecto a la versión original" de RECORTAR_MAIN_TSX_MEJORADO.md.`
-
-#### Código nuevo
-```md
-11. **Estado actual del recorte.** Nueva sección. Se deja constancia de las pantallas de entrada ya extraídas y se aclara que las fases siguientes deben continuar por responsabilidades naturales, evitando piezas demasiado pequeñas salvo que formen un bloque reutilizable claro. También se refuerza que `CAMBIOS_AGENT.md` no debe usar placeholders, resúmenes ni texto documental en inglés cuando pueda escribirse en español.
-```
-
-#### Por qué se cambió
-El documento mantiene un registro interno de mejoras respecto a la versión original. La nueva sección y el refuerzo documental debían quedar reflejados allí.
-
-### Cambio 4 - Ejemplos y criterio de pantallas
-
-#### Código anterior
-```md
-| `src/screens/` | Pantallas completas de la app. | `login-screen.tsx`, `admin-screens.tsx`, `auth-gate.tsx` |
-```
-
-#### Código nuevo
-```md
-| `src/screens/` | Pantallas completas de la app. | `add-entry-screen.tsx`, `add-nota-general-screen.tsx`, `add-single-entry-screen.tsx`, `login-screen.tsx`, `admin-screens.tsx`, `auth-gate.tsx` |
-```
-
-#### Por qué se cambió
-La guía de estructura debía mostrar las pantallas de entrada ya extraídas como ejemplos reales de `src/screens/`.
-
-### Cambio 5 - Criterio entre screens y components
-
-#### Código anterior
-```md
-Regla general: **un archivo = una responsabilidad clara**, con un nombre que la describa.
-```
-
-#### Código nuevo
-```md
-Regla general: **un archivo = una responsabilidad clara**, con un nombre que la describa.
-
-Una pantalla completa va en `src/screens/`. Las piezas de interfaz reutilizables que se usen dentro de varias pantallas van en `src/components/`.
-
-Si una extracción empieza como código privado de una pantalla, puede quedarse dentro del archivo de esa pantalla. Solo se mueve a `src/components/` cuando se reutiliza, cuando tiene responsabilidad propia clara o cuando evita duplicación real entre pantallas.
-```
-
-#### Por qué se cambió
-La guía necesitaba aclarar cuándo una extracción debe quedarse como pantalla y cuándo conviene mover piezas compartidas a componentes reutilizables.
-
-## 2026-05-26 00:00 - Extraer pantalla de datapropina a src/screens/add-entry-screen.tsx
-
-**Archivos modificados:** `src/screens/add-entry-screen.tsx`, `src/main.tsx`
-
-### Cambio 1 - Pantalla de datapropina extraída
-
-#### Código anterior
-`No existía src/screens/add-entry-screen.tsx.`
-
-#### Código nuevo
-```tsx
-import { type FC } from "react";
-import { Shell } from "../components/shell";
-import { G, P } from "../shared/ui-theme";
-import { timeNow, today } from "../logic/date-time";
-import type { CurrentState, Entry } from "../shared/types";
-
-interface AddEntryScreenProps {
-  activeField: string;
-  setActiveField: React.Dispatch<React.SetStateAction<string>>;
-  valP: string;
-  setValP: React.Dispatch<React.SetStateAction<string>>;
-  valD: string;
-  setValD: React.Dispatch<React.SetStateAction<string>>;
-  noteP: string;
-  setNoteP: React.Dispatch<React.SetStateAction<string>>;
-  noteD: string;
-  setNoteD: React.Dispatch<React.SetStateAction<string>>;
-  setCurrent: React.Dispatch<React.SetStateAction<CurrentState>>;
-  setScreen: React.Dispatch<React.SetStateAction<string>>;
-}
-
-export const AddEntryScreen: FC<AddEntryScreenProps> = ({
-  activeField, setActiveField, valP, setValP, valD, setValD,
-  noteP, setNoteP, noteD, setNoteD, setCurrent, setScreen,
-}) => {
-  const setVal = activeField === "propina" ? setValP : setValD;
-  const curVal = activeField === "propina" ? valP : valD;
-
-  function kpAdd(v: string) {
-    if (v === "DEL") { setVal((p) => p.slice(0, -1)); return; }
-    if (v === ",") { if (!curVal.includes(",")) setVal((p) => p + ","); return; }
-    if (curVal.replace(",", "").length >= 6) return;
-    setVal((p) => p + v);
-  }
-
-  function handleSaveAdd() {
-    const p = parseFloat(valP.replace(",", "."));
-    const d = parseFloat(valD.replace(",", "."));
-    if (isNaN(p) && isNaN(d)) return;
-    const now = timeNow();
-    const newEntries: Entry[] = [];
-    if (!isNaN(p) && p > 0) newEntries.push({ id: Date.now(), type: "propina", amount: p, note: noteP.trim(), time: now });
-    if (!isNaN(d) && d > 0) newEntries.push({ id: Date.now() + 1, type: "datafono", amount: d, note: noteD.trim(), time: now });
-    if (newEntries.length === 0) return;
-    setCurrent((prev) => ({ ...prev, startTime: prev.startTime || now, startDate: prev.startDate || today(), entries: [...prev.entries, ...newEntries] }));
-    setValP(""); setValD(""); setNoteP(""); setNoteD("");
-    setScreen("main");
-  }
-
-  return (
-    <Shell burst={false}>
-      <div style={{ flex: 1, padding: "16px 20px", display: "flex", flexDirection: "column", minHeight: 0, overflow: "hidden" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 16, flexShrink: 0 }}>
-          <button style={iconBtnStyle} onClick={() => setScreen("main")}><IconBack /></button>
-          <div style={{ fontSize: 24, fontWeight: 800, color: "white" }}>
-            Añadir {activeField === "propina" ? "Propina" : "Datáfono"}
-          </div>
-        </div>
-        <div style={{ display: "flex", gap: 10, marginBottom: 20 }}>
-          <div onClick={() => setActiveField("datafono")} style={{ flex: 1, padding: "16px", borderRadius: 16, background: activeField === "datafono" ? "rgba(255,255,255,0.1)" : "rgba(255,255,255,0.03)", border: `1px solid ${activeField === "datafono" ? P : "transparent"}`, cursor: "pointer", textAlign: "center", transition: "all 0.2s" }}>
-            <div style={{ fontSize: 12, fontWeight: 700, color: "rgba(255,255,255,0.5)", marginBottom: 4 }}>DATÁFONO</div>
-            <div style={{ fontSize: 24, fontWeight: 900, color: activeField === "datafono" ? P : "white" }}>{valD || "0"} €</div>
-          </div>
-          <div onClick={() => setActiveField("propina")} style={{ flex: 1, padding: "16px", borderRadius: 16, background: activeField === "propina" ? "rgba(255,255,255,0.1)" : "rgba(255,255,255,0.03)", border: `1px solid ${activeField === "propina" ? G : "transparent"}`, cursor: "pointer", textAlign: "center", transition: "all 0.2s" }}>
-            <div style={{ fontSize: 12, fontWeight: 700, color: "rgba(255,255,255,0.5)", marginBottom: 4 }}>PROPINA</div>
-            <div style={{ fontSize: 24, fontWeight: 900, color: activeField === "propina" ? G : "white" }}>{valP || "0"} €</div>
-          </div>
-        </div>
-        <input placeholder={`Nota para ${activeField} (opcional)`} value={activeField === "propina" ? noteP : noteD}
-          onChange={(e) => activeField === "propina" ? setNoteP(e.target.value) : setNoteD(e.target.value)}
-          style={{ width: "100%", padding: 14, borderRadius: 12, background: "rgba(255,255,255,0.05)", border: "none", color: "white", marginBottom: 12, outline: "none", flexShrink: 0 }} />
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8, flexShrink: 0 }}>
-          {["1", "2", "3", "4", "5", "6", "7", "8", "9", "DEL", "0", ","].map((k) => (
-            <button key={k} aria-label={k === "DEL" ? "Borrar" : k === "," ? "Coma decimal" : k}
-              onClick={() => kpAdd(k)} style={{ ...keyBtnStyle, padding: "20px 0", background: "rgba(255,255,255,0.05)", fontSize: 22, fontWeight: 700, color: "white" }}>
-              {k === "DEL" ? <IconDel /> : k}
-            </button>
-          ))}
-        </div>
-        <button onClick={handleSaveAdd}
-          style={{ width: "100%", padding: 18, marginTop: 12, borderRadius: 16, border: "none", background: activeField === "propina" ? G : P, color: "black", fontWeight: 800, fontSize: 18, cursor: "pointer", flexShrink: 0 }}>
-          Guardar
-        </button>
-      </div>
-    </Shell>
-  );
-};
-```
-
-#### Por qué se cambió
-La pantalla `screen === "add"` (~106 líneas) es el teclado principal para añadir datapropina y propina. Extraerla a `src/screens/add-entry-screen.tsx` reduce `main.tsx` con frontera clara y 12 propiedades.
-
-### Cambio 2 - Reemplazar bloque add en main.tsx
-
-#### Código anterior
-```tsx
-import { AddEntryScreen } from "./screens/add-entry-screen";
-
-  if (screen === "add") {
-  const setVal = activeField === "propina" ? setValP : setValD;
-  const curVal = activeField === "propina" ? valP : valD;
-  function kpAdd(v: string) {
-    if (v === "DEL") { setVal((p) => p.slice(0, -1)); return; }
-    if (v === ",") { if (!curVal.includes(",")) setVal((p) => p + ","); return; }
-    if (curVal.replace(",", "").length >= 6) return;
-    setVal((p) => p + v);
-  }
-  function handleSaveAdd() {
-    const p = parseFloat(valP.replace(",", "."));
-    const d = parseFloat(valD.replace(",", "."));
-    if (isNaN(p) && isNaN(d)) return;
-    const now = timeNow();
-    const newEntries: Entry[] = [];
-    if (!isNaN(p) && p > 0) newEntries.push({ id: Date.now(), type: "propina", amount: p, note: noteP.trim(), time: now });
-    if (!isNaN(d) && d > 0) newEntries.push({ id: Date.now() + 1, type: "datafono", amount: d, note: noteD.trim(), time: now });
-    if (newEntries.length === 0) return;
-    setCurrent((prev) => ({ ...prev, startTime: prev.startTime || now, startDate: prev.startDate || today(), entries: [...prev.entries, ...newEntries] }));
-    setValP(""); setValD(""); setNoteP(""); setNoteD("");
-    setScreen("main");
-  }
-  return (
-    <Shell burst={false}>
-      <div style={{ flex: 1, padding: "16px 20px", display: "flex", flexDirection: "column", minHeight: 0, overflow: "hidden" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 16, flexShrink: 0 }}>
-          <button style={iconBtnStyle} onClick={() => setScreen("main")}><IconBack /></button>
-          <div style={{ fontSize: 24, fontWeight: 800, color: "white" }}>
-            Añadir {activeField === "propina" ? "Propina" : "Datáfono"}
-          </div>
-        </div>
-        <div style={{ display: "flex", gap: 10, marginBottom: 20 }}>
-          <div onClick={() => setActiveField("datafono")} style={{ flex: 1, padding: "16px", borderRadius: 16, background: activeField === "datafono" ? "rgba(255,255,255,0.1)" : "rgba(255,255,255,0.03)", border: `1px solid ${activeField === "datafono" ? P : "transparent"}`, cursor: "pointer", textAlign: "center", transition: "all 0.2s" }}>
-            <div style={{ fontSize: 12, fontWeight: 700, color: "rgba(255,255,255,0.5)", marginBottom: 4 }}>DATÁFONO</div>
-            <div style={{ fontSize: 24, fontWeight: 900, color: activeField === "datafono" ? P : "white" }}>{valD || "0"} €</div>
-          </div>
-          <div onClick={() => setActiveField("propina")} style={{ flex: 1, padding: "16px", borderRadius: 16, background: activeField === "propina" ? "rgba(255,255,255,0.1)" : "rgba(255,255,255,0.03)", border: `1px solid ${activeField === "propina" ? G : "transparent"}`, cursor: "pointer", textAlign: "center", transition: "all 0.2s" }}>
-            <div style={{ fontSize: 12, fontWeight: 700, color: "rgba(255,255,255,0.5)", marginBottom: 4 }}>PROPINA</div>
-            <div style={{ fontSize: 24, fontWeight: 900, color: activeField === "propina" ? G : "white" }}>{valP || "0"} €</div>
-          </div>
-        </div>
-        <input placeholder={`Nota para ${activeField} (opcional)`} value={activeField === "propina" ? noteP : noteD}
-          onChange={(e) => activeField === "propina" ? setNoteP(e.target.value) : setNoteD(e.target.value)}
-          style={{ width: "100%", padding: 14, borderRadius: 12, background: "rgba(255,255,255,0.05)", border: "none", color: "white", marginBottom: 12, outline: "none", flexShrink: 0 }} />
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8, flexShrink: 0 }}>
-          {["1", "2", "3", "4", "5", "6", "7", "8", "9", "DEL", "0", ","].map((k) => (
-            <button key={k} aria-label={k === "DEL" ? "Borrar" : k === "," ? "Coma decimal" : k}
-              onClick={() => kpAdd(k)} style={{ ...keyBtnStyle, padding: "20px 0", background: "rgba(255,255,255,0.05)", fontSize: 22, fontWeight: 700, color: "white" }}>
-              {k === "DEL" ? <IconDel /> : k}
-            </button>
-          ))}
-        </div>
-        <button onClick={handleSaveAdd}
-          style={{ width: "100%", padding: 18, marginTop: 12, borderRadius: 16, border: "none", background: activeField === "propina" ? G : P, color: "black", fontWeight: 800, fontSize: 18, cursor: "pointer", flexShrink: 0 }}>
-          Guardar
-        </button>
-      </div>
-    </Shell>
-  );
-}
-```
-
-#### Código nuevo
-```tsx
-import { AddEntryScreen } from "./screens/add-entry-screen";
-
-if (screen === "add") {
-  return (
-    <AddEntryScreen
-      activeField={activeField} setActiveField={setActiveField}
-      valP={valP} setValP={setValP} valD={valD} setValD={setValD}
-      noteP={noteP} setNoteP={setNoteP} noteD={noteD} setNoteD={setNoteD}
-      setCurrent={setCurrent} setScreen={setScreen}
-    />
-  );
-}
-```
-
-#### Por qué se cambió
-El bloque inline que contenía las funciones kpAdd y handleSaveAdd y el JSX del teclado datapropina se reemplazó por el componente extraído.
-
-## 2026-05-25 23:54 - Extraer pantalla de nota general a src/screens/add-nota-general-screen.tsx
-
-**Archivos modificados:** `src/screens/add-nota-general-screen.tsx`, `src/main.tsx`
-
-### Cambio 1 - Pantalla de nota general extraída
-
-#### Código anterior
-`No existía src/screens/add-nota-general-screen.tsx.`
-
-#### Código nuevo
-```tsx
-import { type FC } from "react";
-import { Shell } from "../components/shell";
-import type { CurrentState } from "../shared/types";
-
-interface AddNotaGeneralScreenProps {
-  noteS: string;
-  setNoteS: React.Dispatch<React.SetStateAction<string>>;
-  setCurrent: React.Dispatch<React.SetStateAction<CurrentState>>;
-  setScreen: React.Dispatch<React.SetStateAction<string>>;
-}
-
-export const AddNotaGeneralScreen: FC<AddNotaGeneralScreenProps> = ({
-  noteS, setNoteS, setCurrent, setScreen,
-}) => {
-  return (
-    <Shell burst={false}>
-      <div style={{ flex: 1, padding: "12px 20px 16px", display: "flex", flexDirection: "column", minHeight: 0, overflow: "hidden", animation: "slideIn 0.25s ease" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 24, flexShrink: 0 }}>
-          <button style={iconBtnStyle} onClick={() => { setScreen("main"); setNoteS(""); }}><IconBack /></button>
-          <div style={{ fontSize: 24, fontWeight: 800, color: "white" }}>Añadir Nota</div>
-        </div>
-        <div style={{ flex: 1, display: "flex", flexDirection: "column" }}>
-          <textarea placeholder="Escribe algo sobre el Turno..." value={noteS}
-            onChange={(e) => setNoteS(e.target.value)}
-            style={{ flex: 1, background: "rgba(255,255,255,0.05)", border: "none", borderRadius: 16, padding: 16, color: "white", fontSize: 16, outline: "none", resize: "none", fontFamily: "inherit", lineHeight: 1.5 }} />
-        </div>
-        <button onClick={() => {
-          if (noteS.trim()) {
-            const newEntry = { id: Date.now(), type: "nota" as const, amount: 0, note: noteS.trim(),
-              time: new Date().toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" }) };
-            setCurrent(prev => ({ ...prev, entries: [...prev.entries, newEntry] }));
-          }
-          setNoteS(""); setScreen("main");
-        }}
-          style={{ width: "100%", padding: 18, marginTop: 16, borderRadius: 16, border: "none", background: "white", color: "black", fontWeight: 800, fontSize: 18, cursor: "pointer", flexShrink: 0 }}>
-          Añadir al Turno
-        </button>
-      </div>
-    </Shell>
-  );
-};
-```
-
-#### Por qué se cambió
-La pantalla `addNotaGeneral` es una responsabilidad autocontenida (campo de texto para nota + botón añadir). Extraerla a `src/screens/add-nota-general-screen.tsx` reduce `main.tsx` en ~56 líneas con frontera clara y 4 propiedades.
-
-### Cambio 2 - Reemplazar bloque addNotaGeneral en main.tsx
-
-#### Código anterior
-```tsx
-import { AddNotaGeneralScreen } from "./screens/add-nota-general-screen";
-
-if (screen === "addNotaGeneral") {
-  return (
-    <Shell burst={false}>
-      <div>...textarea y botón...</div>
-    </Shell>
-  );
-}
-```
-
-#### Código nuevo
-```tsx
-import { AddNotaGeneralScreen } from "./screens/add-nota-general-screen";
-
-if (screen === "addNotaGeneral") {
-  return (
-    <AddNotaGeneralScreen
-      noteS={noteS} setNoteS={setNoteS}
-      setCurrent={setCurrent} setScreen={setScreen}
-    />
-  );
-}
-```
-
-#### Por qué se cambió
-El bloque inline se reemplazó por el componente extraído.
-
-## 2026-05-25 23:47 - Extraer pantalla de entrada individual a src/screens/add-single-entry-screen.tsx
-
-**Archivos modificados:** `src/screens/add-single-entry-screen.tsx`, `src/main.tsx`
-
-### Cambio 1 - Pantalla de entrada individual extraída
-
-#### Código anterior
-`No existía src/screens/add-single-entry-screen.tsx.`
-
-#### Código nuevo
-```tsx
-import { type FC, type CSSProperties } from "react";
-import { Shell } from "../components/shell";
-import { A, ABG, E, EBG, F, FBG, N, NBG } from "../shared/ui-theme";
-import { timeNow, today } from "../logic/date-time";
-import type { Entry } from "../shared/types";
-
-type SingleMode = "agencia_bono" | "extra" | "gasolina" | "nulo";
-
-interface AddSingleEntryScreenProps {
-  singleMode: SingleMode;
-  valS: string;
-  setValS: React.Dispatch<React.SetStateAction<string>>;
-  noteS: string;
-  setNoteS: React.Dispatch<React.SetStateAction<string>>;
-  setCurrent: React.Dispatch<React.SetStateAction<import("../shared/types").CurrentState>>;
-  setSingleMode: React.Dispatch<React.SetStateAction<string | null>>;
-  setScreen: React.Dispatch<React.SetStateAction<string>>;
-}
-
-export const AddSingleEntryScreen: FC<AddSingleEntryScreenProps> = ({
-  singleMode, valS, setValS, noteS, setNoteS,
-  setCurrent, setSingleMode, setScreen,
-}: AddSingleEntryScreenProps) => {
-  const cfg = {
-    agencia_bono: { accent: A, bg: ABG, label: "Agencia/Bono" },
-    extra: { accent: E, bg: EBG, label: "Extra" },
-    gasolina: { accent: F, bg: FBG, label: "Gasolina" },
-    nulo: { accent: N, bg: NBG, label: "Nulo" },
-  }[singleMode] || { accent: E, bg: EBG, label: "Extra" };
-
-  const { accent } = cfg;
-  const label = cfg.label;
-
-  function kpS(v: string) {
-    if (v === "DEL") { setValS((p) => p.slice(0, -1)); return; }
-    if (v === ",") { if (!valS.includes(",")) setValS((p) => p + ","); return; }
-    if (valS.replace(",", "").length >= 6) return;
-    setValS((p) => p + v);
-  }
-
-  const validS = valS && parseFloat(valS.replace(",", ".")) > 0;
-
-  function saveS() {
-    if (!validS) return;
-    const now = timeNow();
-    const entry: Entry = { id: Date.now(), type: singleMode, amount: parseFloat(valS.replace(",", ".")), note: noteS.trim(), time: now };
-    setCurrent((prev) => ({ ...prev, startTime: prev.startTime || now, startDate: prev.startDate || today(), entries: [...prev.entries, entry] }));
-    setValS(""); setNoteS(""); setSingleMode(null); setScreen("main");
-  }
-
-  return (
-    <Shell burst={false}>
-      <div style={{ flex: 1, padding: "12px 20px", display: "flex", flexDirection: "column", minHeight: 0, overflow: "hidden" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 16, flexShrink: 0 }}>
-          <button style={iconBtnStyle} onClick={() => { setScreen("main"); setSingleMode(null); setValS(""); setNoteS(""); }}><IconBack /></button>
-          <div style={{ fontSize: 24, fontWeight: 800, color: "white" }}>Añadir {label}</div>
-        </div>
-        <div style={{ fontSize: 40, fontWeight: 900, color: accent, marginBottom: 16, flexShrink: 0 }}>{valS || "0"} €</div>
-        <input placeholder="Nota (opcional)" value={noteS} onChange={(e) => setNoteS(e.target.value)}
-          style={{ width: "100%", padding: 10, borderRadius: 8, background: "rgba(255,255,255,0.05)", border: "none", color: "white", outline: "none", flexShrink: 0, marginBottom: 12 }} />
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8, flexShrink: 0 }}>
-          {["1", "2", "3", "4", "5", "6", "7", "8", "9", "DEL", "0", ","].map((k) => (
-            <button key={k} aria-label={k === "DEL" ? "Borrar" : k === "," ? "Coma decimal" : k}
-              onClick={() => kpS(k)} style={{ ...keyBtnStyle, padding: "20px 0", background: "rgba(255,255,255,0.05)", color: "white", fontSize: 22, fontWeight: 700 }}>
-              {k === "DEL" ? <IconDel /> : k}
-            </button>
-          ))}
-        </div>
-        <button onClick={saveS}
-          style={{ width: "100%", padding: 15, marginTop: 12, borderRadius: 12, border: "none", background: accent, color: "black", fontWeight: 700, flexShrink: 0 }}>
-          Guardar
-        </button>
-      </div>
-    </Shell>
-  );
-};
-```
-
-#### Por qué se cambió
-La pantalla de entrada individual es una responsabilidad autocontenida (teclado numérico para Agencia/Bono, Extra, Gasolina o Nulo). Extraerla a `src/screens/add-single-entry-screen.tsx` reduce `main.tsx` en ~78 líneas con frontera clara.
-
-### Cambio 2 - Reemplazar bloque addSingle en main.tsx
-
-#### Código anterior
-```tsx
-import { AddSingleEntryScreen } from "./screens/add-single-entry-screen";
-
-  if (screen === "addSingle" && singleMode) {
-  const cfg = {
-    agencia_bono: { accent: A, bg: ABG, label: "Agencia/Bono" },
-    extra: { accent: E, bg: EBG, label: "Extra" },
-    gasolina: { accent: F, bg: FBG, label: "Gasolina" },
-    nulo: { accent: N, bg: NBG, label: "Nulo" },
-  }[singleMode] || { accent: E, bg: EBG, label: "Extra" };
-  const { accent } = cfg;
-  const label = cfg.label;
-  function kpS(v: string) {
-    if (v === "DEL") { setValS((p) => p.slice(0, -1)); return; }
-    if (v === ",") { if (!valS.includes(",")) setValS((p) => p + ","); return; }
-    if (valS.replace(",", "").length >= 6) return;
-    setValS((p) => p + v);
-  }
-  const validS = valS && parseFloat(valS.replace(",", ".")) > 0;
-  function saveS() {
-    if (!validS) return;
-    const now = timeNow();
-    const entry: Entry = { id: Date.now(), type: singleMode, amount: parseFloat(valS.replace(",", ".")), note: noteS.trim(), time: now };
-    setCurrent((prev) => ({ ...prev, startTime: prev.startTime || now, startDate: prev.startDate || today(), entries: [...prev.entries, entry] }));
-    setValS(""); setNoteS(""); setSingleMode(null); setScreen("main");
-  }
-  return (
-    <Shell burst={false}>
-      <div style={{ flex: 1, padding: "12px 20px", display: "flex", flexDirection: "column", minHeight: 0, overflow: "hidden" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 16, flexShrink: 0 }}>
-          <button style={iconBtnStyle} onClick={() => { setScreen("main"); setSingleMode(null); setValS(""); setNoteS(""); }}><IconBack /></button>
-          <div style={{ fontSize: 24, fontWeight: 800, color: "white" }}>Añadir {label}</div>
-        </div>
-        <div style={{ fontSize: 40, fontWeight: 900, color: accent, marginBottom: 16, flexShrink: 0 }}>{valS || "0"} €</div>
-        <input placeholder="Nota (opcional)" value={noteS} onChange={(e) => setNoteS(e.target.value)}
-          style={{ width: "100%", padding: 10, borderRadius: 8, background: "rgba(255,255,255,0.05)", border: "none", color: "white", outline: "none", flexShrink: 0, marginBottom: 12 }} />
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8, flexShrink: 0 }}>
-          {["1", "2", "3", "4", "5", "6", "7", "8", "9", "DEL", "0", ","].map((k) => (
-            <button key={k} aria-label={k === "DEL" ? "Borrar" : k === "," ? "Coma decimal" : k}
-              onClick={() => kpS(k)} style={{ ...keyBtnStyle, padding: "20px 0", background: "rgba(255,255,255,0.05)", color: "white", fontSize: 22, fontWeight: 700 }}>
-              {k === "DEL" ? <IconDel /> : k}
-            </button>
-          ))}
-        </div>
-        <button onClick={saveS}
-          style={{ width: "100%", padding: 15, marginTop: 12, borderRadius: 12, border: "none", background: accent, color: "black", fontWeight: 700, flexShrink: 0 }}>
-          Guardar
-        </button>
-      </div>
-    </Shell>
-  );
-}
-```
-
-#### Código nuevo
-```tsx
-import { AddSingleEntryScreen } from "./screens/add-single-entry-screen";
-
-if (screen === "addSingle" && singleMode) {
-  return (
-    <AddSingleEntryScreen
-      singleMode={singleMode as "agencia_bono" | "extra" | "gasolina" | "nulo"}
-      valS={valS} setValS={setValS} noteS={noteS} setNoteS={setNoteS}
-      setCurrent={setCurrent} setSingleMode={setSingleMode} setScreen={setScreen}
-    />
-  );
-}
-```
-
-#### Por qué se cambió
-El bloque inline con funciones kpS y saveS y el JSX del teclado se reemplazó por el componente extraído.
-
-## 2026-05-25 23:16 - Extraer IconPlay e IconPause a turno-control-icons.tsx
-
-**Archivos modificados:** `src/components/turno-control-icons.tsx`, `src/main.tsx`
-
-### Cambio 1 - IconPlay e IconPause extraídos
-
-#### Código anterior
-`No existía src/components/turno-control-icons.tsx.`
-
-#### Código nuevo
-```tsx
-import type { FC } from 'react';
-
-export const IconPlay: FC<{ s?: number; c?: string }> = ({ s = 24, c = "white" }) => (
-  <svg width={s} height={s} viewBox="0 0 24 24" fill="none" style={{ display: "inline-block", verticalAlign: "middle" }}>
-    <path d="M8 5.5L18.5 12L8 18.5V5.5Z" fill={c} />
-  </svg>
-);
-
-export const IconPause: FC<{ s?: number; c?: string }> = ({ s = 24, c = "white" }) => (
-  <svg width={s} height={s} viewBox="0 0 24 24" fill="none" style={{ display: "inline-block", verticalAlign: "middle" }}>
-    <rect x="6.5" y="5" width="4.2" height="14" rx="1.7" fill={c} />
-    <rect x="13.3" y="5" width="4.2" height="14" rx="1.7" fill={c} />
-  </svg>
-);
-```
-
-#### Por qué se cambió
-IconPlay e IconPause se copiaban en línea dentro de main.tsx. Extraerlos a `src/components/turno-control-icons.tsx` elimina ~12 líneas duplicadas y centraliza los iconos del control de turno.
-
-### Cambio 2 - Reemplazar los iconos inline en main.tsx
-
-#### Código anterior
-```tsx
-// las definitions inline de IconPlay e IconPause en main.tsx
-```
-
-#### Código nuevo
-```tsx
-import { IconPlay } from "./components/turno-control-icons";
-import { IconPause } from "./components/turno-control-icons";
-```
-
-#### Por qué se cambió
-Los iconos inline se sustituyen por los imports de los componentes extraídos.
-
-## 2026-05-25 22:30 - Extraer fmt a src/logic/formatters.ts
-
-**Archivos modificados:** `src/logic/formatters.ts`, `src/main.tsx`
-
-### Cambio 1 - Funciones fmt extraídas
-
-#### Código anterior
-`No existía src/logic/formatters.ts.`
-
-#### Código nuevo
-```ts
-export const fmtKm = (km: number) =>
-  `${km.toLocaleString("es-ES", { minimumFractionDigits: 1, maximumFractionDigits: 1 })} km`;
-
-export const fmtMoney = (amount: number) =>
-  `${amount.toLocaleString("es-ES", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €`;
-```
-
-#### Por qué se cambió
-Las funciones `fmtKm` y `fmtMoney` estaban definidas inline en `main.tsx`. Extraerlas a `src/logic/formatters.ts` las hace reutilizables y testeables.
-
-### Cambio 2 - Reemplazar definiciones inline en main.tsx
-
-#### Código anterior
-```ts
-// las definitions inline de fmtKm y fmtMoney en main.tsx
-```
-
-#### Código nuevo
-```ts
-import { fmtKm, fmtMoney as fmtEuro } from "./logic/formatters";
-```
-
-#### Por qué se cambió
-Las definiciones inline se sustituyen por los imports del módulo extraído.
+const IconCoin = ({ s = 24, c = G }: { s?: number; c?: str

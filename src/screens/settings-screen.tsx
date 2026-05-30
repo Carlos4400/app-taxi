@@ -20,6 +20,7 @@ import { APP_VERSION } from "../shared/app-version";
 import { ApkInstaller } from "../services/apk-installer";
 import { resolveLatestApkUpdate, type UpdateState } from "../logic/update-flow";
 import { IconDel } from "../components/navigation-icons";
+import { hapticTap, hapticConfirm } from "../services/haptics";
 
 interface SettingsScreenProps {
   isAdmin: boolean;
@@ -596,6 +597,7 @@ export const SettingsScreen: FC<SettingsScreenProps> = ({
               {["1", "2", "3", "4", "5", "6", "7", "8", "9", "DEL", "0", ","].map((k) => (
                 <button key={k} aria-label={k === "DEL" ? "Borrar" : k === "," ? "Coma decimal" : k}
                   onClick={() => {
+                    hapticTap();
                     let next = settingsValStr;
                     if (k === "DEL") next = next.slice(0, -1);
                     else if (k === ",") { if (!next.includes(",")) next = next + ","; else return; }
@@ -609,6 +611,7 @@ export const SettingsScreen: FC<SettingsScreenProps> = ({
             </div>
             <button
               onClick={() => {
+                hapticConfirm();
                 const val = parseFloat(settingsValStr.replace(",", ".")) || 0;
                 setConfirmDialog({
                   text: `¿Seguro que quieres cambiar el porcentaje de ${activeSettingsField === "porcentaje.jefe" ? "Jefe" : "Chofer"} a ${val}%?`,

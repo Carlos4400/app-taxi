@@ -15,6 +15,7 @@ import { calcularTurnoContable, calcularResumenContableTurnos, roundMoney } from
 import { getTurnosNotasSemana } from "../logic/turno-notas-logic";
 import { fmtDate } from "../logic/date-time";
 import type { AppSettings, Turno, WeekOverride } from "../shared/types";
+import { useAppStore } from "../services/store";
 
 const NOTE_TIME_STYLE = {
   fontSize: 12,
@@ -26,24 +27,19 @@ const NOTE_TIME_STYLE = {
 } as const;
 
 type Props = {
-  history: Turno[];
-  settings: AppSettings;
-  weekOverrides: WeekOverride[];
   selectedWeekId: string;
   setSelectedWeekId: (id: string | null) => void;
-  setScreen: (screen: string) => void;
   updateWeekOverride: (weekId: string, partial: Partial<Omit<WeekOverride, "weekId">>) => void;
 };
 
 export function LiquidacionSemanaScreen({
-  history,
-  settings,
-  weekOverrides,
   selectedWeekId,
   setSelectedWeekId,
-  setScreen,
   updateWeekOverride,
 }: Props) {
+  const history: Turno[] = useAppStore((s) => s.history);
+  const settings: AppSettings = useAppStore((s) => s.settings);
+  const setScreen = useAppStore((s) => s.setScreen);
   const S = {
     iconBtn: {
       background: "rgba(255,255,255,0.06)",

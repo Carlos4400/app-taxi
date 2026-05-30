@@ -13,6 +13,7 @@ import { TurnoNotasCard } from "../components/turno-notas";
 import { ConfirmDialog } from "../components/common";
 import { DurationCardValue } from "../components/duration-card-value";
 import type { Turno, WeekOverride, AppSettings } from "../shared/types";
+import { useAppStore } from "../services/store";
 import {
   groupTurnosByWeek,
   getWeekOverride,
@@ -33,12 +34,8 @@ const NOTE_TIME_STYLE = {
 } as const;
 
 type Props = {
-  history: Turno[];
-  settings: AppSettings;
-  weekOverrides: WeekOverride[];
   selectedWeekId: string;
   setSelectedWeekId: (id: string | null) => void;
-  setScreen: (screen: string) => void;
   updateWeekOverride: (weekId: string, partial: Partial<Omit<WeekOverride, "weekId">>) => void;
   setReturnScreen: (screen: string | null) => void;
   setViewTurno: (turno: Turno | null) => void;
@@ -56,17 +53,17 @@ type Props = {
 };
 
 export function DetalleSemanaScreen({
-  history,
-  settings,
-  weekOverrides,
   selectedWeekId,
   setSelectedWeekId,
-  setScreen,
   updateWeekOverride,
   setReturnScreen,
   setViewTurno,
   renderTurnoCard,
 }: Props) {
+  const history: Turno[] = useAppStore((s) => s.history);
+  const settings: AppSettings = useAppStore((s) => s.settings);
+  const weekOverrides: WeekOverride[] = useAppStore((s) => s.weekOverrides);
+  const setScreen = useAppStore((s) => s.setScreen);
   const weekId = selectedWeekId;
   const grupos = groupTurnosByWeek(history, settings.diaLibre);
   const turnosSemana = grupos.get(weekId) || [];

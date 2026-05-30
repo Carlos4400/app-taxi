@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { SyncIndicator } from "./sync-indicator";
 
 const BURST_GREEN = "oklch(0.68 0.20 145)";
 const BURST_PURPLE = "oklch(0.65 0.20 280)";
@@ -27,6 +28,7 @@ export function Shell({
     >
       {burst && <Burst />}
       {children}
+      <SyncIndicator />
     </div>
   );
 }

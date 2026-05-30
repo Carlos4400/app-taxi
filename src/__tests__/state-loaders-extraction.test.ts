@@ -45,7 +45,10 @@ describe("State loader extraction", () => {
     ]));
     expect(loadHistory().map((turno: { date: string }) => turno.date)).toEqual(["2026-05-02", "2026-05-01"]);
 
-    expect(mainSource).toContain('from "./logic/state-loaders"');
+    // Tras centralizar el estado en el store (Fase 2), los loaders los consume
+    // el store, no main.tsx. Lo que importa es que sigan FUERA de main.tsx.
+    const storeSource = readFileSync(resolve("src/services/store.ts"), "utf8");
+    expect(storeSource).toContain('from "../logic/state-loaders"');
     expect(mainSource).not.toMatch(/^function loadSettings\(/m);
     expect(mainSource).not.toMatch(/^function loadCurrent\(/m);
     expect(mainSource).not.toMatch(/^function loadWeekOverrides\(/m);

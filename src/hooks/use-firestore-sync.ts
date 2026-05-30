@@ -1,5 +1,6 @@
-import { useState, useEffect, useRef } from "react";
+import { useEffect, useRef } from "react";
 import { onSnapshot, doc, getDoc, setDoc, writeBatch } from "firebase/firestore";
+import { useAppStore } from "../services/store";
 import { auth, db } from "../services/firebase";
 import {
   userMetaDocRef,
@@ -86,33 +87,34 @@ async function migrarLocalStorageAFirestore(uid: string): Promise<void> {
   }));
 }
 
-interface UseFirestoreSyncProps {
-  current: CurrentState;
-  setCurrent: React.Dispatch<React.SetStateAction<CurrentState>>;
-  settings: AppSettings;
-  setSettings: React.Dispatch<React.SetStateAction<AppSettings>>;
-  history: Turno[];
-  setHistory: React.Dispatch<React.SetStateAction<Turno[]>>;
-  reservations: Reserva[];
-  setReservations: React.Dispatch<React.SetStateAction<Reserva[]>>;
-  notes: NotaCalendario[];
-  setNotes: React.Dispatch<React.SetStateAction<NotaCalendario[]>>;
-  weekOverrides: WeekOverride[];
-  setWeekOverrides: React.Dispatch<React.SetStateAction<WeekOverride[]>>;
-  setIsAdmin: React.Dispatch<React.SetStateAction<boolean>>;
-}
+/**
+ * Sincronización Firestore ↔ store ↔ localStorage.
+ *
+ * Antes recibía 6 pares estado/setter por props desde `App`. Ahora lee y
+ * escribe directamente del store global de Zustand, eliminando el prop drilling.
+ * Sigue devolviendo { dataLoaded, loadTimedOut } por compatibilidad con `App`.
+ */
+export function useFirestoreSync() {
+  // Estado de negocio (reactivo) leído del store.
+  const current = useAppStore((s) => s.current);
+  const settings = useAppStore((s) => s.settings);
+  const history = useAppStore((s) => s.history);
+  const reservations = useAppStore((s) => s.reservations);
+  const notes = useAppStore((s) => s.notes);
+  const weekOverrides = useAppStore((s) => s.weekOverrides);
+  const dataLoaded = useAppStore((s) => s.dataLoaded);
+  const loadTimedOut = useAppStore((s) => s.loadTimedOut);
 
-export function useFirestoreSync({
-  current, setCurrent,
-  settings, setSettings,
-  history, setHistory,
-  reservations, setReservations,
-  notes, setNotes,
-  weekOverrides, setWeekOverrides,
-  setIsAdmin,
-}: UseFirestoreSyncProps) {
-  const [dataLoaded, setDataLoaded] = useState(false);
-  const [loadTimedOut, setLoadTimedOut] = useState(false);
+  // Setters del store (referencias estables).
+  const setCurrent = useAppStore((s) => s.setCurrent);
+  const setSettings = useAppStore((s) => s.setSettings);
+  const setHistory = useAppStore((s) => s.setHistory);
+  const setReservations = useAppStore((s) => s.setReservations);
+  const setNotes = useAppStore((s) => s.setNotes);
+  const setWeekOverrides = useAppStore((s) => s.setWeekOverrides);
+  const setDataLoaded = useAppStore((s) => s.setDataLoaded);
+  const setLoadTimedOut = useAppStore((s) => s.setLoadTimedOut);
+  const setIsAdmin = useAppStore((s) => s.setIsAdmin);
 
   const lastCurrentRef = useRef<CurrentState | null>(null);
   const lastSettingsRef = useRef<AppSettings | null>(null);

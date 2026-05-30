@@ -13,26 +13,25 @@ import { DurationCardValue } from "../components/duration-card-value";
 import { KM_CARD_UNIT_STYLE } from "../shared/card-styles";
 import { A, ABG, E, EBG, F, FBG, G, GBG, N, NBG, P, PBG } from "../shared/ui-theme";
 import type { AppSettings, Turno } from "../shared/types";
+import { useAppStore } from "../services/store";
 
 type Props = {
-  history: Turno[];
-  settings: AppSettings;
   selectedAccountingYear: number;
   setSelectedAccountingYear: (year: number | ((prev: number) => number)) => void;
   selectedAccountingMonth: number;
   setSelectedAccountingMonth: (month: number) => void;
-  setScreen: (screen: string) => void;
 };
 
 export function DetalleAnualScreen({
-  history,
-  settings,
   selectedAccountingYear,
   setSelectedAccountingYear,
   selectedAccountingMonth,
   setSelectedAccountingMonth,
-  setScreen,
 }: Props) {
+  // Estado del store (antes props desde App).
+  const history: Turno[] = useAppStore((s) => s.history);
+  const settings: AppSettings = useAppStore((s) => s.settings);
+  const setScreen = useAppStore((s) => s.setScreen);
   const turnosAnual = getTurnosByCalendarYear(history, selectedAccountingYear);
   const resumenAnual = calcularResumenContableTurnos(turnosAnual, settings);
   const monthLabels = MESES_COMPLETOS;

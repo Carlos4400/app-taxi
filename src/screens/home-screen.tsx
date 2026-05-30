@@ -5,8 +5,8 @@ import { Shell } from "../components/shell";
 import { ConfirmDialog } from "../components/common";
 import { G, P, A, C, GBG, PBG, ABG, CBG } from "../shared/ui-theme";
 import { getHomeQuickActionIds } from "../shared/action-ids";
-import { IconCalendar, IconSettings, IconAdminNeon, IconLogoutNeon } from "../components/navigation-icons";
-import { IconRocket, IconPlay, IconClipboard, IconChart, IconReservaWrite, IconAgenda } from "../components/home-icons";
+import { IconCalendar, IconSettingsNeon, IconAdminNeon, IconLogoutNeon } from "../components/navigation-icons";
+import { IconRocket, IconPlay, IconClipboard, IconChart, IconReservaWrite, IconAgendaNeon } from "../components/home-icons";
 
 interface HomeScreenProps {
   isPaused: boolean | undefined;
@@ -217,7 +217,7 @@ export const HomeScreen: FC<HomeScreenProps> = ({
           padding: 0,
         }}
       >
-        <IconAgenda s={32} c="oklch(0.75 0.15 290)" />
+        <IconAgendaNeon s={32} />
       </button>
       {renderReservaDialog()}
       {homeQuickActionIds.includes("admin-users") && (
@@ -297,7 +297,7 @@ export const HomeScreen: FC<HomeScreenProps> = ({
           padding: 0,
         }}
       >
-        <IconSettings s={32} c="oklch(0.72 0.01 250)" />
+        <IconSettingsNeon s={32} c="oklch(0.72 0.01 250)" />
       </button>
       {confirmDialog && <ConfirmDialog {...confirmDialog} onCancel={() => onSetConfirmDialog(null)} />}
     </Shell>

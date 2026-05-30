@@ -8,6 +8,7 @@ import { getEntryTypeMeta } from "../shared/entry-type-meta";
 import { A, ABG, E, EBG, F, FBG, G, GBG, N, NBG, P, PBG } from "../shared/ui-theme";
 import { KM_CARD_UNIT_STYLE } from "../shared/card-styles";
 import type { CurrentState, AppSettings, Entry } from "../shared/types";
+import { hapticTap, hapticConfirm, hapticAction } from "../services/haptics";
 
 const C = "white";
 
@@ -88,6 +89,7 @@ export function ConfirmEndScreen({
   setScreen,
 }: Props) {
   function kpEnd(v: string) {
+    hapticTap();
     if (!endField) return;
     const cur = endField === "dinero" ? dineroJ : kmJ;
     const setVal = endField === "dinero" ? setDineroJ : setKmJ;
@@ -263,7 +265,7 @@ export function ConfirmEndScreen({
         })()}
 
         <div style={{ display: "flex", flexDirection: "column", gap: 8, flexShrink: 0, marginTop: "auto" }}>
-          <button onClick={onEndTurno}
+          <button onClick={() => { hapticAction(); onEndTurno(); }}
             style={{ padding: "15px 0", borderRadius: 16, border: "none", background: "rgba(255,60,60,0.12)", color: "rgba(255,110,110,0.9)", fontSize: 16, fontWeight: 800, cursor: "pointer", outline: "1.5px solid rgba(255,60,60,0.25)" }}>
             Terminar Turno
           </button>
@@ -322,7 +324,7 @@ export function ConfirmEndScreen({
               ))}
             </div>
             <button
-              onClick={() => setEndField(null)}
+              onClick={() => { hapticConfirm(); setEndField(null); }}
               style={{
                 width: "100%",
                 padding: "16px 0",

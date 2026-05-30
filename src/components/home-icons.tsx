@@ -97,15 +97,51 @@ export const IconReservaWrite: FC<{ s?: number; c?: string }> = ({ s = 24, c = C
   </span>
 );
 
-export const IconAgenda: FC<{ s?: number; c?: string }> = ({ s = 24, c = "white" }: { s?: number; c?: string }) => (
-  <svg width={s} height={s} viewBox="0 0 24 24" fill="none" style={{ display: "inline-block", verticalAlign: "middle" }}>
-    <rect x="3" y="4" width="18" height="17" rx="3" stroke={c} strokeWidth="1.8" strokeLinejoin="round" />
-    <circle cx="7" cy="9" r="1" fill={c} />
-    <circle cx="7" cy="13" r="1" fill={c} />
-    <circle cx="7" cy="17" r="1" fill={c} opacity="0.6" />
-    <path d="M10 9H17" stroke={c} strokeWidth="1.8" strokeLinecap="round" />
-    <path d="M10 13H17" stroke={c} strokeWidth="1.8" strokeLinecap="round" />
-    <path d="M10 17H15" stroke={c} strokeWidth="1.8" strokeLinecap="round" opacity="0.6" />
+export const IconAgendaNeon: FC<{ s?: number }> = ({ s = 24 }: { s?: number }) => (
+  <svg
+    width={s}
+    height={s}
+    viewBox="0 0 24 24"
+    fill="none"
+    style={{
+      display: "inline-block",
+      verticalAlign: "middle",
+      overflow: "visible",
+      filter: "drop-shadow(0 0 1.2px rgba(180, 120, 255, 0.8)) drop-shadow(0 0 5px rgba(180, 120, 255, 0.28))"
+    }}
+  >
+    <rect
+      x="3"
+      y="4"
+      width="18"
+      height="17"
+      rx="3"
+      stroke="#b478ff"
+      strokeWidth="2"
+      strokeLinejoin="round"
+    />
+    <circle cx="7" cy="9" r="1.1" fill="#d7b8ff" />
+    <circle cx="7" cy="13" r="1.1" fill="#d7b8ff" />
+    <circle cx="7" cy="17" r="1.1" fill="#d7b8ff" opacity="0.6" />
+    <path
+      d="M10 9H17"
+      stroke="#d7b8ff"
+      strokeWidth="2"
+      strokeLinecap="round"
+    />
+    <path
+      d="M10 13H17"
+      stroke="#d7b8ff"
+      strokeWidth="2"
+      strokeLinecap="round"
+    />
+    <path
+      d="M10 17H15"
+      stroke="#d7b8ff"
+      strokeWidth="2"
+      strokeLinecap="round"
+      opacity="0.6"
+    />
   </svg>
 );
 

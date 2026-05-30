@@ -1,7 +1,7 @@
 import { type FC } from "react";
 import { Shell } from "../components/shell";
 import { IconBack } from "../components/navigation-icons";
-import type { CurrentState } from "../shared/types";
+import { useAppStore } from "../services/store";
 
 const iconBtnStyle = {
   background: "rgba(255,255,255,0.06)",
@@ -16,16 +16,17 @@ const iconBtnStyle = {
 interface AddNotaGeneralScreenProps {
   noteS: string;
   setNoteS: React.Dispatch<React.SetStateAction<string>>;
-  setCurrent: React.Dispatch<React.SetStateAction<CurrentState>>;
-  setScreen: React.Dispatch<React.SetStateAction<string>>;
 }
 
 export const AddNotaGeneralScreen: FC<AddNotaGeneralScreenProps> = ({
   noteS,
   setNoteS,
-  setCurrent,
-  setScreen,
 }) => {
+  // Estado/acciones de negocio leídos directamente del store (antes llegaban
+  // como props desde App). El estado del formulario (noteS) sigue siendo local.
+  const setCurrent = useAppStore((s) => s.setCurrent);
+  const setScreen = useAppStore((s) => s.setScreen);
+
   return (
     <Shell burst={false}>
       <div style={{ flex: 1, padding: "12px 20px 16px", display: "flex", flexDirection: "column", minHeight: 0, overflow: "hidden", animation: "slideIn 0.25s ease" }}>

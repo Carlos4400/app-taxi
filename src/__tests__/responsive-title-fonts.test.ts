@@ -3,7 +3,7 @@ import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 
 describe("Responsive title fonts", () => {
-  const source = readFileSync(resolve("src/main.tsx"), "utf8");
+  const source = readFileSync(resolve("src/screens/summary-screen.tsx"), "utf8");
 
   const detalleSemanaSource = readFileSync(resolve("src/screens/detalle-semana-screen.tsx"), "utf8");
 

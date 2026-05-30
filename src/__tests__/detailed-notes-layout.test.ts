@@ -4,6 +4,8 @@ import { describe, expect, it } from "vitest";
 
 describe("Detailed notes layout", () => {
   const source = readFileSync(resolve("src/main.tsx"), "utf8");
+  const summarySource = readFileSync(resolve("src/screens/summary-screen.tsx"), "utf8");
+  const editTurnoSource = readFileSync(resolve("src/screens/edit-turno-screen.tsx"), "utf8");
 
   const summaryIconsSource = readFileSync(resolve("src/components/summary-icons.tsx"), "utf8");
   const confirmEndSource = readFileSync(resolve("src/screens/confirm-end-screen.tsx"), "utf8");
@@ -43,6 +45,26 @@ describe("Detailed notes layout", () => {
     expect(iconPinBlock).toBeDefined();
     expect(iconPinBlock).toMatch(/c = "oklch\(0\.72 0\.14 28\)"/);
     expect(iconPinBlock).toMatch(/drop-shadow\(0 0 1px \$\{c\}\)/);
+  });
+
+  it("uses the completed note icon without the add badge for saved notes", () => {
+    const iconNoteAddBlock = summaryIconsSource.match(/(?:export )?const IconNoteAdd = \([\s\S]*?\n\);/)?.[0];
+
+    expect(iconNoteAddBlock).toBeDefined();
+    expect(iconNoteAddBlock).toMatch(/showPlus = true/);
+    expect(iconNoteAddBlock).toMatch(/\{showPlus && \(/);
+    expect(iconNoteAddBlock).toMatch(/d=\{showPlus \? "M3\.75 6\.75h10\.5" : "M7\.5 10h8\.25"\}/);
+    expect(iconNoteAddBlock).toMatch(/d=\{showPlus \? "M7\.5 20\.25H2\.25[\s\S]*?" : "M5 21\.25H19/);
+    expect(iconNoteAddBlock).toMatch(/!showPlus && \(/);
+    expect(source).toMatch(/<IconNoteAdd s=\{26\} \/> A(?:ñ|Ã±)adir Nota al Turno/);
+  });
+
+  it("uses a restrained faithful pin icon for detailed notes", () => {
+    const iconPinBlock = summaryIconsSource.match(/const IconPinNeon = \([\s\S]*?\n\);/)?.[0];
+
+    expect(iconPinBlock).toBeDefined();
+    expect(iconPinBlock).toMatch(/c = "oklch\(0\.72 0\.14 28\)"/);
+    expect(iconPinBlock).toMatch(/drop-shadow\(0 0 1px \$\{c\}\)/);
     expect(iconPinBlock).toMatch(/<g transform="rotate\(32 12 12\)">/);
     expect(iconPinBlock).toMatch(/d="M8\.2 4\.8h7\.6c0\.7 0 1\.2 0\.5 1\.2 1\.2v1\.1c0 0\.5-0\.3 0\.9-0\.7 1\.1l-1\.8 1\.1v3\.1l2\.7 2\.7v1\.2H6\.8v-1\.2l2\.7-2\.7V9\.3L7\.7 8\.2C7\.3 8 7 7\.6 7 7\.1V6c0-0\.7 0\.5-1\.2 1\.2-1\.2Z"/);
     expect(iconPinBlock).toMatch(/d="M12 16\.3V21"/);
@@ -50,16 +72,16 @@ describe("Detailed notes layout", () => {
     expect(iconPinBlock).not.toMatch(/d="M9\.3 5\.1l6\.9 1\.9/);
     expect(iconPinBlock).not.toContain("rotate(45 12 12)");
     expect(iconPinBlock).not.toContain("drop-shadow(0 0 4px");
-    expect(source).toMatch(/<IconPinNeon s=\{18\} \/> Notas detalladas/);
-    expect(source).not.toContain("<IconPinNeon s={18} c={F} /> Notas detalladas");
+    expect(summarySource).toMatch(/<IconPinNeon s=\{18\} \/> Notas detalladas/);
+    expect(summarySource).not.toContain("<IconPinNeon s={18} c={F} /> Notas detalladas");
   });
 
   it("keeps detailed note rows on display labels and constrained grids", () => {
-    expect(source).not.toContain("{e.type}</span>");
-    expect(source).not.toContain("{e.type === 'agencia_bono' ? 'agencia/bono' : e.type}</span>");
+    expect(summarySource).not.toContain("{e.type}</span>");
+    expect(summarySource).not.toContain("{e.type === 'agencia_bono' ? 'agencia/bono' : e.type}</span>");
 
     const detailedRows = [
-      { source, pattern: /entriesWithNotes\.map\(\(e: any\) => \{[\s\S]*?<\/div>\s*\);\s*\}\)/ },
+      { source: summarySource, pattern: /entriesWithNotes\.map\(\(e: any\) => \{[\s\S]*?<\/div>\s*\);\s*\}\)/ },
       { source: confirmEndSource, pattern: /entriesWithNotes\.map\(e => \{[\s\S]*?<\/div>\s*\);\s*\}\)/ },
       { source: liquidacionSemanaSource, pattern: /notasDetalladas\.map\(\(entry\) => \{[\s\S]*?key=\{`ticket-nota-detallada-\$\{entry\.id\}`\}[\s\S]*?<\/div>\s*\);\s*\}\)/ },
     ];
@@ -80,8 +102,8 @@ describe("Detailed notes layout", () => {
   });
 
   it("keeps turn summary and end-turn note sections visually consistent", () => {
-    const summaryBlockMatch = source.match(
-      /if \(screen === 'summary' && viewTurno\) \{[\s\S]*?\/\* Contenedor Inferior Agrupado: Descontar y Dar \*\//
+    const summaryBlockMatch = summarySource.match(
+      /export const SummaryScreen[\s\S]*?\/\* Contenedor Inferior Agrupado: Descontar y Dar \*\//
     );
     const summaryBlock = summaryBlockMatch ? summaryBlockMatch[0] : undefined;
     const confirmEndMatch = confirmEndSource.match(
@@ -100,7 +122,7 @@ describe("Detailed notes layout", () => {
     expect(confirmEndBlock).toMatch(/gNotes\.map[\s\S]*?gridTemplateColumns: "auto auto minmax\(0, 1fr\)", alignItems: "baseline"[\s\S]*?\{meta\.label\}[\s\S]*?overflowWrap: "anywhere"/);
     expect(summaryBlock).toMatch(/entriesWithNotes\.map[\s\S]*?gridTemplateColumns: 'auto auto minmax\(0, 1fr\) auto', alignItems: 'baseline'/);
     expect(confirmEndBlock).toMatch(/entriesWithNotes\.map[\s\S]*?gridTemplateColumns: "auto auto minmax\(0, 1fr\) auto", alignItems: "baseline"/);
-    expect(source).toMatch(/const NOTE_TIME_STYLE = \{[\s\S]*?fontSize: 12,[\s\S]*?color: "rgba\(255,255,255,0\.45\)",[\s\S]*?fontWeight: 700,[\s\S]*?whiteSpace: "nowrap",[\s\S]*?flexShrink: 0,[\s\S]*?alignSelf: "baseline",[\s\S]*?\} as const;/);
+    expect(summarySource).toMatch(/const NOTE_TIME_STYLE = \{[\s\S]*?fontSize: 12,[\s\S]*?color: "rgba\(255,255,255,0\.45\)",[\s\S]*?fontWeight: 700,[\s\S]*?whiteSpace: "nowrap",[\s\S]*?flexShrink: 0,[\s\S]*?alignSelf: "baseline",[\s\S]*?\} as const;/);
     expect(summaryBlock).toMatch(/generalNotes\.map[\s\S]*?<span style=\{NOTE_TIME_STYLE\}>\{e\.time\}<\/span>/);
     expect(summaryBlock).toMatch(/entriesWithNotes\.map[\s\S]*?<span style=\{NOTE_TIME_STYLE\}>\{e\.time\}<\/span>/);
     expect(confirmEndBlock).toMatch(/gNotes\.map[\s\S]*?<span style=\{NOTE_TIME_STYLE\}>\{e\.time\}<\/span>/);
@@ -122,8 +144,8 @@ describe("Detailed notes layout", () => {
   });
 
   it("keeps edit turn entries aligned with editable entries layout", () => {
-    const editTurnoBlock = source.match(
-      /if \(screen === 'editTurno' && editJ\) \{[\s\S]*?\/\* Teclado in-app para Dinero \/ KM en Editar Turno \*\//
+    const editTurnoBlock = editTurnoSource.match(
+      /export const EditTurnoScreen[\s\S]*?\/\* Teclado in-app para Dinero \/ KM en Editar Turno \*\//
     )?.[0];
 
     const editableEntriesBlock = editTurnoBlock?.match(

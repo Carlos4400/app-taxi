@@ -1,0 +1,1004 @@
+{
+  "communities": {
+    "0": [
+      "components_calendar_icons_iconmoneybag",
+      "components_calendar_icons_iconpencilneon",
+      "components_calendar_icons_icontimer",
+      "components_common_confirmdialog",
+      "components_duration_card_value_durationcardvalue",
+      "components_entry_icons_iconagency",
+      "components_entry_icons_iconcard",
+      "components_entry_icons_iconcoin",
+      "components_entry_icons_iconextra",
+      "components_entry_icons_iconfuel",
+      "components_entry_icons_iconnulo",
+      "components_navigation_icons_iconback",
+      "components_shell_burst",
+      "components_shell_shell",
+      "components_summary_icons_icongive",
+      "components_summary_icons_iconnoteadd",
+      "components_summary_icons_iconpinneon",
+      "components_summary_icons_iconroad",
+      "components_summary_icons_icontaxibadgeneon",
+      "components_turno_notas_turnonotascard",
+      "logic_accounting_accountingturno",
+      "logic_accounting_accountingturnoconfig",
+      "logic_accounting_buildturnoconfigfromsettings",
+      "logic_accounting_calcularresumencontableturnos",
+      "logic_accounting_calculartotalesturnos",
+      "logic_accounting_calcularturnocontable",
+      "logic_accounting_getturnoconfig",
+      "logic_accounting_roundmoney",
+      "logic_date_time_fmtdate",
+      "logic_date_time_getdiffmins",
+      "logic_formatters_fmt",
+      "logic_formatters_fmtduration",
+      "logic_formatters_fmtkmnumber",
+      "logic_turno_notas_logic_getturnosnotassemana",
+      "screens_calendar_screen_calendarscreenprops",
+      "screens_calendar_screen_iconbtnstyle",
+      "screens_calendar_screen_renderreservacardfield",
+      "screens_confirm_end_screen_note_time_style",
+      "screens_confirm_end_screen_props",
+      "screens_confirm_end_screen_s",
+      "screens_detalle_anual_screen_detalleanualscreen",
+      "screens_detalle_anual_screen_props",
+      "screens_detalle_mes_screen_detallemesscreen",
+      "screens_detalle_mes_screen_detallemesscreenprops",
+      "screens_detalle_mes_screen_note_time_style",
+      "screens_detalle_mes_screen_s",
+      "screens_detalle_semana_screen_detallesemanascreen",
+      "screens_detalle_semana_screen_note_time_style",
+      "screens_detalle_semana_screen_props",
+      "screens_liquidacion_semana_screen_liquidacionsemanascreen",
+      "screens_liquidacion_semana_screen_note_time_style",
+      "screens_liquidacion_semana_screen_props",
+      "screens_pantalla_turnos_s",
+      "screens_today_history_screen_props",
+      "screens_today_history_screen_s",
+      "shared_card_styles_km_card_unit_style",
+      "shared_entry_type_meta_entry_type_meta",
+      "shared_entry_type_meta_entrytypemeta",
+      "shared_entry_type_meta_getentrytypemeta",
+      "shared_types_appsettings",
+      "shared_types_turno",
+      "src_components_calendar_icons_tsx",
+      "src_components_entry_icons_tsx",
+      "src_components_shell_tsx",
+      "src_components_summary_icons_tsx",
+      "src_logic_accounting_ts",
+      "src_logic_date_time_ts",
+      "src_logic_formatters_ts",
+      "src_logic_turno_notas_logic_ts",
+      "src_main_app",
+      "src_screens_calendar_screen_tsx",
+      "src_screens_confirm_end_screen_tsx",
+      "src_screens_detalle_anual_screen_tsx",
+      "src_screens_detalle_mes_screen_tsx",
+      "src_screens_detalle_semana_screen_tsx",
+      "src_screens_liquidacion_semana_screen_tsx",
+      "src_screens_pantalla_turnos_tsx",
+      "src_screens_today_history_screen_tsx",
+      "src_shared_entry_type_meta_tsx",
+      "src_shared_ui_theme_ts"
+    ],
+    "1": [
+      "app_taxi_mainantiguo_apkinstaller",
+      "app_taxi_mainantiguo_apkinstallerplugintype",
+      "app_taxi_mainantiguo_appsettings",
+      "app_taxi_mainantiguo_authgate",
+      "app_taxi_mainantiguo_backupmenuactionid",
+      "app_taxi_mainantiguo_burst",
+      "app_taxi_mainantiguo_confirmdialog",
+      "app_taxi_mainantiguo_confirmdialogprops",
+      "app_taxi_mainantiguo_currentstate",
+      "app_taxi_mainantiguo_editturnostate",
+      "app_taxi_mainantiguo_ensureturnosdialibrecontable",
+      "app_taxi_mainantiguo_entry",
+      "app_taxi_mainantiguo_entry_type_meta",
+      "app_taxi_mainantiguo_entrytypemeta",
+      "app_taxi_mainantiguo_exportbackupjson",
+      "app_taxi_mainantiguo_getturnofechaefectiva",
+      "app_taxi_mainantiguo_getturnomergekey",
+      "app_taxi_mainantiguo_homequickactionid",
+      "app_taxi_mainantiguo_iconadminneon",
+      "app_taxi_mainantiguo_iconagency",
+      "app_taxi_mainantiguo_iconagenda",
+      "app_taxi_mainantiguo_iconback",
+      "app_taxi_mainantiguo_iconcalendar",
+      "app_taxi_mainantiguo_iconcard",
+      "app_taxi_mainantiguo_iconchart",
+      "app_taxi_mainantiguo_iconclipboard",
+      "app_taxi_mainantiguo_iconcoin",
+      "app_taxi_mainantiguo_icondel",
+      "app_taxi_mainantiguo_icondownload",
+      "app_taxi_mainantiguo_iconextra",
+      "app_taxi_mainantiguo_iconfuel",
+      "app_taxi_mainantiguo_icongive",
+      "app_taxi_mainantiguo_iconholiday",
+      "app_taxi_mainantiguo_iconhomeneon",
+      "app_taxi_mainantiguo_iconlogoutneon",
+      "app_taxi_mainantiguo_iconmoneybag",
+      "app_taxi_mainantiguo_iconnoteadd",
+      "app_taxi_mainantiguo_iconnulo",
+      "app_taxi_mainantiguo_iconpause",
+      "app_taxi_mainantiguo_iconpencilneon",
+      "app_taxi_mainantiguo_iconpercent",
+      "app_taxi_mainantiguo_iconpinneon",
+      "app_taxi_mainantiguo_iconplay",
+      "app_taxi_mainantiguo_iconreceipt",
+      "app_taxi_mainantiguo_iconrefresh",
+      "app_taxi_mainantiguo_iconreservawrite",
+      "app_taxi_mainantiguo_iconroad",
+      "app_taxi_mainantiguo_iconrocket",
+      "app_taxi_mainantiguo_iconsettings",
+      "app_taxi_mainantiguo_icontaxibadgeneon",
+      "app_taxi_mainantiguo_icontimer",
+      "app_taxi_mainantiguo_iconupload",
+      "app_taxi_mainantiguo_km_card_unit_style",
+      "app_taxi_mainantiguo_meses_abreviados",
+      "app_taxi_mainantiguo_meses_completos",
+      "app_taxi_mainantiguo_notacalendario",
+      "app_taxi_mainantiguo_notatipo",
+      "app_taxi_mainantiguo_note_time_style",
+      "app_taxi_mainantiguo_reserva",
+      "app_taxi_mainantiguo_rootelement",
+      "app_taxi_mainantiguo_shell",
+      "app_taxi_mainantiguo_time_card_hour_unit_style",
+      "app_taxi_mainantiguo_time_card_unit_style",
+      "app_taxi_mainantiguo_timenow",
+      "app_taxi_mainantiguo_turno",
+      "app_taxi_mainantiguo_turnoconfig",
+      "app_taxi_mainantiguo_turnonotassemana",
+      "app_taxi_mainantiguo_updateturnoentrega",
+      "app_taxi_mainantiguo_week_list_card_text_sizes",
+      "app_taxi_mainantiguo_weekoverride",
+      "mainantiguo_tsx"
+    ],
+    "2": [
+      "app_taxi_mainantiguo_migrarlocalstorageafirestore",
+      "hooks_use_firestore_sync_migrarlocalstorageafirestore",
+      "hooks_use_firestore_sync_usefirestoresync",
+      "logic_formatters_fmtkm",
+      "screens_admin_screens_adminlistscreen",
+      "screens_admin_screens_adminuserview",
+      "screens_admin_screens_appsettings",
+      "screens_admin_screens_calendariotab",
+      "screens_admin_screens_configtab",
+      "screens_admin_screens_contabilidadtab",
+      "screens_admin_screens_currentstate",
+      "screens_admin_screens_entry",
+      "screens_admin_screens_fmtfecha",
+      "screens_admin_screens_getweekid",
+      "screens_admin_screens_notacalendario",
+      "screens_admin_screens_notatipo",
+      "screens_admin_screens_reserva",
+      "screens_admin_screens_tab",
+      "screens_admin_screens_turno",
+      "screens_admin_screens_turnodetail",
+      "screens_admin_screens_turnostab",
+      "screens_admin_screens_userlistitem",
+      "screens_admin_screens_weekoverride",
+      "screens_auth_gate_authgate",
+      "screens_login_screen_entrar",
+      "screens_login_screen_inputstyle",
+      "screens_login_screen_labelstyle",
+      "screens_login_screen_linkbtnstyle",
+      "screens_login_screen_loginscreen",
+      "screens_login_screen_mensajeerror",
+      "screens_login_screen_modo",
+      "screens_login_screen_primarybtnstyle",
+      "screens_login_screen_recuperarpassword",
+      "screens_login_screen_registrar",
+      "screens_login_screen_resolveremail",
+      "services_firebase_app",
+      "services_firebase_auth",
+      "services_firebase_db",
+      "services_firebase_firebaseconfig",
+      "services_firestore_sync_saveuserdoc",
+      "services_firestore_sync_syncsubcollection",
+      "services_firestore_sync_userhasfirestoredata",
+      "services_firestore_sync_usermetadocref",
+      "services_firestore_sync_usersubcollectionref",
+      "services_user_storage_readlocaljson",
+      "services_user_storage_userstoragekey",
+      "services_user_storage_writeuserlocaljson",
+      "src_hooks_use_firestore_sync_ts",
+      "src_screens_admin_screens_tsx",
+      "src_screens_auth_gate_tsx",
+      "src_screens_login_screen_tsx",
+      "src_services_firebase_ts",
+      "src_services_firestore_sync_ts",
+      "src_services_user_storage_ts",
+      "src_shared_storage_keys_ts",
+      "src_tests_state_loaders_extraction_test_ts"
+    ],
+    "3": [
+      "components_entry_icons_iconpercent",
+      "components_home_icons_iconagenda",
+      "components_home_icons_iconchart",
+      "components_home_icons_iconclipboard",
+      "components_home_icons_iconplay",
+      "components_home_icons_iconreservawrite",
+      "components_home_icons_iconrocket",
+      "components_navigation_icons_iconadminneon",
+      "components_navigation_icons_iconcalendar",
+      "components_navigation_icons_icondownload",
+      "components_navigation_icons_iconhomeneon",
+      "components_navigation_icons_iconlogoutneon",
+      "components_navigation_icons_iconrefresh",
+      "components_navigation_icons_iconsettings",
+      "components_navigation_icons_iconupload",
+      "components_settings_icons_iconholiday",
+      "components_settings_icons_iconreceipt",
+      "logic_backup_backuppayloadvalues",
+      "logic_backup_backupstatevalues",
+      "logic_backup_buildbackuppayload",
+      "logic_backup_buildbackuppayloadfromstate",
+      "logic_update_flow_githublatestrelease",
+      "logic_update_flow_githubreleaseasset",
+      "logic_update_flow_resolvelatestapkupdate",
+      "logic_update_flow_updatecheckresult",
+      "logic_update_flow_updatestate",
+      "screens_home_screen_homescreen",
+      "screens_home_screen_homescreenprops",
+      "screens_settings_screen_checkupdate",
+      "screens_settings_screen_handleinstallupdate",
+      "screens_settings_screen_handleopenrelease",
+      "screens_settings_screen_s",
+      "screens_settings_screen_settingsscreen",
+      "services_apk_installer_apkinstaller",
+      "services_apk_installer_apkinstallerplugintype",
+      "services_backup_export_exportbackupjson",
+      "shared_action_ids_backupmenuactionid",
+      "shared_action_ids_getbackupmenuactionids",
+      "shared_action_ids_gethomequickactionids",
+      "shared_action_ids_homequickactionid",
+      "shared_app_version_app_version",
+      "src_components_home_icons_tsx",
+      "src_components_navigation_icons_tsx",
+      "src_components_settings_icons_tsx",
+      "src_logic_backup_ts",
+      "src_logic_update_flow_ts",
+      "src_screens_home_screen_tsx",
+      "src_screens_settings_screen_tsx",
+      "src_services_apk_installer_ts",
+      "src_services_backup_export_ts",
+      "src_shared_action_ids_ts",
+      "src_shared_app_version_ts"
+    ],
+    "4": [
+      "components_edit_entry_dialog_editentrydialog",
+      "components_edit_entry_dialog_entrytypemetafordialog",
+      "components_navigation_icons_icondel",
+      "components_turno_notas_entrytypemetafornotes",
+      "hooks_use_firestore_sync_usefirestoresyncprops",
+      "logic_date_time_timenow",
+      "logic_date_time_today",
+      "screens_add_entry_screen_addentryscreen",
+      "screens_add_entry_screen_addentryscreenprops",
+      "screens_add_entry_screen_iconbtnstyle",
+      "screens_add_entry_screen_keybtnstyle",
+      "screens_add_nota_general_screen_addnotageneralscreen",
+      "screens_add_nota_general_screen_addnotageneralscreenprops",
+      "screens_add_nota_general_screen_iconbtnstyle",
+      "screens_add_single_entry_screen_addsingleentryscreen",
+      "screens_add_single_entry_screen_addsingleentryscreenprops",
+      "screens_add_single_entry_screen_iconbtnstyle",
+      "screens_add_single_entry_screen_keybtnstyle",
+      "screens_add_single_entry_screen_singlemode",
+      "screens_contabilidad_screen_contabilidadscreenprops",
+      "screens_settings_screen_settingsscreenprops",
+      "shared_types_currentstate",
+      "shared_types_editturnostate",
+      "shared_types_entry",
+      "shared_types_notacalendario",
+      "shared_types_notatipo",
+      "shared_types_reserva",
+      "shared_types_turnoconfig",
+      "shared_types_turnonotassemana",
+      "shared_types_weekoverride",
+      "src_components_edit_entry_dialog_tsx",
+      "src_components_turno_notas_tsx",
+      "src_screens_add_entry_screen_tsx",
+      "src_screens_add_nota_general_screen_tsx",
+      "src_screens_add_single_entry_screen_tsx",
+      "src_shared_types_ts"
+    ],
+    "5": [
+      "app_taxi_package_dependencies",
+      "app_taxi_package_dependencies_capacitor_core",
+      "app_taxi_package_dependencies_capacitor_filesystem",
+      "app_taxi_package_dependencies_capacitor_share",
+      "app_taxi_package_dependencies_firebase",
+      "app_taxi_package_dependencies_html2canvas",
+      "app_taxi_package_dependencies_react",
+      "app_taxi_package_dependencies_react_dom",
+      "app_taxi_package_description",
+      "app_taxi_package_devdependencies",
+      "app_taxi_package_devdependencies_capacitor_android",
+      "app_taxi_package_devdependencies_capacitor_assets",
+      "app_taxi_package_devdependencies_capacitor_cli",
+      "app_taxi_package_devdependencies_jsdom",
+      "app_taxi_package_devdependencies_types_react",
+      "app_taxi_package_devdependencies_types_react_dom",
+      "app_taxi_package_devdependencies_typescript",
+      "app_taxi_package_devdependencies_vite",
+      "app_taxi_package_devdependencies_vitejs_plugin_react",
+      "app_taxi_package_devdependencies_vitest",
+      "app_taxi_package_name",
+      "app_taxi_package_scripts",
+      "app_taxi_package_scripts_android",
+      "app_taxi_package_scripts_android_build",
+      "app_taxi_package_scripts_build",
+      "app_taxi_package_scripts_dev",
+      "app_taxi_package_scripts_preview",
+      "app_taxi_package_scripts_test",
+      "app_taxi_package_scripts_test_watch",
+      "app_taxi_package_scripts_typecheck",
+      "app_taxi_package_type",
+      "app_taxi_package_version",
+      "package_json"
+    ],
+    "6": [
+      "components_turno_control_icons_iconpause",
+      "components_turno_control_icons_iconplay",
+      "logic_calendar_date_getdaysinmonth",
+      "logic_calendar_date_getstartoffset",
+      "screens_calendar_screen_calendarscreen",
+      "screens_confirm_end_screen_confirmendscreen",
+      "screens_pantalla_turnos_pantallaturnos",
+      "screens_today_history_screen_todayhistoryscreen",
+      "services_service_worker_registration_registerserviceworker",
+      "src_components_turno_control_icons_tsx",
+      "src_logic_calendar_date_ts",
+      "src_main_entry_type_meta",
+      "src_main_entrytypemeta",
+      "src_main_getentrytypemeta",
+      "src_main_iconagenda",
+      "src_main_iconchart",
+      "src_main_iconclipboard",
+      "src_main_icongive",
+      "src_main_iconholiday",
+      "src_main_iconmoneybag",
+      "src_main_iconnoteadd",
+      "src_main_iconpencilneon",
+      "src_main_iconpinneon",
+      "src_main_iconreceipt",
+      "src_main_iconreservawrite",
+      "src_main_iconroad",
+      "src_main_iconrocket",
+      "src_main_icontaxibadgeneon",
+      "src_main_icontimer",
+      "src_main_note_time_style",
+      "src_main_rootelement",
+      "src_main_tsx",
+      "src_services_service_worker_registration_ts"
+    ],
+    "7": [
+      "logic_accounting_accountingsettings",
+      "logic_date_labels_getaccountingperiodlabel",
+      "logic_date_labels_getmeslabel",
+      "logic_date_labels_meses_abreviados",
+      "logic_date_labels_meses_completos",
+      "logic_week_logic_formatweekrange",
+      "logic_week_logic_formatweekrangefull",
+      "logic_week_logic_getcurrentopenweekid",
+      "logic_week_logic_getturnoaccountingweekid",
+      "logic_week_logic_getturnofechaefectiva",
+      "logic_week_logic_getweekid",
+      "logic_week_logic_getweekmonth",
+      "logic_week_logic_getweekoverride",
+      "logic_week_logic_getweekrange",
+      "logic_week_logic_getweekstartdate",
+      "logic_week_logic_groupturnosbyweek",
+      "logic_week_logic_isweekclosed",
+      "logic_week_logic_selectaccountingheroweek",
+      "logic_week_logic_weekoverridelike",
+      "logic_week_logic_weekturno",
+      "screens_contabilidad_screen_contabilidadscreen",
+      "screens_contabilidad_screen_elem",
+      "screens_contabilidad_screen_elemconmes",
+      "screens_contabilidad_screen_elemsemana",
+      "screens_contabilidad_screen_elemturnosuelto",
+      "screens_contabilidad_screen_grupomes",
+      "screens_contabilidad_screen_note_time_style",
+      "screens_contabilidad_screen_s",
+      "src_logic_date_labels_ts",
+      "src_logic_week_logic_ts",
+      "src_screens_contabilidad_screen_tsx"
+    ],
+    "8": [
+      "app_taxi_mainantiguo_app",
+      "app_taxi_mainantiguo_buildturnoconfigfromsettings",
+      "app_taxi_mainantiguo_calcularresumencontableturnos",
+      "app_taxi_mainantiguo_calculartotalesturnos",
+      "app_taxi_mainantiguo_calcularturnocontable",
+      "app_taxi_mainantiguo_formatweekrange",
+      "app_taxi_mainantiguo_formatweekrangefull",
+      "app_taxi_mainantiguo_getaccountingperiodlabel",
+      "app_taxi_mainantiguo_getbackupmenuactionids",
+      "app_taxi_mainantiguo_getcurrentopenweekid",
+      "app_taxi_mainantiguo_getdaysinmonth",
+      "app_taxi_mainantiguo_getdiffmins",
+      "app_taxi_mainantiguo_gethomequickactionids",
+      "app_taxi_mainantiguo_getmeslabel",
+      "app_taxi_mainantiguo_getstartoffset",
+      "app_taxi_mainantiguo_getturnoconfig",
+      "app_taxi_mainantiguo_getturnosnotassemana",
+      "app_taxi_mainantiguo_getweekmonth",
+      "app_taxi_mainantiguo_getweekoverride",
+      "app_taxi_mainantiguo_getweekrange",
+      "app_taxi_mainantiguo_isweekclosed",
+      "app_taxi_mainantiguo_roundmoney",
+      "app_taxi_mainantiguo_selectaccountingheroweek",
+      "app_taxi_mainantiguo_today"
+    ],
+    "9": [
+      "agents_changelog_entry_format",
+      "agents_changelog_policy",
+      "analisis_plan_profesional",
+      "cambios_agent_log",
+      "concept_arquitectura_src",
+      "concept_capacitor_android",
+      "concept_contabilidad",
+      "concept_firebase_firestore",
+      "concept_firestore_rules",
+      "concept_main_tsx",
+      "concept_mi_turno_app",
+      "concept_pwa",
+      "concept_refactor_incremental",
+      "concept_sw_version_bug",
+      "concept_tests_caracterizacion",
+      "concept_use_firestore_sync",
+      "concept_versionado_unificado",
+      "estructura_guia",
+      "index_html",
+      "readme_mi_turno",
+      "revision_implementacion",
+      "workflows_android",
+      "workflows_ci",
+      "workflows_pages"
+    ],
+    "10": [
+      "app_taxi_tsconfig_compileroptions",
+      "app_taxi_tsconfig_compileroptions_allowimportingtsextensions",
+      "app_taxi_tsconfig_compileroptions_allowsyntheticdefaultimports",
+      "app_taxi_tsconfig_compileroptions_esmoduleinterop",
+      "app_taxi_tsconfig_compileroptions_isolatedmodules",
+      "app_taxi_tsconfig_compileroptions_jsx",
+      "app_taxi_tsconfig_compileroptions_lib",
+      "app_taxi_tsconfig_compileroptions_module",
+      "app_taxi_tsconfig_compileroptions_moduleresolution",
+      "app_taxi_tsconfig_compileroptions_noemit",
+      "app_taxi_tsconfig_compileroptions_nofallthroughcasesinswitch",
+      "app_taxi_tsconfig_compileroptions_nounusedlocals",
+      "app_taxi_tsconfig_compileroptions_nounusedparameters",
+      "app_taxi_tsconfig_compileroptions_resolvejsonmodule",
+      "app_taxi_tsconfig_compileroptions_skiplibcheck",
+      "app_taxi_tsconfig_compileroptions_strict",
+      "app_taxi_tsconfig_compileroptions_target",
+      "app_taxi_tsconfig_compileroptions_usedefineforclassfields",
+      "app_taxi_tsconfig_include",
+      "app_taxi_tsconfig_references",
+      "tsconfig_json"
+    ],
+    "11": [
+      "logic_csv_csventry",
+      "logic_csv_csvturno",
+      "logic_csv_parsecsvline",
+      "logic_csv_parsecsvtohistory",
+      "logic_turnos_ensureturnosdialibrecontable",
+      "logic_turnos_getturnomergekey",
+      "logic_turnos_getturnosbycalendarmonth",
+      "logic_turnos_getturnosbycalendaryear",
+      "logic_turnos_mergeturnos",
+      "logic_turnos_sortableturno",
+      "logic_turnos_sortturnosbydatedesc",
+      "src_logic_csv_ts",
+      "src_logic_turnos_ts",
+      "src_tests_logic_test_ts"
+    ],
+    "12": [
+      "public_manifest_background_color",
+      "public_manifest_categories",
+      "public_manifest_description",
+      "public_manifest_display",
+      "public_manifest_icons",
+      "public_manifest_json",
+      "public_manifest_name",
+      "public_manifest_orientation",
+      "public_manifest_scope",
+      "public_manifest_short_name",
+      "public_manifest_start_url",
+      "public_manifest_theme_color",
+      "public_manifest_version"
+    ],
+    "13": [
+      "app_taxi_mainantiguo_durationcardvalue",
+      "components_common_confirmdialogprops",
+      "components_common_fmt",
+      "components_common_maincard",
+      "components_common_smallcard",
+      "logic_formatters_fmtmoney",
+      "logic_formatters_fmtmoneynumber",
+      "logic_formatters_splitdurationlabel",
+      "src_components_common_tsx",
+      "src_tests_formatters_test_ts"
+    ],
+    "14": [
+      "logic_state_loaders_loadcurrent",
+      "logic_state_loaders_loadedcurrentstate",
+      "logic_state_loaders_loadedweekoverride",
+      "logic_state_loaders_loadhistory",
+      "logic_state_loaders_loadnotes",
+      "logic_state_loaders_loadreservations",
+      "logic_state_loaders_loadsettings",
+      "logic_state_loaders_loadweekoverrides",
+      "src_logic_state_loaders_ts"
+    ],
+    "15": [
+      "app_taxi_tsconfig_node_compileroptions",
+      "app_taxi_tsconfig_node_compileroptions_allowsyntheticdefaultimports",
+      "app_taxi_tsconfig_node_compileroptions_composite",
+      "app_taxi_tsconfig_node_compileroptions_module",
+      "app_taxi_tsconfig_node_compileroptions_moduleresolution",
+      "app_taxi_tsconfig_node_compileroptions_skiplibcheck",
+      "app_taxi_tsconfig_node_include",
+      "tsconfig_node_json"
+    ],
+    "16": [
+      "app_taxi_mainantiguo_loadcurrent",
+      "app_taxi_mainantiguo_loadnotes",
+      "app_taxi_mainantiguo_loadreservations",
+      "app_taxi_mainantiguo_loadsettings",
+      "app_taxi_mainantiguo_loadweekoverrides",
+      "app_taxi_mainantiguo_readlocaljson",
+      "app_taxi_mainantiguo_userstoragekey",
+      "app_taxi_mainantiguo_writeuserlocaljson"
+    ],
+    "17": [
+      "app_taxi_mainantiguo_getturnosbycalendarmonth",
+      "app_taxi_mainantiguo_getturnosbycalendaryear",
+      "app_taxi_mainantiguo_loadhistory",
+      "app_taxi_mainantiguo_mergeturnos",
+      "app_taxi_mainantiguo_parsecsvline",
+      "app_taxi_mainantiguo_parsecsvtohistory",
+      "app_taxi_mainantiguo_sortturnosbydatedesc"
+    ],
+    "18": [
+      "app_taxi_convert_ods_to_csv_fmt_num",
+      "app_taxi_convert_ods_to_csv_main",
+      "app_taxi_convert_ods_to_csv_parse_date",
+      "app_taxi_convert_ods_to_csv_parse_num",
+      "convert_ods_to_csv_py"
+    ],
+    "19": [
+      "shared_card_styles_time_card_hour_unit_style",
+      "shared_card_styles_time_card_unit_style",
+      "shared_card_styles_week_list_card_text_sizes",
+      "src_components_duration_card_value_tsx",
+      "src_shared_card_styles_ts"
+    ],
+    "20": [
+      "app_taxi_mainantiguo_getturnoaccountingweekid",
+      "app_taxi_mainantiguo_getweekid",
+      "app_taxi_mainantiguo_getweekstartdate",
+      "app_taxi_mainantiguo_groupturnosbyweek"
+    ],
+    "21": [
+      "android_app_src_androidtest_java_com_getcapacitor_myapp_exampleinstrumentedtest_java",
+      "android_app_src_androidtest_java_com_getcapacitor_myapp_exampleinstrumentedtest_java_test",
+      "myapp_exampleinstrumentedtest_exampleinstrumentedtest",
+      "myapp_exampleinstrumentedtest_exampleinstrumentedtest_useappcontext"
+    ],
+    "22": [
+      "android_app_src_test_java_com_getcapacitor_myapp_exampleunittest_java",
+      "android_app_src_test_java_com_getcapacitor_myapp_exampleunittest_java_test",
+      "myapp_exampleunittest_exampleunittest",
+      "myapp_exampleunittest_exampleunittest_addition_iscorrect"
+    ],
+    "23": [
+      "android_app_src_main_java_com_mijornada_app_mainactivity_java",
+      "app_mainactivity_mainactivity",
+      "bridgeactivity"
+    ],
+    "24": [
+      "logic_turno_entrega_entregaturno",
+      "logic_turno_entrega_updateturnoentrega",
+      "src_logic_turno_entrega_ts"
+    ],
+    "25": [
+      "app_taxi_mainantiguo_fmt",
+      "app_taxi_mainantiguo_maincard",
+      "app_taxi_mainantiguo_smallcard"
+    ],
+    "26": [
+      "public_sw_assets",
+      "public_sw_checkversion",
+      "public_sw_js"
+    ],
+    "27": [
+      "app_taxi_vite_config_inyectarversion",
+      "app_taxi_vite_config_pkg",
+      "vite_config_ts"
+    ],
+    "28": [
+      "app_taxi_capacitor_config_config",
+      "capacitor_config_ts"
+    ],
+    "29": [
+      "app_taxi_mainantiguo_buildbackuppayload",
+      "app_taxi_mainantiguo_buildbackuppayloadfromstate"
+    ],
+    "30": [
+      "app_taxi_mainantiguo_fmtdate",
+      "app_taxi_mainantiguo_turnonotascard"
+    ],
+    "31": [
+      "app_taxi_mainantiguo_editentrydialog",
+      "app_taxi_mainantiguo_getentrytypemeta"
+    ],
+    "32": [
+      "src_tests_main_antiguo_regressions_test_ts",
+      "tests_main_antiguo_regressions_test_readsource"
+    ],
+    "33": [
+      "android_build_gradle"
+    ],
+    "34": [
+      "android_capacitor_settings_gradle"
+    ],
+    "35": [
+      "android_settings_gradle"
+    ],
+    "36": [
+      "android_variables_gradle"
+    ],
+    "37": [
+      "android_app_build_gradle"
+    ],
+    "38": [
+      "android_app_capacitor_build_gradle"
+    ],
+    "39": [
+      "src_tests_accounting_extraction_test_ts"
+    ],
+    "40": [
+      "src_tests_action_ids_extraction_test_ts"
+    ],
+    "41": [
+      "src_tests_apk_installer_extraction_test_ts"
+    ],
+    "42": [
+      "src_tests_apk_update_flow_test_ts"
+    ],
+    "43": [
+      "src_tests_app_version_extraction_test_ts"
+    ],
+    "44": [
+      "src_tests_auth_gate_extraction_test_ts"
+    ],
+    "45": [
+      "src_tests_backup_export_extraction_test_ts"
+    ],
+    "46": [
+      "src_tests_backup_extraction_test_ts"
+    ],
+    "47": [
+      "src_tests_calendar_date_extraction_test_ts"
+    ],
+    "48": [
+      "src_tests_card_styles_extraction_test_ts"
+    ],
+    "49": [
+      "src_tests_common_components_extraction_test_ts"
+    ],
+    "50": [
+      "src_tests_csv_extraction_test_ts"
+    ],
+    "51": [
+      "src_tests_date_labels_extraction_test_ts"
+    ],
+    "52": [
+      "src_tests_date_time_extraction_test_ts"
+    ],
+    "53": [
+      "src_tests_detailed_notes_layout_test_ts"
+    ],
+    "54": [
+      "src_tests_domain_types_extraction_test_ts"
+    ],
+    "55": [
+      "src_tests_duration_card_value_extraction_test_ts"
+    ],
+    "56": [
+      "src_tests_edit_entry_dialog_extraction_test_ts"
+    ],
+    "57": [
+      "src_tests_home_icons_test_ts"
+    ],
+    "58": [
+      "src_tests_latest_entries_layout_test_ts"
+    ],
+    "59": [
+      "src_tests_liquidacion_semana_test_ts"
+    ],
+    "60": [
+      "src_tests_main_note_button_test_ts"
+    ],
+    "61": [
+      "src_tests_responsive_title_fonts_test_ts"
+    ],
+    "62": [
+      "src_tests_service_worker_registration_test_ts"
+    ],
+    "63": [
+      "src_tests_shell_components_extraction_test_ts"
+    ],
+    "64": [
+      "src_tests_src_reorganization_test_ts"
+    ],
+    "65": [
+      "src_tests_storage_keys_extraction_test_ts"
+    ],
+    "66": [
+      "src_tests_summary_layout_test_ts"
+    ],
+    "67": [
+      "src_tests_sw_version_test_ts"
+    ],
+    "68": [
+      "src_tests_turno_entrega_extraction_test_ts"
+    ],
+    "69": [
+      "src_tests_turno_merge_extraction_test_ts"
+    ],
+    "70": [
+      "src_tests_turno_notas_component_extraction_test_ts"
+    ],
+    "71": [
+      "src_tests_turno_notas_logic_extraction_test_ts"
+    ],
+    "72": [
+      "src_tests_turno_selection_extraction_test_ts"
+    ],
+    "73": [
+      "src_tests_ui_theme_extraction_test_ts"
+    ],
+    "74": [
+      "src_tests_update_flow_extraction_test_ts"
+    ],
+    "75": [
+      "src_tests_user_storage_extraction_test_ts"
+    ],
+    "76": [
+      "src_tests_week_logic_extraction_test_ts"
+    ]
+  },
+  "cohesion": {
+    "0": 0.09272151898734177,
+    "1": 0.028169014084507043,
+    "2": 0.05714285714285714,
+    "3": 0.05957767722473605,
+    "4": 0.08253968253968254,
+    "5": 0.06060606060606061,
+    "6": 0.07007575757575757,
+    "7": 0.11827956989247312,
+    "8": 0.11956521739130435,
+    "9": 0.13768115942028986,
+    "10": 0.09523809523809523,
+    "11": 0.26373626373626374,
+    "12": 0.15384615384615385,
+    "13": 0.28888888888888886,
+    "14": 0.2222222222222222,
+    "15": 0.25,
+    "16": 0.25,
+    "17": 0.2857142857142857,
+    "18": 0.7,
+    "19": 0.6,
+    "20": 0.5,
+    "21": 0.6666666666666666,
+    "22": 0.6666666666666666,
+    "23": 1.0,
+    "24": 0.6666666666666666,
+    "25": 0.6666666666666666,
+    "26": 0.6666666666666666,
+    "27": 0.6666666666666666,
+    "28": 1.0,
+    "29": 1.0,
+    "30": 1.0,
+    "31": 1.0,
+    "32": 1.0,
+    "33": 1.0,
+    "34": 1.0,
+    "35": 1.0,
+    "36": 1.0,
+    "37": 1.0,
+    "38": 1.0,
+    "39": 1.0,
+    "40": 1.0,
+    "41": 1.0,
+    "42": 1.0,
+    "43": 1.0,
+    "44": 1.0,
+    "45": 1.0,
+    "46": 1.0,
+    "47": 1.0,
+    "48": 1.0,
+    "49": 1.0,
+    "50": 1.0,
+    "51": 1.0,
+    "52": 1.0,
+    "53": 1.0,
+    "54": 1.0,
+    "55": 1.0,
+    "56": 1.0,
+    "57": 1.0,
+    "58": 1.0,
+    "59": 1.0,
+    "60": 1.0,
+    "61": 1.0,
+    "62": 1.0,
+    "63": 1.0,
+    "64": 1.0,
+    "65": 1.0,
+    "66": 1.0,
+    "67": 1.0,
+    "68": 1.0,
+    "69": 1.0,
+    "70": 1.0,
+    "71": 1.0,
+    "72": 1.0,
+    "73": 1.0,
+    "74": 1.0,
+    "75": 1.0,
+    "76": 1.0
+  },
+  "gods": [
+    {
+      "id": "app_taxi_mainantiguo_app",
+      "label": "App()",
+      "degree": 30
+    },
+    {
+      "id": "shared_types_turno",
+      "label": "Turno",
+      "degree": 19
+    },
+    {
+      "id": "app_taxi_tsconfig_compileroptions",
+      "label": "compilerOptions",
+      "degree": 18
+    },
+    {
+      "id": "shared_types_appsettings",
+      "label": "AppSettings",
+      "degree": 18
+    },
+    {
+      "id": "logic_formatters_fmtkmnumber",
+      "label": "fmtKmNumber()",
+      "degree": 17
+    },
+    {
+      "id": "components_shell_shell",
+      "label": "Shell()",
+      "degree": 16
+    },
+    {
+      "id": "components_navigation_icons_iconback",
+      "label": "IconBack()",
+      "degree": 15
+    },
+    {
+      "id": "logic_formatters_fmtduration",
+      "label": "fmtDuration()",
+      "degree": 14
+    },
+    {
+      "id": "logic_formatters_fmt",
+      "label": "fmt()",
+      "degree": 12
+    },
+    {
+      "id": "shared_types_currentstate",
+      "label": "CurrentState",
+      "degree": 12
+    }
+  ],
+  "surprises": [
+    {
+      "source": "fmt()",
+      "target": "fmtMoney()",
+      "source_files": [
+        "mainAntiguo.tsx",
+        "src/logic/formatters.ts"
+      ],
+      "confidence": "INFERRED",
+      "relation": "calls",
+      "why": "inferred connection - not explicitly stated in source; connects across different repos/directories; bridges separate communities"
+    },
+    {
+      "source": "DurationCardValue()",
+      "target": "splitDurationLabel()",
+      "source_files": [
+        "mainAntiguo.tsx",
+        "src/logic/formatters.ts"
+      ],
+      "confidence": "INFERRED",
+      "relation": "calls",
+      "why": "inferred connection - not explicitly stated in source; connects across different repos/directories; peripheral node `DurationCardValue()` unexpectedly reaches hub `splitDurationLabel()`"
+    },
+    {
+      "source": "App()",
+      "target": "fmtDuration()",
+      "source_files": [
+        "mainAntiguo.tsx",
+        "src/logic/formatters.ts"
+      ],
+      "confidence": "INFERRED",
+      "relation": "calls",
+      "why": "inferred connection - not explicitly stated in source; connects across different repos/directories; bridges separate communities"
+    },
+    {
+      "source": "App()",
+      "target": "fmtKmNumber()",
+      "source_files": [
+        "mainAntiguo.tsx",
+        "src/logic/formatters.ts"
+      ],
+      "confidence": "INFERRED",
+      "relation": "calls",
+      "why": "inferred connection - not explicitly stated in source; connects across different repos/directories; bridges separate communities"
+    },
+    {
+      "source": "CAMBIOS_AGENT.md (registro de cambios)",
+      "target": "Formato de entrada de CAMBIOS_AGENT.md",
+      "source_files": [
+        "CAMBIOS_AGENT.md",
+        "AGENTS.md"
+      ],
+      "confidence": "INFERRED",
+      "relation": "implements",
+      "why": "inferred connection - not explicitly stated in source; connects across different repos/directories; peripheral node `Formato de entrada de CAMBIOS_AGENT.md` unexpectedly reaches hub `CAMBIOS_AGENT.md (registro de cambios)`"
+    }
+  ],
+  "questions": [
+    {
+      "type": "bridge_node",
+      "question": "Why does `App()` connect `Community 8` to `Community 0`, `Community 1`, `Community 17`, `Community 20`, `Community 25`, `Community 30`?",
+      "why": "High betweenness centrality (0.117) - this node is a cross-community bridge."
+    },
+    {
+      "type": "bridge_node",
+      "question": "Why does `fmtKmNumber()` connect `Community 0` to `Community 2`, `Community 6`, `Community 7`, `Community 8`, `Community 11`, `Community 13`?",
+      "why": "High betweenness centrality (0.061) - this node is a cross-community bridge."
+    },
+    {
+      "type": "bridge_node",
+      "question": "Why does `fmtDuration()` connect `Community 0` to `Community 8`, `Community 13`, `Community 6`, `Community 7`?",
+      "why": "High betweenness centrality (0.056) - this node is a cross-community bridge."
+    },
+    {
+      "type": "verify_inferred",
+      "question": "Are the 2 inferred relationships involving `App()` (e.g. with `fmtDuration()` and `fmtKmNumber()`) actually correct?",
+      "why": "`App()` has 2 INFERRED edges - model-reasoned connections that need verification."
+    },
+    {
+      "type": "isolated_nodes",
+      "question": "What connects `config`, `ApkInstallerPluginType`, `ApkInstaller` to the rest of the system?",
+      "why": "169 weakly-connected nodes found - possible documentation gaps or missing edges."
+    },
+    {
+      "type": "low_cohesion",
+      "question": "Should `Community 0` be split into smaller, more focused modules?",
+      "why": "Cohesion score 0.09272151898734177 - nodes in this community are weakly interconnected."
+    },
+    {
+      "type": "low_cohesion",
+      "question": "Should `Community 1` be split into smaller, more focused modules?",
+      "why": "Cohesion score 0.028169014084507043 - nodes in this community are weakly interconnected."
+    }
+  ]
+}

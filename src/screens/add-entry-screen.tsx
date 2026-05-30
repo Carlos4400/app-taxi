@@ -4,6 +4,7 @@ import { IconBack, IconDel } from "../components/navigation-icons";
 import { G, P } from "../shared/ui-theme";
 import { timeNow, today } from "../logic/date-time";
 import type { CurrentState, Entry } from "../shared/types";
+import { hapticTap, hapticConfirm } from "../services/haptics";
 
 const iconBtnStyle = {
   background: "rgba(255,255,255,0.06)",
@@ -57,6 +58,7 @@ export const AddEntryScreen: FC<AddEntryScreenProps> = ({
   const curVal = activeField === "propina" ? valP : valD;
 
   function kpAdd(v: string) {
+    hapticTap();
     if (v === "DEL") {
       setVal((p) => p.slice(0, -1));
       return;
@@ -70,6 +72,7 @@ export const AddEntryScreen: FC<AddEntryScreenProps> = ({
   }
 
   function handleSaveAdd() {
+    hapticConfirm();
     const p = parseFloat(valP.replace(",", "."));
     const d = parseFloat(valD.replace(",", "."));
     if (isNaN(p) && isNaN(d)) return;

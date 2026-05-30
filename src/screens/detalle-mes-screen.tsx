@@ -1,5 +1,6 @@
 import type { CSSProperties } from "react";
 import type { AppSettings, Turno, TurnoNotasSemana } from "../shared/types";
+import { useAppStore } from "../services/store";
 import { Shell } from "../components/shell";
 import { IconBack } from "../components/navigation-icons";
 import {
@@ -40,13 +41,10 @@ const NOTE_TIME_STYLE = {
 } as const;
 
 interface DetalleMesScreenProps {
-  history: Turno[];
-  settings: AppSettings;
   selectedAccountingYear: number;
   selectedAccountingMonth: number;
   setSelectedAccountingYear: (year: number | ((prev: number) => number)) => void;
   setSelectedAccountingMonth: (month: number | ((prev: number) => number)) => void;
-  setScreen: (screen: string) => void;
   setReturnScreen: (screen: string) => void;
   setViewTurno: (turno: Turno) => void;
   renderTurnoCard: (
@@ -63,17 +61,17 @@ interface DetalleMesScreenProps {
 }
 
 export function DetalleMesScreen({
-  history,
-  settings,
   selectedAccountingYear,
   selectedAccountingMonth,
   setSelectedAccountingYear,
   setSelectedAccountingMonth,
-  setScreen,
   setReturnScreen,
   setViewTurno,
   renderTurnoCard,
 }: DetalleMesScreenProps) {
+  const history: Turno[] = useAppStore((s) => s.history);
+  const settings: AppSettings = useAppStore((s) => s.settings);
+  const setScreen = useAppStore((s) => s.setScreen);
   const monthId = `${selectedAccountingYear}-${String(selectedAccountingMonth).padStart(2, "0")}`;
   const turnosMes = getTurnosByCalendarMonth(history, selectedAccountingYear, selectedAccountingMonth);
   const resumenMes = calcularResumenContableTurnos(turnosMes, settings);

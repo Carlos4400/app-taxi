@@ -4,6 +4,7 @@ import { IconBack, IconDel } from "../components/navigation-icons";
 import { A, ABG, E, EBG, F, FBG, N, NBG } from "../shared/ui-theme";
 import { timeNow, today } from "../logic/date-time";
 import type { Entry } from "../shared/types";
+import { hapticTap, hapticConfirm } from "../services/haptics";
 
 const iconBtnStyle: CSSProperties = {
   background: "rgba(255,255,255,0.06)",
@@ -58,6 +59,7 @@ export const AddSingleEntryScreen: FC<AddSingleEntryScreenProps> = ({
   const label = cfg.label;
 
   function kpS(v: string) {
+    hapticTap();
     if (v === "DEL") {
       setValS((p) => p.slice(0, -1));
       return;
@@ -73,6 +75,7 @@ export const AddSingleEntryScreen: FC<AddSingleEntryScreenProps> = ({
   const validS = valS && parseFloat(valS.replace(",", ".")) > 0;
 
   function saveS() {
+    hapticConfirm();
     if (!validS) return;
     const now = timeNow();
     const entry: Entry = {
