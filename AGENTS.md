@@ -97,3 +97,21 @@ Notas sobre el formato:
 - La fecha vive solo en el título (`##`), no se repite debajo.
 - `Archivos modificados` va inline tras el título. Si hay muchos archivos (10+), usa lista con guiones.
 - El lenguaje del fence (` ```ts `, ` ```py `, etc.) debe coincidir con el del archivo modificado.
+
+## Entender el código: usar graphify
+
+Este proyecto tiene un grafo de conocimiento del código generado en `graphify-out/` (presente en disco; en `.gitignore`, no se versiona).
+
+Cuando haya que responder cómo funciona la app, flujos, dependencias entre módulos o dónde vive algo en el código, usa el skill `graphify` (tratar la pregunta como una consulta al grafo) en lugar de explorar solo a mano con `grep`/`find`/lectura directa. Si tras cambios grandes el grafo parece desactualizado, regenéralo con graphify antes de consultarlo.
+
+## Estructura del proyecto: leer ESTRUCTURA.md
+
+Antes de añadir código nuevo (pantalla, componente, hook, servicio, tipo, constante o carpeta), lee `ESTRUCTURA.md`.
+
+Ese archivo define:
+
+- Qué va en cada carpeta de `src/`.
+- Dónde colocar cada tipo de archivo nuevo.
+- Las reglas de nombres (kebab-case, `.ts` vs `.tsx`).
+- La regla de oro de la contabilidad: no toques `src/logic/accounting.ts` ni `src/logic/week-logic.ts` como efecto secundario de otra tarea.
+- Los cuatro checks obligatorios antes de dar algo por terminado (`tsc`, `npm test`, `npm run build`, `CAMBIOS_AGENT.md`).

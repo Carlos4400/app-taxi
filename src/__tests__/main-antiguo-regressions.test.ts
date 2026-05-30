@@ -76,6 +76,39 @@ describe("Main antiguo regression locks", () => {
     expect(source).toContain('color: "rgba(255,255,255,0.8)"');
   });
 
+  it("prevents double closing the same turno from duplicating history", () => {
+    const mainSource = readSource("src/main.tsx");
+    const loadingReturnIndex = mainSource.indexOf("if (!dataLoaded) {");
+    const activeIndex = mainSource.indexOf("const active = current.entries.length > 0 || !!current.startTime;");
+    const endingRefIndex = mainSource.indexOf("const endingTurnoRef = useRef(false);");
+
+    expect(activeIndex).toBeGreaterThan(-1);
+    expect(endingRefIndex).toBeGreaterThan(-1);
+    expect(loadingReturnIndex).toBeGreaterThan(-1);
+    expect(activeIndex).toBeLessThan(loadingReturnIndex);
+    expect(endingRefIndex).toBeLessThan(loadingReturnIndex);
+    expect(mainSource).toContain("if (endingTurnoRef.current || !active) return;");
+    expect(mainSource).toContain("endingTurnoRef.current = true;");
+    expect(mainSource).toContain("setHistory((h) => mergeTurnos(h, [turno]));");
+    expect(mainSource).not.toContain("setHistory((h) => [turno, ...h]);");
+  });
+
+  it("cleans service worker update listeners mounted by App", () => {
+    const mainSource = readSource("src/main.tsx");
+
+    expect(mainSource).toContain('const isLocalDev = ["localhost", "127.0.0.1", "::1"].includes(window.location.hostname);');
+    expect(mainSource).toContain("if (isLocalDev) return;");
+    expect(mainSource).toContain("let updateFoundCleanup: (() => void) | null = null;");
+    expect(mainSource).toContain('reg.removeEventListener("updatefound", onRegUpdateFound);');
+    expect(mainSource).not.toContain('reg.addEventListener("updatefound", () => onUpdateFound(reg));');
+  });
+
+  it("does not keep unreachable export color branches", () => {
+    const source = readSource("src/screens/liquidacion-semana-screen.tsx");
+
+    expect(source).not.toContain("if (false) return match;");
+  });
+
   it("keeps extracted screens using shared visual building blocks", () => {
     const addEntrySource = readSource("src/screens/add-entry-screen.tsx");
     const addSingleSource = readSource("src/screens/add-single-entry-screen.tsx");

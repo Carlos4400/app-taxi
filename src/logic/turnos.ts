@@ -38,9 +38,9 @@ export function ensureTurnosDiaLibreContable<T extends { diaLibreContable?: numb
 }
 
 function getTurnoMergeKey(t: SortableTurno): string {
+  const effectiveDate = t.startDate || t.date || "";
   return [
-    t.startDate || "",
-    t.date || "",
+    effectiveDate,
     t.startTime || "",
     t.endTime || "",
   ].join("|");

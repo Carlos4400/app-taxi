@@ -48,3 +48,6 @@ icons/
 scratch/
 test_failures.txt
 scratch_verify_results.txt
+
+# ── Salida generada por graphify (mapa del código, se regenera) ──
+graphify-out/

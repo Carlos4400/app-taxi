@@ -11,6 +11,8 @@ describe("service worker registration extraction", () => {
 
     const registrationSource = readFileSync(registrationPath, "utf8");
     expect(registrationSource).toContain('"serviceWorker" in navigator');
+    expect(registrationSource).toContain("isLocalDev");
+    expect(registrationSource).toContain("registration.unregister()");
     expect(registrationSource).toContain('navigator.serviceWorker.register("./sw.js")');
     expect(registrationSource).toContain("SW registered");
     expect(mainSource).toContain('from "./services/service-worker-registration"');

@@ -154,7 +154,6 @@ export function LiquidacionSemanaScreen({
             if (Math.abs(lightness - 0.75) < 0.05 && Math.abs(chroma - 0.16) < 0.05 && Math.abs(hue - 70) < 5) return "#ed990e";
             if (Math.abs(lightness - 0.72) < 0.05 && Math.abs(chroma - 0.14) < 0.05 && Math.abs(hue - 200) < 5) return "#00bec7";
             if (Math.abs(lightness - 0.62) < 0.05 && Math.abs(chroma - 0.06) < 0.05 && Math.abs(hue - 260) < 5) return "#888899";
-            if (false) return match;
             return "#ffffff";
           });
         };

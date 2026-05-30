@@ -399,6 +399,21 @@ describe('Merge Turnos Logic', () => {
     expect(merged).toHaveLength(2);
     expect(merged.map((t) => t.id).sort()).toEqual([1, 2]);
   });
+
+  it('should deduplicate the same turno when one copy is missing startDate', () => {
+    const actuales = [
+      { date: '2026-05-08', startDate: null, startTime: '08:00', endTime: '12:00', id: 1 } as Turno,
+    ];
+
+    const nuevos = [
+      { date: '2026-05-08', startDate: '2026-05-08', startTime: '08:00', endTime: '12:00', id: 2 } as Turno,
+    ];
+
+    const merged = mergeTurnos(actuales, nuevos);
+
+    expect(merged).toHaveLength(1);
+    expect(merged[0].id).toBe(2);
+  });
 });
 
 describe('Turno Sorting Logic', () => {

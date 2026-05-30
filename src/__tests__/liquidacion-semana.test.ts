@@ -46,7 +46,7 @@ describe("Liquidación Semanal screen and typography", () => {
     expect(themeSource).toContain('oklch(0.72 0.14 200)');
 
     const exportColorBlock = liquidacionSemanaSource.match(
-      /const replaceOklch = \(str: string\) => \{[\s\S]*?return match;/
+      /const replaceOklch = \(str: string\) => \{[\s\S]*?return "#ffffff";/
     )?.[0] || "";
 
     expect(exportColorBlock).toContain('return "#ffc200"');

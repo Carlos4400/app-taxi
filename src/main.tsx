@@ -468,6 +468,13 @@ function App() {
   // cuando la versión cambia; aquí lo recibimos y mostramos el aviso.
   useEffect(() => {
     if (!("serviceWorker" in navigator)) return;
+    const isLocalDev = ["localhost", "127.0.0.1", "::1"].includes(window.location.hostname);
+    if (isLocalDev) return;
+
+    let cancelado = false;
+    let updateFoundCleanup: (() => void) | null = null;
+    const stateChangeCleanups: Array<() => void> = [];
+
     const onMessage = (e: MessageEvent) => {
       if (e.data && e.data.type === "NEW_VERSION") {
         setUpdateMsg(`¡Nueva versión ${e.data.version} disponible! Recarga para actualizar.`);
@@ -476,21 +483,37 @@ function App() {
     const onUpdateFound = (reg: ServiceWorkerRegistration) => {
       const newSW = reg.installing;
       if (!newSW) return;
-      newSW.addEventListener("statechange", () => {
+      const onStateChange = () => {
         if (newSW.state === "installed" && navigator.serviceWorker.controller) {
           setUpdateMsg("Nueva versión disponible. Recarga para actualizar.");
         }
-      });
+      };
+      newSW.addEventListener("statechange", onStateChange);
+      stateChangeCleanups.push(() => newSW.removeEventListener("statechange", onStateChange));
     };
     navigator.serviceWorker.addEventListener("message", onMessage);
     navigator.serviceWorker.getRegistration().then((reg) => {
-      if (!reg) return;
-      reg.addEventListener("updatefound", () => onUpdateFound(reg));
+      if (!reg || cancelado) return;
+      const onRegUpdateFound = () => onUpdateFound(reg);
+      reg.addEventListener("updatefound", onRegUpdateFound);
+      updateFoundCleanup = () => {
+        reg.removeEventListener("updatefound", onRegUpdateFound);
+      };
     });
     return () => {
+      cancelado = true;
       navigator.serviceWorker.removeEventListener("message", onMessage);
+      updateFoundCleanup?.();
+      stateChangeCleanups.forEach((cleanup) => cleanup());
     };
   }, []);
+
+  const active = current.entries.length > 0 || !!current.startTime;
+  const endingTurnoRef = useRef(false);
+
+  useEffect(() => {
+    if (active) endingTurnoRef.current = false;
+  }, [active]);
 
   // Mientras llegan las primeras respuestas de Firestore para este usuario,
   // mostramos un placeholder de carga. Esto evita que la UI parezca vacía y,
@@ -595,7 +618,6 @@ function App() {
   const totalE = extras.reduce((s, e) => s + e.amount, 0);
   const totalF = gasolinas.reduce((s, e) => s + e.amount, 0);
   const totalN = nulos.reduce((s, e) => s + e.amount, 0);
-  const active = current.entries.length > 0 || !!current.startTime;
 
   function togglePause() {
     hapticAction();
@@ -622,6 +644,8 @@ function App() {
   }
 
   function handleEndTurno() {
+    if (endingTurnoRef.current || !active) return;
+    endingTurnoRef.current = true;
     const turno = {
       id: Date.now(),
       date: today(),
@@ -642,7 +666,7 @@ function App() {
       configTurno: buildTurnoConfigFromSettings(settings),
       diaLibreContable: settings.diaLibre,
     };
-    setHistory((h) => [turno, ...h]);
+    setHistory((h) => mergeTurnos(h, [turno]));
     setCurrent({ entries: [], startTime: null, startDate: null, isPaused: false, pauseStartTime: null, totalPausedMinutes: 0 });
     setDineroJ("");
     setKmJ("");

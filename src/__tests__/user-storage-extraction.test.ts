@@ -10,16 +10,18 @@ describe("User storage extraction", () => {
     expect(existsSync(userStoragePath)).toBe(true);
 
     const modulePath = "../services/user-storage";
-    const { userStorageKey, readLocalJSON, writeUserLocalJSON } = await import(modulePath);
+    const { userStorageKey, readLocalJSON, readUserLocalJSON, writeUserLocalJSON } = await import(modulePath);
     localStorage.clear();
     localStorage.setItem("plain", "{\"ok\":true}");
 
     expect(userStorageKey("plain", "uid-1")).toBe("plain__uid-1");
     expect(userStorageKey("plain", "")).toBe("plain");
     expect(readLocalJSON("plain")).toEqual({ ok: true });
+    expect(readUserLocalJSON("uid-1", "plain")).toBeNull();
     expect(readLocalJSON("missing")).toBeNull();
     writeUserLocalJSON("uid-1", "plain", { value: 2 });
     expect(localStorage.getItem("plain__uid-1")).toBe("{\"value\":2}");
+    expect(readUserLocalJSON("uid-1", "plain")).toEqual({ value: 2 });
 
     expect(mainSource).toContain('from "./services/user-storage"');
     expect(mainSource).not.toMatch(/^function userStorageKey\(/m);

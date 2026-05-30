@@ -12,6 +12,14 @@ export function readLocalJSON<T>(baseKey: string): T | null {
   }
 }
 
+export function readUserLocalJSON<T>(uid: string, baseKey: string): T | null {
+  try {
+    return JSON.parse(localStorage.getItem(userStorageKey(baseKey, uid)) || "null") as T | null;
+  } catch (e) {
+    return null;
+  }
+}
+
 export function writeUserLocalJSON(uid: string, baseKey: string, value: unknown): void {
   localStorage.setItem(userStorageKey(baseKey, uid), JSON.stringify(value));
 }

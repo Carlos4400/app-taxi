@@ -1,4 +1,1273 @@
+## 2026-05-30 22:24 - Corregir aislamiento de turnos por usuario
+
+**Archivos modificados:**
+- `src/hooks/use-firestore-sync.ts`
+- `src/main.tsx`
+- `src/services/user-storage.ts`
+- `src/services/service-worker-registration.ts`
+- `src/logic/turnos.ts`
+- `src/screens/liquidacion-semana-screen.tsx`
+- `src/__tests__/use-firestore-sync-user-isolation.test.tsx`
+- `src/__tests__/main-antiguo-regressions.test.ts`
+- `src/__tests__/user-storage-extraction.test.ts`
+- `src/__tests__/service-worker-registration.test.ts`
+- `src/__tests__/logic.test.ts`
+- `src/__tests__/liquidacion-semana.test.ts`
+
+### Cambio 1 - Import de settings para reset por usuario
+
+#### Código anterior
+```ts
+import { writeUserLocalJSON } from "../services/user-storage";
+import { KEY_CURRENT, KEY_HISTORY, KEY_SETTINGS, KEY_WEEK_OVERRIDES, KEY_RESERVATIONS, KEY_NOTES } from "../shared/storage-keys";
+import { ensureTurnosDiaLibreContable, sortTurnosByDateDesc } from "../logic/turnos";
+```
+
+#### Código nuevo
+```ts
+import { readUserLocalJSON, writeUserLocalJSON } from "../services/user-storage";
+import { KEY_CURRENT, KEY_HISTORY, KEY_SETTINGS, KEY_WEEK_OVERRIDES, KEY_RESERVATIONS, KEY_NOTES } from "../shared/storage-keys";
+import { loadSettings } from "../logic/state-loaders";
+import { ensureTurnosDiaLibreContable, mergeTurnos, sortTurnosByDateDesc } from "../logic/turnos";
+```
+
+#### Por qué se cambió
+El reset al cambiar de usuario necesitaba restaurar también `settings` con el cargador existente, leer claves locales por UID y usar `mergeTurnos` para fusionar turnos del mismo usuario sin duplicarlos.
+
+### Cambio 2 - Bloqueo de escrituras hasta cargar el UID actual
+
+#### Código anterior
+```ts
+  const lastCurrentRef = useRef<CurrentState | null>(null);
+  const lastSettingsRef = useRef<AppSettings | null>(null);
+  const lastHistoryRef = useRef<Turno[]>([]);
+  const lastReservationsRef = useRef<Reserva[]>([]);
+  const lastNotesRef = useRef<NotaCalendario[]>([]);
+  const lastWeekOverridesRef = useRef<WeekOverride[]>([]);
+
+  useEffect(() => {
+    if (!dataLoaded || !auth.currentUser) return;
+    if (JSON.stringify(current) === JSON.stringify(lastCurrentRef.current)) return;
+    const uid = auth.currentUser.uid;
+    writeUserLocalJSON(uid, KEY_CURRENT, current);
+    saveUserDoc(db, uid, "current", current).catch((err) =>
+      console.error("Save current failed:", err)
+    );
+  }, [current, dataLoaded]);
+
+  useEffect(() => {
+    if (!dataLoaded || !auth.currentUser) return;
+    if (JSON.stringify(settings) === JSON.stringify(lastSettingsRef.current)) return;
+    const uid = auth.currentUser.uid;
+    writeUserLocalJSON(uid, KEY_SETTINGS, settings);
+    saveUserDoc(db, uid, "settings", settings).catch((err) =>
+      console.error("Save settings failed:", err)
+    );
+  }, [settings, dataLoaded]);
+
+  useEffect(() => {
+    if (!dataLoaded || !auth.currentUser) return;
+    const uid = auth.currentUser.uid;
+    writeUserLocalJSON(uid, KEY_HISTORY, history);
+    syncSubcollection(db, uid, "turnos", lastHistoryRef.current, history, (t) => t.id)
+      .then(() => { lastHistoryRef.current = history; })
+      .catch((err) => console.error("Sync turnos failed:", err));
+  }, [history, dataLoaded]);
+```
+
+#### Código nuevo
+```ts
+  const lastCurrentRef = useRef<CurrentState | null>(null);
+  const lastSettingsRef = useRef<AppSettings | null>(null);
+  const lastHistoryRef = useRef<Turno[]>([]);
+  const lastReservationsRef = useRef<Reserva[]>([]);
+  const lastNotesRef = useRef<NotaCalendario[]>([]);
+  const lastWeekOverridesRef = useRef<WeekOverride[]>([]);
+  const loadedUidRef = useRef<string | null>(null);
+  const mergeLocalHistoryRef = useRef(false);
+  const mergeLocalReservationsRef = useRef(false);
+  const mergeLocalNotesRef = useRef(false);
+  const mergeLocalWeekOverridesRef = useRef(false);
+
+  function getWritableUid(): string | null {
+    const uid = auth.currentUser?.uid;
+    if (!dataLoaded || !uid || loadedUidRef.current !== uid) return null;
+    return uid;
+  }
+
+  useEffect(() => {
+    const uid = getWritableUid();
+    if (!uid) return;
+    if (JSON.stringify(current) === JSON.stringify(lastCurrentRef.current)) return;
+    writeUserLocalJSON(uid, KEY_CURRENT, current);
+    saveUserDoc(db, uid, "current", current).catch((err) =>
+      console.error("Save current failed:", err)
+    );
+  }, [current, dataLoaded]);
+
+  useEffect(() => {
+    const uid = getWritableUid();
+    if (!uid) return;
+    if (JSON.stringify(settings) === JSON.stringify(lastSettingsRef.current)) return;
+    writeUserLocalJSON(uid, KEY_SETTINGS, settings);
+    saveUserDoc(db, uid, "settings", settings).catch((err) =>
+      console.error("Save settings failed:", err)
+    );
+  }, [settings, dataLoaded]);
+
+  useEffect(() => {
+    const uid = getWritableUid();
+    if (!uid) return;
+    writeUserLocalJSON(uid, KEY_HISTORY, history);
+    syncSubcollection(db, uid, "turnos", lastHistoryRef.current, history, (t) => t.id)
+      .then(() => { lastHistoryRef.current = history; })
+      .catch((err) => console.error("Sync turnos failed:", err));
+  }, [history, dataLoaded]);
+```
+
+#### Por qué se cambió
+Los efectos de escritura podían ejecutarse con `dataLoaded=true` heredado del usuario anterior. `loadedUidRef` impide escribir en Firestore o localStorage hasta que los snapshots del UID actual hayan terminado su primera carga.
+
+### Cambio 3 - Reset completo antes de cargar Firestore
+
+#### Código anterior
+```ts
+    // ── Reset a estado vacío antes de cargar los datos del nuevo usuario ──────
+    // El store (Zustand) es un singleton de módulo: persiste entre desmontajes.
+    // Sin este reset, los datos del usuario anterior se muestran hasta que
+    // Firestore responde con los del usuario nuevo (puede tardar varios segundos).
+    // dataLoaded=false evita que los efectos de escritura re-persistan el estado
+    // vacío en Firestore antes de que lleguen los datos reales.
+    setCurrent({ entries: [], startTime: null, startDate: null, isPaused: false, pauseStartTime: null, totalPausedMinutes: 0 });
+    setHistory([]);
+    setReservations([]);
+    setNotes([]);
+    setWeekOverrides([]);
+    setIsAdmin(false);
+    setDataLoaded(false);
+    setLoadTimedOut(false);
+    // ─────────────────────────────────────────────────────────────────────────
+```
+
+#### Código nuevo
+```ts
+    // ── Reset a estado vacío antes de cargar los datos del nuevo usuario ──────
+    // El store (Zustand) es un singleton de módulo: persiste entre desmontajes.
+    // Sin este reset, los datos del usuario anterior se muestran hasta que
+    // Firestore responde con los del usuario nuevo (puede tardar varios segundos).
+    // dataLoaded=false evita que los efectos de escritura re-persistan el estado
+    // vacío en Firestore antes de que lleguen los datos reales.
+    loadedUidRef.current = null;
+    lastCurrentRef.current = null;
+    lastSettingsRef.current = null;
+    lastHistoryRef.current = [];
+    lastReservationsRef.current = [];
+    lastNotesRef.current = [];
+    lastWeekOverridesRef.current = [];
+    mergeLocalHistoryRef.current = true;
+    mergeLocalReservationsRef.current = true;
+    mergeLocalNotesRef.current = true;
+    mergeLocalWeekOverridesRef.current = true;
+    setCurrent(emptyCurrent());
+    setSettings(loadSettings());
+    setHistory([]);
+    setReservations([]);
+    setNotes([]);
+    setWeekOverrides([]);
+    setIsAdmin(false);
+    setDataLoaded(false);
+    setLoadTimedOut(false);
+    // ─────────────────────────────────────────────────────────────────────────
+```
+
+#### Por qué se cambió
+Además de vaciar las colecciones y el turno actual, era necesario invalidar el UID cargado, limpiar las referencias usadas como baseline de sincronización, reactivar la fusión local solo para la primera carga del UID y resetear `settings`. Sin esto, los datos del usuario anterior podían seguir siendo la base de escritura del usuario nuevo.
+
+### Cambio 4 - Marcado del UID cargado
+
+#### Código anterior
+```ts
+    function marcar(key: keyof typeof recibido) {
+      recibido[key] = true;
+      if (Object.values(recibido).every((v) => v)) {
+        setDataLoaded(true);
+      }
+    }
+```
+
+#### Código nuevo
+```ts
+    function marcar(key: keyof typeof recibido) {
+      recibido[key] = true;
+      if (Object.values(recibido).every((v) => v)) {
+        loadedUidRef.current = uid;
+        setDataLoaded(true);
+      }
+    }
+```
+
+#### Por qué se cambió
+Las escrituras solo deben habilitarse cuando las seis lecturas iniciales de Firestore pertenecen al mismo `uid` que se está marcando como cargado.
+
+### Cambio 5 - Test de aislamiento entre usuarios
+
+#### Código anterior
+`No existía el archivo src/__tests__/use-firestore-sync-user-isolation.test.tsx.`
+
+#### Código nuevo
+```tsx
+import React from "react";
+import { createRoot, type Root } from "react-dom/client";
+import { act } from "react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { useFirestoreSync } from "../hooks/use-firestore-sync";
+
+const firestoreSyncMock = vi.hoisted(() => ({
+  saveUserDoc: vi.fn(),
+  syncSubcollection: vi.fn(),
+  userHasFirestoreData: vi.fn(),
+}));
+
+const firebaseMock = vi.hoisted(() => ({
+  auth: { currentUser: { uid: "uid-nuevo" } as { uid: string } | null },
+  db: {},
+}));
+
+vi.mock("../services/firebase", () => firebaseMock);
+
+vi.mock("../services/firestore-sync", () => ({
+  userMetaDocRef: vi.fn((_db: unknown, uid: string, name: string) => ({
+    kind: "meta",
+    uid,
+    name,
+  })),
+  userSubcollectionRef: vi.fn((_db: unknown, uid: string, name: string) => ({
+    kind: "collection",
+    uid,
+    name,
+  })),
+  saveUserDoc: firestoreSyncMock.saveUserDoc,
+  syncSubcollection: firestoreSyncMock.syncSubcollection,
+  userHasFirestoreData: firestoreSyncMock.userHasFirestoreData,
+}));
+
+vi.mock("firebase/firestore", () => ({
+  doc: vi.fn((_dbOrRef: unknown, ...path: string[]) => ({ path })),
+  getDoc: vi.fn(() => Promise.resolve({ exists: () => false })),
+  onSnapshot: vi.fn(() => vi.fn()),
+  setDoc: vi.fn(() => Promise.resolve()),
+  writeBatch: vi.fn(() => ({
+    set: vi.fn(),
+    commit: vi.fn(() => Promise.resolve()),
+  })),
+}));
+
+function HookProbe() {
+  useFirestoreSync();
+  return null;
+}
+
+describe("useFirestoreSync: aislamiento entre usuarios", () => {
+  let container: HTMLDivElement;
+  let root: Root;
+
+  beforeEach(async () => {
+    (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+    vi.clearAllMocks();
+    localStorage.clear();
+    firebaseMock.auth.currentUser = { uid: "uid-nuevo" };
+    firestoreSyncMock.saveUserDoc.mockResolvedValue(undefined);
+    firestoreSyncMock.syncSubcollection.mockResolvedValue(undefined);
+    firestoreSyncMock.userHasFirestoreData.mockResolvedValue(false);
+
+    const { useAppStore } = await import("../services/store");
+    useAppStore.setState({
+      current: {
+        entries: [{ id: 1, type: "efectivo", amount: 10, note: "", time: "10:00" }],
+        startTime: "10:00",
+        startDate: "2026-05-30",
+        isPaused: false,
+        pauseStartTime: null,
+        totalPausedMinutes: 0,
+      },
+      history: [{
+        id: 1,
+        date: "2026-05-30",
+        startDate: "2026-05-30",
+        startTime: "10:00",
+        endTime: "12:00",
+        entries: [],
+        totalP: 0,
+        totalD: 0,
+        totalA: 0,
+        totalE: 0,
+        totalF: 0,
+        totalN: 0,
+        dinero: 0,
+        km: 0,
+        notes: "",
+      }],
+      reservations: [],
+      notes: [],
+      settings: {
+        "porcentaje.jefe": 50,
+        "porcentaje.chofer": 50,
+        "descontar.datafono": true,
+        "descontar.agencia_bono": true,
+        "descontar.extra": true,
+        "descontar.gasolina": true,
+        diaLibre: 2,
+        diaLibreDesde: null,
+      },
+      weekOverrides: [],
+      dataLoaded: true,
+      loadTimedOut: false,
+      isAdmin: false,
+    });
+
+    container = document.createElement("div");
+    document.body.appendChild(container);
+    root = createRoot(container);
+  });
+
+  afterEach(() => {
+    act(() => {
+      root.unmount();
+    });
+    container.remove();
+  });
+
+  it("no escribe datos del usuario anterior bajo el UID nuevo antes de cargar Firestore", async () => {
+    await act(async () => {
+      root.render(<HookProbe />);
+      await Promise.resolve();
+    });
+
+    expect(firestoreSyncMock.saveUserDoc).not.toHaveBeenCalled();
+    expect(firestoreSyncMock.syncSubcollection).not.toHaveBeenCalled();
+  });
+
+  it("resetea los ajustes del usuario anterior antes de aceptar la carga del usuario nuevo", async () => {
+    await act(async () => {
+      root.render(<HookProbe />);
+      await Promise.resolve();
+    });
+
+    const { useAppStore } = await import("../services/store");
+    expect(useAppStore.getState().settings["porcentaje.jefe"]).toBe(0);
+    expect(useAppStore.getState().settings["porcentaje.chofer"]).toBe(0);
+  });
+});
+```
+
+#### Por qué se cambió
+La prueba reproduce el caso en que `dataLoaded` queda `true` con estado de un usuario anterior y se monta la sincronización para `uid-nuevo`. Antes de la corrección fallaba porque `saveUserDoc` recibía datos antiguos para el UID nuevo.
+
+### Cambio 6 - Bloqueo de doble cierre de turno
+
+#### Código anterior
+```tsx
+  const totalF = gasolinas.reduce((s, e) => s + e.amount, 0);
+  const totalN = nulos.reduce((s, e) => s + e.amount, 0);
+  const active = current.entries.length > 0 || !!current.startTime;
+
+  function togglePause() {
+    hapticAction();
+```
+
+#### Código nuevo
+```tsx
+  const active = current.entries.length > 0 || !!current.startTime;
+  const endingTurnoRef = useRef(false);
+
+  useEffect(() => {
+    if (active) endingTurnoRef.current = false;
+  }, [active]);
+
+  // Mientras llegan las primeras respuestas de Firestore para este usuario,
+  // mostramos un placeholder de carga. Esto evita que la UI parezca vacía y,
+  // sobre todo, evita que el usuario pueda crear/editar antes de tener su
+  // historial cargado (lo cual provocaría diffs incorrectos).
+  if (!dataLoaded) {
+```
+
+#### Por qué se cambió
+Un doble toque rápido sobre `Terminar Turno` podía ejecutar `handleEndTurno` más de una vez antes de que React renderizara la pantalla siguiente. `endingTurnoRef` bloquea cierres repetidos del mismo turno activo y se declara antes del primer `return` condicional para mantener estable el orden de hooks de React.
+
+### Cambio 7 - Inserción de turno cerrado sin duplicar historial
+
+#### Código anterior
+```tsx
+  function handleEndTurno() {
+    const turno = {
+      id: Date.now(),
+      date: today(),
+      startTime: current.startTime,
+      endTime: timeNow(),
+      entries: current.entries,
+      totalP,
+      totalD,
+      totalA,
+      totalE,
+      totalF,
+      totalN,
+      dinero: parseFloat(dineroJ.replace(",", ".")) || 0,
+      km: parseFloat(kmJ.replace(",", ".")) || 0,
+      notes: notesJ.trim(),
+      startDate: current.startDate,
+      totalPausedMinutes: current.totalPausedMinutes || 0,
+      configTurno: buildTurnoConfigFromSettings(settings),
+      diaLibreContable: settings.diaLibre,
+    };
+    setHistory((h) => [turno, ...h]);
+```
+
+#### Código nuevo
+```tsx
+  function handleEndTurno() {
+    if (endingTurnoRef.current || !active) return;
+    endingTurnoRef.current = true;
+    const turno = {
+      id: Date.now(),
+      date: today(),
+      startTime: current.startTime,
+      endTime: timeNow(),
+      entries: current.entries,
+      totalP,
+      totalD,
+      totalA,
+      totalE,
+      totalF,
+      totalN,
+      dinero: parseFloat(dineroJ.replace(",", ".")) || 0,
+      km: parseFloat(kmJ.replace(",", ".")) || 0,
+      notes: notesJ.trim(),
+      startDate: current.startDate,
+      totalPausedMinutes: current.totalPausedMinutes || 0,
+      configTurno: buildTurnoConfigFromSettings(settings),
+      diaLibreContable: settings.diaLibre,
+    };
+    setHistory((h) => mergeTurnos(h, [turno]));
+```
+
+#### Por qué se cambió
+`[turno, ...h]` insertaba siempre una fila nueva. `mergeTurnos(h, [turno])` reutiliza la lógica existente que evita duplicados por fecha, inicio y fin de turno, y el guard previo impide una segunda ejecución del cierre.
+
+### Cambio 8 - Test de doble cierre de turno
+
+#### Código anterior
+```ts
+  it("keeps detailed notes outside the summary card on confirm end", () => {
+    const source = readSource("src/screens/confirm-end-screen.tsx");
+
+    expect(source).toContain('style={{ marginBottom: 12, display: "flex", flexDirection: "column", gap: 6, flexShrink: 0 }}');
+    expect(source).toContain('background: "rgba(255,255,255,0.03)"');
+    expect(source).toContain('color: "rgba(255,255,255,0.8)"');
+  });
+
+  it("keeps extracted screens using shared visual building blocks", () => {
+```
+
+#### Código nuevo
+```ts
+  it("keeps detailed notes outside the summary card on confirm end", () => {
+    const source = readSource("src/screens/confirm-end-screen.tsx");
+
+    expect(source).toContain('style={{ marginBottom: 12, display: "flex", flexDirection: "column", gap: 6, flexShrink: 0 }}');
+    expect(source).toContain('background: "rgba(255,255,255,0.03)"');
+    expect(source).toContain('color: "rgba(255,255,255,0.8)"');
+  });
+
+  it("prevents double closing the same turno from duplicating history", () => {
+    const mainSource = readSource("src/main.tsx");
+    const loadingReturnIndex = mainSource.indexOf("if (!dataLoaded) {");
+    const activeIndex = mainSource.indexOf("const active = current.entries.length > 0 || !!current.startTime;");
+    const endingRefIndex = mainSource.indexOf("const endingTurnoRef = useRef(false);");
+
+    expect(activeIndex).toBeGreaterThan(-1);
+    expect(endingRefIndex).toBeGreaterThan(-1);
+    expect(loadingReturnIndex).toBeGreaterThan(-1);
+    expect(activeIndex).toBeLessThan(loadingReturnIndex);
+    expect(endingRefIndex).toBeLessThan(loadingReturnIndex);
+    expect(mainSource).toContain("if (endingTurnoRef.current || !active) return;");
+    expect(mainSource).toContain("endingTurnoRef.current = true;");
+    expect(mainSource).toContain("setHistory((h) => mergeTurnos(h, [turno]));");
+    expect(mainSource).not.toContain("setHistory((h) => [turno, ...h]);");
+  });
+
+  it("keeps extracted screens using shared visual building blocks", () => {
+```
+
+#### Por qué se cambió
+La prueba bloquea una regresión concreta: el cierre de turno no debe volver a usar inserción directa `[turno, ...h]`, no debe perder el guard contra doble ejecución y el hook del guard debe quedar antes del primer `return` condicional.
+
+### Cambio 9 - Lectura local explícita por UID
+
+#### Código anterior
+```ts
+export function readLocalJSON<T>(baseKey: string): T | null {
+  try {
+    return JSON.parse(localStorage.getItem(userStorageKey(baseKey)) || "null") as T | null;
+  } catch (e) {
+    return null;
+  }
+}
+
+export function writeUserLocalJSON(uid: string, baseKey: string, value: unknown): void {
+  localStorage.setItem(userStorageKey(baseKey, uid), JSON.stringify(value));
+}
+```
+
+#### Código nuevo
+```ts
+export function readLocalJSON<T>(baseKey: string): T | null {
+  try {
+    return JSON.parse(localStorage.getItem(userStorageKey(baseKey)) || "null") as T | null;
+  } catch (e) {
+    return null;
+  }
+}
+
+export function readUserLocalJSON<T>(uid: string, baseKey: string): T | null {
+  try {
+    return JSON.parse(localStorage.getItem(userStorageKey(baseKey, uid)) || "null") as T | null;
+  } catch (e) {
+    return null;
+  }
+}
+
+export function writeUserLocalJSON(uid: string, baseKey: string, value: unknown): void {
+  localStorage.setItem(userStorageKey(baseKey, uid), JSON.stringify(value));
+}
+```
+
+#### Por qué se cambió
+La sincronización inicial necesita leer datos locales de un `uid` concreto aunque el store global de Zustand conserve estado previo. La lectura explícita por UID evita leer claves de otro usuario.
+
+### Cambio 10 - Helpers de estado vacío y fusión por id
+
+#### Código anterior
+`No existía el bloque emptyCurrent/mergeById/hasOpenCurrent en src/hooks/use-firestore-sync.ts.`
+
+#### Código nuevo
+```ts
+function emptyCurrent(): CurrentState {
+  return { entries: [], startTime: null, startDate: null, isPaused: false, pauseStartTime: null, totalPausedMinutes: 0 };
+}
+
+function mergeById<T>(localItems: T[], remoteItems: T[], getId: (item: T) => string | number): T[] {
+  const merged = new Map<string, T>();
+  localItems.forEach((item) => merged.set(String(getId(item)), item));
+  remoteItems.forEach((item) => merged.set(String(getId(item)), item));
+  return Array.from(merged.values());
+}
+
+function hasOpenCurrent(current: CurrentState): boolean {
+  return !!current.startTime || current.entries.length > 0;
+}
+```
+
+#### Por qué se cambió
+`emptyCurrent` centraliza el estado vacío usado al cambiar de usuario. `mergeById` permite fusionar datos locales offline con Firestore sin duplicar reservas, notas ni overrides con el mismo identificador. `hasOpenCurrent` permite detectar si un turno abierto local debe conservarse frente a un `current` remoto vacío.
+
+### Cambio 11 - Restauración de turno abierto offline por UID
+
+#### Código anterior
+```ts
+      unsubs.push(onSnapshot(userMetaDocRef(db, uid, "current"), (snap) => {
+        if (snap.exists()) {
+          const data = snap.data() as CurrentState;
+          lastCurrentRef.current = data;
+          writeUserLocalJSON(uid, KEY_CURRENT, data);
+          setCurrent(data);
+        } else {
+          lastCurrentRef.current = null;
+        }
+        marcar("current");
+      }));
+```
+
+#### Código nuevo
+```ts
+      unsubs.push(onSnapshot(userMetaDocRef(db, uid, "current"), (snap) => {
+        if (snap.exists()) {
+          const remoteCurrent = snap.data() as CurrentState;
+          const localCurrent = readUserLocalJSON<CurrentState>(uid, KEY_CURRENT);
+          const nextCurrent =
+            localCurrent && hasOpenCurrent(localCurrent) && !hasOpenCurrent(remoteCurrent)
+              ? localCurrent
+              : remoteCurrent;
+          lastCurrentRef.current = remoteCurrent;
+          writeUserLocalJSON(uid, KEY_CURRENT, nextCurrent);
+          setCurrent(nextCurrent);
+        } else {
+          const localCurrent = readUserLocalJSON<CurrentState>(uid, KEY_CURRENT) ?? emptyCurrent();
+          lastCurrentRef.current = null;
+          setCurrent(localCurrent);
+        }
+        marcar("current");
+      }));
+```
+
+#### Por qué se cambió
+Si el usuario cierra sesión o la app sin haber terminado el turno y Firestore aún no tiene `current`, el turno abierto guardado offline bajo `KEY_CURRENT__uid` debe restaurarse solo para ese mismo usuario. Si Firestore tiene un `current` vacío pero existe un turno local abierto del mismo UID, se conserva el local y después se sube por el efecto de escritura.
+
+### Cambio 12 - Fusión de turnos locales offline con Firestore
+
+#### Código anterior
+```ts
+      unsubs.push(onSnapshot(userSubcollectionRef(db, uid, "turnos"), (snap) => {
+        const items: Turno[] = [];
+        snap.forEach((d) => items.push(d.data() as Turno));
+        const orderedItems = sortTurnosByDateDesc(items);
+        lastHistoryRef.current = orderedItems;
+        writeUserLocalJSON(uid, KEY_HISTORY, orderedItems);
+        setHistory(orderedItems);
+        marcar("turnos");
+      }));
+```
+
+#### Código nuevo
+```ts
+      unsubs.push(onSnapshot(userSubcollectionRef(db, uid, "turnos"), (snap) => {
+        const items: Turno[] = [];
+        snap.forEach((d) => items.push(d.data() as Turno));
+        const orderedItems = sortTurnosByDateDesc(items);
+        const localItems = readUserLocalJSON<Turno[]>(uid, KEY_HISTORY) ?? [];
+        const mergedItems = mergeTurnos(localItems, orderedItems);
+        lastHistoryRef.current = orderedItems;
+        writeUserLocalJSON(uid, KEY_HISTORY, mergedItems);
+        setHistory(mergedItems);
+        marcar("turnos");
+      }));
+```
+
+#### Por qué se cambió
+Si un turno se cerró sin conexión, estaba guardado localmente por UID pero podía perderse cuando Firestore devolvía un snapshot vacío o incompleto. La fusión mantiene el turno offline del mismo usuario y usa `lastHistoryRef.current = orderedItems` para que después se suba a Firestore.
+
+### Cambio 13 - Fusión de subcolecciones locales offline
+
+#### Código anterior
+```ts
+      unsubs.push(onSnapshot(userSubcollectionRef(db, uid, "reservations"), (snap) => {
+        const items: Reserva[] = [];
+        snap.forEach((d) => items.push(d.data() as Reserva));
+        lastReservationsRef.current = items;
+        writeUserLocalJSON(uid, KEY_RESERVATIONS, items);
+        setReservations(items);
+        marcar("reservations");
+      }));
+```
+
+#### Código nuevo
+```ts
+      unsubs.push(onSnapshot(userSubcollectionRef(db, uid, "reservations"), (snap) => {
+        const items: Reserva[] = [];
+        snap.forEach((d) => items.push(d.data() as Reserva));
+        const localItems = readUserLocalJSON<Reserva[]>(uid, KEY_RESERVATIONS) ?? [];
+        const mergedItems = mergeById(localItems, items, (r) => r.id);
+        lastReservationsRef.current = items;
+        writeUserLocalJSON(uid, KEY_RESERVATIONS, mergedItems);
+        setReservations(mergedItems);
+        marcar("reservations");
+      }));
+```
+
+#### Por qué se cambió
+Reservas, notas y overrides también pueden existir en localStorage por UID cuando no hay conexión. La fusión por identificador impide perder datos locales del mismo usuario y evita duplicar elementos con el mismo id.
+
+### Cambio 14 - Pruebas de offline por UID
+
+#### Código anterior
+```tsx
+  it("resetea los ajustes del usuario anterior antes de aceptar la carga del usuario nuevo", async () => {
+    await act(async () => {
+      root.render(<HookProbe />);
+      await Promise.resolve();
+    });
+
+    const { useAppStore } = await import("../services/store");
+    expect(useAppStore.getState().settings["porcentaje.jefe"]).toBe(0);
+    expect(useAppStore.getState().settings["porcentaje.chofer"]).toBe(0);
+  });
+});
+```
+
+#### Código nuevo
+```tsx
+  it("resetea los ajustes del usuario anterior antes de aceptar la carga del usuario nuevo", async () => {
+    await act(async () => {
+      root.render(<HookProbe />);
+      await Promise.resolve();
+    });
+
+    const { useAppStore } = await import("../services/store");
+    expect(useAppStore.getState().settings["porcentaje.jefe"]).toBe(0);
+    expect(useAppStore.getState().settings["porcentaje.chofer"]).toBe(0);
+  });
+
+  it("conserva y sube turnos offline del mismo UID sin mezclar los de otro usuario", async () => {
+    const turnoOffline = turno(11, "2026-05-30", "10:00", "12:00");
+    const turnoOtroUsuario = turno(22, "2026-05-29", "11:00", "13:00");
+    localStorage.setItem(`${KEY_HISTORY}__uid-nuevo`, JSON.stringify([turnoOffline]));
+    localStorage.setItem(`${KEY_HISTORY}__uid-otro`, JSON.stringify([turnoOtroUsuario]));
+
+    await act(async () => {
+      root.render(<HookProbe />);
+      await Promise.resolve();
+    });
+    await emitInitialSnapshots();
+
+    const { useAppStore } = await import("../services/store");
+    expect(useAppStore.getState().history.map((t) => t.id)).toEqual([11]);
+    expect(JSON.parse(localStorage.getItem(`${KEY_HISTORY}__uid-nuevo`) || "[]").map((t: Turno) => t.id)).toEqual([11]);
+    expect(JSON.parse(localStorage.getItem(`${KEY_HISTORY}__uid-otro`) || "[]").map((t: Turno) => t.id)).toEqual([22]);
+    expect(firestoreSyncMock.syncSubcollection).toHaveBeenCalledWith(
+      {},
+      "uid-nuevo",
+      "turnos",
+      [],
+      [turnoOffline],
+      expect.any(Function),
+    );
+  });
+
+  it("restaura el turno abierto offline del mismo UID sin leer el de otro usuario", async () => {
+    const currentOffline = {
+      entries: [{ id: 1, type: "efectivo", amount: 10, note: "", time: "10:00" }],
+      startTime: "10:00",
+      startDate: "2026-05-30",
+      isPaused: false,
+      pauseStartTime: null,
+      totalPausedMinutes: 0,
+    };
+    const currentOtroUsuario = {
+      entries: [],
+      startTime: "11:00",
+      startDate: "2026-05-29",
+      isPaused: false,
+      pauseStartTime: null,
+      totalPausedMinutes: 0,
+    };
+    localStorage.setItem("taxi_current_v3__uid-nuevo", JSON.stringify(currentOffline));
+    localStorage.setItem("taxi_current_v3__uid-otro", JSON.stringify(currentOtroUsuario));
+
+    await act(async () => {
+      root.render(<HookProbe />);
+      await Promise.resolve();
+    });
+    await emitInitialSnapshots();
+
+    const { useAppStore } = await import("../services/store");
+    expect(useAppStore.getState().current.startTime).toBe("10:00");
+    expect(useAppStore.getState().current.entries).toHaveLength(1);
+    expect(firestoreSyncMock.saveUserDoc).toHaveBeenCalledWith(
+      {},
+      "uid-nuevo",
+      "current",
+      currentOffline,
+    );
+  });
+
+  it("fusiona turno offline y Firestore sin duplicar el mismo cierre", async () => {
+    const turnoLocal = turno(11, "2026-05-30", "10:00", "12:00");
+    const turnoFirestore = { ...turnoLocal, id: 99 };
+    localStorage.setItem(`${KEY_HISTORY}__uid-nuevo`, JSON.stringify([turnoLocal]));
+
+    await act(async () => {
+      root.render(<HookProbe />);
+      await Promise.resolve();
+    });
+    await emitInitialSnapshots({ turnos: [turnoFirestore] });
+
+    const { useAppStore } = await import("../services/store");
+    expect(useAppStore.getState().history).toHaveLength(1);
+    expect(useAppStore.getState().history[0].id).toBe(99);
+    expect(JSON.parse(localStorage.getItem(`${KEY_HISTORY}__uid-nuevo`) || "[]")).toHaveLength(1);
+  });
+});
+```
+
+#### Por qué se cambió
+Las pruebas fijan los casos críticos de uso profesional: turno cerrado offline, turno abierto offline, aislamiento de claves de otro usuario y fusión local/Firestore sin duplicar el mismo cierre.
+
+### Cambio 15 - Test de readUserLocalJSON
+
+#### Código anterior
+```ts
+    const modulePath = "../services/user-storage";
+    const { userStorageKey, readLocalJSON, writeUserLocalJSON } = await import(modulePath);
+    localStorage.clear();
+    localStorage.setItem("plain", "{\"ok\":true}");
+
+    expect(userStorageKey("plain", "uid-1")).toBe("plain__uid-1");
+    expect(userStorageKey("plain", "")).toBe("plain");
+    expect(readLocalJSON("plain")).toEqual({ ok: true });
+    expect(readLocalJSON("missing")).toBeNull();
+    writeUserLocalJSON("uid-1", "plain", { value: 2 });
+    expect(localStorage.getItem("plain__uid-1")).toBe("{\"value\":2}");
+```
+
+#### Código nuevo
+```ts
+    const modulePath = "../services/user-storage";
+    const { userStorageKey, readLocalJSON, readUserLocalJSON, writeUserLocalJSON } = await import(modulePath);
+    localStorage.clear();
+    localStorage.setItem("plain", "{\"ok\":true}");
+
+    expect(userStorageKey("plain", "uid-1")).toBe("plain__uid-1");
+    expect(userStorageKey("plain", "")).toBe("plain");
+    expect(readLocalJSON("plain")).toEqual({ ok: true });
+    expect(readUserLocalJSON("uid-1", "plain")).toBeNull();
+    expect(readLocalJSON("missing")).toBeNull();
+    writeUserLocalJSON("uid-1", "plain", { value: 2 });
+    expect(localStorage.getItem("plain__uid-1")).toBe("{\"value\":2}");
+    expect(readUserLocalJSON("uid-1", "plain")).toEqual({ value: 2 });
+```
+
+#### Por qué se cambió
+El helper nuevo queda cubierto por test: antes de escribir una clave por UID devuelve `null`, y después lee solo la clave `baseKey__uid` correspondiente.
+
+### Cambio 16 - Desregistro del Service Worker en desarrollo
+
+#### Código anterior
+```ts
+export function registerServiceWorker() {
+  if ("serviceWorker" in navigator) {
+    window.addEventListener("load", () => {
+      navigator.serviceWorker.register("./sw.js")
+        .then(() => console.log("SW registered"))
+        .catch((err) => console.warn("SW registration failed", err));
+    });
+  }
+}
+```
+
+#### Código nuevo
+```ts
+export function registerServiceWorker() {
+  if (!("serviceWorker" in navigator)) return;
+
+  const isLocalDev = ["localhost", "127.0.0.1", "::1"].includes(window.location.hostname);
+
+  if (isLocalDev) {
+    window.addEventListener("load", () => {
+      navigator.serviceWorker.getRegistrations()
+        .then((registrations) => Promise.all(registrations.map((registration) => registration.unregister())))
+        .then(() => console.log("SW unregistered in dev"))
+        .catch((err) => console.warn("SW unregister failed", err));
+    });
+    return;
+  }
+
+  window.addEventListener("load", () => {
+    navigator.serviceWorker.register("./sw.js")
+      .then(() => console.log("SW registered"))
+      .catch((err) => console.warn("SW registration failed", err));
+  });
+}
+```
+
+#### Por qué se cambió
+En `localhost` el Service Worker podía mantener una versión anterior de la app durante desarrollo y provocar una pantalla negra o estado visual obsoleto. En desarrollo se desregistran Service Workers existentes; en producción se conserva el registro.
+
+### Cambio 17 - Test del Service Worker en desarrollo
+
+#### Código anterior
+```ts
+    const registrationSource = readFileSync(registrationPath, "utf8");
+    expect(registrationSource).toContain('"serviceWorker" in navigator');
+    expect(registrationSource).toContain('navigator.serviceWorker.register("./sw.js")');
+    expect(registrationSource).toContain("SW registered");
+```
+
+#### Código nuevo
+```ts
+    const registrationSource = readFileSync(registrationPath, "utf8");
+    expect(registrationSource).toContain('"serviceWorker" in navigator');
+    expect(registrationSource).toContain("isLocalDev");
+    expect(registrationSource).toContain("registration.unregister()");
+    expect(registrationSource).toContain('navigator.serviceWorker.register("./sw.js")');
+    expect(registrationSource).toContain("SW registered");
+```
+
+#### Por qué se cambió
+El test fija que el Service Worker no quede activo en entorno local y que el registro de producción siga existiendo.
+
+### Cambio 18 - Fusión local solo en carga inicial
+
+#### Código anterior
+```ts
+  const lastHistoryRef = useRef<Turno[]>([]);
+  const lastReservationsRef = useRef<Reserva[]>([]);
+  const lastNotesRef = useRef<NotaCalendario[]>([]);
+  const lastWeekOverridesRef = useRef<WeekOverride[]>([]);
+  const loadedUidRef = useRef<string | null>(null);
+```
+
+```ts
+        const items: Turno[] = [];
+        snap.forEach((d) => items.push(d.data() as Turno));
+        const orderedItems = sortTurnosByDateDesc(items);
+        const localItems = readUserLocalJSON<Turno[]>(uid, KEY_HISTORY) ?? [];
+        const mergedItems = mergeTurnos(localItems, orderedItems);
+        lastHistoryRef.current = orderedItems;
+        writeUserLocalJSON(uid, KEY_HISTORY, mergedItems);
+        setHistory(mergedItems);
+```
+
+#### Código nuevo
+```ts
+  const lastHistoryRef = useRef<Turno[]>([]);
+  const lastReservationsRef = useRef<Reserva[]>([]);
+  const lastNotesRef = useRef<NotaCalendario[]>([]);
+  const lastWeekOverridesRef = useRef<WeekOverride[]>([]);
+  const loadedUidRef = useRef<string | null>(null);
+  const mergeLocalHistoryRef = useRef(false);
+  const mergeLocalReservationsRef = useRef(false);
+  const mergeLocalNotesRef = useRef(false);
+  const mergeLocalWeekOverridesRef = useRef(false);
+```
+
+```ts
+        const items: Turno[] = [];
+        snap.forEach((d) => items.push(d.data() as Turno));
+        const orderedItems = sortTurnosByDateDesc(items);
+        const localItems = mergeLocalHistoryRef.current ? readUserLocalJSON<Turno[]>(uid, KEY_HISTORY) ?? [] : [];
+        const mergedItems = mergeLocalHistoryRef.current ? mergeTurnos(localItems, orderedItems) : orderedItems;
+        mergeLocalHistoryRef.current = false;
+        lastHistoryRef.current = orderedItems;
+        writeUserLocalJSON(uid, KEY_HISTORY, mergedItems);
+        setHistory(mergedItems);
+```
+
+#### Por qué se cambió
+La fusión con `localStorage` debe ocurrir solo durante la primera carga del UID, para recuperar cambios offline. En snapshots posteriores Firestore debe poder reflejar borrados reales sin que el cache local vuelva a insertar turnos eliminados.
+
+### Cambio 19 - Test contra resurrección de borrados
+
+#### Código anterior
+`No existía el test "no resucita turnos borrados en Firestore desde el cache local tras la carga inicial" en src/__tests__/use-firestore-sync-user-isolation.test.tsx.`
+
+#### Código nuevo
+```tsx
+  it("no resucita turnos borrados en Firestore desde el cache local tras la carga inicial", async () => {
+    const turnoFirestore = turno(11, "2026-05-30", "10:00", "12:00");
+    localStorage.setItem(`${KEY_HISTORY}__uid-nuevo`, JSON.stringify([turnoFirestore]));
+
+    await act(async () => {
+      root.render(<HookProbe />);
+      await Promise.resolve();
+    });
+    await emitInitialSnapshots({ turnos: [turnoFirestore] });
+
+    const turnosSnapshot = firestoreSyncMock.snapshotCallbacks.find(({ ref }) => ref.name === "turnos");
+    expect(turnosSnapshot).toBeDefined();
+
+    await act(async () => {
+      turnosSnapshot?.callback(collectionSnap([]));
+      await Promise.resolve();
+    });
+
+    const { useAppStore } = await import("../services/store");
+    expect(useAppStore.getState().history).toEqual([]);
+    expect(JSON.parse(localStorage.getItem(`${KEY_HISTORY}__uid-nuevo`) || "[]")).toEqual([]);
+  });
+```
+
+#### Por qué se cambió
+La prueba reproduce un borrado remoto después de la carga inicial. Antes de corregirlo fallaba porque el turno quedaba de nuevo en `history` desde el cache local.
+
+### Cambio 20 - Bloqueo de migración legacy sin UID
+
+#### Código anterior
+```ts
+  const current = currentRaw ? JSON.parse(currentRaw) as CurrentState : null;
+  const history = historyRaw ? JSON.parse(historyRaw) as Turno[] : [];
+  const settings = settingsRaw ? JSON.parse(settingsRaw) as AppSettings : null;
+  const weekOverrides = weekOverridesRaw ? JSON.parse(weekOverridesRaw) as WeekOverride[] : [];
+  const reservations = reservationsRaw ? JSON.parse(reservationsRaw) as Reserva[] : [];
+  const notes = notesRaw ? JSON.parse(notesRaw) as NotaCalendario[] : [];
+
+  const docPromises: Promise<unknown>[] = [];
+  if (current) docPromises.push(setDoc(userMetaDocRef(db, uid, "current"), current));
+  if (settings) docPromises.push(setDoc(userMetaDocRef(db, uid, "settings"), settings));
+```
+
+#### Código nuevo
+```ts
+  localStorage.setItem(LOCAL_MIGRATION_KEY, JSON.stringify({
+    uid, at: new Date().toISOString(), migrado: false, motivo: "legacy-sin-uid-no-atribuible",
+  }));
+}
+```
+
+#### Por qué se cambió
+Las claves antiguas sin UID no contienen información verificable sobre el usuario propietario. Subirlas automáticamente al UID autenticado actual podía mezclar datos entre usuarios en un dispositivo compartido.
+
+### Cambio 21 - Tests de current local y legacy sin UID
+
+#### Código anterior
+`No existían los tests "conserva el turno abierto local del mismo UID si Firestore tiene current vacío" ni "no migra claves legacy sin UID a un usuario autenticado" en src/__tests__/use-firestore-sync-user-isolation.test.tsx.`
+
+#### Código nuevo
+```tsx
+  it("conserva el turno abierto local del mismo UID si Firestore tiene current vacío", async () => {
+    const currentOffline = {
+      entries: [{ id: 1, type: "efectivo", amount: 10, note: "", time: "10:00" }],
+      startTime: "10:00",
+      startDate: "2026-05-30",
+      isPaused: false,
+      pauseStartTime: null,
+      totalPausedMinutes: 0,
+    };
+    const currentFirestoreVacio = {
+      entries: [],
+      startTime: null,
+      startDate: null,
+      isPaused: false,
+      pauseStartTime: null,
+      totalPausedMinutes: 0,
+    };
+    localStorage.setItem(`${KEY_CURRENT}__uid-nuevo`, JSON.stringify(currentOffline));
+
+    await act(async () => {
+      root.render(<HookProbe />);
+      await Promise.resolve();
+    });
+    await emitInitialSnapshots({ current: currentFirestoreVacio });
+
+    const { useAppStore } = await import("../services/store");
+    expect(useAppStore.getState().current.startTime).toBe("10:00");
+    expect(useAppStore.getState().current.entries).toHaveLength(1);
+    expect(firestoreSyncMock.saveUserDoc).toHaveBeenCalledWith(
+      {},
+      "uid-nuevo",
+      "current",
+      currentOffline,
+    );
+  });
+```
+
+```tsx
+  it("no migra claves legacy sin UID a un usuario autenticado", async () => {
+    const turnoLegacy = turno(77, "2026-05-30", "10:00", "12:00");
+    localStorage.setItem(KEY_HISTORY, JSON.stringify([turnoLegacy]));
+
+    await act(async () => {
+      root.render(<HookProbe />);
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(localStorage.getItem(KEY_HISTORY)).toBe(JSON.stringify([turnoLegacy]));
+    expect(firestoreSyncMock.syncSubcollection).not.toHaveBeenCalled();
+  });
+```
+
+#### Por qué se cambió
+Los tests fijan que un turno abierto offline del mismo UID no se pierde frente a un `current` remoto vacío, y que datos legacy sin UID no se atribuyen automáticamente al usuario autenticado actual.
+
+### Cambio 22 - Normalización de clave de turno
+
+#### Código anterior
+```ts
+function getTurnoMergeKey(t: SortableTurno): string {
+  return [
+    t.startDate || "",
+    t.date || "",
+    t.startTime || "",
+    t.endTime || "",
+  ].join("|");
+}
+```
+
+#### Código nuevo
+```ts
+function getTurnoMergeKey(t: SortableTurno): string {
+  const effectiveDate = t.startDate || t.date || "";
+  return [
+    effectiveDate,
+    t.startTime || "",
+    t.endTime || "",
+  ].join("|");
+}
+```
+
+#### Por qué se cambió
+Dos copias del mismo turno podían no deduplicarse si una tenía `startDate` vacío y la otra tenía `startDate` igual a `date`. La clave usa ahora la fecha efectiva del turno.
+
+### Cambio 23 - Test de deduplicación sin startDate
+
+#### Código anterior
+`No existía el test "should deduplicate the same turno when one copy is missing startDate" en src/__tests__/logic.test.ts.`
+
+#### Código nuevo
+```ts
+  it('should deduplicate the same turno when one copy is missing startDate', () => {
+    const actuales = [
+      { date: '2026-05-08', startDate: null, startTime: '08:00', endTime: '12:00', id: 1 } as Turno,
+    ];
+
+    const nuevos = [
+      { date: '2026-05-08', startDate: '2026-05-08', startTime: '08:00', endTime: '12:00', id: 2 } as Turno,
+    ];
+
+    const merged = mergeTurnos(actuales, nuevos);
+
+    expect(merged).toHaveLength(1);
+    expect(merged[0].id).toBe(2);
+  });
+```
+
+#### Por qué se cambió
+La prueba cubre el caso de duplicado real con `startDate` ausente en una de las copias.
+
+### Cambio 24 - Limpieza de listeners del Service Worker
+
+#### Código anterior
+```tsx
+    navigator.serviceWorker.addEventListener("message", onMessage);
+    navigator.serviceWorker.getRegistration().then((reg) => {
+      if (!reg) return;
+      reg.addEventListener("updatefound", () => onUpdateFound(reg));
+    });
+    return () => {
+      navigator.serviceWorker.removeEventListener("message", onMessage);
+    };
+```
+
+#### Código nuevo
+```tsx
+    navigator.serviceWorker.addEventListener("message", onMessage);
+    navigator.serviceWorker.getRegistration().then((reg) => {
+      if (!reg || cancelado) return;
+      const onRegUpdateFound = () => onUpdateFound(reg);
+      reg.addEventListener("updatefound", onRegUpdateFound);
+      updateFoundCleanup = () => {
+        reg.removeEventListener("updatefound", onRegUpdateFound);
+      };
+    });
+    return () => {
+      cancelado = true;
+      navigator.serviceWorker.removeEventListener("message", onMessage);
+      updateFoundCleanup?.();
+      stateChangeCleanups.forEach((cleanup) => cleanup());
+    };
+```
+
+#### Por qué se cambió
+`App` se desmonta y remonta al cambiar de usuario. El listener `updatefound` y los listeners `statechange` debían limpiarse igual que `message` para no dejar listeners acumulados.
+
+### Cambio 25 - Eliminar rama inalcanzable de exportación
+
+#### Código anterior
+```tsx
+            if (false) return match;
+            return "#ffffff";
+```
+
+#### Código nuevo
+```tsx
+            return "#ffffff";
+```
+
+#### Por qué se cambió
+La condición `if (false)` era código muerto dentro de la conversión de colores del ticket.
+
+### Cambio 26 - Tests de limpieza de UI y Service Worker
+
+#### Código anterior
+`No existían los tests "cleans service worker update listeners mounted by App" ni "does not keep unreachable export color branches" en src/__tests__/main-antiguo-regressions.test.ts.`
+
+#### Código nuevo
+```ts
+  it("cleans service worker update listeners mounted by App", () => {
+    const mainSource = readSource("src/main.tsx");
+
+    expect(mainSource).toContain('const isLocalDev = ["localhost", "127.0.0.1", "::1"].includes(window.location.hostname);');
+    expect(mainSource).toContain("if (isLocalDev) return;");
+    expect(mainSource).toContain("let updateFoundCleanup: (() => void) | null = null;");
+    expect(mainSource).toContain('reg.removeEventListener("updatefound", onRegUpdateFound);');
+    expect(mainSource).not.toContain('reg.addEventListener("updatefound", () => onUpdateFound(reg));');
+  });
+
+  it("does not keep unreachable export color branches", () => {
+    const source = readSource("src/screens/liquidacion-semana-screen.tsx");
+
+    expect(source).not.toContain("if (false) return match;");
+  });
+```
+
+#### Por qué se cambió
+Los tests fijan que el listener de actualización del Service Worker no vuelva a quedar sin limpieza y que no se reintroduzca la rama inalcanzable en la exportación.
+
+### Cambio 27 - Test de colores sin depender de código muerto
+
+#### Código anterior
+```ts
+    const exportColorBlock = liquidacionSemanaSource.match(
+      /const replaceOklch = \(str: string\) => \{[\s\S]*?return match;/
+    )?.[0] || "";
+```
+
+#### Código nuevo
+```ts
+    const exportColorBlock = liquidacionSemanaSource.match(
+      /const replaceOklch = \(str: string\) => \{[\s\S]*?return "#ffffff";/
+    )?.[0] || "";
+```
+
+#### Por qué se cambió
+El test buscaba el final del bloque mediante una rama inalcanzable eliminada. Ahora localiza el bloque por el retorno real que queda en la función.
+
+## 2026-05-30 22:08 - Corregir datos de usuario anterior visibles al cambiar sesión
+
+**Archivos modificados:** `src/hooks/use-firestore-sync.ts`
+
+### Cambio 1 - Reset del store Zustand al inicio del efecto de Firestore
+
+#### Código anterior
+```ts
+  useEffect(() => {
+    const user = auth.currentUser;
+    if (!user) return;
+    const uid = user.uid;
+
+    let cancelado = false;
+```
+
+#### Código nuevo
+```ts
+  useEffect(() => {
+    const user = auth.currentUser;
+    if (!user) return;
+    const uid = user.uid;
+
+    // ── Reset a estado vacío antes de cargar los datos del nuevo usuario ──────
+    // El store (Zustand) es un singleton de módulo: persiste entre desmontajes.
+    // Sin este reset, los datos del usuario anterior se muestran hasta que
+    // Firestore responde con los del usuario nuevo (puede tardar varios segundos).
+    // dataLoaded=false evita que los efectos de escritura re-persistan el estado
+    // vacío en Firestore antes de que lleguen los datos reales.
+    setCurrent({ entries: [], startTime: null, startDate: null, isPaused: false, pauseStartTime: null, totalPausedMinutes: 0 });
+    setHistory([]);
+    setReservations([]);
+    setNotes([]);
+    setWeekOverrides([]);
+    setIsAdmin(false);
+    setDataLoaded(false);
+    setLoadTimedOut(false);
+    // ─────────────────────────────────────────────────────────────────────────
+
+    let cancelado = false;
+```
+
+#### Por qué se cambió
+El store Zustand es un singleton de módulo y persiste en memoria entre desmontajes de componentes. Al cambiar de usuario (login con otra cuenta), el store conservaba el estado del usuario anterior, incluyendo el turno abierto, hasta que Firestore respondía con los datos del nuevo usuario. El reset garantiza que el nuevo usuario siempre parte de un estado vacío y limpio. Se resetea también `isAdmin`, `dataLoaded` y `loadTimedOut` para coherencia total del estado.
+
 ## 2026-05-30 20:40 - Añadir efecto neón a los iconos de agenda y ajustes
+
 
 **Archivos modificados:** `src/components/home-icons.tsx`, `src/components/navigation-icons.tsx`, `src/screens/home-screen.tsx`, `src/main.tsx`
 
