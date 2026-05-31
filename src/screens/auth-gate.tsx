@@ -4,7 +4,7 @@ import { onAuthStateChanged, type User } from "firebase/auth";
 import { auth } from "../services/firebase";
 import { LoginScreen } from "./login-screen";
 
-export function AuthGate({ AppComponent }: { AppComponent: React.ComponentType }) {
+export function AuthGate({ AppComponent }: { AppComponent: React.ComponentType<{ uid: string }> }) {
   const [user, setUser] = React.useState<User | null>(null);
   const [loading, setLoading] = React.useState(true);
 
@@ -38,5 +38,5 @@ export function AuthGate({ AppComponent }: { AppComponent: React.ComponentType }
     return <LoginScreen />;
   }
 
-  return <AppComponent key={user.uid} />;
+  return <AppComponent key={user.uid} uid={user.uid} />;
 }

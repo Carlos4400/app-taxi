@@ -4,23 +4,13 @@ import { IconBack, IconDel } from "../components/navigation-icons";
 import {
   IconTaxiBadgeNeon,
   IconRoad,
-  IconPinNeon,
   IconNoteAdd
 } from "../components/summary-icons";
-import {
-  IconCoin,
-  IconCard,
-  IconAgency,
-  IconExtra,
-  IconFuel,
-  IconNulo
-} from "../components/entry-icons";
 import { EditEntryDialog } from "../components/edit-entry-dialog";
 import { ConfirmDialog } from "../components/common";
-import { hapticTap, hapticAction } from "../services/haptics";
-import { today, timeNow } from "../logic/date-time";
+import { hapticTap } from "../services/haptics";
 import { fmt } from "../logic/formatters";
-import { A, ABG, E, EBG, F, FBG, G, GBG, N, NBG, P, PBG, C } from "../shared/ui-theme";
+import { A, E, F, G, GBG, N, P } from "../shared/ui-theme";
 import { KM_CARD_UNIT_STYLE } from "../shared/card-styles";
 import { getEntryTypeMeta } from "../shared/entry-type-meta";
 import type { Turno, Entry, EditTurnoState } from "../shared/types";
@@ -44,15 +34,6 @@ const S = {
     cursor: "pointer",
   },
 };
-
-const NOTE_TIME_STYLE = {
-  fontSize: 12,
-  color: "rgba(255,255,255,0.45)",
-  fontWeight: 700,
-  whiteSpace: "nowrap",
-  flexShrink: 0,
-  alignSelf: "baseline",
-} as const;
 
 interface EditTurnoScreenProps {
   editJ: EditTurnoState;

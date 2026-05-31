@@ -1,4 +1,3 @@
-import React from "react";
 import { Shell } from "../components/shell";
 import { ConfirmDialog } from "../components/common";
 import { IconBack, IconDel } from "../components/navigation-icons";

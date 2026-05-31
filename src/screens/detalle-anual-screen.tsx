@@ -1,4 +1,3 @@
-import React from "react";
 import { Shell } from "../components/shell";
 import { IconBack } from "../components/navigation-icons";
 import { IconCard, IconCoin, IconAgency, IconExtra, IconFuel, IconNulo } from "../components/entry-icons";

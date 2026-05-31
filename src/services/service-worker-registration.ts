@@ -2,9 +2,16 @@ export function registerServiceWorker() {
   if (!("serviceWorker" in navigator)) return;
 
   const isLocalDev = ["localhost", "127.0.0.1", "::1"].includes(window.location.hostname);
+  const runWhenLoaded = (fn: () => void) => {
+    if (document.readyState === "loading") {
+      window.addEventListener("load", fn, { once: true });
+      return;
+    }
+    fn();
+  };
 
   if (isLocalDev) {
-    window.addEventListener("load", () => {
+    runWhenLoaded(() => {
       navigator.serviceWorker.getRegistrations()
         .then((registrations) => Promise.all(registrations.map((registration) => registration.unregister())))
         .then(() => console.log("SW unregistered in dev"))
@@ -13,7 +20,7 @@ export function registerServiceWorker() {
     return;
   }
 
-  window.addEventListener("load", () => {
+  runWhenLoaded(() => {
     navigator.serviceWorker.register("./sw.js")
       .then(() => console.log("SW registered"))
       .catch((err) => console.warn("SW registration failed", err));

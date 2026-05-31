@@ -11,7 +11,7 @@ describe("TurnoNotasCard extraction", () => {
 
     const componentSource = readFileSync(componentPath, "utf8");
     expect(componentSource).toContain("export function TurnoNotasCard");
-    expect(mainSource).toContain('from "./components/turno-notas"');
+    expect(mainSource).not.toContain('from "./components/turno-notas"');
     expect(mainSource).not.toMatch(/^function TurnoNotasCard/m);
   });
 });

@@ -15,7 +15,7 @@ describe("Calendar date extraction", () => {
     expect(getDaysInMonth(2024, 1)).toBe(29);
     expect(getStartOffset(2026, 4)).toBe(4);
 
-    expect(mainSource).toContain('from "./logic/calendar-date"');
+    expect(mainSource).not.toContain('from "./logic/calendar-date"');
     expect(mainSource).not.toMatch(/^function getDaysInMonth\(/m);
     expect(mainSource).not.toMatch(/^function getStartOffset\(/m);
   });

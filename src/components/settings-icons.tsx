@@ -1,5 +1,3 @@
-import React from "react";
-
 export const IconReceipt = ({ s = 24, c = "white" }: { s?: number; c?: string }) => (
   <svg width={s} height={s} viewBox="0 0 24 24" fill="none">
     <path d="M4.5 21V3C4.5 2.44772 4.94772 2 5.5 2H18.5C19.0523 2 19.5 2.44772 19.5 3V21L15.75 19.5L12 21L8.25 19.5L4.5 21Z" stroke={c} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />

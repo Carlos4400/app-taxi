@@ -63,9 +63,9 @@ describe("Main antiguo regression locks", () => {
   it("keeps turnos dates formatted for display", () => {
     const source = readSource("src/screens/pantalla-turnos.tsx");
 
-    expect(source).toContain('from "../logic/date-time"');
-    expect(source).toContain("fmtDate");
-    expect(source).toContain("{fmtDate(turno.startDate || turno.date)}");
+    expect(source).toContain("renderTurnoCard(j, {");
+    expect(source).not.toContain('from "../logic/date-time"');
+    expect(source).not.toContain("fmtDate");
   });
 
   it("keeps detailed notes outside the summary card on confirm end", () => {
@@ -107,6 +107,16 @@ describe("Main antiguo regression locks", () => {
     const source = readSource("src/screens/liquidacion-semana-screen.tsx");
 
     expect(source).not.toContain("if (false) return match;");
+  });
+
+  it("does not keep Firestore sync helpers or extracted liquidation state in main", () => {
+    const mainSource = readSource("src/main.tsx");
+
+    expect(mainSource).not.toContain('from "./services/firestore-sync"');
+    expect(mainSource).not.toContain('from "./services/user-storage"');
+    expect(mainSource).not.toContain('from "./shared/storage-keys"');
+    expect(mainSource).not.toContain("const [copiado, setCopiado] = useState(false);");
+    expect(mainSource).not.toContain("const [procesandoTicket, setProcesandoTicket] = useState(false);");
   });
 
   it("keeps extracted screens using shared visual building blocks", () => {

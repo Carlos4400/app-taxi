@@ -18,7 +18,7 @@ import {
   IconNulo
 } from "../components/entry-icons";
 import { IconMoneyBag, IconTimer } from "../components/calendar-icons";
-import { IconReceipt, IconHoliday } from "../components/settings-icons";
+import { IconReceipt } from "../components/settings-icons";
 import { DurationCardValue } from "../components/duration-card-value";
 import { ConfirmDialog } from "../components/common";
 import { today, fmtDate, getDiffMins } from "../logic/date-time";
@@ -26,10 +26,10 @@ import { fmtDuration, fmtKmNumber, fmt } from "../logic/formatters";
 import { calcularTurnoContable } from "../logic/accounting";
 import { getTurnoAccountingWeekId } from "../logic/week-logic";
 import { updateTurnoEntrega } from "../logic/turno-entrega";
-import { A, ABG, E, EBG, F, FBG, G, GBG, N, NBG, P, PBG, C } from "../shared/ui-theme";
+import { A, ABG, E, EBG, F, FBG, G, GBG, N, NBG, P, PBG } from "../shared/ui-theme";
 import { KM_CARD_UNIT_STYLE } from "../shared/card-styles";
 import { getEntryTypeMeta } from "../shared/entry-type-meta";
-import type { Turno, AppSettings, Entry } from "../shared/types";
+import type { Turno, AppSettings } from "../shared/types";
 
 const iconBtnStyle = {
   background: "rgba(255,255,255,0.06)",

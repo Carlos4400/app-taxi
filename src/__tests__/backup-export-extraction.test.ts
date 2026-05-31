@@ -13,7 +13,7 @@ describe("Backup export extraction", () => {
     expect(backupExportSource).toContain("export async function exportBackupJSON");
     expect(backupExportSource).toContain("@capacitor/filesystem");
     expect(backupExportSource).toContain("@capacitor/share");
-    expect(mainSource).toContain('from "./services/backup-export"');
+    expect(mainSource).not.toContain('from "./services/backup-export"');
     expect(mainSource).not.toMatch(/^async function exportBackupJSON\(/m);
   });
 });

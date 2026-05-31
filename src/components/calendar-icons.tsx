@@ -1,5 +1,3 @@
-import React from "react";
-
 export const IconPencilNeon = ({ s = 28 }: { s?: number }) => (
   <svg
     width={s}

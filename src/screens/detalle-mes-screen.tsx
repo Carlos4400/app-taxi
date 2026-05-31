@@ -1,5 +1,4 @@
-import type { CSSProperties } from "react";
-import type { AppSettings, Turno, TurnoNotasSemana } from "../shared/types";
+import type { AppSettings, Turno } from "../shared/types";
 import { useAppStore } from "../services/store";
 import { Shell } from "../components/shell";
 import { IconBack } from "../components/navigation-icons";

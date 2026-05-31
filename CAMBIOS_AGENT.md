@@ -1,3 +1,526 @@
+## 2026-05-31 09:24 - Añadir .gitattributes y normalizar fin de línea a LF
+
+**Archivos modificados:** .gitattributes
+
+### Cambio 1 - Crear .gitattributes con normalización LF
+
+**Código anterior:** `No existía .gitattributes en la raíz del proyecto.`
+
+**Código nuevo:**
+```
+* text=auto eol=lf
+
+*.png   binary
+*.jpg   binary
+*.jpeg  binary
+*.gif   binary
+*.ico   binary
+*.webp  binary
+*.ttf   binary
+*.otf   binary
+*.woff  binary
+*.woff2 binary
+*.pdf   binary
+*.keystore binary
+*.jar   binary
+```
+
+**Por qué se cambió:** al editar desde Windows, `src/main.tsx` y `CAMBIOS_AGENT.md` se reescribieron con CRLF cuando el repo usaba LF, generando diffs enormes de ruido (miles de líneas marcadas como modificadas solo por el salto de línea). El `.gitattributes` fuerza LF en todo el texto y marca los binarios para que no se normalicen, evitando que vuelva a ocurrir.
+
+## 2026-05-31 10:25 - Corregir sincronización offline por UID
+
+**Archivos modificados:**
+- `src/__tests__/apk-installer-extraction.test.ts`
+- `src/__tests__/apk-update-flow.test.ts`
+- `src/__tests__/app-version-extraction.test.ts`
+- `src/__tests__/backup-export-extraction.test.ts`
+- `src/__tests__/calendar-date-extraction.test.ts`
+- `src/__tests__/duration-card-value-extraction.test.ts`
+- `src/__tests__/logic.test.ts`
+- `src/__tests__/main-antiguo-regressions.test.ts`
+- `src/__tests__/pending-sync.test.ts`
+- `src/__tests__/service-worker-registration.test.ts`
+- `src/__tests__/storage-keys-extraction.test.ts`
+- `src/__tests__/turno-notas-component-extraction.test.ts`
+- `src/__tests__/use-firestore-sync-user-isolation.test.tsx`
+- `src/__tests__/user-storage-extraction.test.ts`
+- `src/components/calendar-icons.tsx`
+- `src/components/entry-icons.tsx`
+- `src/components/settings-icons.tsx`
+- `src/components/summary-icons.tsx`
+- `src/hooks/use-firestore-sync.ts`
+- `src/main.tsx`
+- `src/screens/auth-gate.tsx`
+- `src/screens/confirm-end-screen.tsx`
+- `src/screens/contabilidad-screen.tsx`
+- `src/screens/detalle-anual-screen.tsx`
+- `src/screens/detalle-mes-screen.tsx`
+- `src/screens/edit-turno-screen.tsx`
+- `src/screens/liquidacion-semana-screen.tsx`
+- `src/screens/pantalla-turnos.tsx`
+- `src/screens/settings-screen.tsx`
+- `src/screens/summary-screen.tsx`
+- `src/screens/today-history-screen.tsx`
+- `src/services/pending-sync.ts`
+- `src/services/service-worker-registration.ts`
+- `src/shared/storage-keys.ts`
+
+### Cambio 1 - Añadir estado pendiente por usuario
+
+#### Código anterior
+```ts
+export const KEY_CURRENT = "taxi_current_v3";
+export const KEY_HISTORY = "taxi_history_v3";
+export const KEY_SETTINGS = "taxi_settings_v3";
+export const KEY_WEEK_OVERRIDES = "taxi_week_overrides_v1";
+export const KEY_RESERVATIONS = "taxi_reservations_v1";
+export const KEY_NOTES = "taxi_notes_v1";
+```
+
+#### Código nuevo
+```ts
+export const KEY_CURRENT = "taxi_current_v3";
+export const KEY_HISTORY = "taxi_history_v3";
+export const KEY_SETTINGS = "taxi_settings_v3";
+export const KEY_WEEK_OVERRIDES = "taxi_week_overrides_v1";
+export const KEY_RESERVATIONS = "taxi_reservations_v1";
+export const KEY_NOTES = "taxi_notes_v1";
+export const KEY_PENDING_SYNC = "taxi_pending_sync_v1";
+```
+
+#### Por qué se cambió
+Se necesitaba una clave persistente y separada por UID para distinguir cache local antigua de cambios offline reales pendientes de subir.
+
+### Cambio 2 - Crear servicio de pendientes offline
+
+#### Código anterior
+`No existía pending-sync en src/services/pending-sync.ts.`
+
+#### Código nuevo
+```ts
+import { KEY_PENDING_SYNC } from "../shared/storage-keys";
+import { userStorageKey } from "./user-storage";
+
+export type PendingSyncArea =
+  | "current"
+  | "settings"
+  | "turnos"
+  | "reservations"
+  | "notes"
+  | "weekOverrides";
+
+export type PendingSyncState = Partial<Record<PendingSyncArea, true>>;
+
+export function readUserPendingSync(uid: string): PendingSyncState {
+  try {
+    return JSON.parse(localStorage.getItem(userStorageKey(KEY_PENDING_SYNC, uid)) || "{}") as PendingSyncState;
+  } catch {
+    return {};
+  }
+}
+
+export function hasUserPendingSync(uid: string, area: PendingSyncArea): boolean {
+  return readUserPendingSync(uid)[area] === true;
+}
+
+export function markUserPendingSync(uid: string, area: PendingSyncArea): void {
+  const state = readUserPendingSync(uid);
+  state[area] = true;
+  localStorage.setItem(userStorageKey(KEY_PENDING_SYNC, uid), JSON.stringify(state));
+}
+
+export function clearUserPendingSync(uid: string, area: PendingSyncArea): void {
+  const state = readUserPendingSync(uid);
+  delete state[area];
+
+  if (Object.keys(state).length === 0) {
+    localStorage.removeItem(userStorageKey(KEY_PENDING_SYNC, uid));
+    return;
+  }
+
+  localStorage.setItem(userStorageKey(KEY_PENDING_SYNC, uid), JSON.stringify(state));
+}
+```
+
+#### Por qué se cambió
+La sincronización necesitaba marcar por usuario y por área cuándo un cambio local no había llegado todavía a Firestore, para no fusionar cache vieja como si fuese un cambio válido.
+
+### Cambio 3 - Pasar UID autenticado al hook de sincronización
+
+#### Código anterior
+```tsx
+export function AuthGate({ AppComponent }: { AppComponent: React.ComponentType }) {
+```
+
+```tsx
+  return <AppComponent key={user.uid} />;
+```
+
+```tsx
+function App() {
+```
+
+```tsx
+  const { dataLoaded, loadTimedOut } = useFirestoreSync();
+```
+
+#### Código nuevo
+```tsx
+export function AuthGate({ AppComponent }: { AppComponent: React.ComponentType<{ uid: string }> }) {
+```
+
+```tsx
+  return <AppComponent key={user.uid} uid={user.uid} />;
+```
+
+```tsx
+function App({ uid }: { uid: string }) {
+```
+
+```tsx
+  const { dataLoaded, loadTimedOut } = useFirestoreSync(uid);
+```
+
+#### Por qué se cambió
+El hook ya no depende solo de `auth.currentUser` dentro de sus efectos: recibe el UID montado por `AuthGate` y puede impedir escrituras si el UID cargado no coincide con el usuario autenticado actual.
+
+### Cambio 4 - Bloquear escrituras cruzadas y marcar pendientes
+
+#### Código anterior
+```ts
+export function useFirestoreSync() {
+```
+
+```ts
+  function getWritableUid(): string | null {
+    const uid = auth.currentUser?.uid;
+    if (!dataLoaded || !uid || loadedUidRef.current !== uid) return null;
+    return uid;
+  }
+```
+
+```ts
+  useEffect(() => {
+    const uid = getWritableUid();
+    if (!uid) return;
+    if (JSON.stringify(current) === JSON.stringify(lastCurrentRef.current)) return;
+    writeUserLocalJSON(uid, KEY_CURRENT, current);
+    saveUserDoc(db, uid, "current", current).catch((err) =>
+      console.error("Save current failed:", err)
+    );
+  }, [current, dataLoaded]);
+```
+
+#### Código nuevo
+```ts
+export function useFirestoreSync(uid: string) {
+```
+
+```ts
+  function getWritableUid(): string | null {
+    const authUid = auth.currentUser?.uid;
+    if (!dataLoaded || !authUid || authUid !== uid || loadedUidRef.current !== uid) return null;
+    return uid;
+  }
+```
+
+```ts
+  useEffect(() => {
+    const writableUid = getWritableUid();
+    if (!writableUid) return;
+    if (sameJSON(current, lastCurrentRef.current)) return;
+    writeUserLocalJSON(writableUid, KEY_CURRENT, current);
+    markUserPendingSync(writableUid, "current");
+    saveUserDoc(db, writableUid, "current", current)
+      .then(() => {
+        lastCurrentRef.current = current;
+        clearUserPendingSync(writableUid, "current");
+      })
+      .catch((err) => console.error("Save current failed:", err));
+  }, [current, dataLoaded, uid]);
+```
+
+#### Por qué se cambió
+Antes una escritura podía tomar el UID desde `auth.currentUser` aunque el estado cargado perteneciese a otro montaje. Ahora se escribe solo cuando `auth.currentUser.uid`, el UID recibido y el UID ya cargado coinciden; además, cada escritura local queda marcada como pendiente hasta que Firestore confirma la operación.
+
+### Cambio 5 - Fusionar local solo cuando hay pendiente real
+
+#### Código anterior
+```ts
+  const mergeLocalHistoryRef = useRef(false);
+  const mergeLocalReservationsRef = useRef(false);
+  const mergeLocalNotesRef = useRef(false);
+  const mergeLocalWeekOverridesRef = useRef(false);
+```
+
+```ts
+        const localItems = mergeLocalHistoryRef.current ? readUserLocalJSON<Turno[]>(uid, KEY_HISTORY) ?? [] : [];
+        const mergedItems = mergeLocalHistoryRef.current ? mergeTurnos(localItems, orderedItems) : orderedItems;
+        mergeLocalHistoryRef.current = false;
+        lastHistoryRef.current = orderedItems;
+        writeUserLocalJSON(uid, KEY_HISTORY, mergedItems);
+        setHistory(mergedItems);
+```
+
+#### Código nuevo
+```ts
+function sameJSON(a: unknown, b: unknown): boolean {
+  return JSON.stringify(a) === JSON.stringify(b);
+}
+```
+
+```ts
+        const hasPendingHistory = hasUserPendingSync(uid, "turnos");
+        const localItems = hasPendingHistory ? readUserLocalJSON<Turno[]>(uid, KEY_HISTORY) ?? [] : [];
+        const mergedItems = hasPendingHistory ? mergeTurnos(localItems, orderedItems) : orderedItems;
+        lastHistoryRef.current = orderedItems;
+        writeUserLocalJSON(uid, KEY_HISTORY, mergedItems);
+        setHistory(mergedItems);
+        if (hasPendingHistory && sameJSON(mergedItems, orderedItems)) clearUserPendingSync(uid, "turnos");
+```
+
+#### Por qué se cambió
+La primera carga ya no mezcla automáticamente el cache local con Firestore. Solo fusiona si existe una marca pendiente para ese usuario y esa zona, evitando resucitar turnos borrados en Firestore desde cache local antigua.
+
+### Cambio 6 - Conservar current pendiente aunque Firestore tenga current abierto
+
+#### Código anterior
+```ts
+          const nextCurrent =
+            localCurrent && hasOpenCurrent(localCurrent) && !hasOpenCurrent(remoteCurrent)
+              ? localCurrent
+              : remoteCurrent;
+```
+
+#### Código nuevo
+```ts
+          const nextCurrent =
+            hasPendingCurrent && localCurrent && hasOpenCurrent(localCurrent)
+              ? localCurrent
+              : remoteCurrent;
+```
+
+#### Por qué se cambió
+Si el usuario tenía un turno local pendiente por falta de conexión, ese turno debía conservarse aunque Firestore también tuviese un current abierto. La condición nueva usa la marca pendiente explícita en vez de inferirlo solo por el estado remoto.
+
+### Cambio 7 - Ejecutar service worker aunque la página ya cargó
+
+#### Código anterior
+```ts
+  if (isLocalDev) {
+    window.addEventListener("load", () => {
+      navigator.serviceWorker.getRegistrations()
+        .then((registrations) => Promise.all(registrations.map((registration) => registration.unregister())))
+        .then(() => console.log("SW unregistered in dev"))
+        .catch((err) => console.warn("SW unregister failed", err));
+    });
+    return;
+  }
+
+  window.addEventListener("load", () => {
+    navigator.serviceWorker.register("./sw.js")
+      .then(() => console.log("SW registered"))
+      .catch((err) => console.warn("SW registration failed", err));
+  });
+```
+
+#### Código nuevo
+```ts
+  const runWhenLoaded = (fn: () => void) => {
+    if (document.readyState === "loading") {
+      window.addEventListener("load", fn, { once: true });
+      return;
+    }
+    fn();
+  };
+
+  if (isLocalDev) {
+    runWhenLoaded(() => {
+      navigator.serviceWorker.getRegistrations()
+        .then((registrations) => Promise.all(registrations.map((registration) => registration.unregister())))
+        .then(() => console.log("SW unregistered in dev"))
+        .catch((err) => console.warn("SW unregister failed", err));
+    });
+    return;
+  }
+
+  runWhenLoaded(() => {
+    navigator.serviceWorker.register("./sw.js")
+      .then(() => console.log("SW registered"))
+      .catch((err) => console.warn("SW registration failed", err));
+  });
+```
+
+#### Por qué se cambió
+Si `registerServiceWorker()` se ejecutaba cuando `load` ya había ocurrido, no se registraba ni se desregistraba nada. Ahora actúa inmediatamente cuando el documento ya está cargado.
+
+### Cambio 8 - Añadir pruebas de pendientes y aislamiento
+
+#### Código anterior
+`No existía pending-sync.test en src/__tests__/pending-sync.test.ts.`
+
+#### Código nuevo
+```ts
+import { describe, expect, it, beforeEach } from "vitest";
+import {
+  clearUserPendingSync,
+  hasUserPendingSync,
+  markUserPendingSync,
+  readUserPendingSync,
+} from "../services/pending-sync";
+
+describe("pending-sync", () => {
+  beforeEach(() => {
+    localStorage.clear();
+  });
+
+  it("guarda marcas pendientes separadas por UID", () => {
+    markUserPendingSync("uid-a", "turnos");
+    markUserPendingSync("uid-b", "current");
+
+    expect(hasUserPendingSync("uid-a", "turnos")).toBe(true);
+    expect(hasUserPendingSync("uid-a", "current")).toBe(false);
+    expect(hasUserPendingSync("uid-b", "current")).toBe(true);
+    expect(readUserPendingSync("uid-a")).toEqual({ turnos: true });
+  });
+
+  it("elimina la clave local al limpiar la última marca pendiente", () => {
+    markUserPendingSync("uid-a", "turnos");
+    markUserPendingSync("uid-a", "notes");
+
+    clearUserPendingSync("uid-a", "turnos");
+    expect(readUserPendingSync("uid-a")).toEqual({ notes: true });
+
+    clearUserPendingSync("uid-a", "notes");
+    expect(localStorage.getItem("taxi_pending_sync_v1__uid-a")).toBeNull();
+  });
+});
+```
+
+#### Por qué se cambió
+Se añadió una prueba directa del nuevo servicio para verificar que las marcas pendientes quedan separadas por usuario y se limpian cuando Firestore confirma.
+
+### Cambio 9 - Cubrir conflictos offline y no duplicados
+
+#### Código anterior
+```tsx
+function HookProbe() {
+  useFirestoreSync();
+  return null;
+}
+```
+
+#### Código nuevo
+```tsx
+function HookProbe() {
+  useFirestoreSync("uid-nuevo");
+  return null;
+}
+```
+
+```tsx
+  it("conserva el current local pendiente aunque Firestore también tenga un turno abierto", async () => {
+```
+
+```tsx
+  it("no resucita turnos borrados en Firestore desde cache local sin pendiente durante la primera carga", async () => {
+```
+
+```tsx
+  it("solo fusiona reservas, notas y overrides locales en primera carga si tienen pendiente offline", async () => {
+```
+
+#### Por qué se cambió
+Las pruebas ahora ejercitan el UID explícito, el turno abierto offline, la no resurrección de turnos borrados y la fusión selectiva por marca pendiente.
+
+### Cambio 10 - Limpiar código muerto verificable
+
+#### Código anterior
+```ts
+import { APP_VERSION } from "./shared/app-version";
+import { IconRocket, IconClipboard, IconChart, IconReservaWrite } from "./components/home-icons";
+import { fmtDuration, fmtKm, fmtKmNumber, fmtMoney, fmtMoneyNumber, fmt } from "./logic/formatters";
+import { TurnoNotasCard } from "./components/turno-notas";
+import { DurationCardValue } from "./components/duration-card-value";
+import { ApkInstaller } from "./services/apk-installer";
+import { resolveLatestApkUpdate, type UpdateState } from "./logic/update-flow";
+import { exportBackupJSON } from "./services/backup-export";
+import { parseCSVToHistory } from "./logic/csv";
+import { getDaysInMonth, getStartOffset } from "./logic/calendar-date";
+```
+
+#### Código nuevo
+```ts
+import { IconRocket } from "./components/home-icons";
+import { fmtDuration, fmtKm, fmt } from "./logic/formatters";
+import type { UpdateState } from "./logic/update-flow";
+```
+
+#### Por qué se cambió
+`npx tsc --noEmit --noUnusedLocals --noUnusedParameters` confirmó que esos imports ya no se usaban en `src/main.tsx`. Se retiraron para no mantener dependencias muertas ni código huérfano.
+
+### Cambio 11 - Eliminar funciones extraídas sin uso en main
+
+#### Código anterior
+```ts
+  async function checkUpdate() {
+    setUpdateState("checking");
+    setUpdateMsg("Buscando actualizaciones...");
+    setDownloadUrl("");
+    setReleaseUrl("");
+    try {
+      const res = await fetch("https://api.github.com/repos/Carlos4400/app-taxi/releases/latest");
+      if (!res.ok) throw new Error("No se encontró el release");
+      const data = await res.json();
+      const result = resolveLatestApkUpdate(data, APP_VERSION);
+      setDownloadUrl(result.downloadUrl);
+      setReleaseUrl(result.releaseUrl);
+      setUpdateState(result.updateState);
+      setUpdateMsg(result.updateMsg);
+    } catch (e) {
+      setUpdateState("error");
+      setUpdateMsg("Error al conectar con GitHub.");
+    }
+  }
+```
+
+#### Código nuevo
+`No existe checkUpdate en src/main.tsx. La función equivalente está en src/screens/settings-screen.tsx.`
+
+#### Por qué se cambió
+La pantalla de ajustes ya tenía la lógica de actualización. Mantener otra copia en `main.tsx` era código muerto confirmado por TypeScript.
+
+### Cambio 12 - Ajustar tests de extracción sin imports muertos
+
+#### Código anterior
+```ts
+    expect(mainSource).toContain('from "./services/apk-installer"');
+```
+
+```ts
+    expect(mainSource).toContain('from "./shared/app-version"');
+```
+
+```ts
+    expect(mainSource).toContain('from "./components/turno-notas"');
+```
+
+#### Código nuevo
+```ts
+    expect(mainSource).not.toContain('from "./services/apk-installer"');
+```
+
+```ts
+    expect(mainSource).not.toContain('from "./shared/app-version"');
+```
+
+```ts
+    expect(mainSource).not.toContain('from "./components/turno-notas"');
+```
+
+#### Por qué se cambió
+Los tests seguían obligando a `main.tsx` a importar módulos ya extraídos aunque no los usara. Ahora verifican que el código está fuera de `main.tsx` sin forzar imports huérfanos.
+
 ## 2026-05-30 22:24 - Corregir aislamiento de turnos por usuario
 
 **Archivos modificados:**
@@ -4616,7 +5139,7 @@ El botón de volver y las tarjetas de turnos cerrados habían quedado conectados
 #### Código anterior
 ```tsx
 const ENTRY_TYPE_META: Record<string, { color: string; label: string; icon: (s?: number) => React.ReactNode }> = {
-  datafono: { color: P, label: "DatÃ¡fono", icon: (s = 17) => <IconCard s={s} c={P} /> },
+  datafono: { color: P, label: "Datáfono", icon: (s = 17) => <IconCard s={s} c={P} /> },
   agencia_bono: { color: A, label: "Agencia/Bono", icon: (s = 17) => <IconAgency s={s} c={A} /> },
   propina: { color: G, label: "Propina", icon: (s = 17) => <IconCoin s={s} c={G} /> },
   extra: { color: E, label: "Extra", icon: (s = 17) => <IconExtra s={s} c={E} /> },

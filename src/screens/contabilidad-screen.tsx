@@ -12,7 +12,7 @@ import {
 } from "../components/calendar-icons";
 import { A, ABG, C, E, G } from "../shared/ui-theme";
 import { fmtDuration, fmtKmNumber, fmtMoneyNumber, fmt, fmtKm } from "../logic/formatters";
-import { fmtDate, getDiffMins, today } from "../logic/date-time";
+import { getDiffMins, today } from "../logic/date-time";
 import { getMesLabel } from "../logic/date-labels";
 import { getAccountingPeriodLabel } from "../logic/date-labels";
 import {
@@ -26,17 +26,8 @@ import {
   isWeekClosed,
   selectAccountingHeroWeek,
 } from "../logic/week-logic";
-import { calcularResumenContableTurnos, type AccountingSettings } from "../logic/accounting";
+import { calcularResumenContableTurnos } from "../logic/accounting";
 import { WEEK_LIST_CARD_TEXT_SIZES } from "../shared/card-styles";
-
-const NOTE_TIME_STYLE = {
-  fontSize: 12,
-  color: "rgba(255,255,255,0.45)",
-  fontWeight: 700,
-  whiteSpace: "nowrap",
-  flexShrink: 0,
-  alignSelf: "baseline",
-} as const;
 
 export interface ContabilidadScreenProps {
   history: Turno[];
@@ -95,8 +86,6 @@ export function ContabilidadScreen({
   weekOverrides,
   selectedAccountingYear,
   selectedAccountingMonth,
-  setSelectedAccountingYear,
-  setSelectedAccountingMonth,
   tieResolutions,
   setTieResolutions,
   pendingTie,
@@ -471,7 +460,6 @@ export function ContabilidadScreen({
             {grupo.items.map((item) => {
               if (item.elem.kind === "turno") {
                 const turno = item.elem.turno;
-                const entregado = turno.entregada || false;
                 return renderTurnoCard(turno, {
                   onClick: () => {
                     setReturnScreen("contabilidad");

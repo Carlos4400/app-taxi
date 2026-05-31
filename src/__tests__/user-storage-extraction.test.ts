@@ -23,7 +23,7 @@ describe("User storage extraction", () => {
     expect(localStorage.getItem("plain__uid-1")).toBe("{\"value\":2}");
     expect(readUserLocalJSON("uid-1", "plain")).toEqual({ value: 2 });
 
-    expect(mainSource).toContain('from "./services/user-storage"');
+    expect(mainSource).not.toContain('from "./services/user-storage"');
     expect(mainSource).not.toMatch(/^function userStorageKey\(/m);
     expect(mainSource).not.toMatch(/^function readLocalJSON/m);
     expect(mainSource).not.toMatch(/^function writeUserLocalJSON/m);

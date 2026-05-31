@@ -1,5 +1,4 @@
 import { type FC } from "react";
-import { A, E, F, N, P } from "../shared/ui-theme";
 
 export const IconCoin: FC<{ s?: number; c?: string }> = ({ s = 24, c }: { s?: number; c?: string }) => (
   <svg width={s} height={s} viewBox="0 0 24 24" fill="none">

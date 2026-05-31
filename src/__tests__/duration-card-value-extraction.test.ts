@@ -13,7 +13,7 @@ describe("DurationCardValue extraction", () => {
     expect(componentSource).toContain("export function DurationCardValue");
     expect(componentSource).toContain("splitDurationLabel(value)");
     expect(componentSource).toContain("TIME_CARD_HOUR_UNIT_STYLE");
-    expect(mainSource).toContain('from "./components/duration-card-value"');
+    expect(mainSource).not.toContain('from "./components/duration-card-value"');
     expect(mainSource).not.toMatch(/^function DurationCardValue\(/m);
   });
 });

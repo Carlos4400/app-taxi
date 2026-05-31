@@ -1,4 +1,3 @@
-import React from "react";
 import { Shell } from "../components/shell";
 import { IconBack, IconDel } from "../components/navigation-icons";
 import { IconCoin, IconCard, IconAgency, IconExtra, IconFuel, IconNulo } from "../components/entry-icons";
@@ -7,10 +6,8 @@ import { fmt } from "../logic/formatters";
 import { getEntryTypeMeta } from "../shared/entry-type-meta";
 import { A, ABG, E, EBG, F, FBG, G, GBG, N, NBG, P, PBG } from "../shared/ui-theme";
 import { KM_CARD_UNIT_STYLE } from "../shared/card-styles";
-import type { CurrentState, AppSettings, Entry } from "../shared/types";
+import type { CurrentState, Entry } from "../shared/types";
 import { hapticTap, hapticConfirm, hapticAction } from "../services/haptics";
-
-const C = "white";
 
 const NOTE_TIME_STYLE = {
   fontSize: 12,

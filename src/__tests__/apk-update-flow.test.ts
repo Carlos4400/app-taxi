@@ -3,7 +3,6 @@ import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 
 describe("APK update flow hardening", () => {
-  const mainSource = readFileSync(resolve("src/main.tsx"), "utf8");
   const settingsScreenSource = readFileSync(resolve("src/screens/settings-screen.tsx"), "utf8");
   const updateFlowSource = readFileSync(resolve("src/logic/update-flow.ts"), "utf8");
   const gradleSource = readFileSync(resolve("android/app/build.gradle"), "utf8");

@@ -5,11 +5,11 @@ import { Capacitor } from "@capacitor/core";
 import html2canvas from "html2canvas";
 import { Shell } from "../components/shell";
 import { IconBack } from "../components/navigation-icons";
-import { IconCoin, IconCard, IconAgency, IconExtra, IconFuel, IconNulo } from "../components/entry-icons";
+import { IconCard, IconAgency, IconExtra, IconFuel } from "../components/entry-icons";
 import { IconTaxiBadgeNeon, IconRoad } from "../components/summary-icons";
 import { fmt, fmtKmNumber } from "../logic/formatters";
 import { getEntryTypeMeta } from "../shared/entry-type-meta";
-import { A, ABG, E, EBG, F, FBG, G, GBG, N, NBG, P, PBG } from "../shared/ui-theme";
+import { A, E, F, G, P } from "../shared/ui-theme";
 import { groupTurnosByWeek, formatWeekRangeFull } from "../logic/week-logic";
 import { calcularTurnoContable, calcularResumenContableTurnos, roundMoney } from "../logic/accounting";
 import { getTurnosNotasSemana } from "../logic/turno-notas-logic";
@@ -34,8 +34,6 @@ type Props = {
 
 export function LiquidacionSemanaScreen({
   selectedWeekId,
-  setSelectedWeekId,
-  updateWeekOverride,
 }: Props) {
   const history: Turno[] = useAppStore((s) => s.history);
   const settings: AppSettings = useAppStore((s) => s.settings);
@@ -142,7 +140,7 @@ export function LiquidacionSemanaScreen({
 
         const elements = [ticket, ...Array.from(ticket.getElementsByTagName("*"))] as HTMLElement[];
         const replaceOklch = (str: string) => {
-          return str.replace(/oklch\(\s*([\d.]+)\s+([\d.]+)\s+([\d.]+)(?:\s*\/\s*[\d.]+)?\s*\)/gi, (match, l, c, h) => {
+          return str.replace(/oklch\(\s*([\d.]+)\s+([\d.]+)\s+([\d.]+)(?:\s*\/\s*[\d.]+)?\s*\)/gi, (_match, l, c, h) => {
             const lightness = parseFloat(l);
             const chroma = parseFloat(c);
             const hue = parseFloat(h);

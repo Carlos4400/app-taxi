@@ -9,6 +9,11 @@ import {
   syncSubcollection,
   userHasFirestoreData,
 } from "../services/firestore-sync";
+import {
+  clearUserPendingSync,
+  hasUserPendingSync,
+  markUserPendingSync,
+} from "../services/pending-sync";
 import { readUserLocalJSON, writeUserLocalJSON } from "../services/user-storage";
 import { KEY_CURRENT, KEY_HISTORY, KEY_SETTINGS, KEY_WEEK_OVERRIDES, KEY_RESERVATIONS, KEY_NOTES } from "../shared/storage-keys";
 import { loadSettings } from "../logic/state-loaders";
@@ -31,6 +36,10 @@ function mergeById<T>(localItems: T[], remoteItems: T[], getId: (item: T) => str
 
 function hasOpenCurrent(current: CurrentState): boolean {
   return !!current.startTime || current.entries.length > 0;
+}
+
+function sameJSON(a: unknown, b: unknown): boolean {
+  return JSON.stringify(a) === JSON.stringify(b);
 }
 
 async function migrarLocalStorageAFirestore(uid: string): Promise<void> {
@@ -74,7 +83,7 @@ async function migrarLocalStorageAFirestore(uid: string): Promise<void> {
  * escribe directamente del store global de Zustand, eliminando el prop drilling.
  * Sigue devolviendo { dataLoaded, loadTimedOut } por compatibilidad con `App`.
  */
-export function useFirestoreSync() {
+export function useFirestoreSync(uid: string) {
   // Estado de negocio (reactivo) leído del store.
   const current = useAppStore((s) => s.current);
   const settings = useAppStore((s) => s.settings);
@@ -103,45 +112,54 @@ export function useFirestoreSync() {
   const lastNotesRef = useRef<NotaCalendario[]>([]);
   const lastWeekOverridesRef = useRef<WeekOverride[]>([]);
   const loadedUidRef = useRef<string | null>(null);
-  const mergeLocalHistoryRef = useRef(false);
-  const mergeLocalReservationsRef = useRef(false);
-  const mergeLocalNotesRef = useRef(false);
-  const mergeLocalWeekOverridesRef = useRef(false);
 
   function getWritableUid(): string | null {
-    const uid = auth.currentUser?.uid;
-    if (!dataLoaded || !uid || loadedUidRef.current !== uid) return null;
+    const authUid = auth.currentUser?.uid;
+    if (!dataLoaded || !authUid || authUid !== uid || loadedUidRef.current !== uid) return null;
     return uid;
   }
 
   useEffect(() => {
-    const uid = getWritableUid();
-    if (!uid) return;
-    if (JSON.stringify(current) === JSON.stringify(lastCurrentRef.current)) return;
-    writeUserLocalJSON(uid, KEY_CURRENT, current);
-    saveUserDoc(db, uid, "current", current).catch((err) =>
-      console.error("Save current failed:", err)
-    );
-  }, [current, dataLoaded]);
+    const writableUid = getWritableUid();
+    if (!writableUid) return;
+    if (sameJSON(current, lastCurrentRef.current)) return;
+    writeUserLocalJSON(writableUid, KEY_CURRENT, current);
+    markUserPendingSync(writableUid, "current");
+    saveUserDoc(db, writableUid, "current", current)
+      .then(() => {
+        lastCurrentRef.current = current;
+        clearUserPendingSync(writableUid, "current");
+      })
+      .catch((err) => console.error("Save current failed:", err));
+  }, [current, dataLoaded, uid]);
 
   useEffect(() => {
-    const uid = getWritableUid();
-    if (!uid) return;
-    if (JSON.stringify(settings) === JSON.stringify(lastSettingsRef.current)) return;
-    writeUserLocalJSON(uid, KEY_SETTINGS, settings);
-    saveUserDoc(db, uid, "settings", settings).catch((err) =>
-      console.error("Save settings failed:", err)
-    );
-  }, [settings, dataLoaded]);
+    const writableUid = getWritableUid();
+    if (!writableUid) return;
+    if (sameJSON(settings, lastSettingsRef.current)) return;
+    writeUserLocalJSON(writableUid, KEY_SETTINGS, settings);
+    markUserPendingSync(writableUid, "settings");
+    saveUserDoc(db, writableUid, "settings", settings)
+      .then(() => {
+        lastSettingsRef.current = settings;
+        clearUserPendingSync(writableUid, "settings");
+      })
+      .catch((err) => console.error("Save settings failed:", err));
+  }, [settings, dataLoaded, uid]);
 
   useEffect(() => {
-    const uid = getWritableUid();
-    if (!uid) return;
-    writeUserLocalJSON(uid, KEY_HISTORY, history);
-    syncSubcollection(db, uid, "turnos", lastHistoryRef.current, history, (t) => t.id)
-      .then(() => { lastHistoryRef.current = history; })
+    const writableUid = getWritableUid();
+    if (!writableUid) return;
+    if (sameJSON(history, lastHistoryRef.current)) return;
+    writeUserLocalJSON(writableUid, KEY_HISTORY, history);
+    markUserPendingSync(writableUid, "turnos");
+    syncSubcollection(db, writableUid, "turnos", lastHistoryRef.current, history, (t) => t.id)
+      .then(() => {
+        lastHistoryRef.current = history;
+        clearUserPendingSync(writableUid, "turnos");
+      })
       .catch((err) => console.error("Sync turnos failed:", err));
-  }, [history, dataLoaded]);
+  }, [history, dataLoaded, uid]);
 
   useEffect(() => {
     if (!dataLoaded) return;
@@ -150,37 +168,48 @@ export function useFirestoreSync() {
   }, [history, settings.diaLibre, dataLoaded]);
 
   useEffect(() => {
-    const uid = getWritableUid();
-    if (!uid) return;
-    writeUserLocalJSON(uid, KEY_RESERVATIONS, reservations);
-    syncSubcollection(db, uid, "reservations", lastReservationsRef.current, reservations, (r) => r.id)
-      .then(() => { lastReservationsRef.current = reservations; })
+    const writableUid = getWritableUid();
+    if (!writableUid) return;
+    if (sameJSON(reservations, lastReservationsRef.current)) return;
+    writeUserLocalJSON(writableUid, KEY_RESERVATIONS, reservations);
+    markUserPendingSync(writableUid, "reservations");
+    syncSubcollection(db, writableUid, "reservations", lastReservationsRef.current, reservations, (r) => r.id)
+      .then(() => {
+        lastReservationsRef.current = reservations;
+        clearUserPendingSync(writableUid, "reservations");
+      })
       .catch((err) => console.error("Sync reservations failed:", err));
-  }, [reservations, dataLoaded]);
+  }, [reservations, dataLoaded, uid]);
 
   useEffect(() => {
-    const uid = getWritableUid();
-    if (!uid) return;
-    writeUserLocalJSON(uid, KEY_NOTES, notes);
-    syncSubcollection(db, uid, "notes", lastNotesRef.current, notes, (n) => n.id)
-      .then(() => { lastNotesRef.current = notes; })
+    const writableUid = getWritableUid();
+    if (!writableUid) return;
+    if (sameJSON(notes, lastNotesRef.current)) return;
+    writeUserLocalJSON(writableUid, KEY_NOTES, notes);
+    markUserPendingSync(writableUid, "notes");
+    syncSubcollection(db, writableUid, "notes", lastNotesRef.current, notes, (n) => n.id)
+      .then(() => {
+        lastNotesRef.current = notes;
+        clearUserPendingSync(writableUid, "notes");
+      })
       .catch((err) => console.error("Sync notes failed:", err));
-  }, [notes, dataLoaded]);
+  }, [notes, dataLoaded, uid]);
 
   useEffect(() => {
-    const uid = getWritableUid();
-    if (!uid) return;
-    writeUserLocalJSON(uid, KEY_WEEK_OVERRIDES, weekOverrides);
-    syncSubcollection(db, uid, "weekOverrides", lastWeekOverridesRef.current, weekOverrides, (w) => w.weekId)
-      .then(() => { lastWeekOverridesRef.current = weekOverrides; })
+    const writableUid = getWritableUid();
+    if (!writableUid) return;
+    if (sameJSON(weekOverrides, lastWeekOverridesRef.current)) return;
+    writeUserLocalJSON(writableUid, KEY_WEEK_OVERRIDES, weekOverrides);
+    markUserPendingSync(writableUid, "weekOverrides");
+    syncSubcollection(db, writableUid, "weekOverrides", lastWeekOverridesRef.current, weekOverrides, (w) => w.weekId)
+      .then(() => {
+        lastWeekOverridesRef.current = weekOverrides;
+        clearUserPendingSync(writableUid, "weekOverrides");
+      })
       .catch((err) => console.error("Sync weekOverrides failed:", err));
-  }, [weekOverrides, dataLoaded]);
+  }, [weekOverrides, dataLoaded, uid]);
 
   useEffect(() => {
-    const user = auth.currentUser;
-    if (!user) return;
-    const uid = user.uid;
-
     // ── Reset a estado vacío antes de cargar los datos del nuevo usuario ──────
     // El store (Zustand) es un singleton de módulo: persiste entre desmontajes.
     // Sin este reset, los datos del usuario anterior se muestran hasta que
@@ -194,10 +223,6 @@ export function useFirestoreSync() {
     lastReservationsRef.current = [];
     lastNotesRef.current = [];
     lastWeekOverridesRef.current = [];
-    mergeLocalHistoryRef.current = true;
-    mergeLocalReservationsRef.current = true;
-    mergeLocalNotesRef.current = true;
-    mergeLocalWeekOverridesRef.current = true;
     setCurrent(emptyCurrent());
     setSettings(loadSettings());
     setHistory([]);
@@ -234,35 +259,45 @@ export function useFirestoreSync() {
       if (cancelado) return;
 
       unsubs.push(onSnapshot(userMetaDocRef(db, uid, "current"), (snap) => {
+        const hasPendingCurrent = hasUserPendingSync(uid, "current");
         if (snap.exists()) {
           const remoteCurrent = snap.data() as CurrentState;
           const localCurrent = readUserLocalJSON<CurrentState>(uid, KEY_CURRENT);
           const nextCurrent =
-            localCurrent && hasOpenCurrent(localCurrent) && !hasOpenCurrent(remoteCurrent)
+            hasPendingCurrent && localCurrent && hasOpenCurrent(localCurrent)
               ? localCurrent
               : remoteCurrent;
           lastCurrentRef.current = remoteCurrent;
           writeUserLocalJSON(uid, KEY_CURRENT, nextCurrent);
           setCurrent(nextCurrent);
+          if (hasPendingCurrent && sameJSON(nextCurrent, remoteCurrent)) clearUserPendingSync(uid, "current");
         } else {
-          const localCurrent = readUserLocalJSON<CurrentState>(uid, KEY_CURRENT) ?? emptyCurrent();
+          const localCurrent = hasPendingCurrent ? readUserLocalJSON<CurrentState>(uid, KEY_CURRENT) : null;
+          const nextCurrent = localCurrent ?? emptyCurrent();
           lastCurrentRef.current = null;
-          setCurrent(localCurrent);
+          writeUserLocalJSON(uid, KEY_CURRENT, nextCurrent);
+          setCurrent(nextCurrent);
+          if (hasPendingCurrent && sameJSON(nextCurrent, emptyCurrent())) clearUserPendingSync(uid, "current");
         }
         marcar("current");
       }));
 
       unsubs.push(onSnapshot(userMetaDocRef(db, uid, "settings"), (snap) => {
+        const hasPendingSettings = hasUserPendingSync(uid, "settings");
+        const localSettings = hasPendingSettings ? readUserLocalJSON<Partial<AppSettings>>(uid, KEY_SETTINGS) : null;
         if (snap.exists()) {
-          const data = snap.data() as AppSettings;
-          lastSettingsRef.current = data;
-          writeUserLocalJSON(uid, KEY_SETTINGS, data);
-          setSettings(data);
+          const remoteSettings = snap.data() as AppSettings;
+          const nextSettings = localSettings ? { ...loadSettings(), ...remoteSettings, ...localSettings } : remoteSettings;
+          lastSettingsRef.current = remoteSettings;
+          writeUserLocalJSON(uid, KEY_SETTINGS, nextSettings);
+          setSettings(nextSettings);
+          if (hasPendingSettings && sameJSON(nextSettings, remoteSettings)) clearUserPendingSync(uid, "settings");
         } else {
-          const localSettings = readUserLocalJSON<Partial<AppSettings>>(uid, KEY_SETTINGS);
           const nextSettings = localSettings ? { ...loadSettings(), ...localSettings } : loadSettings();
           lastSettingsRef.current = null;
+          writeUserLocalJSON(uid, KEY_SETTINGS, nextSettings);
           setSettings(nextSettings);
+          if (hasPendingSettings && sameJSON(nextSettings, loadSettings())) clearUserPendingSync(uid, "settings");
         }
         marcar("settings");
       }));
@@ -271,48 +306,52 @@ export function useFirestoreSync() {
         const items: Turno[] = [];
         snap.forEach((d) => items.push(d.data() as Turno));
         const orderedItems = sortTurnosByDateDesc(items);
-        const localItems = mergeLocalHistoryRef.current ? readUserLocalJSON<Turno[]>(uid, KEY_HISTORY) ?? [] : [];
-        const mergedItems = mergeLocalHistoryRef.current ? mergeTurnos(localItems, orderedItems) : orderedItems;
-        mergeLocalHistoryRef.current = false;
+        const hasPendingHistory = hasUserPendingSync(uid, "turnos");
+        const localItems = hasPendingHistory ? readUserLocalJSON<Turno[]>(uid, KEY_HISTORY) ?? [] : [];
+        const mergedItems = hasPendingHistory ? mergeTurnos(localItems, orderedItems) : orderedItems;
         lastHistoryRef.current = orderedItems;
         writeUserLocalJSON(uid, KEY_HISTORY, mergedItems);
         setHistory(mergedItems);
+        if (hasPendingHistory && sameJSON(mergedItems, orderedItems)) clearUserPendingSync(uid, "turnos");
         marcar("turnos");
       }));
 
       unsubs.push(onSnapshot(userSubcollectionRef(db, uid, "reservations"), (snap) => {
         const items: Reserva[] = [];
         snap.forEach((d) => items.push(d.data() as Reserva));
-        const localItems = mergeLocalReservationsRef.current ? readUserLocalJSON<Reserva[]>(uid, KEY_RESERVATIONS) ?? [] : [];
-        const mergedItems = mergeLocalReservationsRef.current ? mergeById(localItems, items, (r) => r.id) : items;
-        mergeLocalReservationsRef.current = false;
+        const hasPendingReservations = hasUserPendingSync(uid, "reservations");
+        const localItems = hasPendingReservations ? readUserLocalJSON<Reserva[]>(uid, KEY_RESERVATIONS) ?? [] : [];
+        const mergedItems = hasPendingReservations ? mergeById(localItems, items, (r) => r.id) : items;
         lastReservationsRef.current = items;
         writeUserLocalJSON(uid, KEY_RESERVATIONS, mergedItems);
         setReservations(mergedItems);
+        if (hasPendingReservations && sameJSON(mergedItems, items)) clearUserPendingSync(uid, "reservations");
         marcar("reservations");
       }));
 
       unsubs.push(onSnapshot(userSubcollectionRef(db, uid, "notes"), (snap) => {
         const items: NotaCalendario[] = [];
         snap.forEach((d) => items.push(d.data() as NotaCalendario));
-        const localItems = mergeLocalNotesRef.current ? readUserLocalJSON<NotaCalendario[]>(uid, KEY_NOTES) ?? [] : [];
-        const mergedItems = mergeLocalNotesRef.current ? mergeById(localItems, items, (n) => n.id) : items;
-        mergeLocalNotesRef.current = false;
+        const hasPendingNotes = hasUserPendingSync(uid, "notes");
+        const localItems = hasPendingNotes ? readUserLocalJSON<NotaCalendario[]>(uid, KEY_NOTES) ?? [] : [];
+        const mergedItems = hasPendingNotes ? mergeById(localItems, items, (n) => n.id) : items;
         lastNotesRef.current = items;
         writeUserLocalJSON(uid, KEY_NOTES, mergedItems);
         setNotes(mergedItems);
+        if (hasPendingNotes && sameJSON(mergedItems, items)) clearUserPendingSync(uid, "notes");
         marcar("notes");
       }));
 
       unsubs.push(onSnapshot(userSubcollectionRef(db, uid, "weekOverrides"), (snap) => {
         const items: WeekOverride[] = [];
         snap.forEach((d) => items.push(d.data() as WeekOverride));
-        const localItems = mergeLocalWeekOverridesRef.current ? readUserLocalJSON<WeekOverride[]>(uid, KEY_WEEK_OVERRIDES) ?? [] : [];
-        const mergedItems = mergeLocalWeekOverridesRef.current ? mergeById(localItems, items, (w) => w.weekId) : items;
-        mergeLocalWeekOverridesRef.current = false;
+        const hasPendingWeekOverrides = hasUserPendingSync(uid, "weekOverrides");
+        const localItems = hasPendingWeekOverrides ? readUserLocalJSON<WeekOverride[]>(uid, KEY_WEEK_OVERRIDES) ?? [] : [];
+        const mergedItems = hasPendingWeekOverrides ? mergeById(localItems, items, (w) => w.weekId) : items;
         lastWeekOverridesRef.current = items;
         writeUserLocalJSON(uid, KEY_WEEK_OVERRIDES, mergedItems);
         setWeekOverrides(mergedItems);
+        if (hasPendingWeekOverrides && sameJSON(mergedItems, items)) clearUserPendingSync(uid, "weekOverrides");
         marcar("weekOverrides");
       }));
     })();
@@ -321,7 +360,7 @@ export function useFirestoreSync() {
       cancelado = true;
       unsubs.forEach((u) => u());
     };
-  }, []);
+  }, [uid]);
 
   useEffect(() => {
     if (dataLoaded) return;
@@ -330,10 +369,8 @@ export function useFirestoreSync() {
   }, [dataLoaded]);
 
   useEffect(() => {
-    const user = auth.currentUser;
-    if (!user) return;
     let cancelado = false;
-    getDoc(doc(db, "admins", user.uid))
+    getDoc(doc(db, "admins", uid))
       .then((snap) => {
         if (!cancelado) setIsAdmin(snap.exists());
       })
@@ -341,7 +378,7 @@ export function useFirestoreSync() {
         console.error("Comprobación admin fallida:", err);
       });
     return () => { cancelado = true; };
-  }, []);
+  }, [uid]);
 
   return { dataLoaded, loadTimedOut };
 }

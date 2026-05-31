@@ -12,7 +12,7 @@ describe("APK installer extraction", () => {
     const installerSource = readFileSync(installerPath, "utf8");
     expect(installerSource).toContain('registerPlugin<ApkInstallerPluginType>("ApkInstaller")');
     expect(installerSource).toContain("downloadAndInstall");
-    expect(mainSource).toContain('from "./services/apk-installer"');
+    expect(mainSource).not.toContain('from "./services/apk-installer"');
     expect(mainSource).not.toContain('registerPlugin<ApkInstallerPluginType>("ApkInstaller")');
     expect(mainSource).not.toMatch(/^export interface ApkInstallerPluginType/m);
   });

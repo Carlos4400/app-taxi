@@ -11,7 +11,6 @@ import { AuthGate } from "./screens/auth-gate";
 import { useFirestoreSync } from "./hooks/use-firestore-sync";
 import { useAppStore } from "./services/store";
 import { registerServiceWorker } from "./services/service-worker-registration";
-import { APP_VERSION } from "./shared/app-version";
 import { hapticAction } from "./services/haptics";
 import {
   IconCoin,
@@ -22,24 +21,20 @@ import {
   IconNulo,
 } from "./components/entry-icons";
 import {
-  IconBack,
   IconDel,
   IconHomeNeon,
 } from "./components/navigation-icons";
 import { IconTimer, IconMoneyBag, IconPencilNeon } from "./components/calendar-icons";
-import { IconRocket, IconClipboard, IconChart, IconReservaWrite } from "./components/home-icons";
+import { IconRocket } from "./components/home-icons";
 import { IconNoteAdd, IconTaxiBadgeNeon, IconRoad } from "./components/summary-icons";
-import { IconReceipt, IconHoliday } from "./components/settings-icons";
 import { CalendarScreen } from "./screens/calendar-screen";
 import { HomeScreen } from "./screens/home-screen";
 import { SummaryScreen } from "./screens/summary-screen";
 import { EditTurnoScreen } from "./screens/edit-turno-screen";
 import { SettingsScreen } from "./screens/settings-screen";
-import { fmtDuration, fmtKm, fmtKmNumber, fmtMoney, fmtMoneyNumber, fmt } from "./logic/formatters";
+import { fmtDuration, fmtKm, fmt } from "./logic/formatters";
 import { ConfirmDialog, MainCard, SmallCard } from "./components/common";
-import { TurnoNotasCard } from "./components/turno-notas";
 import { EditEntryDialog } from "./components/edit-entry-dialog";
-import { DurationCardValue } from "./components/duration-card-value";
 import { IconPlay, IconPause } from "./components/turno-control-icons";
 import { AddSingleEntryScreen } from "./screens/add-single-entry-screen";
 import { AddNotaGeneralScreen } from "./screens/add-nota-general-screen";
@@ -54,10 +49,8 @@ import { DetalleSemanaScreen } from "./screens/detalle-semana-screen";
 import { LiquidacionSemanaScreen } from "./screens/liquidacion-semana-screen";
 
 import { Shell } from "./components/shell";
-import { ApkInstaller } from "./services/apk-installer";
-import { resolveLatestApkUpdate, type UpdateState } from "./logic/update-flow";
+import type { UpdateState } from "./logic/update-flow";
 import { buildBackupPayload, buildBackupPayloadFromState } from "./logic/backup";
-import { exportBackupJSON } from "./services/backup-export";
 import {
   ensureTurnosDiaLibreContable,
   getTurnosByCalendarMonth,
@@ -65,17 +58,13 @@ import {
   mergeTurnos,
   sortTurnosByDateDesc,
 } from "./logic/turnos";
-import { parseCSVToHistory } from "./logic/csv";
 import { getBackupMenuActionIds, getHomeQuickActionIds } from "./shared/action-ids";
 import { getTurnosNotasSemana } from "./logic/turno-notas-logic";
 import { updateTurnoEntrega } from "./logic/turno-entrega";
-import { getDaysInMonth, getStartOffset } from "./logic/calendar-date";
-import { MESES_COMPLETOS, getAccountingPeriodLabel, getMesLabel } from "./logic/date-labels";
+import { getAccountingPeriodLabel } from "./logic/date-labels";
 import { KM_CARD_UNIT_STYLE, TIME_CARD_HOUR_UNIT_STYLE, TIME_CARD_UNIT_STYLE, WEEK_LIST_CARD_TEXT_SIZES } from "./shared/card-styles";
 import { fmtDate, getDiffMins, timeNow, today } from "./logic/date-time";
-import { userStorageKey, writeUserLocalJSON } from "./services/user-storage";
-import { KEY_CURRENT, KEY_HISTORY, KEY_NOTES, KEY_RESERVATIONS, KEY_SETTINGS, KEY_WEEK_OVERRIDES } from "./shared/storage-keys";
-import { A, ABG, C, CBG, E, EBG, F, FBG, G, GBG, N, NBG, P, PBG } from "./shared/ui-theme";
+import { A, ABG, C, E, EBG, F, FBG, G, GBG, N, NBG, P, PBG } from "./shared/ui-theme";
 import type {
   EditTurnoState,
   Entry,
@@ -83,22 +72,16 @@ import type {
   NotaTipo,
   Reserva,
   Turno,
-  TurnoNotasSemana,
   WeekOverride,
 } from "./shared/types";
 import {
-  formatWeekRange,
-  formatWeekRangeFull,
   getCurrentOpenWeekId,
   getTurnoAccountingWeekId,
   getTurnoFechaEfectiva,
   getWeekId,
-  getWeekMonth,
-  getWeekOverride,
   getWeekRange,
   getWeekStartDate,
   groupTurnosByWeek,
-  isWeekClosed,
   selectAccountingHeroWeek,
 } from "./logic/week-logic";
 import {
@@ -107,15 +90,7 @@ import {
   calcularTotalesTurnos,
   calcularTurnoContable,
   getTurnoConfig,
-  roundMoney,
 } from "./logic/accounting";
-import {
-  userMetaDocRef,
-  userSubcollectionRef,
-  saveUserDoc,
-  syncSubcollection,
-  userHasFirestoreData,
-} from "./services/firestore-sync";
 import { AdminListScreen, AdminUserView } from "./screens/admin-screens";
 
 export { fmtDuration, fmtKm, fmtKmNumber, fmtMoney, fmtMoneyNumber, splitDurationLabel } from "./logic/formatters";
@@ -177,15 +152,6 @@ function getEntryTypeMeta(type: string): EntryTypeMeta {
   return ENTRY_TYPE_META[type] || ENTRY_TYPE_META.nulo;
 }
 
-const NOTE_TIME_STYLE = {
-  fontSize: 12,
-  color: "rgba(255,255,255,0.45)",
-  fontWeight: 700,
-  whiteSpace: "nowrap",
-  flexShrink: 0,
-  alignSelf: "baseline",
-} as const;
-
 const reservaInputStyle = {
   width: "100%",
   background: "rgba(0,0,0,0.28)",
@@ -218,7 +184,7 @@ const ENTRY_TYPE_META: Record<string, EntryTypeMeta> = {
   nota: { color: "white", label: "Nota", icon: (s = 17) => <IconNoteAdd s={s} showPlus={false} /> },
 };
 
-function App() {
+function App({ uid }: { uid: string }) {
   // Estado de negocio centralizado en el store global (Zustand). Se mantienen
   // los mismos nombres de variables/setters que cuando eran useState locales
   // para no alterar el resto del componente.
@@ -302,8 +268,6 @@ function App() {
   const [selectedWeekId, setSelectedWeekId] = useState<string | null>(null);
   const [selectedAccountingYear, setSelectedAccountingYear] = useState<number>(() => new Date().getFullYear());
   const [selectedAccountingMonth, setSelectedAccountingMonth] = useState<number>(() => new Date().getMonth() + 1);
-  const [copiado, setCopiado] = useState(false);
-  const [procesandoTicket, setProcesandoTicket] = useState(false);
   const [tieResolutions, setTieResolutions] = useState<Map<string, string>>(new Map());
   const [pendingTie, setPendingTie] = useState<{
     weekId: string;
@@ -335,7 +299,7 @@ function App() {
 
   // Sincronización con Firestore (carga inicial, escritura reactiva, migración
   // de localStorage y detección de rol admin), encapsulada en src/hooks/use-firestore-sync.ts.
-  const { dataLoaded, loadTimedOut } = useFirestoreSync();
+  const { dataLoaded, loadTimedOut } = useFirestoreSync(uid);
 
   // Botón físico de retroceso de Android (Capacitor). Recorre el stack de
   // navegación; si ya está en la raíz, cierra la app. Solo en plataforma nativa.
@@ -680,66 +644,6 @@ function App() {
     setScreen("summary");
   }
 
-  async function checkUpdate() {
-    setUpdateState("checking");
-    setUpdateMsg("Buscando actualizaciones...");
-    setDownloadUrl("");
-    setReleaseUrl("");
-    try {
-      const res = await fetch("https://api.github.com/repos/Carlos4400/app-taxi/releases/latest");
-      if (!res.ok) throw new Error("No se encontró el release");
-      const data = await res.json();
-      const result = resolveLatestApkUpdate(data, APP_VERSION);
-      setDownloadUrl(result.downloadUrl);
-      setReleaseUrl(result.releaseUrl);
-      setUpdateState(result.updateState);
-      setUpdateMsg(result.updateMsg);
-    } catch (e) {
-      setUpdateState("error");
-      setUpdateMsg("Error al conectar con GitHub.");
-    }
-  }
-
-  const handleInstallUpdate = async () => {
-    if (!downloadUrl.endsWith(".apk")) {
-      setUpdateState("error");
-      setUpdateMsg("No se encontró APK en el último release.");
-      return;
-    }
-
-    if (Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'android') {
-      try {
-        setUpdateState("checking");
-        const { value: hasPermission } = await ApkInstaller.canInstallPackages();
-        if (!hasPermission) {
-          setUpdateState("permission_required");
-          setUpdateMsg("Se requieren permisos para instalar aplicaciones desconocidas.");
-          await ApkInstaller.openInstallPermissionSettings();
-          return;
-        }
-
-        setUpdateState("downloading");
-        setUpdateMsg("Descargando actualización...");
-        const fileName = `app-update-${Date.now()}.apk`;
-        await ApkInstaller.downloadAndInstall({ url: downloadUrl, fileName });
-        setUpdateState("installed");
-        setUpdateMsg("Instalación iniciada.");
-      } catch (err: any) {
-        console.error("Error al descargar/instalar APK:", err);
-        setUpdateState("error");
-        setUpdateMsg("Error al instalar el APK. Inténtalo de nuevo.");
-      }
-    } else {
-      window.open(downloadUrl, "_blank", "noopener,noreferrer");
-    }
-  };
-
-  const handleOpenRelease = () => {
-    if (releaseUrl) {
-      window.open(releaseUrl, "_blank", "noopener,noreferrer");
-    }
-  };
-
   const S = {
     iconBtn: {
       background: "rgba(255,255,255,0.06)",
@@ -854,47 +758,6 @@ function App() {
       </div>
     </div>
   );
-
-  const renderReservaCardField = (
-    label: string,
-    value: React.ReactNode,
-    options: { href?: string; full?: boolean; muted?: boolean; compact?: boolean; center?: boolean } = {}
-  ) => {
-    const valueStyle = {
-      color: options.muted ? "rgba(255,255,255,0.68)" : "rgba(255,255,255,0.86)",
-      fontSize: options.center ? (options.compact ? 17 : 18) : (options.compact ? 14 : 15),
-      fontWeight: options.muted ? 600 : 750,
-      lineHeight: 1.28,
-      wordBreak: "break-word" as const,
-      textDecoration: "none",
-      textAlign: options.center ? "center" as const : "left" as const,
-    };
-
-    return (
-      <div
-        style={{
-          gridColumn: options.full ? "1 / -1" : undefined,
-          background: "rgba(0,0,0,0.22)",
-          border: "1px solid rgba(255,255,255,0.075)",
-          borderRadius: 11,
-          padding: options.compact ? "7px 9px" : "8px 10px",
-          minWidth: 0,
-          textAlign: options.center ? "center" as const : "left" as const,
-        }}
-      >
-        <div style={{ fontSize: options.compact ? 11 : 12, fontWeight: 900, color: options.muted ? "rgba(255,255,255,0.42)" : C, textTransform: "uppercase", marginBottom: 4, textAlign: options.center ? "center" : "left" }}>
-          {label}
-        </div>
-        {options.href ? (
-          <a href={options.href} style={valueStyle}>
-            {value}
-          </a>
-        ) : (
-          <div style={valueStyle}>{value}</div>
-        )}
-      </div>
-    );
-  };
 
   // Renderiza el modal de Nueva/Editar Reserva. Se invoca desde cada pantalla que lo necesita.
   const renderReservaDialog = () => showReservaDialog && (

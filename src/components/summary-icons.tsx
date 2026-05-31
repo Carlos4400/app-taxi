@@ -1,4 +1,3 @@
-import React from "react";
 import { C } from "../shared/ui-theme";
 
 export const IconGive = ({ s = 26, c = "white" }: { s?: number; c?: string }) => (

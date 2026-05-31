@@ -12,7 +12,7 @@ describe("app version extraction", () => {
     const appVersionSource = readFileSync(appVersionPath, "utf8");
     expect(appVersionSource).toContain("declare const __APP_VERSION__: string");
     expect(appVersionSource).toContain("export const APP_VERSION = __APP_VERSION__");
-    expect(mainSource).toContain('from "./shared/app-version"');
+    expect(mainSource).not.toContain('from "./shared/app-version"');
     expect(mainSource).not.toContain("declare const __APP_VERSION__: string");
     expect(mainSource).not.toContain("const APP_VERSION = __APP_VERSION__");
   });

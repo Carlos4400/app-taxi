@@ -6,7 +6,7 @@ import { ConfirmDialog } from "../components/common";
 import { IconBack, IconRefresh, IconDownload, IconUpload } from "../components/navigation-icons";
 import { IconPercent } from "../components/entry-icons";
 import { IconReceipt, IconHoliday } from "../components/settings-icons";
-import { getBackupMenuActionIds, type BackupMenuActionId } from "../shared/action-ids";
+import { getBackupMenuActionIds } from "../shared/action-ids";
 import { buildBackupPayloadFromState } from "../logic/backup";
 import { exportBackupJSON } from "../services/backup-export";
 import { mergeTurnos } from "../logic/turnos";
@@ -127,7 +127,7 @@ async function checkUpdate(
 
 async function handleInstallUpdate(
   downloadUrl: string,
-  updateState: UpdateState,
+  _updateState: UpdateState,
   setUpdateState: React.Dispatch<React.SetStateAction<UpdateState>>,
   setUpdateMsg: React.Dispatch<React.SetStateAction<string>>
 ) {

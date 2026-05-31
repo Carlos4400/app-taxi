@@ -1,0 +1,18 @@
+# Normalización de fin de línea: todo el texto se almacena con LF en el repo.
+# Evita diffs ruidosos por CRLF/LF al editar desde Windows.
+* text=auto eol=lf
+
+# Archivos binarios: nunca se normalizan ni se tratan como texto.
+*.png   binary
+*.jpg   binary
+*.jpeg  binary
+*.gif   binary
+*.ico   binary
+*.webp  binary
+*.ttf   binary
+*.otf   binary
+*.woff  binary
+*.woff2 binary
+*.pdf   binary
+*.keystore binary
+*.jar   binary

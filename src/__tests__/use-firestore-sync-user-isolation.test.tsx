@@ -1,10 +1,16 @@
-import React from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { act } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { useFirestoreSync } from "../hooks/use-firestore-sync";
-import { KEY_CURRENT, KEY_HISTORY } from "../shared/storage-keys";
-import type { Turno } from "../shared/types";
+import {
+  KEY_CURRENT,
+  KEY_HISTORY,
+  KEY_NOTES,
+  KEY_RESERVATIONS,
+  KEY_WEEK_OVERRIDES,
+} from "../shared/storage-keys";
+import { hasUserPendingSync, markUserPendingSync } from "../services/pending-sync";
+import type { NotaCalendario, Reserva, Turno, WeekOverride } from "../shared/types";
 
 const firestoreSyncMock = vi.hoisted(() => ({
   saveUserDoc: vi.fn(),
@@ -89,12 +95,18 @@ function collectionSnap<T>(items: T[]) {
 async function emitInitialSnapshots(overrides: {
   current?: unknown;
   turnos?: Turno[];
+  reservations?: Reserva[];
+  notes?: NotaCalendario[];
+  weekOverrides?: WeekOverride[];
 } = {}) {
   await act(async () => {
     for (const { ref, callback } of firestoreSyncMock.snapshotCallbacks) {
       if (ref.kind === "meta" && ref.name === "current" && overrides.current) callback(docSnap(overrides.current));
       else if (ref.kind === "meta") callback(emptyDocSnap());
       else if (ref.name === "turnos") callback(collectionSnap(overrides.turnos ?? []));
+      else if (ref.name === "reservations") callback(collectionSnap(overrides.reservations ?? []));
+      else if (ref.name === "notes") callback(collectionSnap(overrides.notes ?? []));
+      else if (ref.name === "weekOverrides") callback(collectionSnap(overrides.weekOverrides ?? []));
       else callback(collectionSnap([]));
     }
     await Promise.resolve();
@@ -102,7 +114,7 @@ async function emitInitialSnapshots(overrides: {
 }
 
 function HookProbe() {
-  useFirestoreSync();
+  useFirestoreSync("uid-nuevo");
   return null;
 }
 
@@ -203,6 +215,7 @@ describe("useFirestoreSync: aislamiento entre usuarios", () => {
     const turnoOtroUsuario = turno(22, "2026-05-29", "11:00", "13:00");
     localStorage.setItem(`${KEY_HISTORY}__uid-nuevo`, JSON.stringify([turnoOffline]));
     localStorage.setItem(`${KEY_HISTORY}__uid-otro`, JSON.stringify([turnoOtroUsuario]));
+    markUserPendingSync("uid-nuevo", "turnos");
 
     await act(async () => {
       root.render(<HookProbe />);
@@ -243,6 +256,7 @@ describe("useFirestoreSync: aislamiento entre usuarios", () => {
     };
     localStorage.setItem("taxi_current_v3__uid-nuevo", JSON.stringify(currentOffline));
     localStorage.setItem("taxi_current_v3__uid-otro", JSON.stringify(currentOtroUsuario));
+    markUserPendingSync("uid-nuevo", "current");
 
     await act(async () => {
       root.render(<HookProbe />);
@@ -279,6 +293,7 @@ describe("useFirestoreSync: aislamiento entre usuarios", () => {
       totalPausedMinutes: 0,
     };
     localStorage.setItem(`${KEY_CURRENT}__uid-nuevo`, JSON.stringify(currentOffline));
+    markUserPendingSync("uid-nuevo", "current");
 
     await act(async () => {
       root.render(<HookProbe />);
@@ -297,10 +312,47 @@ describe("useFirestoreSync: aislamiento entre usuarios", () => {
     );
   });
 
+  it("conserva el current local pendiente aunque Firestore también tenga un turno abierto", async () => {
+    const currentOffline = {
+      entries: [{ id: 1, type: "efectivo", amount: 10, note: "", time: "10:00" }],
+      startTime: "10:00",
+      startDate: "2026-05-30",
+      isPaused: false,
+      pauseStartTime: null,
+      totalPausedMinutes: 0,
+    };
+    const currentFirestore = {
+      entries: [{ id: 2, type: "efectivo", amount: 20, note: "", time: "09:00" }],
+      startTime: "09:00",
+      startDate: "2026-05-30",
+      isPaused: false,
+      pauseStartTime: null,
+      totalPausedMinutes: 0,
+    };
+    localStorage.setItem(`${KEY_CURRENT}__uid-nuevo`, JSON.stringify(currentOffline));
+    markUserPendingSync("uid-nuevo", "current");
+
+    await act(async () => {
+      root.render(<HookProbe />);
+      await Promise.resolve();
+    });
+    await emitInitialSnapshots({ current: currentFirestore });
+
+    const { useAppStore } = await import("../services/store");
+    expect(useAppStore.getState().current).toEqual(currentOffline);
+    expect(firestoreSyncMock.saveUserDoc).toHaveBeenCalledWith(
+      {},
+      "uid-nuevo",
+      "current",
+      currentOffline,
+    );
+  });
+
   it("fusiona turno offline y Firestore sin duplicar el mismo cierre", async () => {
     const turnoLocal = turno(11, "2026-05-30", "10:00", "12:00");
     const turnoFirestore = { ...turnoLocal, id: 99 };
     localStorage.setItem(`${KEY_HISTORY}__uid-nuevo`, JSON.stringify([turnoLocal]));
+    markUserPendingSync("uid-nuevo", "turnos");
 
     await act(async () => {
       root.render(<HookProbe />);
@@ -335,6 +387,78 @@ describe("useFirestoreSync: aislamiento entre usuarios", () => {
     const { useAppStore } = await import("../services/store");
     expect(useAppStore.getState().history).toEqual([]);
     expect(JSON.parse(localStorage.getItem(`${KEY_HISTORY}__uid-nuevo`) || "[]")).toEqual([]);
+  });
+
+  it("no resucita turnos borrados en Firestore desde cache local sin pendiente durante la primera carga", async () => {
+    const turnoCache = turno(11, "2026-05-30", "10:00", "12:00");
+    localStorage.setItem(`${KEY_HISTORY}__uid-nuevo`, JSON.stringify([turnoCache]));
+
+    await act(async () => {
+      root.render(<HookProbe />);
+      await Promise.resolve();
+    });
+    await emitInitialSnapshots({ turnos: [] });
+
+    const { useAppStore } = await import("../services/store");
+    expect(useAppStore.getState().history).toEqual([]);
+    expect(JSON.parse(localStorage.getItem(`${KEY_HISTORY}__uid-nuevo`) || "[]")).toEqual([]);
+    expect(firestoreSyncMock.syncSubcollection).not.toHaveBeenCalled();
+  });
+
+  it("solo fusiona reservas, notas y overrides locales en primera carga si tienen pendiente offline", async () => {
+    const reservaCache: Reserva = {
+      id: "reserva-cache",
+      date: "2026-05-30",
+      time: "10:00",
+      origen: "A",
+      destino: "B",
+      cliente: "Cliente",
+      telefono: "600000000",
+      notas: "",
+    };
+    const notaPendiente: NotaCalendario = {
+      id: "nota-pendiente",
+      date: "2026-05-30",
+      tipo: "Normal",
+      texto: "Pendiente",
+    };
+    const overrideCache: WeekOverride = {
+      weekId: "2026-W22",
+      notes: "cache viejo",
+      entregada: false,
+      fechaEntrega: null,
+    };
+    localStorage.setItem(`${KEY_RESERVATIONS}__uid-nuevo`, JSON.stringify([reservaCache]));
+    localStorage.setItem(`${KEY_NOTES}__uid-nuevo`, JSON.stringify([notaPendiente]));
+    localStorage.setItem(`${KEY_WEEK_OVERRIDES}__uid-nuevo`, JSON.stringify([overrideCache]));
+    markUserPendingSync("uid-nuevo", "notes");
+
+    await act(async () => {
+      root.render(<HookProbe />);
+      await Promise.resolve();
+    });
+    await emitInitialSnapshots({
+      reservations: [],
+      notes: [],
+      weekOverrides: [],
+    });
+
+    const { useAppStore } = await import("../services/store");
+    expect(useAppStore.getState().reservations).toEqual([]);
+    expect(useAppStore.getState().notes).toEqual([notaPendiente]);
+    expect(useAppStore.getState().weekOverrides).toEqual([]);
+    expect(firestoreSyncMock.syncSubcollection).toHaveBeenCalledWith(
+      {},
+      "uid-nuevo",
+      "notes",
+      [],
+      [notaPendiente],
+      expect.any(Function),
+    );
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(hasUserPendingSync("uid-nuevo", "notes")).toBe(false);
   });
 
   it("no migra claves legacy sin UID a un usuario autenticado", async () => {

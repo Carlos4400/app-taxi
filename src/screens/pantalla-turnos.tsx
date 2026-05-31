@@ -1,12 +1,6 @@
 import React from "react";
 import { Shell } from "../components/shell";
 import { IconBack } from "../components/navigation-icons";
-import { IconCoin, IconCard, IconAgency, IconExtra, IconFuel, IconNulo } from "../components/entry-icons";
-import { IconPencilNeon, IconTimer, IconMoneyBag } from "../components/calendar-icons";
-import { IconTaxiBadgeNeon, IconRoad } from "../components/summary-icons";
-import { fmtDuration, fmtKm, fmtKmNumber, fmt } from "../logic/formatters";
-import { getDiffMins, fmtDate } from "../logic/date-time";
-import { calcularTurnoContable } from "../logic/accounting";
 import type { Turno, AppSettings } from "../shared/types";
 
 const S = {
@@ -31,7 +25,6 @@ const S = {
 
 export function PantallaTurnos({
   history,
-  settings,
   isSelectingTurnos,
   setIsSelectingTurnos,
   selectedTurnosIds,
@@ -151,6 +144,3 @@ export function PantallaTurnos({
     </Shell>
   );
 }
-
-// Regression lock checks for: {fmtDate(turno.startDate || turno.date)}
-
