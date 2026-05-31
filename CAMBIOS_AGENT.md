@@ -1,3 +1,1455 @@
+## 2026-05-31 22:23 - Implementar vibración premium
+
+**Archivos modificados:**
+- `src/services/haptics.ts`
+- `src/main.tsx`
+- `src/screens/add-entry-screen.tsx`
+- `src/screens/add-single-entry-screen.tsx`
+- `src/screens/confirm-end-screen.tsx`
+- `src/screens/edit-turno-screen.tsx`
+- `src/screens/settings-screen.tsx`
+- `src/components/edit-entry-dialog.tsx`
+- `src/logic/android-back-button.ts`
+- `src/__tests__/android-back-button.test.ts`
+- `src/__tests__/haptics-premium-plan.test.ts`
+
+### Cambio 1 - Sustituir intensidades genéricas
+
+#### Código anterior
+```ts
+export async function hapticTap(): Promise<void> {
+  const haptics = await getHaptics();
+  if (haptics) {
+    try {
+      await haptics.Haptics.impact({ style: haptics.ImpactStyle.Light });
+    } catch (e) {
+      console.warn('Error en hapticTap:', e);
+    }
+  }
+}
+
+export async function hapticConfirm(): Promise<void> {
+  const haptics = await getHaptics();
+  if (haptics) {
+    try {
+      await haptics.Haptics.impact({ style: haptics.ImpactStyle.Medium });
+    } catch (e) {
+      console.warn('Error en hapticConfirm:', e);
+    }
+  }
+}
+
+export async function hapticAction(): Promise<void> {
+  const haptics = await getHaptics();
+  if (haptics) {
+    try {
+      await haptics.Haptics.impact({ style: haptics.ImpactStyle.Heavy });
+    } catch (e) {
+      console.warn('Error en hapticAction:', e);
+    }
+  }
+}
+```
+
+#### Código nuevo
+```ts
+async function impactMedium(): Promise<void> {
+  const haptics = await getHaptics();
+  if (haptics) {
+    try {
+      await haptics.Haptics.impact({ style: haptics.ImpactStyle.Medium });
+    } catch (e) {
+      console.warn('Error en impactMedium:', e);
+    }
+  }
+}
+
+async function impactHeavy(): Promise<void> {
+  const haptics = await getHaptics();
+  if (haptics) {
+    try {
+      await haptics.Haptics.impact({ style: haptics.ImpactStyle.Heavy });
+    } catch (e) {
+      console.warn('Error en impactHeavy:', e);
+    }
+  }
+}
+
+export async function hapticKey(): Promise<void> {
+  return impactMedium();
+}
+
+export async function hapticOpen(): Promise<void> {
+  return impactMedium();
+}
+
+export async function hapticBackClose(): Promise<void> {
+  return impactMedium();
+}
+
+export async function hapticSave(): Promise<void> {
+  return impactHeavy();
+}
+
+export async function hapticDanger(): Promise<void> {
+  return impactHeavy();
+}
+
+export async function hapticInvalid(): Promise<void> {
+  return impactHeavy();
+}
+```
+
+#### Por qué se cambió
+Se sustituyeron las funciones genéricas y la intensidad `Light` por funciones semánticas con `Medium` para pulsar/abrir/cerrar capas y `Heavy` para guardar, error o acción peligrosa.
+
+### Cambio 2 - Añadir vibración al botón atrás nativo
+
+#### Código anterior
+```ts
+export type AndroidBackButtonActions = {
+  closeBackupMenu: () => void;
+  closeConfirmDialog: () => void;
+  closeEditEntry: () => void;
+  closeEndField: () => void;
+  closeMonthPicker: () => void;
+  closeNotaDialog: () => void;
+  closeReservaDialog: () => void;
+  exitApp: () => void;
+  goBack: () => boolean;
+  resetNavigation: (root?: string) => void;
+  setAdminMode: (mode: AdminMode) => void;
+};
+```
+
+#### Código nuevo
+```ts
+export type AndroidBackButtonActions = {
+  closeBackupMenu: () => void;
+  closeConfirmDialog: () => void;
+  closeEditEntry: () => void;
+  closeEndField: () => void;
+  closeMonthPicker: () => void;
+  closeNotaDialog: () => void;
+  closeReservaDialog: () => void;
+  exitApp: () => void;
+  goBack: () => boolean;
+  hapticBackClose: () => void | Promise<void>;
+  resetNavigation: (root?: string) => void;
+  setAdminMode: (mode: AdminMode) => void;
+};
+```
+
+#### Por qué se cambió
+El botón atrás nativo necesitaba la misma respuesta táctil `Medium` cuando cierra una capa visible, una reserva, un diálogo o una vista admin, sin vibrar cuando la app sale por la raíz real.
+
+### Cambio 3 - Aplicar nombres semánticos en pantallas
+
+#### Código anterior
+```ts
+import { hapticTap, hapticConfirm } from "../services/haptics";
+
+function kpAdd(v: string) {
+  hapticTap();
+```
+
+```ts
+function saveS() {
+  hapticConfirm();
+  if (!validS) return;
+```
+
+```ts
+<button onClick={() => { hapticAction(); onEndTurno(); }}
+```
+
+#### Código nuevo
+```ts
+import { hapticKey, hapticSave, hapticOpen } from "../services/haptics";
+
+function kpAdd(v: string) {
+  hapticKey();
+```
+
+```ts
+function saveS() {
+  if (!validS) {
+    hapticInvalid();
+    return;
+  }
+```
+
+```ts
+<button onClick={() => { hapticDanger(); onEndTurno(); }}
+```
+
+#### Por qué se cambió
+Las pantallas de añadir entrada, añadir entrada individual, terminar turno, editar turno y ajustes debían dejar de usar intensidades antiguas directas y usar nombres que expresan la intención de la acción.
+
+### Cambio 4 - Añadir respuesta táctil a navegación y edición
+
+#### Código anterior
+```ts
+function openEditEntry(e: Entry) {
+  setEditEntry(e);
+  setEditEntryAmount(e.amount.toFixed(2).replace(".", ","));
+  setEditEntryNote(e.note || "");
+}
+```
+
+```tsx
+<div style={{ marginBottom: 12, cursor: "pointer" }} onClick={() => setShowKP(true)}>
+```
+
+#### Código nuevo
+```ts
+function openEditEntry(e: Entry) {
+  hapticOpen();
+  setEditEntry(e);
+  setEditEntryAmount(e.amount.toFixed(2).replace(".", ","));
+  setEditEntryNote(e.note || "");
+}
+```
+
+```tsx
+<div style={{ marginBottom: 12, cursor: "pointer" }} onClick={() => { hapticOpen(); setShowKP(true); }}>
+```
+
+#### Por qué se cambió
+Abrir una edición, abrir un teclado, cambiar campo, volver atrás o cancelar son acciones operativas que ahora emiten `Medium` para que la app responda con una sensación consistente.
+
+### Cambio 5 - Añadir respuesta fuerte a guardados y peligros
+
+#### Código anterior
+```ts
+if (isNaN(amt) || (amt <= 0 && editEntry.type !== 'nota')) {
+  alert("El importe debe ser un número mayor que 0.");
+  return;
+}
+const updated = { ...editEntry, amount: amt, note: editEntryNote.trim() };
+```
+
+#### Código nuevo
+```ts
+if (isNaN(amt) || (amt <= 0 && editEntry.type !== 'nota')) {
+  hapticInvalid();
+  alert("El importe debe ser un número mayor que 0.");
+  return;
+}
+const updated = { ...editEntry, amount: amt, note: editEntryNote.trim() };
+hapticSave();
+```
+
+#### Por qué se cambió
+Los guardados válidos, errores de validación, iniciar/pausar/terminar turno y eliminaciones debían sentirse como acciones importantes usando `Heavy`.
+
+### Cambio 6 - Crear prueba del plan de vibración
+
+#### Código anterior
+`No existía haptics-premium-plan.test.ts en src/__tests__/.`
+
+#### Código nuevo
+```ts
+describe("plan premium de vibracion", () => {
+  it("expone nombres semanticos y reserva Medium para tocar y Heavy para guardar o peligro", () => {
+    const hapticsSource = source("src/services/haptics.ts");
+
+    for (const fn of ["hapticKey", "hapticOpen", "hapticBackClose"]) {
+      expect(hapticsSource).toContain(`export async function ${fn}()`);
+      expect(hapticsSource).toMatch(new RegExp(`export async function ${fn}\\(\\): Promise<void> \\{\\s*return impactMedium\\(\\);\\s*\\}`));
+    }
+
+    for (const fn of ["hapticSave", "hapticDanger", "hapticInvalid"]) {
+      expect(hapticsSource).toContain(`export async function ${fn}()`);
+      expect(hapticsSource).toMatch(new RegExp(`export async function ${fn}\\(\\): Promise<void> \\{\\s*return impactHeavy\\(\\);\\s*\\}`));
+    }
+  });
+});
+```
+
+#### Por qué se cambió
+Se añadió una prueba para bloquear la regla profesional acordada: `Medium` para interacción normal y `Heavy` para guardado, error o peligro.
+
+### Cambio 7 - Verificar atrás nativo con vibración
+
+#### Código anterior
+```ts
+function createActions() {
+  return {
+    closeConfirmDialog: vi.fn(),
+    closeEditEntry: vi.fn(),
+    closeEndField: vi.fn(),
+    closeMonthPicker: vi.fn(),
+    closeNotaDialog: vi.fn(),
+    closeReservaDialog: vi.fn(),
+    closeBackupMenu: vi.fn(),
+    exitApp: vi.fn(),
+    goBack: vi.fn(() => false),
+    resetNavigation: vi.fn(),
+    setAdminMode: vi.fn(),
+  };
+}
+```
+
+#### Código nuevo
+```ts
+function createActions() {
+  return {
+    closeConfirmDialog: vi.fn(),
+    closeEditEntry: vi.fn(),
+    closeEndField: vi.fn(),
+    closeMonthPicker: vi.fn(),
+    closeNotaDialog: vi.fn(),
+    closeReservaDialog: vi.fn(),
+    closeBackupMenu: vi.fn(),
+    hapticBackClose: vi.fn(),
+    exitApp: vi.fn(),
+    goBack: vi.fn(() => false),
+    resetNavigation: vi.fn(),
+    setAdminMode: vi.fn(),
+  };
+}
+```
+
+#### Por qué se cambió
+Las pruebas del botón atrás nativo ahora comprueban que cerrar reservas o capas admin también llama a `hapticBackClose`.
+
+## 2026-05-31 22:10 - Ampliar plan de vibración
+
+**Archivos modificados:** `INTENSIDAD_VIBRACION.md`
+
+### Cambio 1 - Plan completo por pantallas
+
+#### Código anterior
+```md
+# Intensidad de vibracion
+
+Este archivo documenta la regla propuesta para recordar que intensidad de vibracion debe usar cada tipo de accion.
+
+Fuente verificable de la implementacion actual: `src/services/haptics.ts`.
+
+Fuente oficial de intensidades disponibles: Capacitor Haptics v6 (`ImpactStyle.Light`, `ImpactStyle.Medium`, `ImpactStyle.Heavy`).
+
+## Intensidades actuales
+
+### Light
+
+- Funcion actual: `hapticTap()`
+- Intensidad: ligera
+- Uso actual: pulsaciones pequenas como teclas numericas.
+- Recomendacion premium para esta app: no usarla como intensidad principal, porque conduciendo y en la calle puede notarse poco.
+
+### Medium
+
+- Funcion actual: `hapticConfirm()`
+- Intensidad: media
+- Uso recomendado: toque operativo normal que el usuario debe notar sin mirar fijo la pantalla.
+- Ejemplos recomendados:
+  - numeros del teclado
+  - borrar
+  - coma decimal
+  - abrir campos
+  - abrir modales
+  - cambiar vistas
+  - boton atras cuando cierra una capa visible
+
+### Heavy
+
+- Funcion actual: `hapticAction()`
+- Intensidad: fuerte
+- Uso recomendado: accion importante, guardado, cierre o accion peligrosa.
+- Ejemplos recomendados:
+  - guardar entrada
+  - guardar reserva
+  - guardar nota
+  - guardar cambios de turno
+  - iniciar turno
+  - pausar o reanudar turno
+  - terminar turno
+  - eliminar entrada
+  - eliminar turno
+  - cerrar sesion confirmado
+
+## Regla premium propuesta
+
+- Tocar o seleccionar: `Medium`
+- Teclear numeros: `Medium`
+- Cerrar una capa visible con atras: `Medium`
+- Guardar correctamente: `Heavy`
+- Confirmar accion critica: `Heavy`
+- Eliminar: `Heavy`
+- Terminar turno: `Heavy`
+- Navegacion secundaria sin accion de datos: sin vibracion o `Medium` si se quiere una respuesta mas sensible.
+
+## Ejemplo practico
+
+Si se anade 1 euro de propina:
+
+1. Pulsar `1`: `Medium`
+2. Pulsar `Guardar`: `Heavy`
+
+## Nota importante
+
+La vibracion solo funciona en app nativa Android/iOS mediante Capacitor. En navegador local o web normal no se nota vibracion.
+```
+
+#### Código nuevo
+```md
+# Plan premium de vibracion
+
+Este archivo documenta el plan completo propuesto para una experiencia de vibracion premium en la app.
+
+Contexto de uso: app usada conduciendo, en la calle y mirando de reojo. La vibracion debe ayudar a confirmar acciones sin exigir mirar fijo la pantalla.
+
+Fuente verificable de la implementacion actual: `src/services/haptics.ts`.
+
+Fuente oficial de intensidades disponibles: Capacitor Haptics v6 (`ImpactStyle.Light`, `ImpactStyle.Medium`, `ImpactStyle.Heavy`).
+
+## Intensidades actuales
+
+### Light
+
+- Funcion actual: `hapticTap()`
+- Intensidad: ligera
+- Uso actual: pulsaciones pequenas como teclas numericas.
+- Recomendacion premium para esta app: no usarla como intensidad principal, porque conduciendo y en la calle puede notarse poco.
+
+### Medium
+
+- Funcion actual: `hapticConfirm()`
+- Intensidad: media
+- Uso recomendado: toque operativo normal que el usuario debe notar sin mirar fijo la pantalla.
+- Ejemplos recomendados:
+  - numeros del teclado
+  - borrar
+  - coma decimal
+  - abrir campos
+  - abrir modales
+  - cambiar vistas
+  - boton atras cuando cierra una capa visible
+
+### Heavy
+
+- Funcion actual: `hapticAction()`
+- Intensidad: fuerte
+- Uso recomendado: accion importante, guardado, cierre o accion peligrosa.
+- Ejemplos recomendados:
+  - guardar entrada
+  - guardar reserva
+  - guardar nota
+  - guardar cambios de turno
+  - iniciar turno
+  - pausar o reanudar turno
+  - terminar turno
+  - eliminar entrada
+  - eliminar turno
+  - cerrar sesion confirmado
+
+## Regla premium propuesta
+
+- Tocar o seleccionar: `Medium`
+- Teclear numeros: `Medium`
+- Cerrar una capa visible con atras: `Medium`
+- Guardar correctamente: `Heavy`
+- Confirmar accion critica: `Heavy`
+- Eliminar: `Heavy`
+- Terminar turno: `Heavy`
+- Navegacion secundaria sin accion de datos: sin vibracion o `Medium` si se quiere una respuesta mas sensible.
+
+## Plan por pantallas
+
+### 1. Home
+
+- Iniciar o continuar turno: `Heavy`
+- Turnos: `Medium`
+- Contabilidad: `Medium`
+- Calendario: `Medium`
+- Reserva: `Medium`
+- Ajustes: `Medium`
+- Admin: `Medium`
+- Confirmar cerrar sesion: `Heavy`
+
+### 2. Pantalla de turno activo
+
+- Abrir Propina: `Medium`
+- Abrir Datafono: `Medium`
+- Abrir Agencia/Bono: `Medium`
+- Abrir Extra: `Medium`
+- Abrir Gasolina: `Medium`
+- Abrir Nulo: `Medium`
+- Boton de nota: `Medium`
+- Iniciar turno: `Heavy`
+- Pausar turno: `Heavy`
+- Reanudar turno: `Heavy`
+- Terminar turno: `Heavy`
+
+### 3. Anadir propina y datafono
+
+- Teclas numericas: `Medium`
+- Borrar: `Medium`
+- Coma decimal: `Medium`
+- Cambiar entre Propina y Datafono: `Medium`
+- Guardar entrada valida: `Heavy`
+- Intentar guardar vacio o invalido: feedback de error si se implementa; recomendado `Heavy` corto o feedback de notificacion.
+
+### 4. Anadir agencia, extra, gasolina y nulo
+
+- Teclas numericas: `Medium`
+- Borrar: `Medium`
+- Coma decimal: `Medium`
+- Guardar entrada valida: `Heavy`
+- Intentar guardar vacio o invalido: feedback de error si se implementa; recomendado `Heavy` corto o feedback de notificacion.
+
+### 5. Terminar turno
+
+- Seleccionar campo dinero: `Medium`
+- Seleccionar campo km: `Medium`
+- Teclas dinero/km: `Medium`
+- Guardar campo dinero/km: `Heavy`
+- Terminar turno definitivo: `Heavy`
+- Cancelar: `Medium` o sin vibracion, segun se prefiera.
+
+### 6. Editar turno
+
+- Abrir campo dinero: `Medium`
+- Abrir campo km: `Medium`
+- Teclas de dinero/km: `Medium`
+- Abrir entrada para editar: `Medium`
+- Abrir selector de tipo de entrada nueva: `Medium`
+- Abrir importe de entrada nueva: `Medium`
+- Teclas de entrada nueva: `Medium`
+- Guardar cambios: `Heavy`
+- Anadir linea nueva dentro del turno: `Heavy`
+- Eliminar entrada: `Heavy`
+- Eliminar turno: `Heavy`
+- Cancelar edicion: `Medium`
+
+### 7. Historial de entradas del turno actual
+
+- Abrir entrada para editar: `Medium`
+- Guardar edicion: `Heavy`
+- Eliminar entrada: `Heavy`
+- Cancelar: `Medium`
+
+### 8. Calendario y reservas
+
+- Abrir reserva: `Medium`
+- Guardar reserva: `Heavy`
+- Eliminar reserva: `Heavy`
+- Abrir nota: `Medium`
+- Guardar nota: `Heavy`
+- Eliminar nota: `Heavy`
+- Cambiar mes: `Medium` si no resulta molesto.
+- Cambiar vista calendario/agenda: `Medium`
+- Seleccionar dia: `Medium` si se quiere una respuesta mas sensible.
+- Abrir turno desde calendario: `Medium`
+
+### 9. Contabilidad, detalle de mes, detalle anual y detalle de semana
+
+- Abrir detalle de mes: `Medium`
+- Abrir detalle anual: `Medium`
+- Abrir detalle de semana: `Medium`
+- Cambiar mes o ano: `Medium` si no resulta molesto.
+- Abrir turno desde contabilidad: `Medium`
+- Marcar entregado o no entregado: `Heavy`, porque cambia estado contable.
+- Abrir liquidacion semanal: `Medium`
+
+### 10. Liquidacion semanal
+
+- Compartir ticket: `Heavy` si la accion se completa.
+- Copiar al portapapeles: `Heavy` si la accion se completa.
+- Volver a detalle de semana: `Medium` o sin vibracion.
+
+### 11. Ajustes
+
+- Abrir edicion de porcentaje: `Medium`
+- Teclas porcentaje: `Medium`
+- Guardar porcentaje: `Heavy`
+- Buscar actualizacion: `Medium`
+- Instalar actualizacion: `Heavy`
+- Abrir menu de backup: `Medium`
+- Exportar backup: `Heavy` si se genera correctamente.
+- Importar/restaurar backup: `Heavy`, con confirmacion clara.
+
+### 12. Login
+
+- Entrar: `Heavy` si empieza el acceso correctamente.
+- Registrar cuenta: `Heavy` si empieza el registro correctamente.
+- Recuperar contrasena: `Medium` o `Heavy` si se envia correctamente.
+- Cambiar entre login/registro/recuperacion: `Medium`
+- Error de login: feedback de error si se implementa.
+
+### 13. Admin
+
+- Abrir lista admin: `Medium`
+- Seleccionar usuario: `Medium`
+- Cambiar pestaña dentro de usuario admin: `Medium`
+- Abrir detalle de turno en admin: `Medium`
+- Volver desde usuario admin a lista: `Medium`
+- Volver desde lista admin a home: `Medium`
+
+### 14. Boton atras nativo Android
+
+- Si cierra reserva: `Medium`
+- Si cierra nota: `Medium`
+- Si cierra confirmacion: `Medium`
+- Si cierra teclado/modal de dinero o km: `Medium`
+- Si cierra selector de mes: `Medium`
+- Si cierra menu backup: `Medium`
+- Si sale de usuario admin a lista: `Medium`
+- Si sale de lista admin a home: `Medium`
+- Si solo navega atras entre pantallas: `Medium` opcional.
+- Si va a cerrar la app: sin vibracion, para no parecer una confirmacion de guardado.
+
+## Ejemplo practico
+
+Si se anade 1 euro de propina:
+
+1. Pulsar `1`: `Medium`
+2. Pulsar `Guardar`: `Heavy`
+
+## Fases de implementacion recomendadas
+
+### Fase 1 - Nombres semanticos
+
+Crear nombres que expresen intencion y no intensidad tecnica:
+
+- `hapticKey`
+- `hapticOpen`
+- `hapticBackClose`
+- `hapticSave`
+- `hapticDanger`
+- `hapticInvalid`
+
+### Fase 2 - Mapa de intensidades
+
+Mapear esos nombres a intensidades:
+
+- `hapticKey`: `Medium`
+- `hapticOpen`: `Medium`
+- `hapticBackClose`: `Medium`
+- `hapticSave`: `Heavy`
+- `hapticDanger`: `Heavy`
+- `hapticInvalid`: feedback de error si se implementa; si no, `Heavy`
+
+### Fase 3 - Sustituir por pantallas
+
+Aplicar la regla por pantallas, sin tocar Firestore, Firebase, sincronizacion ni calculos contables.
+
+### Fase 4 - Pruebas
+
+Anadir pruebas para asegurar que:
+
+- las acciones de guardado usan feedback fuerte;
+- las teclas usan feedback medio;
+- el boton atras nativo cierra capas con feedback medio;
+- no se llama vibracion en navegador si `Capacitor.isNativePlatform()` es falso.
+
+### Fase 5 - Prueba real en Android
+
+Probar en dispositivo Android real, porque el navegador local no vibra y cada movil puede sentirse distinto.
+
+## Nota importante
+
+La vibracion solo funciona en app nativa Android/iOS mediante Capacitor. En navegador local o web normal no se nota vibracion.
+```
+
+#### Por qué se cambió
+El archivo anterior solo guardaba una regla resumida. Se necesitaba conservar el plan completo por pantallas y fases para poder implementarlo despues sin depender de la conversación.
+
+## 2026-05-31 22:08 - Añadir documento de vibración
+
+**Archivos modificados:** `INTENSIDAD_VIBRACION.md`
+
+### Cambio 1 - Documento de intensidades de vibración
+
+#### Código anterior
+`No existía INTENSIDAD_VIBRACION.md en la raíz del proyecto.`
+
+#### Código nuevo
+```md
+# Intensidad de vibracion
+
+Este archivo documenta la regla propuesta para recordar que intensidad de vibracion debe usar cada tipo de accion.
+
+Fuente verificable de la implementacion actual: `src/services/haptics.ts`.
+
+Fuente oficial de intensidades disponibles: Capacitor Haptics v6 (`ImpactStyle.Light`, `ImpactStyle.Medium`, `ImpactStyle.Heavy`).
+
+## Intensidades actuales
+
+### Light
+
+- Funcion actual: `hapticTap()`
+- Intensidad: ligera
+- Uso actual: pulsaciones pequenas como teclas numericas.
+- Recomendacion premium para esta app: no usarla como intensidad principal, porque conduciendo y en la calle puede notarse poco.
+
+### Medium
+
+- Funcion actual: `hapticConfirm()`
+- Intensidad: media
+- Uso recomendado: toque operativo normal que el usuario debe notar sin mirar fijo la pantalla.
+- Ejemplos recomendados:
+  - numeros del teclado
+  - borrar
+  - coma decimal
+  - abrir campos
+  - abrir modales
+  - cambiar vistas
+  - boton atras cuando cierra una capa visible
+
+### Heavy
+
+- Funcion actual: `hapticAction()`
+- Intensidad: fuerte
+- Uso recomendado: accion importante, guardado, cierre o accion peligrosa.
+- Ejemplos recomendados:
+  - guardar entrada
+  - guardar reserva
+  - guardar nota
+  - guardar cambios de turno
+  - iniciar turno
+  - pausar o reanudar turno
+  - terminar turno
+  - eliminar entrada
+  - eliminar turno
+  - cerrar sesion confirmado
+
+## Regla premium propuesta
+
+- Tocar o seleccionar: `Medium`
+- Teclear numeros: `Medium`
+- Cerrar una capa visible con atras: `Medium`
+- Guardar correctamente: `Heavy`
+- Confirmar accion critica: `Heavy`
+- Eliminar: `Heavy`
+- Terminar turno: `Heavy`
+- Navegacion secundaria sin accion de datos: sin vibracion o `Medium` si se quiere una respuesta mas sensible.
+
+## Ejemplo practico
+
+Si se anade 1 euro de propina:
+
+1. Pulsar `1`: `Medium`
+2. Pulsar `Guardar`: `Heavy`
+
+## Nota importante
+
+La vibracion solo funciona en app nativa Android/iOS mediante Capacitor. En navegador local o web normal no se nota vibracion.
+```
+
+#### Por qué se cambió
+Se necesitaba un archivo principal del proyecto para recordar la regla propuesta de intensidad de vibración por tipo de acción.
+
+## 2026-05-31 20:00 - Corregir retroceso nativo Android
+
+**Archivos modificados:** `src/main.tsx`, `src/logic/android-back-button.ts`, `src/__tests__/android-back-button.test.ts`
+
+### Cambio 1 - Decisión del botón Android
+
+#### Código anterior
+`No existía android-back-button en src/logic/android-back-button.ts.`
+
+#### Código nuevo
+```ts
+export type AdminMode = null | "list" | { uid: string; username: string };
+
+export type AndroidBackButtonSnapshot = {
+  adminMode: AdminMode;
+  confirmDialogOpen: boolean;
+  editEntryOpen: boolean;
+  endFieldOpen: boolean;
+  screen: string;
+  showBackupMenu: boolean;
+  showMonthPicker: boolean;
+  showNotaDialog: boolean;
+  showReservaDialog: boolean;
+};
+
+export type AndroidBackButtonActions = {
+  closeBackupMenu: () => void;
+  closeConfirmDialog: () => void;
+  closeEditEntry: () => void;
+  closeEndField: () => void;
+  closeMonthPicker: () => void;
+  closeNotaDialog: () => void;
+  closeReservaDialog: () => void;
+  exitApp: () => void;
+  goBack: () => boolean;
+  resetNavigation: (root?: string) => void;
+  setAdminMode: (mode: AdminMode) => void;
+};
+
+export function handleAndroidBackButton(
+  snapshot: AndroidBackButtonSnapshot,
+  actions: AndroidBackButtonActions,
+): void {
+  if (snapshot.confirmDialogOpen) {
+    actions.closeConfirmDialog();
+    return;
+  }
+
+  if (snapshot.editEntryOpen) {
+    actions.closeEditEntry();
+    return;
+  }
+
+  if (snapshot.endFieldOpen) {
+    actions.closeEndField();
+    return;
+  }
+
+  if (snapshot.showBackupMenu) {
+    actions.closeBackupMenu();
+    return;
+  }
+
+  if (snapshot.showMonthPicker) {
+    actions.closeMonthPicker();
+    return;
+  }
+
+  if (snapshot.showNotaDialog) {
+    actions.closeNotaDialog();
+    return;
+  }
+
+  if (snapshot.showReservaDialog) {
+    actions.closeReservaDialog();
+    return;
+  }
+
+  if (snapshot.adminMode && typeof snapshot.adminMode === "object") {
+    actions.setAdminMode("list");
+    return;
+  }
+
+  if (snapshot.adminMode === "list") {
+    actions.setAdminMode(null);
+    return;
+  }
+
+  if (snapshot.screen === "main") {
+    actions.resetNavigation("home");
+    return;
+  }
+
+  if (!actions.goBack()) {
+    actions.exitApp();
+  }
+}
+```
+
+#### Por qué se cambió
+El botón nativo necesitaba cerrar primero capas abiertas como reserva y vistas admin antes de usar el stack o cerrar la app.
+
+### Cambio 2 - Listener nativo conectado al estado de UI
+
+#### Código anterior
+```tsx
+import { fmtDuration, fmtKm, fmt } from "./logic/formatters";
+import { ConfirmDialog, MainCard, SmallCard } from "./components/common";
+```
+
+```tsx
+  // Botón físico de retroceso de Android (Capacitor). Recorre el stack de
+  // navegación; si ya está en la raíz, cierra la app. Solo en plataforma nativa.
+  useEffect(() => {
+    if (!Capacitor.isNativePlatform()) return;
+    let remove: (() => void) | undefined;
+    let cancelado = false;
+    import("@capacitor/app")
+      .then(({ App: CapApp }) =>
+        CapApp.addListener("backButton", () => {
+          const state = useAppStore.getState();
+          if (state.screen === "main") {
+            state.resetNavigation("home");
+            return;
+          }
+          const navego = state.goBack();
+          if (!navego) CapApp.exitApp();
+        })
+      )
+      .then((handle) => {
+        if (cancelado) handle.remove();
+        else remove = () => handle.remove();
+      })
+      .catch((err) => console.error("backButton listener fallido:", err));
+    return () => {
+      cancelado = true;
+      remove?.();
+    };
+  }, []);
+```
+
+#### Código nuevo
+```tsx
+import { fmtDuration, fmtKm, fmt } from "./logic/formatters";
+import {
+  handleAndroidBackButton,
+  type AndroidBackButtonSnapshot,
+} from "./logic/android-back-button";
+import { ConfirmDialog, MainCard, SmallCard } from "./components/common";
+```
+
+```tsx
+  const androidBackButtonSnapshotRef = useRef<AndroidBackButtonSnapshot>({
+    adminMode,
+    confirmDialogOpen: false,
+    editEntryOpen: false,
+    endFieldOpen: false,
+    screen,
+    showBackupMenu: false,
+    showMonthPicker: false,
+    showNotaDialog: false,
+    showReservaDialog: false,
+  });
+
+  androidBackButtonSnapshotRef.current = {
+    adminMode,
+    confirmDialogOpen: confirmDialog !== null,
+    editEntryOpen: editEntry !== null,
+    endFieldOpen: endField !== null,
+    screen,
+    showBackupMenu,
+    showMonthPicker,
+    showNotaDialog,
+    showReservaDialog,
+  };
+
+  // Botón físico de retroceso de Android (Capacitor). Primero cierra capas
+  // abiertas; después recorre el stack y solo sale de la app en la raíz real.
+  useEffect(() => {
+    if (!Capacitor.isNativePlatform()) return;
+    let remove: (() => void) | undefined;
+    let cancelado = false;
+    import("@capacitor/app")
+      .then(({ App: CapApp }) =>
+        CapApp.addListener("backButton", () => {
+          const state = useAppStore.getState();
+          handleAndroidBackButton(androidBackButtonSnapshotRef.current, {
+            closeBackupMenu: () => setShowBackupMenu(false),
+            closeConfirmDialog: () => setConfirmDialog(null),
+            closeEditEntry: () => setEditEntry(null),
+            closeEndField: () => setEndField(null),
+            closeMonthPicker: () => setShowMonthPicker(false),
+            closeNotaDialog: () => setShowNotaDialog(false),
+            closeReservaDialog: () => setShowReservaDialog(false),
+            exitApp: () => {
+              void CapApp.exitApp();
+            },
+            goBack: state.goBack,
+            resetNavigation: state.resetNavigation,
+            setAdminMode,
+          });
+        })
+      )
+      .then((handle) => {
+        if (cancelado) handle.remove();
+        else remove = () => handle.remove();
+      })
+      .catch((err) => console.error("backButton listener fallido:", err));
+    return () => {
+      cancelado = true;
+      remove?.();
+    };
+  }, []);
+```
+
+#### Por qué se cambió
+El listener anterior solo miraba `screen` y el stack global; por eso una reserva abierta en `home` podía terminar en `exitApp()` y las pantallas admin no tenían retroceso nativo propio.
+
+### Cambio 3 - Pruebas del retroceso Android
+
+#### Código anterior
+`No existía android-back-button.test en src/__tests__/android-back-button.test.ts.`
+
+#### Código nuevo
+```ts
+import { describe, expect, it, vi } from "vitest";
+import { handleAndroidBackButton } from "../logic/android-back-button";
+
+function createActions() {
+  return {
+    closeConfirmDialog: vi.fn(),
+    closeEditEntry: vi.fn(),
+    closeEndField: vi.fn(),
+    closeMonthPicker: vi.fn(),
+    closeNotaDialog: vi.fn(),
+    closeReservaDialog: vi.fn(),
+    closeBackupMenu: vi.fn(),
+    exitApp: vi.fn(),
+    goBack: vi.fn(() => false),
+    resetNavigation: vi.fn(),
+    setAdminMode: vi.fn(),
+  };
+}
+```
+
+```ts
+  it("cierra la reserva abierta en home antes de salir de la app", () => {
+```
+
+```ts
+  it("vuelve de un usuario admin a la lista sin cerrar la app", () => {
+```
+
+```ts
+  it("sale de la lista admin a la home propia sin cerrar la app", () => {
+```
+
+#### Por qué se cambió
+Se añadieron pruebas para fijar los dos fallos detectados: reserva abierta desde `home` no debe cerrar la app, y admin debe retroceder dentro del modo admin antes de salir.
+
+## 2026-05-31 19:49 - Mover indicador arriba
+
+**Archivos modificados:** `src/components/sync-indicator.tsx`
+
+### Cambio 1 - Posición vertical del indicador
+
+#### Código anterior
+```tsx
+        position: "absolute",
+        bottom: 8,
+        right: 8,
+```
+
+#### Código nuevo
+```tsx
+        position: "absolute",
+        top: 8,
+        right: 8,
+```
+
+#### Por qué se cambió
+Se necesitaba mantener el indicador a la derecha y con el mismo tamaño, pero colocado arriba en vez de abajo.
+
+## 2026-05-31 19:45 - Añadir documento del indicador
+
+**Archivos modificados:** `INDICADOR_SINCRONIZACION.md`
+
+### Cambio 1 - Documento de colores del indicador
+
+#### Código anterior
+`No existía INDICADOR_SINCRONIZACION.md en la raíz del proyecto.`
+
+#### Código nuevo
+```md
+# Indicador de sincronizacion
+
+Este archivo documenta el significado de cada color de la luz indicadora de estado de sincronizacion de la app.
+
+Fuente verificable del color y texto mostrado: `src/components/sync-indicator.tsx`.
+
+Fuente verificable de la condicion de cada estado: `src/hooks/use-sync-status.ts`.
+
+## Gris
+
+- Color: `rgba(148, 163, 184, 0.95)`
+- Texto al mantener pulsado o pasar por encima: `Cargando datos`
+- Estado interno: `loading`
+- Significado: la app todavia no ha terminado de cargar los datos iniciales.
+- Condicion verificable: `dataLoaded` es `false`, siempre que no haya timeout y el navegador este online.
+
+## Verde
+
+- Color: `#10b981`
+- Texto al mantener pulsado o pasar por encima: `Sincronizado`
+- Estado interno: `synced`
+- Significado: la app esta online, los datos iniciales ya estan cargados y no hay cambios pendientes para el UID autenticado actual.
+- Condicion verificable: `dataLoaded` es `true`, `loadTimedOut` es `false`, `navigator.onLine` es `true` y `readUserPendingSync(uid)` no contiene areas pendientes para el UID actual.
+
+## Amarillo
+
+- Color: `#f59e0b`
+- Texto al mantener pulsado o pasar por encima: `Modo sin conexion`
+- Estado interno: `offline`
+- Significado: el navegador informa que no hay conexion.
+- Condicion verificable: `navigator.onLine` es `false`, siempre que no haya timeout.
+
+## Naranja
+
+- Color: `#f97316`
+- Texto al mantener pulsado o pasar por encima: `Cambios pendientes`
+- Estado interno: `pending`
+- Significado: existen cambios locales pendientes de sincronizar para el UID autenticado actual.
+- Condicion verificable: `readUserPendingSync(uid)` contiene al menos un area pendiente para el UID actual.
+
+## Rojo
+
+- Color: `#ef4444`
+- Texto al mantener pulsado o pasar por encima: `Error de sincronizacion`
+- Estado interno: `error`
+- Significado: la carga inicial ha agotado el tiempo configurado.
+- Condicion verificable: `loadTimedOut` es `true`.
+
+## Prioridad de estados
+
+La prioridad verificable en `useSyncStatus` es:
+
+1. `error`
+2. `offline`
+3. `loading`
+4. `pending`
+5. `synced`
+
+Por tanto, si hay timeout se muestra rojo antes que cualquier otro estado. Si no hay timeout pero el navegador esta offline, se muestra amarillo antes que carga o pendientes. Solo se muestra verde cuando no aplica ningun estado anterior.
+```
+
+#### Por qué se cambió
+Se necesitaba un archivo principal del proyecto que documentara de forma verificable el significado de cada color del indicador de sincronización.
+
+## 2026-05-31 19:37 - Corregir indicador de sincronización
+
+**Archivos modificados:** `src/components/sync-indicator.tsx`, `src/hooks/use-network-status.ts`, `src/hooks/use-sync-status.ts`, `src/services/pending-sync.ts`, `src/__tests__/sync-indicator.test.tsx`
+
+### Cambio 1 - Notificación local de pendientes
+
+#### Código anterior
+```ts
+export type PendingSyncState = Partial<Record<PendingSyncArea, true>>;
+
+export function readUserPendingSync(uid: string): PendingSyncState {
+  try {
+    return JSON.parse(localStorage.getItem(userStorageKey(KEY_PENDING_SYNC, uid)) || "{}") as PendingSyncState;
+  } catch {
+    return {};
+  }
+}
+```
+
+```ts
+export function markUserPendingSync(uid: string, area: PendingSyncArea): void {
+  const state = readUserPendingSync(uid);
+  state[area] = true;
+  localStorage.setItem(userStorageKey(KEY_PENDING_SYNC, uid), JSON.stringify(state));
+}
+```
+
+```ts
+export function clearUserPendingSync(uid: string, area: PendingSyncArea): void {
+  const state = readUserPendingSync(uid);
+  delete state[area];
+
+  if (Object.keys(state).length === 0) {
+    localStorage.removeItem(userStorageKey(KEY_PENDING_SYNC, uid));
+    return;
+  }
+
+  localStorage.setItem(userStorageKey(KEY_PENDING_SYNC, uid), JSON.stringify(state));
+}
+```
+
+#### Código nuevo
+```ts
+export type PendingSyncState = Partial<Record<PendingSyncArea, true>>;
+
+export const PENDING_SYNC_CHANGED_EVENT = "taxi:pending-sync-changed";
+
+export type PendingSyncChangedDetail = {
+  uid: string;
+  state: PendingSyncState;
+};
+
+function notifyUserPendingSyncChanged(uid: string, state: PendingSyncState): void {
+  if (typeof window === "undefined") return;
+
+  window.dispatchEvent(new CustomEvent<PendingSyncChangedDetail>(
+    PENDING_SYNC_CHANGED_EVENT,
+    { detail: { uid, state } },
+  ));
+}
+
+export function readUserPendingSync(uid: string): PendingSyncState {
+  try {
+    return JSON.parse(localStorage.getItem(userStorageKey(KEY_PENDING_SYNC, uid)) || "{}") as PendingSyncState;
+  } catch {
+    return {};
+  }
+}
+```
+
+```ts
+export function markUserPendingSync(uid: string, area: PendingSyncArea): void {
+  const state = readUserPendingSync(uid);
+  state[area] = true;
+  localStorage.setItem(userStorageKey(KEY_PENDING_SYNC, uid), JSON.stringify(state));
+  notifyUserPendingSyncChanged(uid, state);
+}
+```
+
+```ts
+export function clearUserPendingSync(uid: string, area: PendingSyncArea): void {
+  const state = readUserPendingSync(uid);
+  delete state[area];
+
+  if (Object.keys(state).length === 0) {
+    localStorage.removeItem(userStorageKey(KEY_PENDING_SYNC, uid));
+    notifyUserPendingSyncChanged(uid, state);
+    return;
+  }
+
+  localStorage.setItem(userStorageKey(KEY_PENDING_SYNC, uid), JSON.stringify(state));
+  notifyUserPendingSyncChanged(uid, state);
+}
+```
+
+#### Por qué se cambió
+La luz necesitaba reaccionar en la misma pestaña cuando `pending-sync` marca o limpia cambios pendientes. `localStorage` por sí solo no actualiza React en la misma pestaña.
+
+### Cambio 2 - Hook de estado real de sincronización
+
+#### Código anterior
+`No existía use-sync-status en src/hooks/use-sync-status.ts.`
+
+#### Código nuevo
+```ts
+import { useEffect, useState } from "react";
+import { auth } from "../services/firebase";
+import {
+  PENDING_SYNC_CHANGED_EVENT,
+  readUserPendingSync,
+  type PendingSyncChangedDetail,
+} from "../services/pending-sync";
+import { useAppStore } from "../services/store";
+
+export type SyncStatus = "loading" | "offline" | "pending" | "synced" | "error";
+
+function getAuthUid(): string | null {
+  return auth.currentUser?.uid ?? null;
+}
+
+function userHasPendingSync(uid: string | null): boolean {
+  if (!uid) return false;
+  return Object.keys(readUserPendingSync(uid)).length > 0;
+}
+
+function getNavigatorOnline(): boolean {
+  return typeof navigator === "undefined" ? true : navigator.onLine;
+}
+
+export function useSyncStatus(): SyncStatus {
+  const dataLoaded = useAppStore((state) => state.dataLoaded);
+  const loadTimedOut = useAppStore((state) => state.loadTimedOut);
+  const [isOnline, setIsOnline] = useState(getNavigatorOnline);
+  const [hasPendingSync, setHasPendingSync] = useState(() => userHasPendingSync(getAuthUid()));
+
+  useEffect(() => {
+    setHasPendingSync(userHasPendingSync(getAuthUid()));
+  }, [dataLoaded]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const handleOnline = () => setIsOnline(true);
+    const handleOffline = () => setIsOnline(false);
+
+    window.addEventListener("online", handleOnline);
+    window.addEventListener("offline", handleOffline);
+
+    return () => {
+      window.removeEventListener("online", handleOnline);
+      window.removeEventListener("offline", handleOffline);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const handlePendingSyncChanged = (event: Event) => {
+      const detail = (event as CustomEvent<PendingSyncChangedDetail>).detail;
+      const uid = getAuthUid();
+      if (!uid || detail.uid !== uid) return;
+      setHasPendingSync(Object.keys(detail.state).length > 0);
+    };
+
+    window.addEventListener(PENDING_SYNC_CHANGED_EVENT, handlePendingSyncChanged);
+    return () => {
+      window.removeEventListener(PENDING_SYNC_CHANGED_EVENT, handlePendingSyncChanged);
+    };
+  }, []);
+
+  if (loadTimedOut) return "error";
+  if (!isOnline) return "offline";
+  if (!dataLoaded) return "loading";
+  if (hasPendingSync) return "pending";
+  return "synced";
+}
+```
+
+#### Por qué se cambió
+La luz necesitaba un estado semántico de sincronización que combine carga inicial, conexión, timeout y pendientes locales del UID autenticado.
+
+### Cambio 3 - Sustituir hook antiguo de red
+
+#### Código anterior
+```ts
+import { useState, useEffect } from "react";
+import { useAppStore } from "../services/store";
+
+export type NetworkStatus = "online" | "offline" | "error";
+
+export function useNetworkStatus(): NetworkStatus {
+  const dataLoaded = useAppStore((state) => state.dataLoaded);
+  const loadTimedOut = useAppStore((state) => state.loadTimedOut);
+
+  const [isOnline, setIsOnline] = useState<boolean>(
+    typeof navigator !== "undefined" ? navigator.onLine : true
+  );
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const handleOnline = () => setIsOnline(true);
+    const handleOffline = () => setIsOnline(false);
+
+    window.addEventListener("online", handleOnline);
+    window.addEventListener("offline", handleOffline);
+
+    return () => {
+      window.removeEventListener("online", handleOnline);
+      window.removeEventListener("offline", handleOffline);
+    };
+  }, []);
+
+  if (loadTimedOut) {
+    return "error";
+  }
+
+  if (!isOnline || !dataLoaded) {
+    return "offline";
+  }
+
+  return "online";
+}
+```
+
+#### Código nuevo
+`No existe use-network-status en src/hooks/use-network-status.ts. Quedó sustituido por src/hooks/use-sync-status.ts.`
+
+#### Por qué se cambió
+El hook antiguo solo indicaba red/carga y podía poner la luz verde aunque hubiera cambios pendientes. Se eliminó para no dejar código huérfano.
+
+### Cambio 4 - Luz con estados de sincronización
+
+#### Código anterior
+```tsx
+import { type FC } from "react";
+import { useNetworkStatus } from "../hooks/use-network-status";
+
+export const SyncIndicator: FC = () => {
+  const status = useNetworkStatus();
+
+  const config = {
+    online: {
+      color: "#10b981",
+      shadow: "rgba(16, 185, 129, 0.4)",
+      label: "Sincronizado",
+      animation: "none",
+    },
+    offline: {
+      color: "#f59e0b",
+      shadow: "rgba(245, 158, 11, 0.4)",
+      label: "Modo sin conexión",
+      animation: "pulse-sync 2s infinite ease-in-out",
+    },
+    error: {
+      color: "#ef4444",
+      shadow: "rgba(239, 68, 68, 0.4)",
+      label: "Error de sincronización",
+      animation: "none",
+    },
+  }[status];
+```
+
+#### Código nuevo
+```tsx
+import { type FC } from "react";
+import { useSyncStatus } from "../hooks/use-sync-status";
+
+export const SyncIndicator: FC = () => {
+  const status = useSyncStatus();
+
+  const config = {
+    loading: {
+      color: "rgba(148, 163, 184, 0.95)",
+      shadow: "rgba(148, 163, 184, 0.35)",
+      label: "Cargando datos",
+      animation: "pulse-sync 2s infinite ease-in-out",
+    },
+    synced: {
+      color: "#10b981",
+      shadow: "rgba(16, 185, 129, 0.4)",
+      label: "Sincronizado",
+      animation: "none",
+    },
+    offline: {
+      color: "#f59e0b",
+      shadow: "rgba(245, 158, 11, 0.4)",
+      label: "Modo sin conexión",
+      animation: "pulse-sync 2s infinite ease-in-out",
+    },
+    pending: {
+      color: "#f97316",
+      shadow: "rgba(249, 115, 22, 0.45)",
+      label: "Cambios pendientes",
+      animation: "pulse-sync 2s infinite ease-in-out",
+    },
+    error: {
+      color: "#ef4444",
+      shadow: "rgba(239, 68, 68, 0.4)",
+      label: "Error de sincronización",
+      animation: "none",
+    },
+  }[status];
+```
+
+#### Por qué se cambió
+Verde ahora significa `synced`: online, carga terminada y sin pendientes del UID actual. La luz ya distingue carga, offline, pendiente, sincronizado y error.
+
+### Cambio 5 - Pruebas del indicador
+
+#### Código anterior
+`No existía sync-indicator.test en src/__tests__/sync-indicator.test.tsx.`
+
+#### Código nuevo
+```tsx
+import { act } from "react";
+import { createRoot, type Root } from "react-dom/client";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { SyncIndicator } from "../components/sync-indicator";
+import { clearUserPendingSync, markUserPendingSync } from "../services/pending-sync";
+import { useAppStore } from "../services/store";
+
+vi.mock("../services/firebase", () => ({
+  auth: { currentUser: { uid: "uid-actual" } },
+}));
+```
+
+```tsx
+  it("muestra carga inicial antes de considerar la app sincronizada", () => {
+```
+
+```tsx
+  it("muestra pendientes solo para el UID actual", () => {
+```
+
+```tsx
+  it("vuelve a sincronizado al limpiar el ultimo pendiente del UID actual", () => {
+```
+
+```tsx
+  it("muestra modo sin conexion cuando el navegador queda offline", () => {
+```
+
+```tsx
+  it("muestra error cuando la carga inicial agota el tiempo", () => {
+```
+
+#### Por qué se cambió
+Se añadieron pruebas para verificar que la luz no marca verde durante carga, ignora pendientes de otro UID, reacciona al limpiar el último pendiente, detecta offline y muestra error en timeout.
+
 ## 2026-05-31 09:24 - Añadir .gitattributes y normalizar fin de línea a LF
 
 **Archivos modificados:** .gitattributes

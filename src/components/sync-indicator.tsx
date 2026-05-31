@@ -1,11 +1,17 @@
 import { type FC } from "react";
-import { useNetworkStatus } from "../hooks/use-network-status";
+import { useSyncStatus } from "../hooks/use-sync-status";
 
 export const SyncIndicator: FC = () => {
-  const status = useNetworkStatus();
+  const status = useSyncStatus();
 
   const config = {
-    online: {
+    loading: {
+      color: "rgba(148, 163, 184, 0.95)",
+      shadow: "rgba(148, 163, 184, 0.35)",
+      label: "Cargando datos",
+      animation: "pulse-sync 2s infinite ease-in-out",
+    },
+    synced: {
       color: "#10b981",
       shadow: "rgba(16, 185, 129, 0.4)",
       label: "Sincronizado",
@@ -15,6 +21,12 @@ export const SyncIndicator: FC = () => {
       color: "#f59e0b",
       shadow: "rgba(245, 158, 11, 0.4)",
       label: "Modo sin conexión",
+      animation: "pulse-sync 2s infinite ease-in-out",
+    },
+    pending: {
+      color: "#f97316",
+      shadow: "rgba(249, 115, 22, 0.45)",
+      label: "Cambios pendientes",
       animation: "pulse-sync 2s infinite ease-in-out",
     },
     error: {
@@ -30,7 +42,7 @@ export const SyncIndicator: FC = () => {
       title={config.label}
       style={{
         position: "absolute",
-        bottom: 8,
+        top: 8,
         right: 8,
         width: 8,
         height: 8,

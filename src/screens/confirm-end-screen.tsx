@@ -7,7 +7,7 @@ import { getEntryTypeMeta } from "../shared/entry-type-meta";
 import { A, ABG, E, EBG, F, FBG, G, GBG, N, NBG, P, PBG } from "../shared/ui-theme";
 import { KM_CARD_UNIT_STYLE } from "../shared/card-styles";
 import type { CurrentState, Entry } from "../shared/types";
-import { hapticTap, hapticConfirm, hapticAction } from "../services/haptics";
+import { hapticBackClose, hapticDanger, hapticKey, hapticOpen, hapticSave } from "../services/haptics";
 
 const NOTE_TIME_STYLE = {
   fontSize: 12,
@@ -86,7 +86,7 @@ export function ConfirmEndScreen({
   setScreen,
 }: Props) {
   function kpEnd(v: string) {
-    hapticTap();
+    hapticKey();
     if (!endField) return;
     const cur = endField === "dinero" ? dineroJ : kmJ;
     const setVal = endField === "dinero" ? setDineroJ : setKmJ;
@@ -100,12 +100,12 @@ export function ConfirmEndScreen({
     <Shell burst={false}>
       <div style={{ flex: 1, display: "flex", flexDirection: "column", padding: "12px 20px 16px", overflowY: "auto", animation: "slideIn 0.25s ease", WebkitOverflowScrolling: "touch" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 16, flexShrink: 0 }}>
-          <button style={S.iconBtn} onClick={() => { setScreen("main"); setEndField(null); }}><IconBack /></button>
+          <button style={S.iconBtn} onClick={() => { hapticOpen(); setScreen("main"); setEndField(null); }}><IconBack /></button>
           <span style={{ fontSize: 20, fontWeight: 700, color: "white" }}>Terminar Turno</span>
         </div>
 
         <div style={{ display: "flex", gap: 10, marginBottom: 12, flexShrink: 0 }}>
-          <div onClick={() => setEndField("dinero")}
+          <div onClick={() => { hapticOpen(); setEndField("dinero"); }}
             style={{
               flex: 1,
               background: "rgba(255, 180, 0, 0.06)",
@@ -127,7 +127,7 @@ export function ConfirmEndScreen({
               {dineroJ ? dineroJ + " €" : "€"}
             </div>
           </div>
-          <div onClick={() => setEndField("km")}
+          <div onClick={() => { hapticOpen(); setEndField("km"); }}
             style={{
               flex: 1,
               background: "oklch(0.19 0.05 220)",
@@ -262,11 +262,11 @@ export function ConfirmEndScreen({
         })()}
 
         <div style={{ display: "flex", flexDirection: "column", gap: 8, flexShrink: 0, marginTop: "auto" }}>
-          <button onClick={() => { hapticAction(); onEndTurno(); }}
+          <button onClick={() => { hapticDanger(); onEndTurno(); }}
             style={{ padding: "15px 0", borderRadius: 16, border: "none", background: "rgba(255,60,60,0.12)", color: "rgba(255,110,110,0.9)", fontSize: 16, fontWeight: 800, cursor: "pointer", outline: "1.5px solid rgba(255,60,60,0.25)" }}>
             Terminar Turno
           </button>
-          <button onClick={() => setScreen("main")}
+          <button onClick={() => { hapticOpen(); setScreen("main"); }}
             style={{ padding: "13px 0", borderRadius: 16, border: "none", background: "rgba(255,255,255,0.06)", color: "rgba(255,255,255,0.5)", fontSize: 15, fontWeight: 700, cursor: "pointer" }}>
             Cancelar
           </button>
@@ -278,7 +278,7 @@ export function ConfirmEndScreen({
           role="dialog"
           aria-modal="true"
           aria-label="Teclado numérico"
-          onClick={() => setEndField(null)}
+          onClick={() => { hapticBackClose(); setEndField(null); }}
           style={{
             position: "fixed",
             top: 0, left: 0, right: 0, bottom: 0,
@@ -321,7 +321,7 @@ export function ConfirmEndScreen({
               ))}
             </div>
             <button
-              onClick={() => { hapticConfirm(); setEndField(null); }}
+              onClick={() => { hapticSave(); setEndField(null); }}
               style={{
                 width: "100%",
                 padding: "16px 0",

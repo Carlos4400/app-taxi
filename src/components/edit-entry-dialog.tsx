@@ -1,5 +1,6 @@
 import { useState, type ReactNode } from "react";
 import type { Entry } from "../shared/types";
+import { hapticDanger, hapticKey, hapticOpen } from "../services/haptics";
 
 type EntryTypeMetaForDialog = {
   color: string;
@@ -33,6 +34,7 @@ export function EditEntryDialog({
   const meta = getEntryTypeMeta(entry.type);
 
   function kpAmount(k: string) {
+    hapticKey();
     if (k === "DEL") { onAmountChange(amount.slice(0, -1)); return; }
     if (k === ",") { if (!amount.includes(",")) onAmountChange(amount + ","); return; }
     if (amount.replace(",", "").length >= 7) return;
@@ -75,7 +77,7 @@ export function EditEntryDialog({
         </div>
 
         {entry.type !== "nota" && (
-          <div style={{ marginBottom: 12, cursor: "pointer" }} onClick={() => setShowKP(true)}>
+          <div style={{ marginBottom: 12, cursor: "pointer" }} onClick={() => { hapticOpen(); setShowKP(true); }}>
             <div style={{ fontSize: 11, fontWeight: 700, color: "rgba(255,255,255,0.5)", marginBottom: 6, textTransform: "uppercase", letterSpacing: "0.6px", display: "flex", justifyContent: "space-between" }}>
               <span>Importe (€)</span>
               {!showKP && <span style={{ color: meta.color, fontSize: 10 }}>Toca para editar</span>}
@@ -143,7 +145,10 @@ export function EditEntryDialog({
 
         <div style={{ display: "flex", gap: 8 }}>
           <button
-            onClick={onCancel}
+            onClick={() => {
+              hapticOpen();
+              onCancel();
+            }}
             style={{
               flex: 1,
               padding: "14px",
@@ -159,7 +164,10 @@ export function EditEntryDialog({
             Cancelar
           </button>
           <button
-            onClick={onDelete}
+            onClick={() => {
+              hapticDanger();
+              onDelete();
+            }}
             style={{
               flex: 1,
               padding: "14px",

@@ -11,7 +11,7 @@ import { AuthGate } from "./screens/auth-gate";
 import { useFirestoreSync } from "./hooks/use-firestore-sync";
 import { useAppStore } from "./services/store";
 import { registerServiceWorker } from "./services/service-worker-registration";
-import { hapticAction } from "./services/haptics";
+import { hapticBackClose, hapticDanger, hapticInvalid, hapticOpen, hapticSave } from "./services/haptics";
 import {
   IconCoin,
   IconCard,
@@ -33,6 +33,10 @@ import { SummaryScreen } from "./screens/summary-screen";
 import { EditTurnoScreen } from "./screens/edit-turno-screen";
 import { SettingsScreen } from "./screens/settings-screen";
 import { fmtDuration, fmtKm, fmt } from "./logic/formatters";
+import {
+  handleAndroidBackButton,
+  type AndroidBackButtonSnapshot,
+} from "./logic/android-back-button";
 import { ConfirmDialog, MainCard, SmallCard } from "./components/common";
 import { EditEntryDialog } from "./components/edit-entry-dialog";
 import { IconPlay, IconPause } from "./components/turno-control-icons";
@@ -301,8 +305,32 @@ function App({ uid }: { uid: string }) {
   // de localStorage y detección de rol admin), encapsulada en src/hooks/use-firestore-sync.ts.
   const { dataLoaded, loadTimedOut } = useFirestoreSync(uid);
 
-  // Botón físico de retroceso de Android (Capacitor). Recorre el stack de
-  // navegación; si ya está en la raíz, cierra la app. Solo en plataforma nativa.
+  const androidBackButtonSnapshotRef = useRef<AndroidBackButtonSnapshot>({
+    adminMode,
+    confirmDialogOpen: false,
+    editEntryOpen: false,
+    endFieldOpen: false,
+    screen,
+    showBackupMenu: false,
+    showMonthPicker: false,
+    showNotaDialog: false,
+    showReservaDialog: false,
+  });
+
+  androidBackButtonSnapshotRef.current = {
+    adminMode,
+    confirmDialogOpen: confirmDialog !== null,
+    editEntryOpen: editEntry !== null,
+    endFieldOpen: endField !== null,
+    screen,
+    showBackupMenu,
+    showMonthPicker,
+    showNotaDialog,
+    showReservaDialog,
+  };
+
+  // Botón físico de retroceso de Android (Capacitor). Primero cierra capas
+  // abiertas; después recorre el stack y solo sale de la app en la raíz real.
   useEffect(() => {
     if (!Capacitor.isNativePlatform()) return;
     let remove: (() => void) | undefined;
@@ -311,12 +339,22 @@ function App({ uid }: { uid: string }) {
       .then(({ App: CapApp }) =>
         CapApp.addListener("backButton", () => {
           const state = useAppStore.getState();
-          if (state.screen === "main") {
-            state.resetNavigation("home");
-            return;
-          }
-          const navego = state.goBack();
-          if (!navego) CapApp.exitApp();
+          handleAndroidBackButton(androidBackButtonSnapshotRef.current, {
+            closeBackupMenu: () => setShowBackupMenu(false),
+            closeConfirmDialog: () => setConfirmDialog(null),
+            closeEditEntry: () => setEditEntry(null),
+            closeEndField: () => setEndField(null),
+            closeMonthPicker: () => setShowMonthPicker(false),
+            closeNotaDialog: () => setShowNotaDialog(false),
+            closeReservaDialog: () => setShowReservaDialog(false),
+            exitApp: () => {
+              void CapApp.exitApp();
+            },
+            goBack: state.goBack,
+            hapticBackClose,
+            resetNavigation: state.resetNavigation,
+            setAdminMode,
+          });
         })
       )
       .then((handle) => {
@@ -355,6 +393,7 @@ function App({ uid }: { uid: string }) {
   }
 
   function openEditEntry(e: Entry) {
+    hapticOpen();
     setEditEntry(e);
     setEditEntryAmount(e.amount.toFixed(2).replace(".", ","));
     setEditEntryNote(e.note || "");
@@ -364,10 +403,12 @@ function App({ uid }: { uid: string }) {
     if (!editEntry) return;
     const amt = parseFloat(editEntryAmount.replace(",", "."));
     if (isNaN(amt) || (amt <= 0 && editEntry.type !== 'nota')) {
+      hapticInvalid();
       alert("El importe debe ser un número mayor que 0.");
       return;
     }
     const updated = { ...editEntry, amount: amt, note: editEntryNote.trim() };
+    hapticSave();
     setCurrent((prev) => ({
       ...prev,
       entries: prev.entries.map((x) =>
@@ -379,6 +420,7 @@ function App({ uid }: { uid: string }) {
 
   function deleteEditEntry() {
     if (!editEntry) return;
+    hapticDanger();
     setCurrent((prev) => ({
       ...prev,
       entries: prev.entries.filter((x) => x.id !== editEntry.id),
@@ -584,7 +626,7 @@ function App({ uid }: { uid: string }) {
   const totalN = nulos.reduce((s, e) => s + e.amount, 0);
 
   function togglePause() {
-    hapticAction();
+    hapticDanger();
     const now = timeNow();
     setCurrent((prev) => {
       if (prev.isPaused) {
@@ -692,6 +734,7 @@ function App({ uid }: { uid: string }) {
 
   // --- Handlers globales del modal de Reserva (accesibles desde cualquier pantalla) ---
   const openNewReserva = (date?: string) => {
+    hapticOpen();
     setEditingReserva(null);
     setSelectedDate(date || "");
     setReservaTime("");
@@ -705,9 +748,11 @@ function App({ uid }: { uid: string }) {
 
   const saveReserva = () => {
     if (!selectedDate || !reservaTime || !reservaOrigen || !reservaDestino || !reservaCliente || !reservaTelefono) {
+      hapticInvalid();
       alert("Por favor rellena todos los campos obligatorios.");
       return;
     }
+    hapticSave();
     if (editingReserva) {
       setReservations(prev => prev.map(r => r.id === editingReserva.id ? {
         ...r,
@@ -1431,6 +1476,7 @@ function App({ uid }: { uid: string }) {
                 }}
                 onClick={() => {
                   if (!current.isPaused) {
+                    hapticOpen();
                     setConfirmDialog({
                       text: "¿Seguro que quieres pausar el Turno actual?",
                       onConfirm: togglePause,
@@ -1461,6 +1507,7 @@ function App({ uid }: { uid: string }) {
             icon={<IconCard s={26} c={P} />}
             disabled={!current.startTime}
             onClick={() => {
+              hapticOpen();
               setActiveField("datafono");
               setScreen("add");
             }}
@@ -1474,6 +1521,7 @@ function App({ uid }: { uid: string }) {
             icon={<IconCoin s={26} c={G} />}
             disabled={!current.startTime}
             onClick={() => {
+              hapticOpen();
               setActiveField("propina");
               setScreen("add");
             }}
@@ -1488,6 +1536,7 @@ function App({ uid }: { uid: string }) {
             icon={<IconAgency s={18} c={A} />}
             disabled={!current.startTime}
             onClick={() => {
+              hapticOpen();
               setSingleMode("agencia_bono");
               setScreen("addSingle");
             }}
@@ -1500,6 +1549,7 @@ function App({ uid }: { uid: string }) {
             icon={<IconExtra s={18} c={E} />}
             disabled={!current.startTime}
             onClick={() => {
+              hapticOpen();
               setScreen("addSingle");
               setSingleMode("extra");
             }}
@@ -1514,6 +1564,7 @@ function App({ uid }: { uid: string }) {
             icon={<IconFuel s={22} c={F} />}
             disabled={!current.startTime}
             onClick={() => {
+              hapticOpen();
               setSingleMode("gasolina");
               setScreen("addSingle");
             }}
@@ -1526,6 +1577,7 @@ function App({ uid }: { uid: string }) {
             icon={<IconNulo s={18} c={N} />}
             disabled={!current.startTime}
             onClick={() => {
+              hapticOpen();
               setSingleMode("nulo");
               setScreen("addSingle");
             }}
@@ -1536,6 +1588,7 @@ function App({ uid }: { uid: string }) {
           <div style={{ marginBottom: 18 }}>
             <button
               onClick={() => {
+                hapticOpen();
                 setNoteS("");
                 setScreen("addNotaGeneral");
               }}
@@ -1579,7 +1632,10 @@ function App({ uid }: { uid: string }) {
             <span>Últimas entradas</span>
             {current.entries.length > 0 && (
               <button
-                onClick={() => setScreen("todayHistory")}
+                onClick={() => {
+                  hapticOpen();
+                  setScreen("todayHistory");
+                }}
                 title="Editar entradas"
                 aria-label="Editar entradas"
                 style={{
@@ -1619,7 +1675,7 @@ function App({ uid }: { uid: string }) {
                 <div>
                   <button
                     onClick={() => {
-                      hapticAction();
+                      hapticDanger();
                       setCurrent({
                         ...current,
                         startTime: new Date().toLocaleTimeString("es-ES", {
@@ -1708,7 +1764,10 @@ function App({ uid }: { uid: string }) {
 
         {active && (
           <button
-            onClick={() => setScreen("confirmEnd")}
+            onClick={() => {
+              hapticDanger();
+              setScreen("confirmEnd");
+            }}
             style={{
               marginTop: 10,
               padding: "15px 0",

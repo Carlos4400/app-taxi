@@ -17,35 +17,48 @@ async function getHaptics() {
   return hapticsModule;
 }
 
-export async function hapticTap(): Promise<void> {
-  const haptics = await getHaptics();
-  if (haptics) {
-    try {
-      await haptics.Haptics.impact({ style: haptics.ImpactStyle.Light });
-    } catch (e) {
-      console.warn('Error en hapticTap:', e);
-    }
-  }
-}
-
-export async function hapticConfirm(): Promise<void> {
+async function impactMedium(): Promise<void> {
   const haptics = await getHaptics();
   if (haptics) {
     try {
       await haptics.Haptics.impact({ style: haptics.ImpactStyle.Medium });
     } catch (e) {
-      console.warn('Error en hapticConfirm:', e);
+      console.warn('Error en impactMedium:', e);
     }
   }
 }
 
-export async function hapticAction(): Promise<void> {
+async function impactHeavy(): Promise<void> {
   const haptics = await getHaptics();
   if (haptics) {
     try {
       await haptics.Haptics.impact({ style: haptics.ImpactStyle.Heavy });
     } catch (e) {
-      console.warn('Error en hapticAction:', e);
+      console.warn('Error en impactHeavy:', e);
     }
   }
+}
+
+export async function hapticKey(): Promise<void> {
+  return impactMedium();
+}
+
+export async function hapticOpen(): Promise<void> {
+  return impactMedium();
+}
+
+export async function hapticBackClose(): Promise<void> {
+  return impactMedium();
+}
+
+export async function hapticSave(): Promise<void> {
+  return impactHeavy();
+}
+
+export async function hapticDanger(): Promise<void> {
+  return impactHeavy();
+}
+
+export async function hapticInvalid(): Promise<void> {
+  return impactHeavy();
 }

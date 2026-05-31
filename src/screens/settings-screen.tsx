@@ -20,7 +20,7 @@ import { APP_VERSION } from "../shared/app-version";
 import { ApkInstaller } from "../services/apk-installer";
 import { resolveLatestApkUpdate, type UpdateState } from "../logic/update-flow";
 import { IconDel } from "../components/navigation-icons";
-import { hapticTap, hapticConfirm } from "../services/haptics";
+import { hapticDanger, hapticKey, hapticOpen, hapticSave } from "../services/haptics";
 
 interface SettingsScreenProps {
   isAdmin: boolean;
@@ -204,7 +204,7 @@ export const SettingsScreen: FC<SettingsScreenProps> = ({
     <Shell burst={false}>
       <div style={{ flex: 1, padding: "16px 20px", display: "flex", flexDirection: "column", gap: 16, overflowY: "auto" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 16 }}>
-          <button style={S.iconBtn} onClick={() => { onSetScreen("home"); setUpdateMsg(""); setDownloadUrl(""); setReleaseUrl(""); }}><IconBack /></button>
+          <button style={S.iconBtn} onClick={() => { hapticOpen(); onSetScreen("home"); setUpdateMsg(""); setDownloadUrl(""); setReleaseUrl(""); }}><IconBack /></button>
           <div style={{ fontSize: 24, fontWeight: 800, color: "white" }}>Ajustes de Usuario</div>
         </div>
 
@@ -212,7 +212,7 @@ export const SettingsScreen: FC<SettingsScreenProps> = ({
           <div style={{ fontSize: 48, marginBottom: 12 }}>🚕</div>
           <div style={{ fontSize: 20, fontWeight: 800, color: "white", marginBottom: 4 }}>Mi Turno</div>
           <div style={{ fontSize: 14, color: "rgba(255,255,255,0.4)", marginBottom: 24 }}>Versión {APP_VERSION}</div>
-          <button onClick={() => checkUpdate(setUpdateState, setUpdateMsg, setDownloadUrl, setReleaseUrl)} style={{ width: "100%", padding: "16px 0", borderRadius: 16, border: "none", background: "rgba(255,255,255,0.1)", color: "white", fontSize: 16, fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 10 }}>
+          <button onClick={() => { hapticOpen(); checkUpdate(setUpdateState, setUpdateMsg, setDownloadUrl, setReleaseUrl); }} style={{ width: "100%", padding: "16px 0", borderRadius: 16, border: "none", background: "rgba(255,255,255,0.1)", color: "white", fontSize: 16, fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 10 }}>
             <IconRefresh s={20} c={G} /> Buscar actualizaciones
           </button>
 
@@ -226,7 +226,7 @@ export const SettingsScreen: FC<SettingsScreenProps> = ({
             const hasApkDownload = downloadUrl.endsWith(".apk");
             return hasApkDownload && updateState !== "downloading" && updateState !== "checking" && (
             <button
-              onClick={() => handleInstallUpdate(downloadUrl, updateState, setUpdateState, setUpdateMsg)}
+              onClick={() => { hapticDanger(); handleInstallUpdate(downloadUrl, updateState, setUpdateState, setUpdateMsg); }}
               style={{
                 display: "flex",
                 alignItems: "center",
@@ -255,7 +255,7 @@ export const SettingsScreen: FC<SettingsScreenProps> = ({
 
           {!Capacitor.isNativePlatform() && releaseUrl && (
             <button
-              onClick={() => handleOpenRelease(releaseUrl)}
+              onClick={() => { hapticOpen(); handleOpenRelease(releaseUrl); }}
               style={{
                 width: "100%",
                 marginTop: 12,
@@ -280,11 +280,11 @@ export const SettingsScreen: FC<SettingsScreenProps> = ({
             <IconPercent s={22} c={G} /> Reparto de Porcentajes
           </div>
           <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-            <div onClick={() => { setActiveSettingsField("porcentaje.jefe"); setSettingsValStr(settings["porcentaje.jefe"].toString().replace(".", ",")); }} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: "rgba(0,0,0,0.2)", padding: "12px 16px", borderRadius: 16, border: "1px solid rgba(255,255,255,0.05)", cursor: "pointer" }}>
+            <div onClick={() => { hapticOpen(); setActiveSettingsField("porcentaje.jefe"); setSettingsValStr(settings["porcentaje.jefe"].toString().replace(".", ",")); }} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: "rgba(0,0,0,0.2)", padding: "12px 16px", borderRadius: 16, border: "1px solid rgba(255,255,255,0.05)", cursor: "pointer" }}>
               <span style={{ color: "white", fontWeight: 600 }}>Jefe</span>
               <span style={{ color: A, fontSize: 20, fontWeight: 800 }}>{settings["porcentaje.jefe"]} %</span>
             </div>
-            <div onClick={() => { setActiveSettingsField("porcentaje.chofer"); setSettingsValStr(settings["porcentaje.chofer"].toString().replace(".", ",")); }} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: "rgba(0,0,0,0.2)", padding: "12px 16px", borderRadius: 16, border: "1px solid rgba(255,255,255,0.05)", cursor: "pointer" }}>
+            <div onClick={() => { hapticOpen(); setActiveSettingsField("porcentaje.chofer"); setSettingsValStr(settings["porcentaje.chofer"].toString().replace(".", ",")); }} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: "rgba(0,0,0,0.2)", padding: "12px 16px", borderRadius: 16, border: "1px solid rgba(255,255,255,0.05)", cursor: "pointer" }}>
               <span style={{ color: "white", fontWeight: 600 }}>Chofer</span>
               <span style={{ color: G, fontSize: 20, fontWeight: 800 }}>{settings["porcentaje.chofer"]} %</span>
             </div>
@@ -310,6 +310,7 @@ export const SettingsScreen: FC<SettingsScreenProps> = ({
                 <button
                   key={item.key}
                   onClick={() => {
+                    hapticOpen();
                     setConfirmDialog({
                       text: `¿Seguro que quieres ${isActive ? "dejar de descontar" : "empezar a descontar"} la categoría ${item.label}?`,
                       onConfirm: () => {
@@ -361,6 +362,7 @@ export const SettingsScreen: FC<SettingsScreenProps> = ({
                   key={d.idx}
                   onClick={() => {
                     if (selected) return;
+                    hapticOpen();
                     const nombres = ["Domingo", "Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado"];
                     setConfirmDialog({
                       text: `¿Cambiar tu día libre a ${nombres[d.idx]}?`,
@@ -406,6 +408,7 @@ export const SettingsScreen: FC<SettingsScreenProps> = ({
         <button
           id="btn_import_turno_fusion"
           onClick={() => {
+            hapticOpen();
             const input = document.createElement('input');
             input.type = 'file';
             input.accept = '.json, .csv';
@@ -466,7 +469,7 @@ export const SettingsScreen: FC<SettingsScreenProps> = ({
 
         <div>
           <div
-            onClick={() => setShowBackupMenu(!showBackupMenu)}
+            onClick={() => { hapticOpen(); setShowBackupMenu(!showBackupMenu); }}
             style={{
               background: "rgba(255,255,255,0.03)",
               borderRadius: 22,
@@ -499,14 +502,17 @@ export const SettingsScreen: FC<SettingsScreenProps> = ({
             }}>
               {backupMenuActionIds.includes("export-json") && (
                 <button
-                  onClick={() => exportBackupJSON(buildBackupPayloadFromState({
-                    history,
-                    settings,
-                    current,
-                    weekOverrides,
-                    reservations,
-                    notes,
-                  }))}
+                  onClick={() => {
+                    hapticSave();
+                    exportBackupJSON(buildBackupPayloadFromState({
+                      history,
+                      settings,
+                      current,
+                      weekOverrides,
+                      reservations,
+                      notes,
+                    }));
+                  }}
                   style={S.backupSubBtn}
                 >
                   <IconDownload s={18} c="white" /> Exportar todo a JSON
@@ -516,6 +522,7 @@ export const SettingsScreen: FC<SettingsScreenProps> = ({
               {backupMenuActionIds.includes("restore-json") && (
                 <button
                   onClick={() => {
+                    hapticOpen();
                     const input = document.createElement('input');
                     input.type = 'file';
                     input.accept = '.json';
@@ -597,7 +604,7 @@ export const SettingsScreen: FC<SettingsScreenProps> = ({
               {["1", "2", "3", "4", "5", "6", "7", "8", "9", "DEL", "0", ","].map((k) => (
                 <button key={k} aria-label={k === "DEL" ? "Borrar" : k === "," ? "Coma decimal" : k}
                   onClick={() => {
-                    hapticTap();
+                    hapticKey();
                     let next = settingsValStr;
                     if (k === "DEL") next = next.slice(0, -1);
                     else if (k === ",") { if (!next.includes(",")) next = next + ","; else return; }
@@ -611,7 +618,7 @@ export const SettingsScreen: FC<SettingsScreenProps> = ({
             </div>
             <button
               onClick={() => {
-                hapticConfirm();
+                hapticSave();
                 const val = parseFloat(settingsValStr.replace(",", ".")) || 0;
                 setConfirmDialog({
                   text: `¿Seguro que quieres cambiar el porcentaje de ${activeSettingsField === "porcentaje.jefe" ? "Jefe" : "Chofer"} a ${val}%?`,

@@ -8,7 +8,7 @@ import {
 } from "../components/summary-icons";
 import { EditEntryDialog } from "../components/edit-entry-dialog";
 import { ConfirmDialog } from "../components/common";
-import { hapticTap } from "../services/haptics";
+import { hapticBackClose, hapticDanger, hapticInvalid, hapticKey, hapticOpen, hapticSave } from "../services/haptics";
 import { fmt } from "../logic/formatters";
 import { A, E, F, G, GBG, N, P } from "../shared/ui-theme";
 import { KM_CARD_UNIT_STYLE } from "../shared/card-styles";
@@ -96,6 +96,7 @@ export const EditTurnoScreen: FC<EditTurnoScreenProps> = ({
       totalF: editJ.entries.filter((e: Entry) => e.type === 'gasolina').reduce((s: number, e: Entry) => s + e.amount, 0),
       totalN: editJ.entries.filter((e: Entry) => e.type === 'nulo').reduce((s: number, e: Entry) => s + e.amount, 0),
     };
+    hapticSave();
     setHistory((h: Turno[]) => h.map((j: Turno) => j.id === updated.id ? (updated as Turno) : j));
     setViewTurno(updated as Turno);
     setEditJ(null);
@@ -106,7 +107,7 @@ export const EditTurnoScreen: FC<EditTurnoScreenProps> = ({
   const eKm = editJ.kmStr !== undefined ? editJ.kmStr : (editJ.km ? editJ.km.toString().replace('.', ',') : "");
 
   function kpEdit(v: string) {
-    hapticTap();
+    hapticKey();
     if (!editJ || !endField) return;
     const cur = endField === "dinero" ? eDinero : eKm;
     const key = endField === "dinero" ? "dineroStr" : "kmStr";
@@ -123,6 +124,7 @@ export const EditTurnoScreen: FC<EditTurnoScreenProps> = ({
   }
 
   function openEditEntry(e: Entry) {
+    hapticOpen();
     setEditEntry(e);
     setEditEntryAmount(e.amount.toFixed(2).replace(".", ","));
     setEditEntryNote(e.note || "");
@@ -132,10 +134,12 @@ export const EditTurnoScreen: FC<EditTurnoScreenProps> = ({
     if (!editEntry) return;
     const amt = parseFloat(editEntryAmount.replace(",", "."));
     if (isNaN(amt) || (amt <= 0 && editEntry.type !== 'nota')) {
+      hapticInvalid();
       alert("El importe debe ser un número mayor que 0.");
       return;
     }
     const updated = { ...editEntry, amount: amt, note: editEntryNote.trim() };
+    hapticSave();
     setEditJ({
       ...editJ,
       entries: editJ.entries.map((x: any) => x.id === updated.id ? updated : x)
@@ -145,6 +149,7 @@ export const EditTurnoScreen: FC<EditTurnoScreenProps> = ({
 
   function deleteEditEntry() {
     if (!editEntry) return;
+    hapticDanger();
     setEditJ({
       ...editJ,
       entries: editJ.entries.filter((x: any) => x.id !== editEntry.id)
@@ -156,13 +161,13 @@ export const EditTurnoScreen: FC<EditTurnoScreenProps> = ({
     <Shell burst={false}>
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', padding: '12px 20px 32px', overflowY: 'auto', animation: 'slideIn 0.25s ease' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 20 }}>
-          <button style={S.iconBtn} onClick={() => { setEditJ(null); setEndField(null); setScreen('summary'); }}><IconBack /></button>
+          <button style={S.iconBtn} onClick={() => { hapticOpen(); setEditJ(null); setEndField(null); setScreen('summary'); }}><IconBack /></button>
           <span style={{ fontSize: 20, fontWeight: 700, color: 'white' }}>Editar Turno</span>
         </div>
 
         {/* Dinero / KM (clickables - centrados y sin ceros) */}
         <div style={{ display: 'flex', gap: 10, marginBottom: 14 }}>
-          <div onClick={() => setEndField("dinero")}
+          <div onClick={() => { hapticOpen(); setEndField("dinero"); }}
             style={{
               flex: 1,
               background: 'rgba(255, 180, 0, 0.06)',
@@ -183,7 +188,7 @@ export const EditTurnoScreen: FC<EditTurnoScreenProps> = ({
               {eDinero ? `${eDinero} €` : "€"}
             </div>
           </div>
-          <div onClick={() => setEndField("km")}
+          <div onClick={() => { hapticOpen(); setEndField("km"); }}
             style={{
               flex: 1,
               background: 'oklch(0.19 0.05 220)',
@@ -250,7 +255,7 @@ export const EditTurnoScreen: FC<EditTurnoScreenProps> = ({
                 {/* Desplegable personalizado visualmente integrado */}
                 <div style={{ position: 'relative', width: '120px', flexShrink: 0 }}>
                   <button
-                    onClick={() => { setShowTypeMenu(!showTypeMenu); setShowNewEntryKP(false); }}
+                    onClick={() => { hapticOpen(); setShowTypeMenu(!showTypeMenu); setShowNewEntryKP(false); }}
                     style={{ width: '100%', height: '100%', background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, padding: '8px 10px', outline: 'none', display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer' }}
                   >
                     <span style={{ color: editJ.newType ? ({ datafono: P, propina: G, agencia_bono: A, extra: E, gasolina: F, nota: 'white', nulo: N } as any)[editJ.newType] : 'white', fontWeight: editJ.newType ? 800 : 600, textTransform: editJ.newType === 'agencia_bono' ? 'none' : (editJ.newType ? 'capitalize' : 'none'), fontSize: 13 }}>
@@ -268,6 +273,7 @@ export const EditTurnoScreen: FC<EditTurnoScreenProps> = ({
                             <div
                               key={type}
                               onClick={() => {
+                                hapticOpen();
                                 setEditJ({ ...editJ, newType: type as any });
                                 setShowTypeMenu(false);
                                 setShowNewEntryKP(true);
@@ -286,7 +292,7 @@ export const EditTurnoScreen: FC<EditTurnoScreenProps> = ({
                 </div>
 
                 <div
-                  onClick={() => { setShowNewEntryKP(!showNewEntryKP); setShowTypeMenu(false); }}
+                  onClick={() => { hapticOpen(); setShowNewEntryKP(!showNewEntryKP); setShowTypeMenu(false); }}
                   style={{ flex: 1, minWidth: 60, background: 'rgba(0,0,0,0.3)', border: `1px solid ${showNewEntryKP ? (editJ.newType ? ({ datafono: P, propina: G, agencia_bono: A, extra: E, gasolina: F, nulo: N } as any)[editJ.newType] : 'white') : 'rgba(255,255,255,0.1)'}`, borderRadius: 8, padding: '8px 10px', display: 'flex', alignItems: 'center', cursor: 'pointer', position: 'relative', zIndex: showNewEntryKP ? 100 : 'auto' }}
                 >
                   <span style={{ fontSize: 13, color: editJ.newAmount ? 'white' : 'rgba(255,255,255,0.4)', fontWeight: editJ.newAmount ? 800 : 500 }}>
@@ -297,11 +303,13 @@ export const EditTurnoScreen: FC<EditTurnoScreenProps> = ({
                 <button
                   onClick={() => {
                     if (!editJ.newType || !editJ.newAmount) {
+                      hapticInvalid();
                       alert('Selecciona categoría e introduce un importe.');
                       return;
                     }
                     const amt = parseFloat(editJ.newAmount.replace(',', '.'));
                     if (isNaN(amt) || amt <= 0) {
+                      hapticInvalid();
                       alert('Importe inválido.');
                       return;
                     }
@@ -313,6 +321,7 @@ export const EditTurnoScreen: FC<EditTurnoScreenProps> = ({
                       note: noteText,
                       time: new Date().toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })
                     };
+                    hapticSave();
                     setEditJ({ ...editJ, entries: [newEntry, ...editJ.entries], newAmount: '', newNote: '', newType: null });
                     setShowNewEntryKP(false);
                   }}
@@ -329,7 +338,7 @@ export const EditTurnoScreen: FC<EditTurnoScreenProps> = ({
                   <div style={{ position: 'relative', zIndex: 99, display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 6, marginTop: 4, marginBottom: 4, animation: 'fadeUp 0.2s ease' }}>
                     {["1", "2", "3", "4", "5", "6", "7", "8", "9", "DEL", "0", ","].map((k) => (
                       <button key={k} aria-label={k === "DEL" ? "Borrar" : k === "," ? "Coma decimal" : k} onClick={(e) => {
-                        hapticTap();
+                        hapticKey();
                         e.preventDefault();
                         let cur = editJ.newAmount || '';
                         if (k === "DEL") { setEditJ({ ...editJ, newAmount: cur.slice(0, -1) }); return; }
@@ -369,6 +378,7 @@ export const EditTurnoScreen: FC<EditTurnoScreenProps> = ({
               <span style={{ position: 'absolute', top: 10, left: 10, color: "rgba(255,255,255,0.5)", fontSize: 11, fontWeight: 600 }}>{e.time}</span>
               <button
                 onClick={() => {
+                  hapticDanger();
                   const newEntries = editJ.entries.filter((ent: Entry) => ent.id !== e.id);
                   setEditJ({ ...editJ, entries: newEntries });
                 }}
@@ -415,10 +425,11 @@ export const EditTurnoScreen: FC<EditTurnoScreenProps> = ({
                 style={{ width: '100%', background: 'transparent', border: 'none', color: 'rgba(255,255,255,0.9)', fontSize: 13, outline: 'none', resize: 'none', minHeight: '60px', fontFamily: 'inherit', boxSizing: 'border-box' }}
               />
               <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
-                <button onClick={() => setEditJ({ ...editJ, isAddingNote: false, tempNote: '' })} style={{ flex: 1, padding: '10px', borderRadius: 8, background: 'rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.7)', border: 'none', fontWeight: 600, cursor: 'pointer' }}>Cancelar</button>
+                <button onClick={() => { hapticOpen(); setEditJ({ ...editJ, isAddingNote: false, tempNote: '' }); }} style={{ flex: 1, padding: '10px', borderRadius: 8, background: 'rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.7)', border: 'none', fontWeight: 600, cursor: 'pointer' }}>Cancelar</button>
                 <button onClick={() => {
                   if (editJ.tempNote && editJ.tempNote.trim() !== '') {
                     const newEntry = { id: Date.now(), type: 'nota', amount: 0, note: editJ.tempNote.trim(), time: new Date().toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' }) };
+                    hapticSave();
                     setEditJ({ ...editJ, entries: [...editJ.entries, newEntry], isAddingNote: false, tempNote: '' });
                   }
                 }} style={{ flex: 1, padding: '10px', borderRadius: 8, background: 'white', color: 'black', border: 'none', fontWeight: 800, cursor: 'pointer' }}>Añadir</button>
@@ -426,7 +437,7 @@ export const EditTurnoScreen: FC<EditTurnoScreenProps> = ({
             </div>
           ) : (
             <button
-              onClick={() => setEditJ({ ...editJ, isAddingNote: true })}
+              onClick={() => { hapticOpen(); setEditJ({ ...editJ, isAddingNote: true }); }}
               style={{
                 width: "100%",
                 padding: "12px",
@@ -455,15 +466,17 @@ export const EditTurnoScreen: FC<EditTurnoScreenProps> = ({
             style={{ padding: '18px 0', borderRadius: 18, border: 'none', background: GBG, color: G, outline: `1.5px solid ${G}55`, fontSize: 17, fontWeight: 800, cursor: 'pointer' }}>
             Guardar cambios
           </button>
-          <button onClick={() => { setEditJ(null); setEndField(null); setScreen('summary'); }}
+          <button onClick={() => { hapticOpen(); setEditJ(null); setEndField(null); setScreen('summary'); }}
             style={{ padding: '16px 0', borderRadius: 18, border: 'none', background: 'rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.5)', fontSize: 16, fontWeight: 700, cursor: 'pointer' }}>
             Cancelar
           </button>
           <button
             onClick={() => {
+              hapticOpen();
               setConfirmDialog({
                 text: "¿Seguro que quieres eliminar este Turno completo? Esta acción no se puede deshacer.",
                 onConfirm: () => {
+                  hapticDanger();
                   setHistory((h) => h.filter((j) => j.id !== editJ.id));
                   setEditJ(null);
                   setViewTurno(null);
@@ -484,7 +497,7 @@ export const EditTurnoScreen: FC<EditTurnoScreenProps> = ({
           role="dialog"
           aria-modal="true"
           aria-label="Teclado numérico"
-          onClick={() => setEndField(null)}
+          onClick={() => { hapticBackClose(); setEndField(null); }}
           style={{
             position: "fixed",
             top: 0, left: 0, right: 0, bottom: 0,
@@ -527,7 +540,7 @@ export const EditTurnoScreen: FC<EditTurnoScreenProps> = ({
               ))}
             </div>
             <button
-              onClick={() => setEndField(null)}
+              onClick={() => { hapticSave(); setEndField(null); }}
               style={{
                 width: "100%",
                 padding: "16px 0",
@@ -558,6 +571,7 @@ export const EditTurnoScreen: FC<EditTurnoScreenProps> = ({
           getEntryTypeMeta={getEntryTypeMeta}
           deleteIcon={<IconDel />}
           onDelete={() => {
+            hapticOpen();
             setConfirmDialog({
               text: "¿Seguro que quieres eliminar esta entrada?",
               onConfirm: () => {
@@ -566,7 +580,7 @@ export const EditTurnoScreen: FC<EditTurnoScreenProps> = ({
               },
             });
           }}
-          onCancel={() => setEditEntry(null)}
+          onCancel={() => { hapticOpen(); setEditEntry(null); }}
         />
       )}
       {confirmDialog && <ConfirmDialog {...confirmDialog} onCancel={() => setConfirmDialog(null)} />}

@@ -1,0 +1,59 @@
+# Indicador de sincronizacion
+
+Este archivo documenta el significado de cada color de la luz indicadora de estado de sincronizacion de la app.
+
+Fuente verificable del color y texto mostrado: `src/components/sync-indicator.tsx`.
+
+Fuente verificable de la condicion de cada estado: `src/hooks/use-sync-status.ts`.
+
+## Gris
+
+- Color: `rgba(148, 163, 184, 0.95)`
+- Texto al mantener pulsado o pasar por encima: `Cargando datos`
+- Estado interno: `loading`
+- Significado: la app todavia no ha terminado de cargar los datos iniciales.
+- Condicion verificable: `dataLoaded` es `false`, siempre que no haya timeout y el navegador este online.
+
+## Verde
+
+- Color: `#10b981`
+- Texto al mantener pulsado o pasar por encima: `Sincronizado`
+- Estado interno: `synced`
+- Significado: la app esta online, los datos iniciales ya estan cargados y no hay cambios pendientes para el UID autenticado actual.
+- Condicion verificable: `dataLoaded` es `true`, `loadTimedOut` es `false`, `navigator.onLine` es `true` y `readUserPendingSync(uid)` no contiene areas pendientes para el UID actual.
+
+## Amarillo
+
+- Color: `#f59e0b`
+- Texto al mantener pulsado o pasar por encima: `Modo sin conexion`
+- Estado interno: `offline`
+- Significado: el navegador informa que no hay conexion.
+- Condicion verificable: `navigator.onLine` es `false`, siempre que no haya timeout.
+
+## Naranja
+
+- Color: `#f97316`
+- Texto al mantener pulsado o pasar por encima: `Cambios pendientes`
+- Estado interno: `pending`
+- Significado: existen cambios locales pendientes de sincronizar para el UID autenticado actual.
+- Condicion verificable: `readUserPendingSync(uid)` contiene al menos un area pendiente para el UID actual.
+
+## Rojo
+
+- Color: `#ef4444`
+- Texto al mantener pulsado o pasar por encima: `Error de sincronizacion`
+- Estado interno: `error`
+- Significado: la carga inicial ha agotado el tiempo configurado.
+- Condicion verificable: `loadTimedOut` es `true`.
+
+## Prioridad de estados
+
+La prioridad verificable en `useSyncStatus` es:
+
+1. `error`
+2. `offline`
+3. `loading`
+4. `pending`
+5. `synced`
+
+Por tanto, si hay timeout se muestra rojo antes que cualquier otro estado. Si no hay timeout pero el navegador esta offline, se muestra amarillo antes que carga o pendientes. Solo se muestra verde cuando no aplica ningun estado anterior.

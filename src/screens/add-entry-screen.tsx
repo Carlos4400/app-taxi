@@ -4,7 +4,7 @@ import { IconBack, IconDel } from "../components/navigation-icons";
 import { G, P } from "../shared/ui-theme";
 import { timeNow, today } from "../logic/date-time";
 import type { CurrentState, Entry } from "../shared/types";
-import { hapticTap, hapticConfirm } from "../services/haptics";
+import { hapticKey, hapticSave, hapticOpen } from "../services/haptics";
 
 const iconBtnStyle = {
   background: "rgba(255,255,255,0.06)",
@@ -58,7 +58,7 @@ export const AddEntryScreen: FC<AddEntryScreenProps> = ({
   const curVal = activeField === "propina" ? valP : valD;
 
   function kpAdd(v: string) {
-    hapticTap();
+    hapticKey();
     if (v === "DEL") {
       setVal((p) => p.slice(0, -1));
       return;
@@ -72,7 +72,6 @@ export const AddEntryScreen: FC<AddEntryScreenProps> = ({
   }
 
   function handleSaveAdd() {
-    hapticConfirm();
     const p = parseFloat(valP.replace(",", "."));
     const d = parseFloat(valD.replace(",", "."));
     if (isNaN(p) && isNaN(d)) return;
@@ -83,6 +82,7 @@ export const AddEntryScreen: FC<AddEntryScreenProps> = ({
     if (!isNaN(d) && d > 0)
       newEntries.push({ id: Date.now() + 1, type: "datafono", amount: d, note: noteD.trim(), time: now });
     if (newEntries.length === 0) return;
+    hapticSave();
     setCurrent((prev) => ({
       ...prev,
       startTime: prev.startTime || now,
@@ -97,7 +97,7 @@ export const AddEntryScreen: FC<AddEntryScreenProps> = ({
     <Shell burst={false}>
       <div style={{ flex: 1, padding: "16px 20px", display: "flex", flexDirection: "column", minHeight: 0, overflow: "hidden" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 16, flexShrink: 0 }}>
-          <button style={iconBtnStyle} onClick={() => setScreen("main")}>
+          <button style={iconBtnStyle} onClick={() => { hapticOpen(); setScreen("main"); }}>
             <IconBack />
           </button>
           <div style={{ fontSize: 24, fontWeight: 800, color: "white" }}>
@@ -107,7 +107,7 @@ export const AddEntryScreen: FC<AddEntryScreenProps> = ({
 
         <div style={{ display: "flex", gap: 10, marginBottom: 20 }}>
           <div
-            onClick={() => setActiveField("datafono")}
+            onClick={() => { hapticOpen(); setActiveField("datafono"); }}
             style={{
               flex: 1,
               padding: "16px",
@@ -123,7 +123,7 @@ export const AddEntryScreen: FC<AddEntryScreenProps> = ({
             <div style={{ fontSize: 24, fontWeight: 900, color: activeField === "datafono" ? P : "white" }}>{valD || "0"} €</div>
           </div>
           <div
-            onClick={() => setActiveField("propina")}
+            onClick={() => { hapticOpen(); setActiveField("propina"); }}
             style={{
               flex: 1,
               padding: "16px",

@@ -4,7 +4,7 @@ import { IconBack, IconDel } from "../components/navigation-icons";
 import { A, ABG, E, EBG, F, FBG, N, NBG } from "../shared/ui-theme";
 import { timeNow, today } from "../logic/date-time";
 import type { Entry } from "../shared/types";
-import { hapticTap, hapticConfirm } from "../services/haptics";
+import { hapticInvalid, hapticKey, hapticOpen, hapticSave } from "../services/haptics";
 
 const iconBtnStyle: CSSProperties = {
   background: "rgba(255,255,255,0.06)",
@@ -59,7 +59,7 @@ export const AddSingleEntryScreen: FC<AddSingleEntryScreenProps> = ({
   const label = cfg.label;
 
   function kpS(v: string) {
-    hapticTap();
+    hapticKey();
     if (v === "DEL") {
       setValS((p) => p.slice(0, -1));
       return;
@@ -75,8 +75,10 @@ export const AddSingleEntryScreen: FC<AddSingleEntryScreenProps> = ({
   const validS = valS && parseFloat(valS.replace(",", ".")) > 0;
 
   function saveS() {
-    hapticConfirm();
-    if (!validS) return;
+    if (!validS) {
+      hapticInvalid();
+      return;
+    }
     const now = timeNow();
     const entry: Entry = {
       id: Date.now(),
@@ -85,6 +87,7 @@ export const AddSingleEntryScreen: FC<AddSingleEntryScreenProps> = ({
       note: noteS.trim(),
       time: now,
     };
+    hapticSave();
     setCurrent((prev) => ({
       ...prev,
       startTime: prev.startTime || now,
@@ -101,7 +104,7 @@ export const AddSingleEntryScreen: FC<AddSingleEntryScreenProps> = ({
     <Shell burst={false}>
       <div style={{ flex: 1, padding: "12px 20px", display: "flex", flexDirection: "column", minHeight: 0, overflow: "hidden" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 16, flexShrink: 0 }}>
-          <button style={iconBtnStyle} onClick={() => { setScreen("main"); setSingleMode(null); setValS(""); setNoteS(""); }}>
+          <button style={iconBtnStyle} onClick={() => { hapticOpen(); setScreen("main"); setSingleMode(null); setValS(""); setNoteS(""); }}>
             <IconBack />
           </button>
           <div style={{ fontSize: 24, fontWeight: 800, color: "white" }}>
