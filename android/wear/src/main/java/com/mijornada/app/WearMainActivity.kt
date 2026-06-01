@@ -34,7 +34,6 @@ class WearMainActivity : ComponentActivity(), MessageClient.OnMessageReceivedLis
     private var selectedCategory = mutableStateOf("")
     private var selectedCategoryLabel = mutableStateOf("")
     private var selectedCategoryColor = mutableStateOf(ColorPropina)
-    private var selectedCategoryBgColor = mutableStateOf(ColorPropinaBg)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -79,10 +78,8 @@ class WearMainActivity : ComponentActivity(), MessageClient.OnMessageReceivedLis
             ScreenState.ADD_ENTRY -> AddEntryScreen(
                 categoryLabel = selectedCategoryLabel.value,
                 categoryColor = selectedCategoryColor.value,
-                categoryBgColor = selectedCategoryBgColor.value,
                 onSave = { amount, note ->
                     sendAddEntry(selectedCategory.value, amount, note)
-                    currentScreen.value = ScreenState.ACTIVE_TURNO
                 },
                 onCancel = {
                     currentScreen.value = ScreenState.ACTIVE_TURNO
@@ -91,7 +88,6 @@ class WearMainActivity : ComponentActivity(), MessageClient.OnMessageReceivedLis
             ScreenState.END_TURNO -> EndTurnoScreen(
                 onConfirm = { dinero, km ->
                     sendEndTurno(dinero, km)
-                    currentScreen.value = ScreenState.NO_CONNECTED
                 },
                 onCancel = {
                     currentScreen.value = ScreenState.ACTIVE_TURNO
@@ -105,32 +101,26 @@ class WearMainActivity : ComponentActivity(), MessageClient.OnMessageReceivedLis
             "propina" -> {
                 selectedCategoryLabel.value = "Propina"
                 selectedCategoryColor.value = ColorPropina
-                selectedCategoryBgColor.value = ColorPropinaBg
             }
             "datafono" -> {
                 selectedCategoryLabel.value = "Datáfono"
                 selectedCategoryColor.value = ColorDatafono
-                selectedCategoryBgColor.value = ColorDatafonoBg
             }
             "agencia_bono" -> {
                 selectedCategoryLabel.value = "Agencia/Bono"
                 selectedCategoryColor.value = ColorAgencia
-                selectedCategoryBgColor.value = ColorAgenciaBg
             }
             "extra" -> {
                 selectedCategoryLabel.value = "Extra"
                 selectedCategoryColor.value = ColorExtra
-                selectedCategoryBgColor.value = ColorExtraBg
             }
             "gasolina" -> {
                 selectedCategoryLabel.value = "Gasolina"
                 selectedCategoryColor.value = ColorGasolina
-                selectedCategoryBgColor.value = ColorGasolinaBg
             }
             "nulo" -> {
                 selectedCategoryLabel.value = "Nulo"
                 selectedCategoryColor.value = ColorNulo
-                selectedCategoryBgColor.value = ColorNuloBg
             }
         }
     }
@@ -157,6 +147,7 @@ class WearMainActivity : ComponentActivity(), MessageClient.OnMessageReceivedLis
                     currentScreen.value = ScreenState.NO_ACTIVE_TURNO
                 }
             } else if ("OK" == json.optString("type")) {
+                currentScreen.value = ScreenState.ACTIVE_TURNO
                 requestStatus()
             } else if ("ERROR" == json.optString("type")) {
                 Log.e(TAG, "Error desde movil: ${json.optString("message")}")
@@ -232,10 +223,13 @@ class WearMainActivity : ComponentActivity(), MessageClient.OnMessageReceivedLis
                     currentScreen.value = ScreenState.NO_CONNECTED
                 } else {
                     val data = commandJson.toByteArray(StandardCharsets.UTF_8)
-                    for (node in nodes) {
-                        Wearable.getMessageClient(this)
-                            .sendMessage(node.id, "/watch-command", data)
-                    }
+                    val node = nodes.first()
+                    Wearable.getMessageClient(this)
+                        .sendMessage(node.id, "/watch-command", data)
+                        .addOnFailureListener {
+                            isConnected.value = false
+                            currentScreen.value = ScreenState.NO_CONNECTED
+                        }
                 }
             }
             .addOnFailureListener {

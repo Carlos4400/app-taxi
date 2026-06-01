@@ -9,6 +9,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.wear.compose.foundation.lazy.ScalingLazyColumn
 import androidx.wear.compose.material.*
 import com.mijornada.app.theme.*
 
@@ -16,7 +17,6 @@ import com.mijornada.app.theme.*
 fun AddEntryScreen(
     categoryLabel: String,
     categoryColor: Color,
-    categoryBgColor: Color,
     onSave: (amount: Double, note: String) -> Unit,
     onCancel: () -> Unit
 ) {

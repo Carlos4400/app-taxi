@@ -2,19 +2,43 @@ import { registerPlugin, Capacitor } from "@capacitor/core";
 import { useAppStore } from "./store";
 import { processWatchCommand } from "../logic/watch-command-processor";
 import type { WatchCommand, WatchCommandResponse } from "../shared/watch-commands";
+import { auth } from "./firebase";
 
 export interface WearOsBridgePlugin {
   setPrepared(options: { uid: string }): Promise<void>;
-  sendResponse(options: { response: string }): Promise<void>;
+  sendResponse(options: { response: string; nodeId?: string }): Promise<void>;
   addListener(
     eventName: "onCommandReceived",
-    listenerFunc: (data: { command: string }) => void
+    listenerFunc: (data: { command: string; nodeId?: string }) => void
   ): Promise<any> & any;
 }
 
 const WearOsBridge = registerPlugin<WearOsBridgePlugin>("WearOsBridge");
 
 let listenerAdded = false;
+let preparedUid: string | null = null;
+
+function readOperationId(command: unknown): string {
+  if (!command || typeof command !== "object") return "";
+  const value = (command as { operationId?: unknown }).operationId;
+  return typeof value === "string" ? value : "";
+}
+
+function errorResponse(operationId: string, code: string, message: string): WatchCommandResponse {
+  return {
+    type: "ERROR",
+    operationId,
+    code,
+    message,
+  };
+}
+
+async function sendResponse(response: WatchCommandResponse, nodeId?: string): Promise<void> {
+  await WearOsBridge.sendResponse({
+    nodeId,
+    response: JSON.stringify(response),
+  });
+}
 
 /**
  * Inicializa la escucha de comandos desde el reloj.
@@ -23,6 +47,8 @@ let listenerAdded = false;
 export function setupWatchBridge(uid: string) {
   if (!uid) return;
   if (!Capacitor.isNativePlatform()) return;
+
+  preparedUid = uid;
 
   WearOsBridge.setPrepared({ uid })
     .then(() => {
@@ -35,10 +61,30 @@ export function setupWatchBridge(uid: string) {
   if (listenerAdded) return;
   listenerAdded = true;
 
-  WearOsBridge.addListener("onCommandReceived", async (data: { command: string }) => {
+  WearOsBridge.addListener("onCommandReceived", async (data: { command: string; nodeId?: string }) => {
     try {
       const command = JSON.parse(data.command) as WatchCommand;
+      const operationId = readOperationId(command);
       const store = useAppStore.getState();
+      const authUid = auth.currentUser?.uid ?? null;
+
+      if (!authUid || !preparedUid || authUid !== preparedUid) {
+        await sendResponse(errorResponse(
+          operationId,
+          "AUTH_UID_MISMATCH",
+          "Usuario movil no coincide con el puente del reloj",
+        ), data.nodeId);
+        return;
+      }
+
+      if (!store.dataLoaded) {
+        await sendResponse(errorResponse(
+          operationId,
+          "DATA_NOT_LOADED",
+          "Datos del usuario no cargados",
+        ), data.nodeId);
+        return;
+      }
 
       const processorState = {
         current: store.current,
@@ -70,9 +116,7 @@ export function setupWatchBridge(uid: string) {
         store.setProcessedOperationIds(result.processedOperationIds);
       }
 
-      await WearOsBridge.sendResponse({
-        response: JSON.stringify(result.response),
-      });
+      await sendResponse(result.response, data.nodeId);
 
       if (result.response.type === "OK") {
         await sendWatchStatus();
@@ -80,6 +124,11 @@ export function setupWatchBridge(uid: string) {
 
     } catch (err) {
       console.error("Error al procesar comando de Wear OS:", err);
+      await sendResponse(errorResponse(
+        "",
+        "INVALID_COMMAND",
+        "Comando del reloj invalido",
+      ), data.nodeId);
     }
   });
 }

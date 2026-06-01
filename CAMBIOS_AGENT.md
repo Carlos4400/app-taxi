@@ -8215,3 +8215,465 @@ Los iconos de tipo de entrada (IconCoin, IconPercent, IconCard, IconAgency, Icon
 #### Código anterior
 ```tsx
 const IconCoin = ({ s = 24, c = G }: { s?: number; c?: str
+## 2026-06-01 13:49 - Blindar puente Wear OS
+
+**Archivos modificados:**
+- `android/app/src/main/java/com/mijornada/app/MainActivity.java`
+- `android/app/src/main/java/com/mijornada/app/WearListenerService.java`
+- `android/app/src/main/java/com/mijornada/app/WearOsBridgePlugin.java`
+- `android/wear/src/main/AndroidManifest.xml`
+- `android/wear/src/main/java/com/mijornada/app/WearMainActivity.kt`
+- `android/wear/src/main/java/com/mijornada/app/screens/ActiveTurnoScreen.kt`
+- `android/wear/src/main/java/com/mijornada/app/screens/AddEntryScreen.kt`
+- `android/wear/src/main/java/com/mijornada/app/screens/EndTurnoScreen.kt`
+- `android/wear/proguard-rules.pro`
+- `src/services/watch-bridge.ts`
+- `src/__tests__/android-wear-bridge.test.ts`
+- `src/__tests__/watch-bridge.test.ts`
+
+### Cambio 1 - Registro del plugin Wear en Capacitor
+
+#### Codigo anterior
+```java
+package com.mijornada.app;
+
+import com.getcapacitor.BridgeActivity;
+
+public class MainActivity extends BridgeActivity {}
+```
+
+#### Codigo nuevo
+```java
+package com.mijornada.app;
+
+import android.os.Bundle;
+import com.getcapacitor.BridgeActivity;
+
+public class MainActivity extends BridgeActivity {
+    @Override
+    protected void onCreate(Bundle savedInstanceState) {
+        registerPlugin(WearOsBridgePlugin.class);
+        super.onCreate(savedInstanceState);
+    }
+}
+```
+
+#### Por que se cambio
+El plugin nativo `WearOsBridgePlugin` existia, pero `MainActivity` no lo registraba manualmente. Sin este registro, Capacitor podia no cargar el puente nativo usado por `registerPlugin<WearOsBridgePlugin>("WearOsBridge")`.
+
+### Cambio 2 - Nodo de origen en comandos del reloj
+
+#### Codigo anterior
+```java
+public interface CommandListener {
+    void onCommandReceived(String commandJson);
+}
+```
+
+```java
+if (listener != null) {
+    listener.onCommandReceived(commandJson);
+} else {
+```
+
+#### Codigo nuevo
+```java
+public interface CommandListener {
+    void onCommandReceived(String commandJson, String nodeId);
+}
+```
+
+```java
+if (listener != null) {
+    listener.onCommandReceived(commandJson, messageEvent.getSourceNodeId());
+} else {
+```
+
+#### Por que se cambio
+El puente necesitaba conocer el nodo Wear que envio cada comando para responder a ese nodo concreto y no emitir respuestas de comandos a todos los nodos conectados.
+
+### Cambio 3 - Respuesta nativa dirigida al reloj
+
+#### Codigo anterior
+```java
+private String currentUid = null;
+```
+
+```java
+public void onCommandReceived(String commandJson) {
+    JSObject data = new JSObject();
+    data.put("command", commandJson);
+    notifyListeners("onCommandReceived", data);
+}
+```
+
+```java
+if (uid != null && !uid.trim().isEmpty()) {
+    this.currentUid = uid;
+    call.resolve();
+} else {
+```
+
+```java
+byte[] responseData = responseJson.getBytes(StandardCharsets.UTF_8);
+Wearable.getNodeClient(getContext())
+    .getConnectedNodes()
+```
+
+#### Codigo nuevo
+```java
+public void onCommandReceived(String commandJson, String nodeId) {
+    JSObject data = new JSObject();
+    data.put("command", commandJson);
+    data.put("nodeId", nodeId);
+    notifyListeners("onCommandReceived", data);
+}
+```
+
+```java
+if (uid != null && !uid.trim().isEmpty()) {
+    call.resolve();
+} else {
+```
+
+```java
+String nodeId = call.getString("nodeId");
+byte[] responseData = responseJson.getBytes(StandardCharsets.UTF_8);
+if (nodeId != null && !nodeId.trim().isEmpty()) {
+    Wearable.getMessageClient(getContext())
+        .sendMessage(nodeId, "/watch-response", responseData)
+        .addOnSuccessListener(unused -> call.resolve())
+        .addOnFailureListener(e -> call.reject("Error al responder a Wear OS: " + e.getMessage()));
+    return;
+}
+
+Wearable.getNodeClient(getContext())
+    .getConnectedNodes()
+```
+
+#### Por que se cambio
+`currentUid` se elimino porque no protegia nada. La respuesta nativa se hizo dirigida por `nodeId` para cerrar el ciclo comando-respuesta con el reloj que origino el mensaje.
+
+### Cambio 4 - Blindaje de UID y carga en el puente JS
+
+#### Codigo anterior
+```ts
+import { registerPlugin, Capacitor } from "@capacitor/core";
+import { useAppStore } from "./store";
+import { processWatchCommand } from "../logic/watch-command-processor";
+import type { WatchCommand, WatchCommandResponse } from "../shared/watch-commands";
+```
+
+```ts
+export interface WearOsBridgePlugin {
+  setPrepared(options: { uid: string }): Promise<void>;
+  sendResponse(options: { response: string }): Promise<void>;
+  addListener(
+    eventName: "onCommandReceived",
+    listenerFunc: (data: { command: string }) => void
+  ): Promise<any> & any;
+}
+```
+
+```ts
+let listenerAdded = false;
+```
+
+```ts
+  WearOsBridge.addListener("onCommandReceived", async (data: { command: string }) => {
+    try {
+      const command = JSON.parse(data.command) as WatchCommand;
+      const store = useAppStore.getState();
+```
+
+```ts
+      await WearOsBridge.sendResponse({
+        response: JSON.stringify(result.response),
+      });
+```
+
+```ts
+    } catch (err) {
+      console.error("Error al procesar comando de Wear OS:", err);
+    }
+```
+
+#### Codigo nuevo
+```ts
+import { registerPlugin, Capacitor } from "@capacitor/core";
+import { useAppStore } from "./store";
+import { processWatchCommand } from "../logic/watch-command-processor";
+import type { WatchCommand, WatchCommandResponse } from "../shared/watch-commands";
+import { auth } from "./firebase";
+```
+
+```ts
+export interface WearOsBridgePlugin {
+  setPrepared(options: { uid: string }): Promise<void>;
+  sendResponse(options: { response: string; nodeId?: string }): Promise<void>;
+  addListener(
+    eventName: "onCommandReceived",
+    listenerFunc: (data: { command: string; nodeId?: string }) => void
+  ): Promise<any> & any;
+}
+```
+
+```ts
+let listenerAdded = false;
+let preparedUid: string | null = null;
+```
+
+```ts
+function readOperationId(command: unknown): string {
+  if (!command || typeof command !== "object") return "";
+  const value = (command as { operationId?: unknown }).operationId;
+  return typeof value === "string" ? value : "";
+}
+
+function errorResponse(operationId: string, code: string, message: string): WatchCommandResponse {
+  return {
+    type: "ERROR",
+    operationId,
+    code,
+    message,
+  };
+}
+
+async function sendResponse(response: WatchCommandResponse, nodeId?: string): Promise<void> {
+  await WearOsBridge.sendResponse({
+    nodeId,
+    response: JSON.stringify(response),
+  });
+}
+```
+
+```ts
+  preparedUid = uid;
+```
+
+```ts
+  WearOsBridge.addListener("onCommandReceived", async (data: { command: string; nodeId?: string }) => {
+    try {
+      const command = JSON.parse(data.command) as WatchCommand;
+      const operationId = readOperationId(command);
+      const store = useAppStore.getState();
+      const authUid = auth.currentUser?.uid ?? null;
+
+      if (!authUid || !preparedUid || authUid !== preparedUid) {
+        await sendResponse(errorResponse(
+          operationId,
+          "AUTH_UID_MISMATCH",
+          "Usuario movil no coincide con el puente del reloj",
+        ), data.nodeId);
+        return;
+      }
+
+      if (!store.dataLoaded) {
+        await sendResponse(errorResponse(
+          operationId,
+          "DATA_NOT_LOADED",
+          "Datos del usuario no cargados",
+        ), data.nodeId);
+        return;
+      }
+```
+
+```ts
+      await sendResponse(result.response, data.nodeId);
+```
+
+```ts
+    } catch (err) {
+      console.error("Error al procesar comando de Wear OS:", err);
+      await sendResponse(errorResponse(
+        "",
+        "INVALID_COMMAND",
+        "Comando del reloj invalido",
+      ), data.nodeId);
+    }
+```
+
+#### Por que se cambio
+Antes el puente aceptaba comandos del reloj sin validar el usuario autenticado real ni que el store tuviera los datos cargados. Ahora un comando no puede tocar `current` ni `history` si el UID no coincide o si `dataLoaded` aun no esta activo.
+
+### Cambio 5 - Esperar OK antes de cambiar pantalla en Wear
+
+#### Codigo anterior
+```kt
+onSave = { amount, note ->
+    sendAddEntry(selectedCategory.value, amount, note)
+    currentScreen.value = ScreenState.ACTIVE_TURNO
+},
+```
+
+```kt
+onConfirm = { dinero, km ->
+    sendEndTurno(dinero, km)
+    currentScreen.value = ScreenState.NO_CONNECTED
+},
+```
+
+```kt
+} else if ("OK" == json.optString("type")) {
+    requestStatus()
+} else if ("ERROR" == json.optString("type")) {
+```
+
+#### Codigo nuevo
+```kt
+onSave = { amount, note ->
+    sendAddEntry(selectedCategory.value, amount, note)
+},
+```
+
+```kt
+onConfirm = { dinero, km ->
+    sendEndTurno(dinero, km)
+},
+```
+
+```kt
+} else if ("OK" == json.optString("type")) {
+    currentScreen.value = ScreenState.ACTIVE_TURNO
+    requestStatus()
+} else if ("ERROR" == json.optString("type")) {
+```
+
+#### Por que se cambio
+El reloj cambiaba de pantalla como si una entrada o cierre se hubiera aplicado antes de recibir confirmacion del movil. Ahora espera `OK` del movil antes de volver al flujo activo y despues pide estado real.
+
+### Cambio 6 - Enviar comandos Wear a un unico nodo
+
+#### Codigo anterior
+```kt
+val data = commandJson.toByteArray(StandardCharsets.UTF_8)
+for (node in nodes) {
+    Wearable.getMessageClient(this)
+        .sendMessage(node.id, "/watch-command", data)
+}
+```
+
+#### Codigo nuevo
+```kt
+val data = commandJson.toByteArray(StandardCharsets.UTF_8)
+val node = nodes.first()
+Wearable.getMessageClient(this)
+    .sendMessage(node.id, "/watch-command", data)
+    .addOnFailureListener {
+        isConnected.value = false
+        currentScreen.value = ScreenState.NO_CONNECTED
+    }
+```
+
+#### Por que se cambio
+Emitir un comando mutativo a todos los nodos conectados podia enviar la misma orden a mas de un dispositivo. Ahora se envia a un unico nodo conectado y si el envio falla el reloj vuelve al estado seguro de no conectado.
+
+### Cambio 7 - Limpieza Wear sin codigo inutil
+
+#### Codigo anterior
+```kt
+private var selectedCategoryBgColor = mutableStateOf(ColorPropinaBg)
+```
+
+```kt
+categoryBgColor = selectedCategoryBgColor.value,
+```
+
+```kt
+categoryBgColor: Color,
+```
+
+```kt
+import androidx.wear.compose.material.*
+```
+
+```xml
+<activity
+    android:name="com.mijornada.app.WearMainActivity"
+    android:exported="true"
+    android:theme="@android:style/Theme.DeviceDefault.NoActionBar">
+```
+
+#### Codigo nuevo
+```kt
+import androidx.wear.compose.foundation.lazy.ScalingLazyColumn
+import androidx.wear.compose.material.*
+```
+
+```xml
+<activity
+    android:name="com.mijornada.app.WearMainActivity"
+    android:exported="true"
+    android:taskAffinity="com.mijornada.app.watch"
+    android:theme="@android:style/Theme.DeviceDefault.NoActionBar">
+```
+
+#### Por que se cambio
+Se elimino el estado/parametro de color de fondo que no se usaba, se importo `ScalingLazyColumn` desde el paquete no obsoleto y se anadio `taskAffinity` para resolver el aviso Wear Recents de lint.
+
+### Cambio 8 - Archivo ProGuard de Wear
+
+#### Codigo anterior
+`No existia proguard-rules.pro en android/wear.`
+
+#### Codigo nuevo
+```pro
+# Reglas especificas del modulo Wear OS.
+# Se mantiene el archivo porque build.gradle lo referencia en release.
+```
+
+#### Por que se cambio
+`android/wear/build.gradle` referenciaba `proguard-rules.pro` en release. Se creo el archivo para que la configuracion no apunte a un fichero ausente.
+
+### Cambio 9 - Tests del puente Wear
+
+#### Codigo anterior
+`No existia watch-bridge.test.ts en src/__tests__.`
+
+#### Codigo nuevo
+```ts
+describe("watch-bridge", () => {
+  beforeEach(async () => {
+    vi.resetModules();
+    vi.clearAllMocks();
+    capacitorMock.listener = null;
+    capacitorMock.isNative = true;
+    firebaseMock.auth.currentUser = { uid: "uid-preparado" };
+```
+
+```ts
+  it("rechaza comandos si el UID autenticado no coincide con el UID preparado", async () => {
+```
+
+```ts
+  it("rechaza comandos si los datos del usuario aun no estan cargados", async () => {
+```
+
+```ts
+  it("responde con error si el comando recibido no es JSON valido", async () => {
+```
+
+#### Por que se cambio
+Se anadieron regresiones para probar que el puente del reloj no modifica el store si el UID no coincide, si los datos no estan cargados o si el comando recibido no es JSON valido.
+
+### Cambio 10 - Tests Android/Wear de integracion
+
+#### Codigo anterior
+`No existia android-wear-bridge.test.ts en src/__tests__.`
+
+#### Codigo nuevo
+```ts
+describe("Android Wear bridge", () => {
+  it("registra WearOsBridgePlugin en MainActivity para que Capacitor lo cargue", () => {
+```
+
+```ts
+  it("no cambia pantallas de trabajo del reloj antes de recibir OK del movil", () => {
+```
+
+```ts
+  it("envia cada comando del reloj a un unico nodo conectado", () => {
+```
+
+#### Por que se cambio
+Se anadieron regresiones de integracion para fijar el registro del plugin nativo, evitar pantallas optimistas antes del `OK` del movil y evitar comandos enviados a varios nodos.

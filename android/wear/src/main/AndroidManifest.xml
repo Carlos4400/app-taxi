@@ -20,6 +20,7 @@
         <activity
             android:name="com.mijornada.app.WearMainActivity"
             android:exported="true"
+            android:taskAffinity="com.mijornada.app.watch"
             android:theme="@android:style/Theme.DeviceDefault.NoActionBar">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />

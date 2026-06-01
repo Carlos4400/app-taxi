@@ -8,7 +8,7 @@ import java.nio.charset.StandardCharsets;
 public class WearListenerService extends WearableListenerService {
 
     public interface CommandListener {
-        void onCommandReceived(String commandJson);
+        void onCommandReceived(String commandJson, String nodeId);
     }
 
     private static CommandListener listener;
@@ -22,7 +22,7 @@ public class WearListenerService extends WearableListenerService {
         if ("/watch-command".equals(messageEvent.getPath())) {
             String commandJson = new String(messageEvent.getData(), StandardCharsets.UTF_8);
             if (listener != null) {
-                listener.onCommandReceived(commandJson);
+                listener.onCommandReceived(commandJson, messageEvent.getSourceNodeId());
             } else {
                 // Responder directamente si el puente no está preparado.
                 String nodeId = messageEvent.getSourceNodeId();

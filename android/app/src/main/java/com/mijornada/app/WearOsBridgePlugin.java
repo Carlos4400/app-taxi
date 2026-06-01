@@ -12,16 +12,15 @@ import java.nio.charset.StandardCharsets;
 @CapacitorPlugin(name = "WearOsBridge")
 public class WearOsBridgePlugin extends Plugin {
 
-    private String currentUid = null;
-
     @Override
     public void load() {
         super.load();
         WearListenerService.setCommandListener(new WearListenerService.CommandListener() {
             @Override
-            public void onCommandReceived(String commandJson) {
+            public void onCommandReceived(String commandJson, String nodeId) {
                 JSObject data = new JSObject();
                 data.put("command", commandJson);
+                data.put("nodeId", nodeId);
                 notifyListeners("onCommandReceived", data);
             }
         });
@@ -31,7 +30,6 @@ public class WearOsBridgePlugin extends Plugin {
     public void setPrepared(PluginCall call) {
         String uid = call.getString("uid");
         if (uid != null && !uid.trim().isEmpty()) {
-            this.currentUid = uid;
             call.resolve();
         } else {
             call.reject("uid es obligatorio");
@@ -46,7 +44,16 @@ public class WearOsBridgePlugin extends Plugin {
             return;
         }
 
+        String nodeId = call.getString("nodeId");
         byte[] responseData = responseJson.getBytes(StandardCharsets.UTF_8);
+        if (nodeId != null && !nodeId.trim().isEmpty()) {
+            Wearable.getMessageClient(getContext())
+                .sendMessage(nodeId, "/watch-response", responseData)
+                .addOnSuccessListener(unused -> call.resolve())
+                .addOnFailureListener(e -> call.reject("Error al responder a Wear OS: " + e.getMessage()));
+            return;
+        }
+
         Wearable.getNodeClient(getContext())
             .getConnectedNodes()
             .addOnSuccessListener(nodes -> {
