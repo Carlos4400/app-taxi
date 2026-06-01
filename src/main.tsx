@@ -144,7 +144,7 @@ export {
   getTurnoConfig,
 };
 
-const { useState, useEffect, useRef } = React;
+const { useState, useEffect, useRef, useCallback } = React;
 
 type EntryTypeMeta = {
   color: string;
@@ -228,6 +228,8 @@ function App({ uid }: { uid: string }) {
   // Navegación gestionada por el slice de navegación del store (stack + back).
   const screen = useAppStore((s) => s.screen);
   const setScreen = useAppStore((s) => s.setScreen);
+  const replaceScreen = useAppStore((s) => s.replaceScreen);
+  const resetNavigation = useAppStore((s) => s.resetNavigation);
   const [returnScreen, setReturnScreen] = useState<string | null>(null);
   const [burst, setBurst] = useState(false);
   const [viewTurno, setViewTurno] = useState<Turno | null>(null);
@@ -316,6 +318,15 @@ function App({ uid }: { uid: string }) {
     showNotaDialog: false,
     showReservaDialog: false,
   });
+  const localAndroidBackHandlerRef = useRef<(() => boolean) | null>(null);
+  const registerLocalAndroidBackHandler = useCallback((handler: () => boolean) => {
+    localAndroidBackHandlerRef.current = handler;
+    return () => {
+      if (localAndroidBackHandlerRef.current === handler) {
+        localAndroidBackHandlerRef.current = null;
+      }
+    };
+  }, []);
 
   androidBackButtonSnapshotRef.current = {
     adminMode,
@@ -338,6 +349,10 @@ function App({ uid }: { uid: string }) {
     import("@capacitor/app")
       .then(({ App: CapApp }) =>
         CapApp.addListener("backButton", () => {
+          if (localAndroidBackHandlerRef.current?.()) {
+            void hapticBackClose();
+            return;
+          }
           const state = useAppStore.getState();
           handleAndroidBackButton(androidBackButtonSnapshotRef.current, {
             closeBackupMenu: () => setShowBackupMenu(false),
@@ -608,6 +623,7 @@ function App({ uid }: { uid: string }) {
         uid={adminMode.uid}
         username={adminMode.username}
         onBack={() => setAdminMode("list")}
+        registerLocalAndroidBackHandler={registerLocalAndroidBackHandler}
       />
     );
   }
@@ -977,7 +993,7 @@ function App({ uid }: { uid: string }) {
         isPaused={current.isPaused}
         isAdmin={isAdmin}
         active={active}
-        onSetScreen={setScreen}
+        onSetScreen={replaceScreen}
         onSetCalendarView={setCalendarView}
         onOpenNewReserva={openNewReserva}
         onSetAdminMode={setAdminMode}
@@ -1027,6 +1043,7 @@ function App({ uid }: { uid: string }) {
         settings={settings}
         openNewReserva={openNewReserva}
         setScreen={setScreen}
+        replaceScreen={replaceScreen}
         setViewTurno={setViewTurno}
         setReturnScreen={setReturnScreen}
       />
@@ -1075,6 +1092,7 @@ function App({ uid }: { uid: string }) {
         setViewTurno={setViewTurno}
         setReturnScreen={setReturnScreen}
         setScreen={setScreen}
+        replaceScreen={replaceScreen}
         setEditJ={setEditJ}
         setHistory={setHistory}
         confirmDialog={confirmDialog}
@@ -1090,7 +1108,9 @@ function App({ uid }: { uid: string }) {
         setEditJ={setEditJ}
         setHistory={setHistory}
         setViewTurno={setViewTurno}
-        setScreen={setScreen}
+        replaceScreen={replaceScreen}
+        resetNavigation={resetNavigation}
+        registerLocalAndroidBackHandler={registerLocalAndroidBackHandler}
         endField={endField}
         setEndField={setEndField}
       />
@@ -1106,7 +1126,7 @@ function App({ uid }: { uid: string }) {
         setNoteS={setNoteS}
         setCurrent={setCurrent}
         setSingleMode={setSingleMode}
-        setScreen={setScreen}
+        replaceScreen={replaceScreen}
       />
     );
   }
@@ -1134,7 +1154,7 @@ function App({ uid }: { uid: string }) {
         noteD={noteD}
         setNoteD={setNoteD}
         setCurrent={setCurrent}
-        setScreen={setScreen}
+        replaceScreen={replaceScreen}
       />
     );
   }
@@ -1260,6 +1280,7 @@ function App({ uid }: { uid: string }) {
         pendingTie={pendingTie}
         setPendingTie={setPendingTie}
         setScreen={setScreen}
+        replaceScreen={replaceScreen}
         setSelectedWeekId={setSelectedWeekId}
         setReturnScreen={setReturnScreen}
         setViewTurno={setViewTurno}
@@ -1305,6 +1326,7 @@ function App({ uid }: { uid: string }) {
         setReturnScreen={setReturnScreen}
         setViewTurno={setViewTurno}
         renderTurnoCard={renderTurnoCard}
+        registerLocalAndroidBackHandler={registerLocalAndroidBackHandler}
       />
     );
   }
@@ -1331,6 +1353,7 @@ function App({ uid }: { uid: string }) {
         selectedTurnosIds={selectedTurnosIds}
         setSelectedTurnosIds={setSelectedTurnosIds}
         setScreen={setScreen}
+        replaceScreen={replaceScreen}
         setViewTurno={setViewTurno}
         setReturnScreen={setReturnScreen}
         onExportSelectedTurnosJSON={exportSelectedTurnosJSON}
@@ -1354,7 +1377,7 @@ function App({ uid }: { uid: string }) {
         saveEditEntry={saveEditEntry}
         deleteEditEntry={deleteEditEntry}
         setEditEntry={setEditEntry}
-        setScreen={setScreen}
+        replaceScreen={replaceScreen}
       />
     );
   }
@@ -1382,7 +1405,7 @@ function App({ uid }: { uid: string }) {
         gasolinas={gasolinas}
         nulos={nulos}
         onEndTurno={handleEndTurno}
-        setScreen={setScreen}
+        replaceScreen={replaceScreen}
       />
     );
   }
@@ -1456,7 +1479,7 @@ function App({ uid }: { uid: string }) {
                 border: "2px solid rgba(255, 180, 0, 0.24)",
                 boxShadow: "0 8px 22px rgba(255, 180, 0, 0.10)",
               }}
-              onClick={() => setScreen("home")}
+              onClick={() => replaceScreen("home")}
               title="Inicio"
               aria-label="Volver al inicio"
             >

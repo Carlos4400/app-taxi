@@ -37,7 +37,7 @@ export function LiquidacionSemanaScreen({
 }: Props) {
   const history: Turno[] = useAppStore((s) => s.history);
   const settings: AppSettings = useAppStore((s) => s.settings);
-  const setScreen = useAppStore((s) => s.setScreen);
+  const replaceScreen = useAppStore((s) => s.replaceScreen);
   const S = {
     iconBtn: {
       background: "rgba(255,255,255,0.06)",
@@ -303,7 +303,7 @@ export function LiquidacionSemanaScreen({
       <div style={{ flex: 1, padding: "16px 20px 32px", minHeight: 0, display: "flex", flexDirection: "column", gap: 14, overflowY: "auto" }}>
         {/* Cabecera */}
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-          <button style={S.iconBtn} onClick={() => setScreen("detalleSemana")}>
+          <button style={S.iconBtn} onClick={() => replaceScreen("detalleSemana")}>
             <IconBack />
           </button>
           <div style={{ flex: 1 }}>
@@ -612,7 +612,7 @@ export function LiquidacionSemanaScreen({
           </button>
 
           <button
-            onClick={() => setScreen("detalleSemana")}
+            onClick={() => replaceScreen("detalleSemana")}
             style={{
               padding: "16px 0",
               borderRadius: 16,

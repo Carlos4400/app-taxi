@@ -37,7 +37,7 @@ interface AddEntryScreenProps {
   noteD: string;
   setNoteD: React.Dispatch<React.SetStateAction<string>>;
   setCurrent: React.Dispatch<React.SetStateAction<CurrentState>>;
-  setScreen: React.Dispatch<React.SetStateAction<string>>;
+  replaceScreen: (screen: string) => void;
 }
 
 export const AddEntryScreen: FC<AddEntryScreenProps> = ({
@@ -52,7 +52,7 @@ export const AddEntryScreen: FC<AddEntryScreenProps> = ({
   noteD,
   setNoteD,
   setCurrent,
-  setScreen,
+  replaceScreen,
 }) => {
   const setVal = activeField === "propina" ? setValP : setValD;
   const curVal = activeField === "propina" ? valP : valD;
@@ -90,14 +90,14 @@ export const AddEntryScreen: FC<AddEntryScreenProps> = ({
       entries: [...prev.entries, ...newEntries],
     }));
     setValP(""); setValD(""); setNoteP(""); setNoteD("");
-    setScreen("main");
+    replaceScreen("main");
   }
 
   return (
     <Shell burst={false}>
       <div style={{ flex: 1, padding: "16px 20px", display: "flex", flexDirection: "column", minHeight: 0, overflow: "hidden" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 16, flexShrink: 0 }}>
-          <button style={iconBtnStyle} onClick={() => { hapticOpen(); setScreen("main"); }}>
+          <button style={iconBtnStyle} onClick={() => { hapticOpen(); replaceScreen("main"); }}>
             <IconBack />
           </button>
           <div style={{ fontSize: 24, fontWeight: 800, color: "white" }}>

@@ -1,4 +1,4 @@
-import { type FC, useState } from "react";
+import { type FC, useEffect, useState } from "react";
 import { Shell } from "../components/shell";
 import { IconBack, IconDel } from "../components/navigation-icons";
 import {
@@ -40,7 +40,9 @@ interface EditTurnoScreenProps {
   setEditJ: (s: EditTurnoState | null) => void;
   setHistory: React.Dispatch<React.SetStateAction<Turno[]>>;
   setViewTurno: (t: Turno | null) => void;
-  setScreen: (s: string) => void;
+  replaceScreen: (s: string) => void;
+  resetNavigation: (root?: string) => void;
+  registerLocalAndroidBackHandler?: (handler: () => boolean) => () => void;
   endField: "dinero" | "km" | null;
   setEndField: (f: "dinero" | "km" | null) => void;
 }
@@ -50,7 +52,9 @@ export const EditTurnoScreen: FC<EditTurnoScreenProps> = ({
   setEditJ,
   setHistory,
   setViewTurno,
-  setScreen,
+  replaceScreen,
+  resetNavigation,
+  registerLocalAndroidBackHandler,
   endField,
   setEndField,
 }) => {
@@ -66,6 +70,33 @@ export const EditTurnoScreen: FC<EditTurnoScreenProps> = ({
     text: string;
     onConfirm: () => void;
   } | null>(null);
+
+  useEffect(() => {
+    if (!registerLocalAndroidBackHandler) return;
+    return registerLocalAndroidBackHandler(() => {
+      if (confirmDialog) {
+        setConfirmDialog(null);
+        return true;
+      }
+      if (editEntry) {
+        setEditEntry(null);
+        return true;
+      }
+      if (endField) {
+        setEndField(null);
+        return true;
+      }
+      if (showNewEntryKP) {
+        setShowNewEntryKP(false);
+        return true;
+      }
+      if (showTypeMenu) {
+        setShowTypeMenu(false);
+        return true;
+      }
+      return false;
+    });
+  }, [confirmDialog, editEntry, endField, registerLocalAndroidBackHandler, setEndField, showNewEntryKP, showTypeMenu]);
 
   function saveEdit() {
     if (!editJ) return;
@@ -100,7 +131,7 @@ export const EditTurnoScreen: FC<EditTurnoScreenProps> = ({
     setHistory((h: Turno[]) => h.map((j: Turno) => j.id === updated.id ? (updated as Turno) : j));
     setViewTurno(updated as Turno);
     setEditJ(null);
-    setScreen('summary');
+    replaceScreen('summary');
   }
 
   const eDinero = editJ.dineroStr !== undefined ? editJ.dineroStr : (editJ.dinero ? editJ.dinero.toString().replace('.', ',') : "");
@@ -161,7 +192,7 @@ export const EditTurnoScreen: FC<EditTurnoScreenProps> = ({
     <Shell burst={false}>
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', padding: '12px 20px 32px', overflowY: 'auto', animation: 'slideIn 0.25s ease' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 20 }}>
-          <button style={S.iconBtn} onClick={() => { hapticOpen(); setEditJ(null); setEndField(null); setScreen('summary'); }}><IconBack /></button>
+          <button style={S.iconBtn} onClick={() => { hapticOpen(); setEditJ(null); setEndField(null); replaceScreen('summary'); }}><IconBack /></button>
           <span style={{ fontSize: 20, fontWeight: 700, color: 'white' }}>Editar Turno</span>
         </div>
 
@@ -466,7 +497,7 @@ export const EditTurnoScreen: FC<EditTurnoScreenProps> = ({
             style={{ padding: '18px 0', borderRadius: 18, border: 'none', background: GBG, color: G, outline: `1.5px solid ${G}55`, fontSize: 17, fontWeight: 800, cursor: 'pointer' }}>
             Guardar cambios
           </button>
-          <button onClick={() => { hapticOpen(); setEditJ(null); setEndField(null); setScreen('summary'); }}
+          <button onClick={() => { hapticOpen(); setEditJ(null); setEndField(null); replaceScreen('summary'); }}
             style={{ padding: '16px 0', borderRadius: 18, border: 'none', background: 'rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.5)', fontSize: 16, fontWeight: 700, cursor: 'pointer' }}>
             Cancelar
           </button>
@@ -480,7 +511,7 @@ export const EditTurnoScreen: FC<EditTurnoScreenProps> = ({
                   setHistory((h) => h.filter((j) => j.id !== editJ.id));
                   setEditJ(null);
                   setViewTurno(null);
-                  setScreen("PantallaTurnos");
+                  resetNavigation("PantallaTurnos");
                 }
               });
             }}

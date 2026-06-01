@@ -61,6 +61,7 @@ interface CalendarScreenProps {
   openNewReserva: (date?: string) => void;
   renderReservaDialog: () => React.ReactElement | false;
   setScreen: (screen: string) => void;
+  replaceScreen: (screen: string) => void;
   setViewTurno: (turno: Turno) => void;
   setReturnScreen: (screen: string | null) => void;
 }
@@ -153,6 +154,7 @@ export function CalendarScreen({
   openNewReserva,
   renderReservaDialog,
   setScreen,
+  replaceScreen,
   setViewTurno,
   setReturnScreen,
 }: CalendarScreenProps) {
@@ -267,7 +269,7 @@ export function CalendarScreen({
 
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 4, flexShrink: 0, gap: 12 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-            <button style={iconBtnStyle} onClick={() => setScreen("home")}><IconBack /></button>
+            <button style={iconBtnStyle} onClick={() => replaceScreen("home")}><IconBack /></button>
             <div style={{ fontSize: 24, fontWeight: 800, color: "white" }}>Calendario</div>
           </div>
 

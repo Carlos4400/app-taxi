@@ -35,7 +35,7 @@ interface AddSingleEntryScreenProps {
   setNoteS: React.Dispatch<React.SetStateAction<string>>;
   setCurrent: React.Dispatch<React.SetStateAction<import("../shared/types").CurrentState>>;
   setSingleMode: React.Dispatch<React.SetStateAction<string | null>>;
-  setScreen: React.Dispatch<React.SetStateAction<string>>;
+  replaceScreen: (screen: string) => void;
 }
 
 export const AddSingleEntryScreen: FC<AddSingleEntryScreenProps> = ({
@@ -46,7 +46,7 @@ export const AddSingleEntryScreen: FC<AddSingleEntryScreenProps> = ({
   setNoteS,
   setCurrent,
   setSingleMode,
-  setScreen,
+  replaceScreen,
 }: AddSingleEntryScreenProps) => {
   const cfg = {
     agencia_bono: { accent: A, bg: ABG, label: "Agencia/Bono" },
@@ -97,14 +97,14 @@ export const AddSingleEntryScreen: FC<AddSingleEntryScreenProps> = ({
     setValS("");
     setNoteS("");
     setSingleMode(null);
-    setScreen("main");
+    replaceScreen("main");
   }
 
   return (
     <Shell burst={false}>
       <div style={{ flex: 1, padding: "12px 20px", display: "flex", flexDirection: "column", minHeight: 0, overflow: "hidden" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 16, flexShrink: 0 }}>
-          <button style={iconBtnStyle} onClick={() => { hapticOpen(); setScreen("main"); setSingleMode(null); setValS(""); setNoteS(""); }}>
+          <button style={iconBtnStyle} onClick={() => { hapticOpen(); replaceScreen("main"); setSingleMode(null); setValS(""); setNoteS(""); }}>
             <IconBack />
           </button>
           <div style={{ fontSize: 24, fontWeight: 800, color: "white" }}>

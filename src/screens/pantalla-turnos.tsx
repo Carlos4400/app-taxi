@@ -30,6 +30,7 @@ export function PantallaTurnos({
   selectedTurnosIds,
   setSelectedTurnosIds,
   setScreen,
+  replaceScreen,
   setViewTurno,
   setReturnScreen,
   onExportSelectedTurnosJSON,
@@ -42,6 +43,7 @@ export function PantallaTurnos({
   selectedTurnosIds: number[];
   setSelectedTurnosIds: (ids: number[]) => void;
   setScreen: (screen: string) => void;
+  replaceScreen: (screen: string) => void;
   setViewTurno: (turno: Turno) => void;
   setReturnScreen: (screen: string | null) => void;
   onExportSelectedTurnosJSON: () => void;
@@ -64,7 +66,7 @@ export function PantallaTurnos({
           <button style={S.iconBtn} onClick={() => {
             setIsSelectingTurnos(false);
             setSelectedTurnosIds([]);
-            setScreen("home");
+            replaceScreen("home");
           }}>
             <IconBack />
           </button>

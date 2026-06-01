@@ -69,6 +69,8 @@ interface NavigationSlice {
   navigationStack: string[];
   /** Navega a una pantalla apilándola en el historial. */
   setScreen: (value: Updater<string>) => void;
+  /** Sustituye la pantalla actual sin crear una nueva entrada de historial. */
+  replaceScreen: (value: Updater<string>) => void;
   /** Vuelve a la pantalla anterior del stack. Devuelve false si ya estaba en la raíz. */
   goBack: () => boolean;
   /** Reinicia la navegación a una pantalla raíz (p. ej. al hacer login/logout). */
@@ -115,6 +117,17 @@ export const useAppStore = create<AppStore>((set, get) => ({
       const next = resolve(s.screen, value);
       if (next === s.screen) return s;
       return { screen: next, navigationStack: [...s.navigationStack, next] };
+    }),
+
+  replaceScreen: (value) =>
+    set((s) => {
+      const next = resolve(s.screen, value);
+      const stack = s.navigationStack.length > 0 ? [...s.navigationStack] : [s.screen];
+      stack[stack.length - 1] = next;
+      if (stack.length > 1 && stack[stack.length - 2] === next) {
+        stack.pop();
+      }
+      return { screen: next, navigationStack: stack };
     }),
 
   goBack: () => {

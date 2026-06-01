@@ -59,7 +59,7 @@ type Props = {
   gasolinas: Entry[];
   nulos: Entry[];
   onEndTurno: () => void;
-  setScreen: (screen: string) => void;
+  replaceScreen: (screen: string) => void;
 };
 
 export function ConfirmEndScreen({
@@ -83,7 +83,7 @@ export function ConfirmEndScreen({
   gasolinas,
   nulos,
   onEndTurno,
-  setScreen,
+  replaceScreen,
 }: Props) {
   function kpEnd(v: string) {
     hapticKey();
@@ -100,7 +100,7 @@ export function ConfirmEndScreen({
     <Shell burst={false}>
       <div style={{ flex: 1, display: "flex", flexDirection: "column", padding: "12px 20px 16px", overflowY: "auto", animation: "slideIn 0.25s ease", WebkitOverflowScrolling: "touch" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 16, flexShrink: 0 }}>
-          <button style={S.iconBtn} onClick={() => { hapticOpen(); setScreen("main"); setEndField(null); }}><IconBack /></button>
+          <button style={S.iconBtn} onClick={() => { hapticOpen(); replaceScreen("main"); setEndField(null); }}><IconBack /></button>
           <span style={{ fontSize: 20, fontWeight: 700, color: "white" }}>Terminar Turno</span>
         </div>
 
@@ -266,7 +266,7 @@ export function ConfirmEndScreen({
             style={{ padding: "15px 0", borderRadius: 16, border: "none", background: "rgba(255,60,60,0.12)", color: "rgba(255,110,110,0.9)", fontSize: 16, fontWeight: 800, cursor: "pointer", outline: "1.5px solid rgba(255,60,60,0.25)" }}>
             Terminar Turno
           </button>
-          <button onClick={() => { hapticOpen(); setScreen("main"); }}
+          <button onClick={() => { hapticOpen(); replaceScreen("main"); }}
             style={{ padding: "13px 0", borderRadius: 16, border: "none", background: "rgba(255,255,255,0.06)", color: "rgba(255,255,255,0.5)", fontSize: 15, fontWeight: 700, cursor: "pointer" }}>
             Cancelar
           </button>

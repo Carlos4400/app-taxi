@@ -75,4 +75,22 @@ describe("store: slice de navegación", () => {
     useAppStore.getState().goBack();
     expect(useAppStore.getState().screen).toBe("PantallaTurnos");
   });
+
+  it("replaceScreen sustituye la pantalla actual sin duplicar la anterior", () => {
+    useAppStore.getState().setScreen("PantallaTurnos");
+    useAppStore.getState().setScreen("summary");
+    useAppStore.getState().setScreen("editTurno");
+
+    const replaceScreen = (useAppStore.getState() as any).replaceScreen;
+    expect(typeof replaceScreen).toBe("function");
+
+    replaceScreen("summary");
+
+    expect(useAppStore.getState().screen).toBe("summary");
+    expect(useAppStore.getState().navigationStack).toEqual([
+      "home",
+      "PantallaTurnos",
+      "summary",
+    ]);
+  });
 });

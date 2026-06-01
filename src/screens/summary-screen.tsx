@@ -57,6 +57,7 @@ interface SummaryScreenProps {
   setViewTurno: (t: Turno | null) => void;
   setReturnScreen: (s: string | null) => void;
   setScreen: (s: string) => void;
+  replaceScreen: (s: string) => void;
   setEditJ: (s: any) => void;
   setHistory: React.Dispatch<React.SetStateAction<Turno[]>>;
   confirmDialog: any;
@@ -70,6 +71,7 @@ export const SummaryScreen: FC<SummaryScreenProps> = ({
   setViewTurno,
   setReturnScreen,
   setScreen,
+  replaceScreen,
   setEditJ,
   setHistory,
   confirmDialog,
@@ -130,7 +132,7 @@ export const SummaryScreen: FC<SummaryScreenProps> = ({
       <div style={{ flex: 1, overflowY: 'auto', padding: '16px 20px 32px', display: 'flex', flexDirection: 'column', gap: 14, animation: 'slideIn 0.3s ease' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
           <button style={iconBtnStyle} onClick={() => {
-            setScreen(returnScreen || (isToday ? 'home' : 'PantallaTurnos'));
+            replaceScreen(returnScreen || (isToday ? 'home' : 'PantallaTurnos'));
             setViewTurno(null);
             setReturnScreen(null);
           }}>
@@ -367,7 +369,11 @@ export const SummaryScreen: FC<SummaryScreenProps> = ({
         )}
 
         {isToday && (
-          <button onClick={() => setScreen('home')}
+          <button onClick={() => {
+            replaceScreen('home');
+            setViewTurno(null);
+            setReturnScreen(null);
+          }}
             style={{ marginTop: 4, padding: '17px 0', borderRadius: 18, border: 'none', background: 'rgba(255,255,255,0.07)', color: 'rgba(255,255,255,0.7)', fontSize: 16, fontWeight: 700, cursor: 'pointer' }}>
             Volver al inicio
           </button>

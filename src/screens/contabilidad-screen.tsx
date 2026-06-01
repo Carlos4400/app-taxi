@@ -42,6 +42,7 @@ export interface ContabilidadScreenProps {
   pendingTie: { weekId: string; candidates: { mesId: string; mesLabel: string }[] } | null;
   setPendingTie: (tie: { weekId: string; candidates: { mesId: string; mesLabel: string }[] } | null) => void;
   setScreen: (screen: string) => void;
+  replaceScreen: (screen: string) => void;
   setSelectedWeekId: (weekId: string) => void;
   setReturnScreen: (screen: string) => void;
   setViewTurno: (turno: Turno) => void;
@@ -91,6 +92,7 @@ export function ContabilidadScreen({
   pendingTie,
   setPendingTie,
   setScreen,
+  replaceScreen,
   setSelectedWeekId,
   setReturnScreen,
   setViewTurno,
@@ -212,7 +214,7 @@ export function ContabilidadScreen({
       <div style={{ flex: 1, padding: "16px 20px 32px", display: "flex", flexDirection: "column", gap: 16, overflowY: "auto" }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 12, minWidth: 0 }}>
-            <button style={S.iconBtn} onClick={() => setScreen("home")}>
+            <button style={S.iconBtn} onClick={() => replaceScreen("home")}>
               <IconBack />
             </button>
             <div style={{ fontSize: 24, fontWeight: 800, color: "white" }}>Contabilidad</div>

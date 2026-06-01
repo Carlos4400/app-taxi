@@ -25,13 +25,13 @@ export const AddNotaGeneralScreen: FC<AddNotaGeneralScreenProps> = ({
   // Estado/acciones de negocio leídos directamente del store (antes llegaban
   // como props desde App). El estado del formulario (noteS) sigue siendo local.
   const setCurrent = useAppStore((s) => s.setCurrent);
-  const setScreen = useAppStore((s) => s.setScreen);
+  const replaceScreen = useAppStore((s) => s.replaceScreen);
 
   return (
     <Shell burst={false}>
       <div style={{ flex: 1, padding: "12px 20px 16px", display: "flex", flexDirection: "column", minHeight: 0, overflow: "hidden", animation: "slideIn 0.25s ease" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 24, flexShrink: 0 }}>
-          <button style={iconBtnStyle} onClick={() => { setScreen("main"); setNoteS(""); }}>
+          <button style={iconBtnStyle} onClick={() => { replaceScreen("main"); setNoteS(""); }}>
             <IconBack />
           </button>
           <div style={{ fontSize: 24, fontWeight: 800, color: "white" }}>
@@ -73,7 +73,7 @@ export const AddNotaGeneralScreen: FC<AddNotaGeneralScreenProps> = ({
               setCurrent(prev => ({ ...prev, entries: [...prev.entries, newEntry] }));
             }
             setNoteS("");
-            setScreen("main");
+            replaceScreen("main");
           }}
           style={{ width: "100%", padding: 18, marginTop: 16, borderRadius: 16, border: "none", background: "white", color: "black", fontWeight: 800, fontSize: 18, cursor: "pointer", flexShrink: 0 }}
         >

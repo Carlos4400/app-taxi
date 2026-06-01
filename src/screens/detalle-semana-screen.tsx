@@ -39,6 +39,7 @@ type Props = {
   updateWeekOverride: (weekId: string, partial: Partial<Omit<WeekOverride, "weekId">>) => void;
   setReturnScreen: (screen: string | null) => void;
   setViewTurno: (turno: Turno | null) => void;
+  registerLocalAndroidBackHandler?: (handler: () => boolean) => () => void;
   renderTurnoCard: (
     turno: Turno,
     options: {
@@ -58,12 +59,14 @@ export function DetalleSemanaScreen({
   updateWeekOverride,
   setReturnScreen,
   setViewTurno,
+  registerLocalAndroidBackHandler,
   renderTurnoCard,
 }: Props) {
   const history: Turno[] = useAppStore((s) => s.history);
   const settings: AppSettings = useAppStore((s) => s.settings);
   const weekOverrides: WeekOverride[] = useAppStore((s) => s.weekOverrides);
   const setScreen = useAppStore((s) => s.setScreen);
+  const replaceScreen = useAppStore((s) => s.replaceScreen);
   const weekId = selectedWeekId;
   const grupos = groupTurnosByWeek(history, settings.diaLibre);
   const turnosSemana = grupos.get(weekId) || [];
@@ -110,12 +113,21 @@ export function DetalleSemanaScreen({
     onConfirm: () => void;
   } | null>(null);
 
+  React.useEffect(() => {
+    if (!registerLocalAndroidBackHandler) return;
+    return registerLocalAndroidBackHandler(() => {
+      if (!confirmDialog) return false;
+      setConfirmDialog(null);
+      return true;
+    });
+  }, [confirmDialog, registerLocalAndroidBackHandler]);
+
   return (
     <Shell burst={false}>
       <div style={{ flex: 1, padding: "16px 20px 32px", display: "flex", flexDirection: "column", gap: 14, overflowY: "auto" }}>
         {/* Cabecera */}
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-          <button style={{ background: "rgba(255,255,255,0.06)", border: "none", borderRadius: 12, padding: 10, display: "flex", alignItems: "center", cursor: "pointer" }} onClick={() => { setScreen("contabilidad"); setSelectedWeekId(null); }}>
+          <button style={{ background: "rgba(255,255,255,0.06)", border: "none", borderRadius: 12, padding: 10, display: "flex", alignItems: "center", cursor: "pointer" }} onClick={() => { replaceScreen("contabilidad"); setSelectedWeekId(null); }}>
             <IconBack />
           </button>
           <div style={{ flex: 1 }}>
@@ -271,7 +283,11 @@ export function DetalleSemanaScreen({
                   formatMoney={fmt}
                   getEntryTypeMeta={getEntryTypeMeta}
                   noteTimeStyle={NOTE_TIME_STYLE}
-                  onClick={() => { setScreen("summary"); }}
+                  onClick={() => {
+                    setReturnScreen("detalleSemana");
+                    setViewTurno(data.turno);
+                    setScreen("summary");
+                  }}
                 />
               ))}
             </div>

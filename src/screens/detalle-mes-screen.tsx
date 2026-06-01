@@ -71,6 +71,7 @@ export function DetalleMesScreen({
   const history: Turno[] = useAppStore((s) => s.history);
   const settings: AppSettings = useAppStore((s) => s.settings);
   const setScreen = useAppStore((s) => s.setScreen);
+  const replaceScreen = useAppStore((s) => s.replaceScreen);
   const monthId = `${selectedAccountingYear}-${String(selectedAccountingMonth).padStart(2, "0")}`;
   const turnosMes = getTurnosByCalendarMonth(history, selectedAccountingYear, selectedAccountingMonth);
   const resumenMes = calcularResumenContableTurnos(turnosMes, settings);
@@ -99,7 +100,7 @@ export function DetalleMesScreen({
     <Shell burst={false}>
       <div style={{ flex: 1, padding: "16px 20px 32px", display: "flex", flexDirection: "column", gap: 14, overflowY: "auto" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-          <button style={S.iconBtn} onClick={() => setScreen("contabilidad")}>
+          <button style={S.iconBtn} onClick={() => replaceScreen("contabilidad")}>
             <IconBack />
           </button>
           <div style={{ flex: 1 }}>

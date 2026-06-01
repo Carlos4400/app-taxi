@@ -35,7 +35,7 @@ type Props = {
   saveEditEntry: () => void;
   deleteEditEntry: () => void;
   setEditEntry: (e: Entry | null) => void;
-  setScreen: (screen: string) => void;
+  replaceScreen: (screen: string) => void;
 };
 
 export function TodayHistoryScreen({
@@ -51,13 +51,13 @@ export function TodayHistoryScreen({
   saveEditEntry,
   deleteEditEntry,
   setEditEntry,
-  setScreen,
+  replaceScreen,
 }: Props) {
   return (
     <Shell burst={false}>
       <div style={{ flex: 1, padding: "16px 20px", display: "flex", flexDirection: "column", gap: 14, overflowY: "auto" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 10 }}>
-          <button style={S.iconBtn} onClick={() => setScreen("main")}>
+          <button style={S.iconBtn} onClick={() => replaceScreen("main")}>
             <IconBack />
           </button>
           <div style={{ fontSize: 24, fontWeight: 800, color: "white" }}>

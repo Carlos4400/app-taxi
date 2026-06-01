@@ -1,3 +1,712 @@
+## 2026-06-01 02:14 - Añadir contrato Wear seguro
+
+**Archivos modificados:** `src/shared/watch-commands.ts`, `src/logic/watch-command-processor.ts`, `src/__tests__/watch-command-processor.test.ts`
+
+### Cambio 1 - Tipos de comandos del reloj
+
+#### Código anterior
+`No existía watch-commands.ts en src/shared.`
+
+#### Código nuevo
+```ts
+export type WatchEntryType =
+  | "propina"
+  | "datafono"
+  | "agencia_bono"
+  | "extra"
+  | "gasolina"
+  | "nulo";
+
+export type WatchCommand =
+  | {
+      operationId: string;
+      type: "GET_STATUS" | "START_TURNO";
+      createdAt: string;
+    }
+  | {
+      operationId: string;
+      type: "ADD_ENTRY";
+      createdAt: string;
+      payload: {
+        entryType: WatchEntryType;
+        amount: number;
+        note: string;
+      };
+    }
+  | {
+      operationId: string;
+      type: "ADD_NOTE";
+      createdAt: string;
+      payload: {
+        note: string;
+      };
+    }
+  | {
+      operationId: string;
+      type: "END_TURNO";
+      createdAt: string;
+      payload: {
+        dinero: number;
+        km: number;
+        note: string;
+      };
+    };
+```
+
+#### Por qué se cambió
+Se creó un contrato tipado para que las órdenes del reloj tengan formato explícito y siempre incluyan `operationId`, `type`, `createdAt` y el `payload` correspondiente.
+
+### Cambio 2 - Respuestas del móvil al reloj
+
+#### Código anterior
+`No existía WatchCommandResponse en src/shared/watch-commands.ts.`
+
+#### Código nuevo
+```ts
+export type WatchCommandResponse =
+  | {
+      type: "STATUS";
+      connected: true;
+      activeTurno: boolean;
+      startTime: string | null;
+      startDate: string | null;
+    }
+  | {
+      type: "OK";
+      operationId: string;
+      message: string;
+    }
+  | {
+      type: "ERROR";
+      operationId: string;
+      code: string;
+      message: string;
+    }
+  | {
+      type: "DUPLICATE_IGNORED";
+      operationId: string;
+      message: string;
+    };
+```
+
+#### Por qué se cambió
+El reloj necesita respuestas claras del móvil para mostrar estado confirmado, éxito, error o duplicado ignorado sin inventar estado local.
+
+### Cambio 3 - Procesador puro de comandos Wear
+
+#### Código anterior
+`No existía watch-command-processor.ts en src/logic.`
+
+#### Código nuevo
+```ts
+export type WatchCommandProcessorState = {
+  current: CurrentState;
+  history: Turno[];
+  processedOperationIds: string[];
+  settings: Pick<
+    AppSettings,
+    | "porcentaje.jefe"
+    | "porcentaje.chofer"
+    | "descontar.datafono"
+    | "descontar.agencia_bono"
+    | "descontar.extra"
+    | "descontar.gasolina"
+    | "diaLibre"
+  >;
+  now: {
+    date: string;
+    time: string;
+    id: number;
+  };
+};
+
+export type WatchCommandProcessorResult = WatchCommandProcessorState & {
+  response: WatchCommandResponse;
+};
+```
+
+```ts
+export function processWatchCommand(
+  command: WatchCommand,
+  state: WatchCommandProcessorState,
+): WatchCommandProcessorResult {
+  if (!command.operationId.trim()) {
+    return {
+      ...state,
+      response: errorResponse(command, "INVALID_OPERATION_ID", "operationId obligatorio"),
+    };
+  }
+
+  if (command.type === "GET_STATUS") {
+    return {
+      ...state,
+      response: {
+        type: "STATUS",
+        connected: true,
+        activeTurno: isActive(state.current),
+        startTime: state.current.startTime,
+        startDate: state.current.startDate,
+      },
+    };
+  }
+
+  if (state.processedOperationIds.includes(command.operationId)) {
+    return {
+      ...state,
+      response: {
+        type: "DUPLICATE_IGNORED",
+        operationId: command.operationId,
+        message: "Operacion ya procesada",
+      },
+    };
+  }
+```
+
+#### Por qué se cambió
+Se añadió una pieza pura, sin React, sin Android y sin Firebase, para validar y aplicar comandos del reloj de forma testeable antes de conectarlos a Wear OS.
+
+### Cambio 4 - Aplicar órdenes de trabajo desde el procesador
+
+#### Código anterior
+`No existía lógica para START_TURNO, ADD_ENTRY, ADD_NOTE ni END_TURNO en src/logic/watch-command-processor.ts.`
+
+#### Código nuevo
+```ts
+  if (command.type === "START_TURNO") {
+    if (isActive(state.current)) {
+      return {
+        ...state,
+        response: errorResponse(command, "ACTIVE_TURNO", "Ya hay turno activo"),
+      };
+    }
+
+    return {
+      ...state,
+      current: {
+        ...state.current,
+        startTime: state.now.time,
+        startDate: state.now.date,
+      },
+      processedOperationIds: withProcessedOperationId(state, command.operationId),
+      response: {
+        type: "OK",
+        operationId: command.operationId,
+        message: "Turno iniciado",
+      },
+    };
+  }
+```
+
+```ts
+  if (command.type === "ADD_ENTRY") {
+    if (!state.current.startTime) {
+      return {
+        ...state,
+        response: errorResponse(command, "NO_ACTIVE_TURNO", "No hay turno activo"),
+      };
+    }
+    if (!(command.payload.amount > 0)) {
+      return {
+        ...state,
+        response: errorResponse(command, "INVALID_AMOUNT", "Importe invalido"),
+      };
+    }
+```
+
+```ts
+  if (command.type === "END_TURNO") {
+    if (!state.current.startTime) {
+      return {
+        ...state,
+        response: errorResponse(command, "NO_ACTIVE_TURNO", "No hay turno activo"),
+      };
+    }
+    if (!(command.payload.dinero > 0) || !(command.payload.km > 0)) {
+      return {
+        ...state,
+        response: errorResponse(command, "INVALID_END_VALUES", "Taximetro y kilometros obligatorios"),
+      };
+    }
+```
+
+#### Por qué se cambió
+El reloj necesita iniciar turno, añadir entradas, añadir notas y terminar turno, pero el móvil debe validar el estado antes de aplicar cada orden.
+
+### Cambio 5 - Tests del procesador Wear
+
+#### Código anterior
+`No existía watch-command-processor.test.ts en src/__tests__.`
+
+#### Código nuevo
+```ts
+describe("processWatchCommand", () => {
+  it("inicia turno solo una vez con operationId unico", () => {
+    const command: WatchCommand = {
+      operationId: "op-start-1",
+      type: "START_TURNO",
+      createdAt: "2026-06-01T10:35:00",
+    };
+
+    const result = processWatchCommand(command, baseState());
+
+    expect(result.response).toEqual({
+      type: "OK",
+      operationId: "op-start-1",
+      message: "Turno iniciado",
+    });
+    expect(result.current.startTime).toBe("10:35");
+    expect(result.current.startDate).toBe("2026-06-01");
+    expect(result.processedOperationIds).toEqual(["op-start-1"]);
+  });
+```
+
+```ts
+  it("ignora comandos duplicados sin modificar el turno", () => {
+    const command: WatchCommand = {
+      operationId: "op-entry-1",
+      type: "ADD_ENTRY",
+      createdAt: "2026-06-01T10:36:00",
+      payload: {
+        entryType: "propina",
+        amount: 1,
+        note: "",
+      },
+    };
+```
+
+```ts
+  it("termina turno activo y lo mueve al historial", () => {
+    const result = processWatchCommand({
+      operationId: "op-end-1",
+      type: "END_TURNO",
+      createdAt: "2026-06-01T12:00:00",
+      payload: {
+        dinero: 123.45,
+        km: 210,
+        note: "cierre desde reloj",
+      },
+    }, baseState({
+```
+
+#### Por qué se cambió
+Los tests fijan que el procesador inicia turno, ignora duplicados, rechaza entradas sin turno activo, añade entradas/notas y termina turno moviéndolo al historial.
+
+## 2026-06-01 02:08 - Añadir plan del reloj Wear OS
+
+**Archivos modificados:** `PLAN_RELOJ_WEAR_OS.md`
+
+### Cambio 1 - Documento del reloj Wear OS
+
+#### Código anterior
+`No existía PLAN_RELOJ_WEAR_OS.md en la raíz del proyecto.`
+
+#### Código nuevo
+```md
+# Plan Wear OS - Reloj como mando del movil
+
+## Objetivo
+
+Crear una app para Wear OS que funcione como mando seguro del movil para la parte de trabajo:
+
+- Iniciar turno.
+- Anadir entradas al turno activo.
+- Anadir notas del turno.
+- Terminar turno.
+- Consultar el estado confirmado por el movil.
+
+El reloj no sera una app independiente de datos. El movil seguira siendo el cerebro de la app.
+
+## Regla principal
+
+El reloj no escribe en Firestore.
+
+El reloj no escribe en sincronizacion.
+
+El reloj no guarda acciones pendientes.
+
+El reloj solo manda ordenes al movil cuando hay conexion confirmada.
+
+Si no hay conexion confirmada con el movil, el reloj bloquea todas las acciones de trabajo.
+```
+
+#### Por qué se cambió
+Se añadió una especificación previa para fijar que Wear OS funcionará solo como mando del móvil, sin escritura directa en Firestore, sin cola offline y con bloqueo total de acciones cuando no exista conexión confirmada con el móvil.
+
+## 2026-06-01 01:28 - Corregir navegación de vuelta
+
+**Archivos modificados:**
+- `src/services/store.ts`
+- `src/main.tsx`
+- `src/screens/add-entry-screen.tsx`
+- `src/screens/add-nota-general-screen.tsx`
+- `src/screens/add-single-entry-screen.tsx`
+- `src/screens/admin-screens.tsx`
+- `src/screens/calendar-screen.tsx`
+- `src/screens/confirm-end-screen.tsx`
+- `src/screens/contabilidad-screen.tsx`
+- `src/screens/detalle-anual-screen.tsx`
+- `src/screens/detalle-mes-screen.tsx`
+- `src/screens/detalle-semana-screen.tsx`
+- `src/screens/edit-turno-screen.tsx`
+- `src/screens/liquidacion-semana-screen.tsx`
+- `src/screens/pantalla-turnos.tsx`
+- `src/screens/summary-screen.tsx`
+- `src/screens/today-history-screen.tsx`
+- `src/__tests__/main-antiguo-regressions.test.ts`
+- `src/__tests__/store-extraction.test.ts`
+- `src/__tests__/navigation-regressions.test.ts`
+
+### Cambio 1 - Añadir reemplazo de pantalla al store
+
+#### Código anterior
+```ts
+  /** Navega a una pantalla apilándola en el historial. */
+  setScreen: (value: Updater<string>) => void;
+  /** Vuelve a la pantalla anterior del stack. Devuelve false si ya estaba en la raíz. */
+  goBack: () => boolean;
+```
+
+```ts
+  setScreen: (value) =>
+    set((s) => {
+      const next = resolve(s.screen, value);
+      if (next === s.screen) return s;
+      return { screen: next, navigationStack: [...s.navigationStack, next] };
+    }),
+
+  goBack: () => {
+```
+
+#### Código nuevo
+```ts
+  /** Navega a una pantalla apilándola en el historial. */
+  setScreen: (value: Updater<string>) => void;
+  /** Sustituye la pantalla actual sin crear una nueva entrada de historial. */
+  replaceScreen: (value: Updater<string>) => void;
+  /** Vuelve a la pantalla anterior del stack. Devuelve false si ya estaba en la raíz. */
+  goBack: () => boolean;
+```
+
+```ts
+  setScreen: (value) =>
+    set((s) => {
+      const next = resolve(s.screen, value);
+      if (next === s.screen) return s;
+      return { screen: next, navigationStack: [...s.navigationStack, next] };
+    }),
+
+  replaceScreen: (value) =>
+    set((s) => {
+      const next = resolve(s.screen, value);
+      const stack = s.navigationStack.length > 0 ? [...s.navigationStack] : [s.screen];
+      stack[stack.length - 1] = next;
+      if (stack.length > 1 && stack[stack.length - 2] === next) {
+        stack.pop();
+      }
+      return { screen: next, navigationStack: stack };
+    }),
+
+  goBack: () => {
+```
+
+#### Por qué se cambió
+`setScreen` apila pantallas. Para volver, cancelar o cerrar pantallas hacía falta una acción que sustituyera la pantalla actual y evitara duplicados consecutivos en `navigationStack`.
+
+### Cambio 2 - Evitar que editar turno deje `editTurno` en el historial
+
+#### Código anterior
+```tsx
+  setScreen: (s: string) => void;
+```
+
+```tsx
+    setViewTurno(updated as Turno);
+    setEditJ(null);
+    setScreen('summary');
+```
+
+```tsx
+          <button style={S.iconBtn} onClick={() => { hapticOpen(); setEditJ(null); setEndField(null); setScreen('summary'); }}><IconBack /></button>
+```
+
+```tsx
+          <button onClick={() => { hapticOpen(); setEditJ(null); setEndField(null); setScreen('summary'); }}
+```
+
+```tsx
+                  setHistory((h) => h.filter((j) => j.id !== editJ.id));
+                  setEditJ(null);
+                  setViewTurno(null);
+                  setScreen("PantallaTurnos");
+```
+
+#### Código nuevo
+```tsx
+  replaceScreen: (s: string) => void;
+  resetNavigation: (root?: string) => void;
+  registerLocalAndroidBackHandler?: (handler: () => boolean) => () => void;
+```
+
+```tsx
+    setViewTurno(updated as Turno);
+    setEditJ(null);
+    replaceScreen('summary');
+```
+
+```tsx
+          <button style={S.iconBtn} onClick={() => { hapticOpen(); setEditJ(null); setEndField(null); replaceScreen('summary'); }}><IconBack /></button>
+```
+
+```tsx
+          <button onClick={() => { hapticOpen(); setEditJ(null); setEndField(null); replaceScreen('summary'); }}
+```
+
+```tsx
+                  setHistory((h) => h.filter((j) => j.id !== editJ.id));
+                  setEditJ(null);
+                  setViewTurno(null);
+                  resetNavigation("PantallaTurnos");
+```
+
+#### Por qué se cambió
+Al cancelar, guardar o volver desde edición, `editJ` se limpiaba pero `editTurno` quedaba en el historial. Al pulsar atrás nativo se volvía a una pantalla de edición sin estado válido.
+
+### Cambio 3 - Reemplazar pantallas al volver
+
+#### Código anterior
+```tsx
+onClick={() => setScreen("home")}
+```
+
+```tsx
+setScreen("main");
+```
+
+```tsx
+onClick={() => setScreen("contabilidad")}
+```
+
+```tsx
+onClick={() => setScreen("detalleSemana")}
+```
+
+#### Código nuevo
+```tsx
+onClick={() => replaceScreen("home")}
+```
+
+```tsx
+replaceScreen("main");
+```
+
+```tsx
+onClick={() => replaceScreen("contabilidad")}
+```
+
+```tsx
+onClick={() => replaceScreen("detalleSemana")}
+```
+
+#### Por qué se cambió
+Los botones de volver de calendario, contabilidad, turnos, resumen, alta de entradas, confirmar cierre, detalle mensual/anual/semanal y liquidación estaban usando navegación de entrada. Eso dejaba pantallas cerradas dentro del historial.
+
+### Cambio 4 - Abrir notas de detalle semanal con su turno
+
+#### Código anterior
+```tsx
+                  onClick={() => { setScreen("summary"); }}
+```
+
+#### Código nuevo
+```tsx
+                  onClick={() => {
+                    setReturnScreen("detalleSemana");
+                    setViewTurno(data.turno);
+                    setScreen("summary");
+                  }}
+```
+
+#### Por qué se cambió
+La tarjeta de notas de detalle semanal abría `summary` sin asignar el turno correspondiente. Podía mostrar un resumen anterior o caer a una pantalla no esperada si `viewTurno` estaba vacío.
+
+### Cambio 5 - Cerrar capas locales antes de navegar con Android atrás
+
+#### Código anterior
+```ts
+          const state = useAppStore.getState();
+          handleAndroidBackButton(androidBackButtonSnapshotRef.current, {
+```
+
+#### Código nuevo
+```ts
+          if (localAndroidBackHandlerRef.current?.()) {
+            void hapticBackClose();
+            return;
+          }
+          const state = useAppStore.getState();
+          handleAndroidBackButton(androidBackButtonSnapshotRef.current, {
+```
+
+#### Por qué se cambió
+Algunas pantallas tienen diálogos o capas locales que no viven en el estado global de `main.tsx`. El botón nativo de Android necesitaba darles prioridad antes de navegar por el stack.
+
+### Cambio 6 - Registrar cierres locales de edición, semana y admin
+
+#### Código anterior
+`No existía registro local de botón atrás Android en EditTurnoScreen, DetalleSemanaScreen ni AdminUserView.`
+
+#### Código nuevo
+```tsx
+  useEffect(() => {
+    if (!registerLocalAndroidBackHandler) return;
+    return registerLocalAndroidBackHandler(() => {
+      if (confirmDialog) {
+        setConfirmDialog(null);
+        return true;
+      }
+      if (editEntry) {
+        setEditEntry(null);
+        return true;
+      }
+      if (endField) {
+        setEndField(null);
+        return true;
+      }
+      if (showNewEntryKP) {
+        setShowNewEntryKP(false);
+        return true;
+      }
+      if (showTypeMenu) {
+        setShowTypeMenu(false);
+        return true;
+      }
+      return false;
+    });
+  }, [confirmDialog, editEntry, endField, registerLocalAndroidBackHandler, setEndField, showNewEntryKP, showTypeMenu]);
+```
+
+```tsx
+  React.useEffect(() => {
+    if (!registerLocalAndroidBackHandler) return;
+    return registerLocalAndroidBackHandler(() => {
+      if (!confirmDialog) return false;
+      setConfirmDialog(null);
+      return true;
+    });
+  }, [confirmDialog, registerLocalAndroidBackHandler]);
+```
+
+```tsx
+  useEffect(() => {
+    if (!registerLocalAndroidBackHandler) return;
+    return registerLocalAndroidBackHandler(() => {
+      if (!selectedTurno) return false;
+      setSelectedTurno(null);
+      return true;
+    });
+  }, [registerLocalAndroidBackHandler, selectedTurno]);
+```
+
+#### Por qué se cambió
+Editar turno, detalle semanal y la vista admin tenían estados locales que el handler global no podía cerrar. Se añadió un registro local para cerrar primero esas capas y solo navegar si no había nada abierto.
+
+### Cambio 7 - Añadir tests de navegación
+
+#### Código anterior
+`No existía navigation-regressions.test.ts en src/__tests__.`
+
+#### Código nuevo
+```ts
+import { readFile } from "node:fs/promises";
+import { describe, expect, it } from "vitest";
+
+describe("regresiones de navegación", () => {
+  it("editar turno vuelve al resumen sin apilar otra pantalla", async () => {
+    const source = await readFile("src/screens/edit-turno-screen.tsx", "utf8");
+
+    expect(source).not.toContain("setScreen('summary')");
+    expect(source).not.toContain('setScreen("summary")');
+    expect(source).toContain("replaceScreen('summary')");
+  });
+
+  it("detalle semana abre el resumen de notas con el turno seleccionado", async () => {
+    const source = await readFile("src/screens/detalle-semana-screen.tsx", "utf8");
+
+    expect(source).toContain('setReturnScreen("detalleSemana");');
+    expect(source).toContain("setViewTurno(data.turno);");
+  });
+});
+```
+
+#### Por qué se cambió
+Hacía falta fijar una regresión automática para que editar turno no vuelva a usar `setScreen('summary')` y para que detalle semana no abra resumen sin `viewTurno`.
+
+### Cambio 8 - Proteger `replaceScreen` con test
+
+#### Código anterior
+```ts
+  it("resetNavigation reinicia el stack a la raíz dada (flujo post-cierre de turno)", () => {
+    useAppStore.getState().setScreen("calendar");
+    useAppStore.getState().setScreen("confirmEnd");
+    useAppStore.getState().resetNavigation("PantallaTurnos");
+    useAppStore.getState().setScreen("summary");
+    // Atrás desde el resumen debe llevar a la lista de turnos, no a confirmEnd.
+    expect(useAppStore.getState().navigationStack).toEqual(["PantallaTurnos", "summary"]);
+    useAppStore.getState().goBack();
+    expect(useAppStore.getState().screen).toBe("PantallaTurnos");
+  });
+```
+
+#### Código nuevo
+```ts
+  it("resetNavigation reinicia el stack a la raíz dada (flujo post-cierre de turno)", () => {
+    useAppStore.getState().setScreen("calendar");
+    useAppStore.getState().setScreen("confirmEnd");
+    useAppStore.getState().resetNavigation("PantallaTurnos");
+    useAppStore.getState().setScreen("summary");
+    // Atrás desde el resumen debe llevar a la lista de turnos, no a confirmEnd.
+    expect(useAppStore.getState().navigationStack).toEqual(["PantallaTurnos", "summary"]);
+    useAppStore.getState().goBack();
+    expect(useAppStore.getState().screen).toBe("PantallaTurnos");
+  });
+
+  it("replaceScreen sustituye la pantalla actual sin duplicar la anterior", () => {
+    useAppStore.getState().setScreen("PantallaTurnos");
+    useAppStore.getState().setScreen("summary");
+    useAppStore.getState().setScreen("editTurno");
+
+    const replaceScreen = (useAppStore.getState() as any).replaceScreen;
+    expect(typeof replaceScreen).toBe("function");
+
+    replaceScreen("summary");
+
+    expect(useAppStore.getState().screen).toBe("summary");
+    expect(useAppStore.getState().navigationStack).toEqual([
+      "home",
+      "PantallaTurnos",
+      "summary",
+    ]);
+  });
+```
+
+#### Por qué se cambió
+El contrato nuevo del store necesitaba una prueba que reprodujera el caso real `summary -> editTurno -> summary` sin duplicar `summary` en el historial.
+
+### Cambio 9 - Actualizar test de calendario al nuevo contrato
+
+#### Código anterior
+```ts
+    expect(calendarSource).toContain('onClick={() => setScreen("home")}');
+```
+
+#### Código nuevo
+```ts
+    expect(calendarSource).toContain('onClick={() => replaceScreen("home")}');
+```
+
+#### Por qué se cambió
+El test antiguo protegía literalmente una navegación que ahora era el origen del fallo. Se cambió para proteger que el botón de volver de calendario cierre la pantalla sin apilarla.
+
 ## 2026-05-31 22:23 - Implementar vibración premium
 
 **Archivos modificados:**

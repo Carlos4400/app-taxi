@@ -31,6 +31,7 @@ export function DetalleAnualScreen({
   const history: Turno[] = useAppStore((s) => s.history);
   const settings: AppSettings = useAppStore((s) => s.settings);
   const setScreen = useAppStore((s) => s.setScreen);
+  const replaceScreen = useAppStore((s) => s.replaceScreen);
   const turnosAnual = getTurnosByCalendarYear(history, selectedAccountingYear);
   const resumenAnual = calcularResumenContableTurnos(turnosAnual, settings);
   const monthLabels = MESES_COMPLETOS;
@@ -72,7 +73,7 @@ export function DetalleAnualScreen({
     <Shell burst={false}>
       <div style={{ flex: 1, padding: "16px 20px 32px", display: "flex", flexDirection: "column", gap: 14, overflowY: "auto" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-          <button style={{ background: "rgba(255,255,255,0.06)", border: "none", borderRadius: 12, padding: 10, display: "flex", alignItems: "center", cursor: "pointer" }} onClick={() => setScreen("contabilidad")}>
+          <button style={{ background: "rgba(255,255,255,0.06)", border: "none", borderRadius: 12, padding: 10, display: "flex", alignItems: "center", cursor: "pointer" }} onClick={() => replaceScreen("contabilidad")}>
             <IconBack />
           </button>
           <div style={{ flex: 1 }}>

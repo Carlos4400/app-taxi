@@ -24,7 +24,7 @@ describe("Main antiguo regression locks", () => {
     expect(openNewNotaBlock).toContain("setEditingNota(null);");
     expect(openNewNotaBlock).not.toContain("setEditingReserva(null);");
 
-    expect(calendarSource).toContain('onClick={() => setScreen("home")}');
+    expect(calendarSource).toContain('onClick={() => replaceScreen("home")}');
     expect(calendarSource).toContain('setReturnScreen("calendar");');
     expect(calendarSource).toContain("setViewTurno(turno);");
     expect(calendarSource).toContain('setScreen("summary");');

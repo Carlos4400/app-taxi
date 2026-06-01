@@ -276,10 +276,12 @@ export function AdminUserView({
   uid,
   username,
   onBack,
+  registerLocalAndroidBackHandler,
 }: {
   uid: string;
   username: string;
   onBack: () => void;
+  registerLocalAndroidBackHandler?: (handler: () => boolean) => () => void;
 }) {
   const [current, setCurrent] = useState<CurrentState | null>(null);
   const [settings, setSettings] = useState<AppSettings | null>(null);
@@ -291,6 +293,15 @@ export function AdminUserView({
   const [error, setError] = useState<string | null>(null);
   const [tab, setTab] = useState<Tab>("turnos");
   const [selectedTurno, setSelectedTurno] = useState<Turno | null>(null);
+
+  useEffect(() => {
+    if (!registerLocalAndroidBackHandler) return;
+    return registerLocalAndroidBackHandler(() => {
+      if (!selectedTurno) return false;
+      setSelectedTurno(null);
+      return true;
+    });
+  }, [registerLocalAndroidBackHandler, selectedTurno]);
 
   useEffect(() => {
     let cancelado = false;
