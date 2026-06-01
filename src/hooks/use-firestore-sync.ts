@@ -15,10 +15,11 @@ import {
   markUserPendingSync,
 } from "../services/pending-sync";
 import { readUserLocalJSON, writeUserLocalJSON } from "../services/user-storage";
-import { KEY_CURRENT, KEY_HISTORY, KEY_SETTINGS, KEY_WEEK_OVERRIDES, KEY_RESERVATIONS, KEY_NOTES } from "../shared/storage-keys";
-import { loadSettings } from "../logic/state-loaders";
+import { KEY_CURRENT, KEY_HISTORY, KEY_SETTINGS, KEY_WEEK_OVERRIDES, KEY_RESERVATIONS, KEY_NOTES, KEY_PROCESSED_OPERATIONS } from "../shared/storage-keys";
+import { loadSettings, loadProcessedOperationIds } from "../logic/state-loaders";
 import { ensureTurnosDiaLibreContable, mergeTurnos, sortTurnosByDateDesc } from "../logic/turnos";
 import type { CurrentState, AppSettings, Turno, Reserva, NotaCalendario, WeekOverride } from "../shared/types";
+import { setupWatchBridge, sendWatchStatus } from "../services/watch-bridge";
 
 const LOCAL_MIGRATION_KEY = "taxi_migration_done_v2";
 const LOAD_TIMEOUT_MS = 15000;
@@ -91,6 +92,7 @@ export function useFirestoreSync(uid: string) {
   const reservations = useAppStore((s) => s.reservations);
   const notes = useAppStore((s) => s.notes);
   const weekOverrides = useAppStore((s) => s.weekOverrides);
+  const processedOperationIds = useAppStore((s) => s.processedOperationIds);
   const dataLoaded = useAppStore((s) => s.dataLoaded);
   const loadTimedOut = useAppStore((s) => s.loadTimedOut);
 
@@ -101,6 +103,7 @@ export function useFirestoreSync(uid: string) {
   const setReservations = useAppStore((s) => s.setReservations);
   const setNotes = useAppStore((s) => s.setNotes);
   const setWeekOverrides = useAppStore((s) => s.setWeekOverrides);
+  const setProcessedOperationIds = useAppStore((s) => s.setProcessedOperationIds);
   const setDataLoaded = useAppStore((s) => s.setDataLoaded);
   const setLoadTimedOut = useAppStore((s) => s.setLoadTimedOut);
   const setIsAdmin = useAppStore((s) => s.setIsAdmin);
@@ -111,6 +114,7 @@ export function useFirestoreSync(uid: string) {
   const lastReservationsRef = useRef<Reserva[]>([]);
   const lastNotesRef = useRef<NotaCalendario[]>([]);
   const lastWeekOverridesRef = useRef<WeekOverride[]>([]);
+  const lastProcessedOperationIdsRef = useRef<string[]>([]);
   const loadedUidRef = useRef<string | null>(null);
 
   function getWritableUid(): string | null {
@@ -210,6 +214,14 @@ export function useFirestoreSync(uid: string) {
   }, [weekOverrides, dataLoaded, uid]);
 
   useEffect(() => {
+    const writableUid = getWritableUid();
+    if (!writableUid) return;
+    if (sameJSON(processedOperationIds, lastProcessedOperationIdsRef.current)) return;
+    writeUserLocalJSON(writableUid, KEY_PROCESSED_OPERATIONS, processedOperationIds);
+    lastProcessedOperationIdsRef.current = processedOperationIds;
+  }, [processedOperationIds, dataLoaded, uid]);
+
+  useEffect(() => {
     // ── Reset a estado vacío antes de cargar los datos del nuevo usuario ──────
     // El store (Zustand) es un singleton de módulo: persiste entre desmontajes.
     // Sin este reset, los datos del usuario anterior se muestran hasta que
@@ -223,12 +235,14 @@ export function useFirestoreSync(uid: string) {
     lastReservationsRef.current = [];
     lastNotesRef.current = [];
     lastWeekOverridesRef.current = [];
+    lastProcessedOperationIdsRef.current = [];
     setCurrent(emptyCurrent());
     setSettings(loadSettings());
     setHistory([]);
     setReservations([]);
     setNotes([]);
     setWeekOverrides([]);
+    setProcessedOperationIds([]);
     setIsAdmin(false);
     setDataLoaded(false);
     setLoadTimedOut(false);
@@ -251,6 +265,10 @@ export function useFirestoreSync(uid: string) {
     }
 
     (async () => {
+      const localProcessed = readUserLocalJSON<string[]>(uid, KEY_PROCESSED_OPERATIONS) || [];
+      lastProcessedOperationIdsRef.current = localProcessed;
+      setProcessedOperationIds(localProcessed);
+
       try {
         await migrarLocalStorageAFirestore(uid);
       } catch (err) {
@@ -379,6 +397,18 @@ export function useFirestoreSync(uid: string) {
       });
     return () => { cancelado = true; };
   }, [uid]);
+
+  useEffect(() => {
+    if (dataLoaded && uid) {
+      setupWatchBridge(uid);
+    }
+  }, [dataLoaded, uid]);
+
+  useEffect(() => {
+    if (dataLoaded && uid) {
+      sendWatchStatus().catch((err) => console.error("Error al actualizar estado al reloj:", err));
+    }
+  }, [current.startTime, current.entries.length, dataLoaded, uid]);
 
   return { dataLoaded, loadTimedOut };
 }

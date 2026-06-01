@@ -14,6 +14,7 @@ import {
   loadReservations,
   loadSettings,
   loadWeekOverrides,
+  loadProcessedOperationIds,
 } from "../logic/state-loaders";
 
 /**
@@ -46,6 +47,7 @@ interface BusinessSlice {
   notes: NotaCalendario[];
   settings: AppSettings;
   weekOverrides: WeekOverride[];
+  processedOperationIds: string[];
 
   dataLoaded: boolean;
   loadTimedOut: boolean;
@@ -57,6 +59,7 @@ interface BusinessSlice {
   setNotes: (value: Updater<NotaCalendario[]>) => void;
   setSettings: (value: Updater<AppSettings>) => void;
   setWeekOverrides: (value: Updater<WeekOverride[]>) => void;
+  setProcessedOperationIds: (value: Updater<string[]>) => void;
 
   setDataLoaded: (value: Updater<boolean>) => void;
   setLoadTimedOut: (value: Updater<boolean>) => void;
@@ -89,6 +92,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
   notes: loadNotes(),
   settings: loadSettings(),
   weekOverrides: loadWeekOverrides(),
+  processedOperationIds: loadProcessedOperationIds(),
 
   dataLoaded: false,
   loadTimedOut: false,
@@ -102,6 +106,8 @@ export const useAppStore = create<AppStore>((set, get) => ({
   setSettings: (value) => set((s) => ({ settings: resolve(s.settings, value) })),
   setWeekOverrides: (value) =>
     set((s) => ({ weekOverrides: resolve(s.weekOverrides, value) })),
+  setProcessedOperationIds: (value) =>
+    set((s) => ({ processedOperationIds: resolve(s.processedOperationIds, value) })),
 
   setDataLoaded: (value) => set((s) => ({ dataLoaded: resolve(s.dataLoaded, value) })),
   setLoadTimedOut: (value) =>

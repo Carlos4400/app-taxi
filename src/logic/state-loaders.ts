@@ -7,6 +7,7 @@ import {
   KEY_RESERVATIONS,
   KEY_SETTINGS,
   KEY_WEEK_OVERRIDES,
+  KEY_PROCESSED_OPERATIONS,
 } from "../shared/storage-keys";
 import { sortTurnosByDateDesc } from "./turnos";
 
@@ -88,6 +89,14 @@ export function loadNotes(): NotaCalendario[] {
 export function loadWeekOverrides(): LoadedWeekOverride[] {
   try {
     const d = readLocalJSON<LoadedWeekOverride[]>(KEY_WEEK_OVERRIDES);
+    if (Array.isArray(d)) return d;
+  } catch (e) { }
+  return [];
+}
+
+export function loadProcessedOperationIds(): string[] {
+  try {
+    const d = readLocalJSON<string[]>(KEY_PROCESSED_OPERATIONS);
     if (Array.isArray(d)) return d;
   } catch (e) { }
   return [];
