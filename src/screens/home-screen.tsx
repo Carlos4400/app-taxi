@@ -7,6 +7,7 @@ import { G, P, A, C, GBG, PBG, ABG, CBG } from "../shared/ui-theme";
 import { getHomeQuickActionIds } from "../shared/action-ids";
 import { IconCalendar, IconSettingsNeon, IconAdminNeon, IconLogoutNeon } from "../components/navigation-icons";
 import { IconRocket, IconPlay, IconClipboard, IconChart, IconReservaWrite, IconAgendaNeon } from "../components/home-icons";
+import { BrandTaxiHero } from "../components/brand-assets";
 
 interface HomeScreenProps {
   isPaused: boolean | undefined;
@@ -47,9 +48,7 @@ export const HomeScreen: FC<HomeScreenProps> = ({
         }}
       >
         <div style={{ textAlign: "center", marginBottom: 52 }}>
-          <div style={{ fontSize: 88, lineHeight: 1, marginBottom: 18 }}>
-            🚕
-          </div>
+          <BrandTaxiHero width={190} style={{ marginBottom: 18 }} />
           <div
             style={{
               fontSize: 40,

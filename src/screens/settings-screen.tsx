@@ -21,6 +21,7 @@ import { ApkInstaller } from "../services/apk-installer";
 import { resolveLatestApkUpdate, type UpdateState } from "../logic/update-flow";
 import { IconDel } from "../components/navigation-icons";
 import { hapticDanger, hapticKey, hapticOpen, hapticSave } from "../services/haptics";
+import { BrandTaxiLogo } from "../components/brand-assets";
 
 interface SettingsScreenProps {
   isAdmin: boolean;
@@ -209,7 +210,7 @@ export const SettingsScreen: FC<SettingsScreenProps> = ({
         </div>
 
         <div style={{ background: "rgba(255,255,255,0.03)", borderRadius: 20, padding: 24, border: "1px solid rgba(255,255,255,0.07)", textAlign: "center" }}>
-          <div style={{ fontSize: 48, marginBottom: 12 }}>🚕</div>
+          <BrandTaxiLogo width={120} style={{ marginBottom: 12 }} />
           <div style={{ fontSize: 20, fontWeight: 800, color: "white", marginBottom: 4 }}>Mi Turno</div>
           <div style={{ fontSize: 14, color: "rgba(255,255,255,0.4)", marginBottom: 24 }}>Versión {APP_VERSION}</div>
           <button onClick={() => { hapticOpen(); checkUpdate(setUpdateState, setUpdateMsg, setDownloadUrl, setReleaseUrl); }} style={{ width: "100%", padding: "16px 0", borderRadius: 16, border: "none", background: "rgba(255,255,255,0.1)", color: "white", fontSize: 16, fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 10 }}>

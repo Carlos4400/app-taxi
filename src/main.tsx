@@ -27,6 +27,7 @@ import {
 import { IconTimer, IconMoneyBag, IconPencilNeon } from "./components/calendar-icons";
 import { IconRocket } from "./components/home-icons";
 import { IconNoteAdd, IconTaxiBadgeNeon, IconRoad } from "./components/summary-icons";
+import { BrandTaxiIcon } from "./components/brand-assets";
 import { CalendarScreen } from "./screens/calendar-screen";
 import { HomeScreen } from "./screens/home-screen";
 import { SummaryScreen } from "./screens/summary-screen";
@@ -1443,7 +1444,7 @@ function App({ uid }: { uid: string }) {
                 lineHeight: 1.1,
               }}
             >
-              🚕{" "}
+              <BrandTaxiIcon size={20} style={{ marginRight: 5, transform: "translateY(-1px)" }} />
               {new Date()
                 .toLocaleDateString("es-ES", {
                   weekday: "long",

@@ -1,3 +1,134 @@
+## 2026-06-03 00:17 - Integrar logo de Home
+
+**Archivos modificados:** `src/components/brand-assets.tsx`, `src/screens/home-screen.tsx`, `src/__tests__/brand-assets.test.ts`
+
+### Cambio 1 - Marca hero del taxi
+
+#### Código anterior
+```tsx
+const BRAND_MINI_20 = "/brand/brand-taxi-mini-20.png";
+const BRAND_MINI_18 = "/brand/brand-taxi-mini-18.png";
+const BRAND_LOGO = "/brand/brand-taxi-logo.png";
+```
+
+`No existía BrandTaxiHero en src/components/brand-assets.tsx.`
+
+#### Código nuevo
+```tsx
+const BRAND_MINI_20 = "/brand/brand-taxi-mini-20.png";
+const BRAND_MINI_18 = "/brand/brand-taxi-mini-18.png";
+const BRAND_LOGO = "/brand/brand-taxi-logo.png";
+const BRAND_HERO = "/brand/brand-taxi-hero.png";
+```
+
+```tsx
+type BrandTaxiHeroProps = {
+  width?: number;
+  alt?: string;
+  style?: CSSProperties;
+};
+
+export const BrandTaxiHero: FC<BrandTaxiHeroProps> = ({
+  width = 184,
+  alt = "Mi Turno Taxi",
+  style,
+}) => (
+  <img
+    src={BRAND_HERO}
+    width={width}
+    alt={alt}
+    decoding="async"
+    draggable={false}
+    style={{
+      display: "block",
+      width,
+      maxWidth: "78%",
+      height: "auto",
+      objectFit: "contain",
+      margin: "0 auto",
+      filter:
+        "drop-shadow(0 0 18px rgba(251, 191, 36, 0.20)) drop-shadow(0 0 16px rgba(56, 189, 248, 0.12))",
+      ...style,
+    }}
+  />
+);
+```
+
+#### Por qué se cambió
+La pantalla Home no debía usar el logo rectangular plano. Se añadió un componente específico para la marca principal con asset transparente y sombra integrada.
+
+### Cambio 2 - Uso del hero en Home
+
+#### Código anterior
+```tsx
+import { BrandTaxiLogo } from "../components/brand-assets";
+```
+
+```tsx
+          <BrandTaxiLogo width={168} style={{ marginBottom: 18 }} />
+```
+
+#### Código nuevo
+```tsx
+import { BrandTaxiHero } from "../components/brand-assets";
+```
+
+```tsx
+          <BrandTaxiHero width={190} style={{ marginBottom: 18 }} />
+```
+
+#### Por qué se cambió
+El logo anterior se veía como una imagen pegada encima del título. El nuevo `BrandTaxiHero` usa el recorte transparente preparado para integrarse visualmente con el fondo oscuro de la app.
+
+### Cambio 3 - Regresión de integración visual
+
+#### Código anterior
+```ts
+    expect(brandAssets).toContain("BrandTaxiIcon");
+    expect(brandAssets).toContain("/brand/brand-taxi-mini-20.png");
+    expect(brandAssets).toContain("/brand/brand-taxi-mini-18.png");
+    expect(brandAssets).toContain("/brand/brand-taxi-logo.png");
+    expect(existsSync(resolve(root, "public/brand/brand-taxi-mini-20.png"))).toBe(true);
+    expect(existsSync(resolve(root, "public/brand/brand-taxi-mini-18.png"))).toBe(true);
+    expect(existsSync(resolve(root, "public/brand/brand-taxi-logo.png"))).toBe(true);
+```
+
+```ts
+    expect(home).toContain("<BrandTaxiLogo");
+    expect(settings).toContain("<BrandTaxiLogo");
+    expect(wearHome).toContain("BrandTaxiLogo(");
+    expect(home).not.toContain("🚕");
+    expect(settings).not.toContain("🚕");
+    expect(wearHome).not.toContain("🚕");
+```
+
+#### Código nuevo
+```ts
+    expect(brandAssets).toContain("BrandTaxiIcon");
+    expect(brandAssets).toContain("BrandTaxiHero");
+    expect(brandAssets).toContain("/brand/brand-taxi-mini-20.png");
+    expect(brandAssets).toContain("/brand/brand-taxi-mini-18.png");
+    expect(brandAssets).toContain("/brand/brand-taxi-logo.png");
+    expect(brandAssets).toContain("/brand/brand-taxi-hero.png");
+    expect(existsSync(resolve(root, "public/brand/brand-taxi-mini-20.png"))).toBe(true);
+    expect(existsSync(resolve(root, "public/brand/brand-taxi-mini-18.png"))).toBe(true);
+    expect(existsSync(resolve(root, "public/brand/brand-taxi-logo.png"))).toBe(true);
+    expect(existsSync(resolve(root, "public/brand/brand-taxi-hero.png"))).toBe(true);
+```
+
+```ts
+    expect(home).toContain("<BrandTaxiHero");
+    expect(home).not.toContain("<BrandTaxiLogo");
+    expect(settings).toContain("<BrandTaxiLogo");
+    expect(wearHome).toContain("BrandTaxiLogo(");
+    expect(home).not.toContain("\u{1F695}");
+    expect(settings).not.toContain("\u{1F695}");
+    expect(wearHome).not.toContain("\u{1F695}");
+```
+
+#### Por qué se cambió
+Se fijó por prueba que Home use el componente hero y no vuelva al logo rectangular. También se cambió la comprobación del emoji a escape Unicode para evitar confusiones de codificación.
+
 ## 2026-06-02 21:36 - Añadir actualizador Wear
 
 **Archivos modificados:** `actualizar_reloj.bat`, `src/__tests__/android-wear-bridge.test.ts`
@@ -11504,3 +11635,282 @@ describe("Android Wear bridge", () => {
 
 #### Por que se cambio
 Se anadieron regresiones de integracion para fijar el registro del plugin nativo, evitar pantallas optimistas antes del `OK` del movil y evitar comandos enviados a varios nodos.
+## 2026-06-03 00:04 - Cambiar identidad visual del taxi
+
+**Archivos modificados:** `src/components/brand-assets.tsx`, `src/main.tsx`, `src/screens/home-screen.tsx`, `src/screens/settings-screen.tsx`, `android/wear/src/main/java/com/mijornada/app/screens/NoActiveTurnoScreen.kt`, `src/__tests__/brand-assets.test.ts`
+
+### Cambio 1 - Componente de marca del taxi
+
+#### Código anterior
+`No existía BrandTaxiIcon ni BrandTaxiLogo en src/components/brand-assets.tsx.`
+
+#### Código nuevo
+```tsx
+import type { CSSProperties, FC } from "react";
+
+const BRAND_MINI_20 = "/brand/brand-taxi-mini-20.png";
+const BRAND_MINI_18 = "/brand/brand-taxi-mini-18.png";
+const BRAND_LOGO = "/brand/brand-taxi-logo.png";
+
+type BrandTaxiIconProps = {
+  size?: 18 | 20 | 24 | 28 | number;
+  variant?: "primary" | "alternate";
+  alt?: string;
+  style?: CSSProperties;
+};
+
+export const BrandTaxiIcon: FC<BrandTaxiIconProps> = ({
+  size = 20,
+  variant = "primary",
+  alt = "Taxi",
+  style,
+}) => (
+  <img
+    src={variant === "alternate" ? BRAND_MINI_18 : BRAND_MINI_20}
+    width={size}
+    height={size}
+    alt={alt}
+    decoding="async"
+    draggable={false}
+    style={{
+      display: "inline-block",
+      verticalAlign: "middle",
+      objectFit: "contain",
+      flexShrink: 0,
+      ...style,
+    }}
+  />
+);
+
+type BrandTaxiLogoProps = {
+  width?: number;
+  alt?: string;
+  style?: CSSProperties;
+};
+
+export const BrandTaxiLogo: FC<BrandTaxiLogoProps> = ({
+  width = 156,
+  alt = "Mi Turno Taxi",
+  style,
+}) => (
+  <img
+    src={BRAND_LOGO}
+    width={width}
+    alt={alt}
+    decoding="async"
+    draggable={false}
+    style={{
+      display: "block",
+      width,
+      maxWidth: "100%",
+      height: "auto",
+      objectFit: "contain",
+      margin: "0 auto",
+      ...style,
+    }}
+  />
+);
+```
+
+#### Por qué se cambió
+Se centralizó la identidad visual del taxi para usar el mini icono principal de 20px, conservar la variante de 18px y reutilizar el logo grande sin duplicar rutas ni dejar emojis como marca visual.
+
+### Cambio 2 - Icono de cabecera principal
+
+#### Código anterior
+```tsx
+import { IconNoteAdd, IconTaxiBadgeNeon, IconRoad } from "./components/summary-icons";
+```
+
+```tsx
+              🚕{" "}
+              {new Date()
+```
+
+#### Código nuevo
+```tsx
+import { IconNoteAdd, IconTaxiBadgeNeon, IconRoad } from "./components/summary-icons";
+import { BrandTaxiIcon } from "./components/brand-assets";
+```
+
+```tsx
+              <BrandTaxiIcon size={20} style={{ marginRight: 5, transform: "translateY(-1px)" }} />
+              {new Date()
+```
+
+#### Por qué se cambió
+Se sustituyó el emoji de la cabecera principal por el mini icono de taxi de 20px elegido para que la cabecera use un asset propio y coherente con el resto de la marca.
+
+### Cambio 3 - Logo de la pantalla Home
+
+#### Código anterior
+```tsx
+import { IconRocket, IconPlay, IconClipboard, IconChart, IconReservaWrite, IconAgendaNeon } from "../components/home-icons";
+```
+
+```tsx
+          <div style={{ fontSize: 88, lineHeight: 1, marginBottom: 18 }}>
+            🚕
+          </div>
+```
+
+#### Código nuevo
+```tsx
+import { IconRocket, IconPlay, IconClipboard, IconChart, IconReservaWrite, IconAgendaNeon } from "../components/home-icons";
+import { BrandTaxiLogo } from "../components/brand-assets";
+```
+
+```tsx
+          <BrandTaxiLogo width={168} style={{ marginBottom: 18 }} />
+```
+
+#### Por qué se cambió
+Se sustituyó el emoji grande de la pantalla Home por el logo nuevo del taxi para que la pantalla principal muestre una imagen de marca propia.
+
+### Cambio 4 - Logo de Ajustes
+
+#### Código anterior
+```tsx
+import { hapticDanger, hapticKey, hapticOpen, hapticSave } from "../services/haptics";
+```
+
+```tsx
+          <div style={{ fontSize: 48, marginBottom: 12 }}>🚕</div>
+```
+
+#### Código nuevo
+```tsx
+import { hapticDanger, hapticKey, hapticOpen, hapticSave } from "../services/haptics";
+import { BrandTaxiLogo } from "../components/brand-assets";
+```
+
+```tsx
+          <BrandTaxiLogo width={120} style={{ marginBottom: 12 }} />
+```
+
+#### Por qué se cambió
+Se sustituyó el emoji de la tarjeta de Ajustes por el mismo logo visual usado en Home para mantener una identidad coherente.
+
+### Cambio 5 - Logo inicial de Wear
+
+#### Código anterior
+```kt
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.*
+```
+
+```kt
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.unit.dp
+```
+
+```kt
+import androidx.wear.compose.material.Text
+import com.mijornada.app.theme.*
+```
+
+```kt
+            Text("🚕", fontSize = 34.sp)
+            Spacer(modifier = Modifier.height(5.dp))
+```
+
+#### Código nuevo
+```kt
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.layout.*
+```
+
+```kt
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.unit.dp
+```
+
+```kt
+import androidx.wear.compose.material.Text
+import com.mijornada.app.R
+import com.mijornada.app.theme.*
+```
+
+```kt
+            BrandTaxiLogo()
+            Spacer(modifier = Modifier.height(5.dp))
+```
+
+```kt
+@Composable
+private fun BrandTaxiLogo() {
+    Image(
+        painter = painterResource(id = R.drawable.brand_taxi_logo),
+        contentDescription = "Mi Turno Taxi",
+        contentScale = ContentScale.Fit,
+        modifier = Modifier
+            .fillMaxWidth(0.66f)
+            .height(58.dp)
+    )
+}
+```
+
+#### Por qué se cambió
+Se sustituyó el emoji de la pantalla inicial del reloj por un recurso nativo del taxi, optimizado para Wear OS y cargado desde `R.drawable.brand_taxi_logo`.
+
+### Cambio 6 - Pruebas de identidad visual
+
+#### Código anterior
+`No existía src/__tests__/brand-assets.test.ts.`
+
+#### Código nuevo
+```ts
+import { existsSync, readFileSync } from "node:fs";
+import { resolve } from "node:path";
+import { describe, expect, it } from "vitest";
+
+const root = resolve(__dirname, "..", "..");
+
+describe("brand taxi assets", () => {
+  it("centraliza los assets visuales del taxi para movil web y reloj", () => {
+    const brandAssets = readFileSync(
+      resolve(root, "src/components/brand-assets.tsx"),
+      "utf8",
+    );
+
+    expect(brandAssets).toContain("BrandTaxiIcon");
+    expect(brandAssets).toContain("/brand/brand-taxi-mini-20.png");
+    expect(brandAssets).toContain("/brand/brand-taxi-mini-18.png");
+    expect(brandAssets).toContain("/brand/brand-taxi-logo.png");
+    expect(existsSync(resolve(root, "public/brand/brand-taxi-mini-20.png"))).toBe(true);
+    expect(existsSync(resolve(root, "public/brand/brand-taxi-mini-18.png"))).toBe(true);
+    expect(existsSync(resolve(root, "public/brand/brand-taxi-logo.png"))).toBe(true);
+  });
+
+  it("sustituye los emojis de marca por assets propios en pantallas visibles", () => {
+    const main = readFileSync(resolve(root, "src/main.tsx"), "utf8");
+    const home = readFileSync(resolve(root, "src/screens/home-screen.tsx"), "utf8");
+    const settings = readFileSync(resolve(root, "src/screens/settings-screen.tsx"), "utf8");
+    const wearHome = readFileSync(
+      resolve(root, "android/wear/src/main/java/com/mijornada/app/screens/NoActiveTurnoScreen.kt"),
+      "utf8",
+    );
+
+    expect(main).toContain("<BrandTaxiIcon size={20}");
+    expect(home).toContain("<BrandTaxiLogo");
+    expect(settings).toContain("<BrandTaxiLogo");
+    expect(wearHome).toContain("BrandTaxiLogo(");
+    expect(home).not.toContain("🚕");
+    expect(settings).not.toContain("🚕");
+    expect(wearHome).not.toContain("🚕");
+  });
+
+  it("mantiene iconos launcher actualizados para PWA Android y Wear", () => {
+    expect(existsSync(resolve(root, "public/icon-192.png"))).toBe(true);
+    expect(existsSync(resolve(root, "public/icon-512.png"))).toBe(true);
+    expect(existsSync(resolve(root, "android/app/src/main/res/mipmap-xxxhdpi/ic_launcher.png"))).toBe(true);
+    expect(existsSync(resolve(root, "android/wear/src/main/res/mipmap-xxxhdpi/ic_launcher.png"))).toBe(true);
+  });
+});
+```
+
+#### Por qué se cambió
+Se añadió cobertura para verificar que la identidad visual queda centralizada, que las pantallas visibles usan los assets nuevos y que existen iconos launcher para PWA, Android móvil y Wear.

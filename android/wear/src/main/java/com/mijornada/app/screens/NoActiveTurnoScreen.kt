@@ -3,15 +3,19 @@ package com.mijornada.app.screens
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.wear.compose.material.Text
+import com.mijornada.app.R
 import com.mijornada.app.theme.*
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
@@ -39,7 +43,7 @@ fun NoActiveTurnoScreen(
                 .fillMaxWidth(0.86f)
                 .padding(vertical = 18.dp)
         ) {
-            Text("🚕", fontSize = 34.sp)
+            BrandTaxiLogo()
             Spacer(modifier = Modifier.height(5.dp))
             Text(
                 text = "Mi Turno",
@@ -68,6 +72,18 @@ fun NoActiveTurnoScreen(
             Text("Móvil conectado", color = ColorPropina, fontSize = 9.sp)
         }
     }
+}
+
+@Composable
+private fun BrandTaxiLogo() {
+    Image(
+        painter = painterResource(id = R.drawable.brand_taxi_logo),
+        contentDescription = "Mi Turno Taxi",
+        contentScale = ContentScale.Fit,
+        modifier = Modifier
+            .fillMaxWidth(0.66f)
+            .height(58.dp)
+    )
 }
 
 @Composable

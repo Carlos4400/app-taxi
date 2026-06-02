@@ -155,7 +155,7 @@ describe("Android Wear bridge", () => {
 
   it("el instalador del reloj no fija un puerto adb concreto", () => {
     const source = readFileSync(
-      resolve(root, "actualizar_reloj.bat"),
+      resolve(root, "Actualizaciones/actualizar_reloj.bat"),
       "utf8",
     );
 
@@ -166,7 +166,7 @@ describe("Android Wear bridge", () => {
 
   it("mantiene un actualizador directo del reloj para compilar instalar y abrir", () => {
     const source = readFileSync(
-      resolve(root, "actualizar_reloj.bat"),
+      resolve(root, "Actualizaciones/actualizar_reloj.bat"),
       "utf8",
     );
 
