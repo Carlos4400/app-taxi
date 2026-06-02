@@ -41,6 +41,8 @@ enum class ScreenState {
     NO_CONNECTED,
     NO_ACTIVE_TURNO,
     ACTIVE_TURNO,
+    TURNOS,
+    TURNO_SUMMARY,
     ADD_ENTRY,
     EDIT_ENTRY,
     CONFIRM_DELETE,
@@ -64,7 +66,10 @@ class WearMainActivity : ComponentActivity(), MessageClient.OnMessageReceivedLis
     private var totalsPorTipo = mutableStateOf<Map<String, Double>>(emptyMap())
     private var numPorTipo = mutableStateOf<Map<String, Int>>(emptyMap())
     private var entradas = mutableStateOf<List<WatchEntry>>(emptyList())
+    private var turnos = mutableStateOf<List<WatchTurno>>(emptyList())
+    private var selectedTurno = mutableStateOf<WatchTurno?>(null)
     private var editingEntry = mutableStateOf<WatchEntry?>(null)
+    private var openTurnosAfterOk = false
 
     // Entrada de texto (nota) vía teclado / voz del sistema (RemoteInput)
     private val NOTE_KEY = "wear_note"
@@ -112,7 +117,10 @@ class WearMainActivity : ComponentActivity(), MessageClient.OnMessageReceivedLis
 
         when (currentScreen.value) {
             ScreenState.NO_CONNECTED -> NoConnectedScreen(onRetry = { requestStatus() })
-            ScreenState.NO_ACTIVE_TURNO -> NoActiveTurnoScreen(onStartTurno = { sendStartTurno() })
+            ScreenState.NO_ACTIVE_TURNO -> NoActiveTurnoScreen(
+                onStartTurno = { sendStartTurno() },
+                onOpenTurnos = { sendGetTurnos() }
+            )
             ScreenState.ACTIVE_TURNO -> ActiveTurnoScreen(
                 fechaTurno = formatFechaTurno(startDate.value),
                 startTime = startTime.value,
@@ -181,14 +189,36 @@ class WearMainActivity : ComponentActivity(), MessageClient.OnMessageReceivedLis
             }
             ScreenState.END_TURNO -> EndTurnoScreen(
                 totalsPorTipo = totalsPorTipo.value,
-                onConfirm = { dinero, km, note ->
-                    sendEndTurno(dinero, km, note)
+                numPorTipo = numPorTipo.value,
+                entradas = entradas.value,
+                onConfirm = { dinero, km ->
+                    sendEndTurno(dinero, km, "")
                 },
                 onCancel = {
                     currentScreen.value = ScreenState.ACTIVE_TURNO
-                },
-                onRequestNote = { current, onResult -> requestNote(current, onResult) }
+                }
             )
+            ScreenState.TURNOS -> TurnosScreen(
+                turnos = turnos.value,
+                onBack = {
+                    currentScreen.value = if (activeTurno.value) ScreenState.ACTIVE_TURNO else ScreenState.NO_ACTIVE_TURNO
+                },
+                onOpenTurno = { turno ->
+                    selectedTurno.value = turno
+                    currentScreen.value = ScreenState.TURNO_SUMMARY
+                }
+            )
+            ScreenState.TURNO_SUMMARY -> {
+                val turno = selectedTurno.value
+                if (turno == null) {
+                    LaunchedEffect(Unit) { currentScreen.value = ScreenState.TURNOS }
+                } else {
+                    TurnoSummaryScreen(
+                        turno = turno,
+                        onBack = { currentScreen.value = ScreenState.TURNOS }
+                    )
+                }
+            }
         }
     }
 
@@ -198,6 +228,8 @@ class WearMainActivity : ComponentActivity(), MessageClient.OnMessageReceivedLis
             ScreenState.EDIT_ENTRY -> currentScreen.value = ScreenState.ACTIVE_TURNO
             ScreenState.CONFIRM_DELETE -> currentScreen.value = ScreenState.EDIT_ENTRY
             ScreenState.END_TURNO -> currentScreen.value = ScreenState.ACTIVE_TURNO
+            ScreenState.TURNOS -> currentScreen.value = if (activeTurno.value) ScreenState.ACTIVE_TURNO else ScreenState.NO_ACTIVE_TURNO
+            ScreenState.TURNO_SUMMARY -> currentScreen.value = ScreenState.TURNOS
             ScreenState.NO_ACTIVE_TURNO -> currentScreen.value = ScreenState.NO_CONNECTED
             ScreenState.ACTIVE_TURNO -> Unit
             ScreenState.NO_CONNECTED -> Unit
@@ -255,13 +287,29 @@ class WearMainActivity : ComponentActivity(), MessageClient.OnMessageReceivedLis
                         currentScreen.value = ScreenState.ACTIVE_TURNO
                     }
                 } else {
-                    currentScreen.value = ScreenState.NO_ACTIVE_TURNO
+                    if (currentScreen.value != ScreenState.TURNOS && currentScreen.value != ScreenState.TURNO_SUMMARY) {
+                        currentScreen.value = ScreenState.NO_ACTIVE_TURNO
+                    }
+                }
+            } else if ("TURNOS_STATUS" == json.optString("type")) {
+                isConnected.value = json.optBoolean("connected", false)
+                parseTurnos(json.optJSONArray("turnos"))
+                if (isConnected.value) {
+                    currentScreen.value = ScreenState.TURNOS
+                } else {
+                    currentScreen.value = ScreenState.NO_CONNECTED
                 }
             } else if ("OK" == json.optString("type")) {
                 performFeedback(json.optString("message", "Hecho"), strong = false)
-                currentScreen.value = ScreenState.ACTIVE_TURNO
-                requestStatus()
+                if (openTurnosAfterOk) {
+                    openTurnosAfterOk = false
+                    sendGetTurnos()
+                } else {
+                    currentScreen.value = ScreenState.ACTIVE_TURNO
+                    requestStatus()
+                }
             } else if ("ERROR" == json.optString("type")) {
+                openTurnosAfterOk = false
                 Log.e(TAG, "Error desde movil: ${json.optString("message")}")
                 performFeedback(json.optString("message", "Error"), strong = true)
             }
@@ -284,6 +332,15 @@ class WearMainActivity : ComponentActivity(), MessageClient.OnMessageReceivedLis
         val command = JSONObject().apply {
             put("operationId", UUID.randomUUID().toString())
             put("type", "START_TURNO")
+            put("createdAt", System.currentTimeMillis().toString())
+        }
+        sendCommand(command.toString())
+    }
+
+    private fun sendGetTurnos() {
+        val command = JSONObject().apply {
+            put("operationId", UUID.randomUUID().toString())
+            put("type", "GET_TURNOS")
             put("createdAt", System.currentTimeMillis().toString())
         }
         sendCommand(command.toString())
@@ -337,6 +394,66 @@ class WearMainActivity : ComponentActivity(), MessageClient.OnMessageReceivedLis
         entradas.value = list
     }
 
+    private fun parseTurnos(arr: JSONArray?) {
+        if (arr == null) {
+            turnos.value = emptyList()
+            return
+        }
+        val list = mutableListOf<WatchTurno>()
+        for (i in 0 until arr.length()) {
+            val o = arr.optJSONObject(i) ?: continue
+            val totals = o.optJSONObject("totals")
+            list.add(
+                WatchTurno(
+                    id = o.optLong("id", 0L),
+                    date = o.optString("date", ""),
+                    startDate = o.optString("startDate", ""),
+                    startTime = o.optString("startTime", ""),
+                    endTime = o.optString("endTime", ""),
+                    dinero = o.optDouble("dinero", 0.0),
+                    km = o.optDouble("km", 0.0),
+                    totalTaximetro = o.optDouble("totalTaximetro", 0.0),
+                    miGanancia = o.optDouble("miGanancia", 0.0),
+                    totalADescontar = o.optDouble("totalADescontar", 0.0),
+                    totalADar = o.optDouble("totalADar", 0.0),
+                    tiempoTrabajado = o.optString("tiempoTrabajado", ""),
+                    totals = parseTurnoTotals(totals),
+                    entradas = parseEntryArray(o.optJSONArray("entradas"))
+                )
+            )
+        }
+        turnos.value = list
+    }
+
+    private fun parseTurnoTotals(totals: JSONObject?): WatchTurnoTotals {
+        val tipos = listOf("propina", "datafono", "agencia_bono", "extra", "gasolina", "nulo")
+        val porTipo = totals?.optJSONObject("porTipo")
+        val numTipo = totals?.optJSONObject("numPorTipo")
+        return WatchTurnoTotals(
+            porTipo = tipos.associateWith { porTipo?.optDouble(it, 0.0) ?: 0.0 },
+            numPorTipo = tipos.associateWith { numTipo?.optInt(it, 0) ?: 0 },
+            numEntradas = totals?.optInt("numEntradas", 0) ?: 0
+        )
+    }
+
+    private fun parseEntryArray(arr: JSONArray?): List<WatchEntry> {
+        if (arr == null) return emptyList()
+        val list = mutableListOf<WatchEntry>()
+        for (i in 0 until arr.length()) {
+            val o = arr.optJSONObject(i) ?: continue
+            list.add(
+                WatchEntry(
+                    id = o.optLong("id", 0L),
+                    type = o.optString("type", ""),
+                    amount = o.optDouble("amount", 0.0),
+                    note = o.optString("note", ""),
+                    time = o.optString("time", "")
+                )
+            )
+        }
+        return list
+    }
+
     private fun sendEditEntry(id: Long, amount: Double, note: String) {
         val command = JSONObject().apply {
             put("operationId", UUID.randomUUID().toString())
@@ -376,6 +493,7 @@ class WearMainActivity : ComponentActivity(), MessageClient.OnMessageReceivedLis
     }
 
     private fun sendEndTurno(dinero: Double, km: Double, note: String) {
+        openTurnosAfterOk = true
         val command = JSONObject().apply {
             put("operationId", UUID.randomUUID().toString())
             put("type", "END_TURNO")

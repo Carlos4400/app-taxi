@@ -1,3 +1,1683 @@
+## 2026-06-02 21:36 - Añadir actualizador Wear
+
+**Archivos modificados:** `actualizar_reloj.bat`, `src/__tests__/android-wear-bridge.test.ts`
+
+### Cambio 1 - Prueba del actualizador directo
+
+#### Código anterior
+`No existía la prueba "mantiene un actualizador directo del reloj para compilar instalar y abrir" en src/__tests__/android-wear-bridge.test.ts.`
+
+#### Código nuevo
+```ts
+  it("mantiene un actualizador directo del reloj para compilar instalar y abrir", () => {
+    const source = readFileSync(
+      resolve(root, "actualizar_reloj.bat"),
+      "utf8",
+    );
+
+    expect(source).toContain(":wear:assembleDebug");
+    expect(source).toContain("adb.exe");
+    expect(source).toContain("connect !WATCH!");
+    expect(source).toContain("install -r");
+    expect(source).toContain("am start -n com.mijornada.app/com.mijornada.app.WearMainActivity");
+  });
+```
+
+#### Por qué se cambió
+Se añadió una prueba para fijar que el actualizador del reloj compile el módulo Wear, use ADB, permita conexión por `IP:PUERTO`, instale el APK y abra la app del reloj.
+
+### Cambio 2 - Script actualizar_reloj.bat
+
+#### Código anterior
+`No existía actualizar_reloj.bat.`
+
+#### Código nuevo
+```bat
+@echo off
+setlocal enabledelayedexpansion
+chcp 65001 >nul
+title Actualizar Mi Turno Watch
+
+set "ROOT=C:\Users\carlo\Desktop\APP Taxi"
+set "ANDROID_DIR=%ROOT%\android"
+set "ADB=C:\Users\carlo\AppData\Local\Android\Sdk\platform-tools\adb.exe"
+set "JAVA_HOME=C:\Program Files\Android\Android Studio\jbr"
+set "APK=%ANDROID_DIR%\wear\build\outputs\apk\debug\wear-debug.apk"
+set "WATCH="
+
+echo ============================================
+echo  Actualizar Mi Turno Watch
+echo ============================================
+echo.
+
+if not exist "%ADB%" (
+  echo [ERROR] No se encontro adb.exe:
+  echo %ADB%
+  pause
+  exit /b 1
+)
+
+if not exist "%JAVA_HOME%\bin\java.exe" (
+  echo [ERROR] No se encontro Java en:
+  echo %JAVA_HOME%
+  pause
+  exit /b 1
+)
+
+echo [1/4] Compilando app del reloj...
+cd /d "%ANDROID_DIR%"
+call gradlew.bat :wear:assembleDebug --console=plain
+if errorlevel 1 (
+  echo.
+  echo [ERROR] La compilacion del reloj ha fallado.
+  pause
+  exit /b 1
+)
+
+if not exist "%APK%" (
+  echo.
+  echo [ERROR] No se encontro el APK generado:
+  echo %APK%
+  pause
+  exit /b 1
+)
+
+echo.
+echo [2/4] Buscando reloj conectado...
+"%ADB%" devices -l
+for /f "skip=1 tokens=1,2,*" %%a in ('"%ADB%" devices -l') do (
+  if "%%b"=="device" if not defined WATCH set "WATCH=%%a"
+)
+
+if not defined WATCH (
+  echo.
+  echo No hay reloj conectado por ADB.
+  set /p WATCH=Escribe IP:PUERTO del reloj:
+  if not defined WATCH (
+    echo [ERROR] No se indico IP:PUERTO.
+    pause
+    exit /b 1
+  )
+  "%ADB%" connect !WATCH!
+  if errorlevel 1 (
+    echo.
+    echo [ERROR] No se pudo conectar con !WATCH!
+    pause
+    exit /b 1
+  )
+)
+
+echo.
+echo Reloj seleccionado: !WATCH!
+echo.
+echo [3/4] Instalando APK...
+"%ADB%" -s !WATCH! install -r "%APK%"
+if errorlevel 1 (
+  echo.
+  echo [ERROR] No se pudo instalar el APK.
+  pause
+  exit /b 1
+)
+
+echo.
+echo [4/4] Abriendo Mi Turno Watch...
+"%ADB%" -s !WATCH! shell am start -n com.mijornada.app/com.mijornada.app.WearMainActivity
+
+echo.
+echo ============================================
+echo  Reloj actualizado correctamente.
+echo ============================================
+pause
+```
+
+#### Por qué se cambió
+Se añadió un actualizador directo para que, tras modificar la app del reloj, se pueda compilar, instalar y abrir `Mi Turno Watch` desde un único archivo.
+
+## 2026-06-02 21:20 - Añadir turnos guardados Wear
+
+**Archivos modificados:** `src/shared/watch-commands.ts`, `src/logic/watch-command-processor.ts`, `src/__tests__/watch-command-processor.test.ts`, `src/__tests__/android-wear-bridge.test.ts`, `android/wear/src/main/java/com/mijornada/app/WearMainActivity.kt`, `android/wear/src/main/java/com/mijornada/app/screens/NoActiveTurnoScreen.kt`, `android/wear/src/main/java/com/mijornada/app/screens/WatchModels.kt`, `android/wear/src/main/java/com/mijornada/app/screens/TurnosScreen.kt`, `android/wear/src/main/java/com/mijornada/app/screens/TurnoSummaryScreen.kt`
+
+### Cambio 1 - Prueba de turnos guardados para Wear
+
+#### Código anterior
+`No existía la prueba "GET_TURNOS devuelve turnos guardados preparados para el reloj" en src/__tests__/watch-command-processor.test.ts.`
+
+#### Código nuevo
+```ts
+  it("GET_TURNOS devuelve turnos guardados preparados para el reloj", () => {
+    const command: WatchCommand = {
+      operationId: "op-turnos-1",
+      type: "GET_TURNOS",
+      createdAt: "2026-06-01T13:00:00",
+    };
+
+    const state = baseState({
+      history: [{
+        id: 2000,
+        date: "2026-06-01",
+        startTime: "10:35",
+        endTime: "12:00",
+        entries: [
+          { id: 10, type: "propina", amount: 2, note: "", time: "10:40" },
+          { id: 11, type: "datafono", amount: 20, note: "tarjeta", time: "10:45" },
+          { id: 12, type: "nota", amount: 0, note: "Nota general", time: "10:50" },
+        ],
+        totalP: 2,
+        totalD: 20,
+        totalA: 0,
+        totalE: 5,
+        totalF: 0,
+        totalN: 3,
+        dinero: 80,
+        km: 42,
+        notes: "",
+        startDate: "2026-06-01",
+        totalPausedMinutes: 5,
+        configTurno: {
+          porcentajeJefe: 50,
+          porcentajeChofer: 50,
+          descDatafono: true,
+          descAgencia: true,
+          descExtra: false,
+          descGasolina: true,
+        },
+        diaLibreContable: 0,
+      }],
+    });
+
+    const result = processWatchCommand(command, state);
+
+    expect(result.response).toMatchObject({
+      type: "TURNOS_STATUS",
+      connected: true,
+      turnos: [{
+        id: 2000,
+        date: "2026-06-01",
+        startDate: "2026-06-01",
+        startTime: "10:35",
+        endTime: "12:00",
+        dinero: 80,
+        km: 42,
+        totalTaximetro: 77,
+        miGanancia: 40.5,
+        totalADescontar: 20,
+        totalADar: 18.5,
+        tiempoTrabajado: "1h 20m",
+        totals: {
+          porTipo: {
+            propina: 2,
+            datafono: 20,
+            agencia_bono: 0,
+            extra: 5,
+            gasolina: 0,
+            nulo: 3,
+          },
+          numPorTipo: {
+            propina: 1,
+            datafono: 1,
+            agencia_bono: 0,
+            extra: 0,
+            gasolina: 0,
+            nulo: 0,
+          },
+        },
+      }],
+    });
+    if (result.response.type !== "TURNOS_STATUS") throw new Error("Se esperaba TURNOS_STATUS");
+    expect(result.response.turnos[0].entradas).toEqual([
+      { id: 12, type: "nota", amount: 0, note: "Nota general", time: "10:50" },
+      { id: 11, type: "datafono", amount: 20, note: "tarjeta", time: "10:45" },
+      { id: 10, type: "propina", amount: 2, note: "", time: "10:40" },
+    ]);
+  });
+```
+
+#### Por qué se cambió
+Se añadió una prueba para exigir que el móvil prepare los turnos guardados para el reloj con los mismos datos contables y visuales que usa la app móvil.
+
+### Cambio 2 - Contrato GET_TURNOS
+
+#### Código anterior
+```ts
+export type WatchCommand =
+  | {
+      operationId: string;
+      type: "GET_STATUS" | "START_TURNO";
+      createdAt: string;
+    }
+```
+
+#### Código nuevo
+```ts
+export type WatchTurno = {
+  id: number;
+  date: string;
+  startDate: string | null;
+  startTime: string | null;
+  endTime: string;
+  dinero: number;
+  km: number;
+  totalTaximetro: number;
+  miGanancia: number;
+  totalADescontar: number;
+  totalADar: number;
+  tiempoTrabajado: string;
+  totals: WatchTurnoTotals;
+  entradas: WatchEntry[];
+};
+
+export type WatchCommand =
+  | {
+      operationId: string;
+      type: "GET_STATUS" | "GET_TURNOS" | "START_TURNO";
+      createdAt: string;
+    }
+```
+
+#### Por qué se cambió
+El reloj necesitaba pedir turnos guardados al móvil. Se añadió `GET_TURNOS` y el tipo `WatchTurno` para transportar datos calculados por el móvil sin guardar historial en el reloj.
+
+### Cambio 3 - Respuesta TURNOS_STATUS
+
+#### Código anterior
+```ts
+  | {
+      type: "STATUS";
+      connected: true;
+      activeTurno: boolean;
+      startTime: string | null;
+      startDate: string | null;
+      totals: WatchTurnoTotals;
+      entradas: WatchEntry[];
+    }
+```
+
+#### Código nuevo
+```ts
+  | {
+      type: "STATUS";
+      connected: true;
+      activeTurno: boolean;
+      startTime: string | null;
+      startDate: string | null;
+      totals: WatchTurnoTotals;
+      entradas: WatchEntry[];
+    }
+  | {
+      type: "TURNOS_STATUS";
+      connected: true;
+      turnos: WatchTurno[];
+    }
+```
+
+#### Por qué se cambió
+La respuesta de estado solo enviaba el turno activo. Se añadió una respuesta separada para que el móvil envíe turnos cerrados ya preparados al reloj.
+
+### Cambio 4 - Builder de turnos Wear
+
+#### Código anterior
+`No existían buildWatchTotalsFromTurno, buildWatchEntradasFromTurno ni buildWatchTurnos en src/logic/watch-command-processor.ts.`
+
+#### Código nuevo
+```ts
+export function buildWatchTurnos(history: Turno[], settings: WatchCommandProcessorState["settings"]): WatchTurno[] {
+  return sortTurnosByDateDesc(history).slice(0, 30).map((turno) => {
+    let totalMins = 0;
+    if (turno.startTime && turno.endTime) {
+      const [startH, startM] = turno.startTime.split(":").map(Number);
+      const [endH, endM] = turno.endTime.split(":").map(Number);
+      if (Number.isFinite(startH) && Number.isFinite(startM) && Number.isFinite(endH) && Number.isFinite(endM)) {
+        totalMins = (endH * 60 + endM) - (startH * 60 + startM);
+        if (totalMins < 0) totalMins += 24 * 60;
+        totalMins = Math.max(0, totalMins - (turno.totalPausedMinutes || 0));
+      }
+    }
+    const calculo = calcularTurnoContable(turno, settings);
+
+    return {
+      id: turno.id,
+      date: turno.date,
+      startDate: turno.startDate,
+      startTime: turno.startTime,
+      endTime: turno.endTime,
+      dinero: turno.dinero || 0,
+      km: turno.km || 0,
+      totalTaximetro: calculo.dineroBase,
+      miGanancia: calculo.miGanancia,
+      totalADescontar: calculo.totalDescontar,
+      totalADar: calculo.totalADar,
+      tiempoTrabajado: fmtDuration(totalMins),
+      totals: buildWatchTotalsFromTurno(turno),
+      entradas: buildWatchEntradasFromTurno(turno),
+    };
+  });
+}
+```
+
+#### Por qué se cambió
+El reloj no debe calcular contabilidad ni guardar historial. El móvil transforma `history` en datos listos para mostrar usando `calcularTurnoContable`, `fmtDuration` y `sortTurnosByDateDesc`.
+
+### Cambio 5 - Procesado de GET_TURNOS
+
+#### Código anterior
+```ts
+  if (command.type === "GET_STATUS") {
+    return {
+      ...state,
+      response: {
+        type: "STATUS",
+        connected: true,
+        activeTurno: isActive(state.current),
+        startTime: state.current.startTime,
+        startDate: state.current.startDate,
+        totals: computeWatchTotals(state.current),
+        entradas: buildWatchEntradas(state.current),
+      },
+    };
+  }
+```
+
+#### Código nuevo
+```ts
+  if (command.type === "GET_STATUS") {
+    return {
+      ...state,
+      response: {
+        type: "STATUS",
+        connected: true,
+        activeTurno: isActive(state.current),
+        startTime: state.current.startTime,
+        startDate: state.current.startDate,
+        totals: computeWatchTotals(state.current),
+        entradas: buildWatchEntradas(state.current),
+      },
+    };
+  }
+
+  if (command.type === "GET_TURNOS") {
+    return {
+      ...state,
+      response: {
+        type: "TURNOS_STATUS",
+        connected: true,
+        turnos: buildWatchTurnos(state.history, state.settings),
+      },
+    };
+  }
+```
+
+#### Por qué se cambió
+`GET_STATUS` no cubría el historial. Se añadió `GET_TURNOS` como lectura pura que no modifica `current`, `history` ni `processedOperationIds`.
+
+### Cambio 6 - Modelos Wear de turno guardado
+
+#### Código anterior
+`No existían WatchTurnoTotals ni WatchTurno en android/wear/src/main/java/com/mijornada/app/screens/WatchModels.kt.`
+
+#### Código nuevo
+```kotlin
+data class WatchTurnoTotals(
+    val porTipo: Map<String, Double>,
+    val numPorTipo: Map<String, Int>,
+    val numEntradas: Int
+)
+
+data class WatchTurno(
+    val id: Long,
+    val date: String,
+    val startDate: String,
+    val startTime: String,
+    val endTime: String,
+    val dinero: Double,
+    val km: Double,
+    val totalTaximetro: Double,
+    val miGanancia: Double,
+    val totalADescontar: Double,
+    val totalADar: Double,
+    val tiempoTrabajado: String,
+    val totals: WatchTurnoTotals,
+    val entradas: List<WatchEntry>
+)
+```
+
+#### Por qué se cambió
+Las pantallas Wear de lista y resumen necesitan recibir los campos del turno cerrado enviados por el móvil.
+
+### Cambio 7 - Formato compacto de fecha
+
+#### Código anterior
+`No existía formatFechaResumen en android/wear/src/main/java/com/mijornada/app/screens/WatchModels.kt.`
+
+#### Código nuevo
+```kotlin
+fun formatFechaResumen(iso: String): String {
+    if (iso.isBlank()) return ""
+    return try {
+        val date = java.time.LocalDate.parse(iso)
+        val fmt = java.time.format.DateTimeFormatter.ofPattern("EEE, d MMM yyyy", esES)
+        date.format(fmt).replaceFirstChar { it.uppercase(esES) }
+    } catch (e: Exception) {
+        iso
+    }
+}
+```
+
+#### Por qué se cambió
+El resumen de turno en reloj necesita una fecha parecida a la app móvil, pero más corta para pantalla redonda.
+
+### Cambio 8 - Home Wear sin turno
+
+#### Código anterior
+```kotlin
+fun NoActiveTurnoScreen(
+    onStartTurno: () -> Unit
+) {
+```
+
+```kotlin
+            Text(
+                text = "Sin turno activo",
+                color = ColorWhite,
+                fontSize = 16.sp
+            )
+            Spacer(modifier = Modifier.height(20.dp))
+            Chip(
+                onClick = onStartTurno,
+                label = { Text("Iniciar turno", color = ColorPropina) },
+                colors = ChipDefaults.chipColors(
+                    backgroundColor = ColorPropinaBg,
+                    contentColor = ColorPropina
+                ),
+                border = ChipDefaults.chipBorder(BorderStroke(1.5.dp, ColorPropina)),
+                modifier = Modifier.width(130.dp)
+            )
+```
+
+#### Código nuevo
+```kotlin
+fun NoActiveTurnoScreen(
+    onStartTurno: () -> Unit,
+    onOpenTurnos: () -> Unit
+) {
+```
+
+```kotlin
+            Text("🚕", fontSize = 34.sp)
+            Spacer(modifier = Modifier.height(5.dp))
+            Text(
+                text = "Mi Turno",
+                color = ColorWhite,
+                fontSize = 24.sp
+            )
+            Text(fechaLabel, color = ColorGrey, fontSize = 10.sp)
+            Spacer(modifier = Modifier.height(18.dp))
+
+            HomeActionButton(
+                label = "🚀  Iniciar Turno",
+                textColor = ColorPropina,
+                bg = ColorPropinaBg,
+                borderColor = ColorPropina,
+                onClick = onStartTurno
+            )
+            Spacer(modifier = Modifier.height(9.dp))
+            HomeActionButton(
+                label = "Turnos",
+                textColor = ColorDatafono,
+                bg = ColorDatafonoBg,
+                borderColor = ColorDatafono,
+                onClick = onOpenTurnos
+            )
+            Spacer(modifier = Modifier.height(12.dp))
+            Text("Móvil conectado", color = ColorPropina, fontSize = 9.sp)
+```
+
+#### Por qué se cambió
+La pantalla inicial del reloj era demasiado pobre. Se adaptó a la home móvil con marca, fecha, acción principal y acceso a `Turnos`.
+
+### Cambio 9 - Navegación Wear a turnos
+
+#### Código anterior
+```kotlin
+enum class ScreenState {
+    NO_CONNECTED,
+    NO_ACTIVE_TURNO,
+    ACTIVE_TURNO,
+    ADD_ENTRY,
+    EDIT_ENTRY,
+    CONFIRM_DELETE,
+    END_TURNO
+}
+```
+
+#### Código nuevo
+```kotlin
+enum class ScreenState {
+    NO_CONNECTED,
+    NO_ACTIVE_TURNO,
+    ACTIVE_TURNO,
+    TURNOS,
+    TURNO_SUMMARY,
+    ADD_ENTRY,
+    EDIT_ENTRY,
+    CONFIRM_DELETE,
+    END_TURNO
+}
+```
+
+#### Por qué se cambió
+El reloj necesitaba dos estados nuevos: lista de turnos y resumen de un turno guardado.
+
+### Cambio 10 - Solicitud y parseo de turnos en Wear
+
+#### Código anterior
+`No existían sendGetTurnos, parseTurnos, parseTurnoTotals ni parseEntryArray en android/wear/src/main/java/com/mijornada/app/WearMainActivity.kt.`
+
+#### Código nuevo
+```kotlin
+    private fun sendGetTurnos() {
+        val command = JSONObject().apply {
+            put("operationId", UUID.randomUUID().toString())
+            put("type", "GET_TURNOS")
+            put("createdAt", System.currentTimeMillis().toString())
+        }
+        sendCommand(command.toString())
+    }
+```
+
+```kotlin
+            } else if ("TURNOS_STATUS" == json.optString("type")) {
+                isConnected.value = json.optBoolean("connected", false)
+                parseTurnos(json.optJSONArray("turnos"))
+                if (isConnected.value) {
+                    currentScreen.value = ScreenState.TURNOS
+                } else {
+                    currentScreen.value = ScreenState.NO_CONNECTED
+                }
+```
+
+#### Por qué se cambió
+El reloj debe pedir los turnos guardados al móvil y pintar solo la respuesta del móvil, sin guardar ni inventar historial propio.
+
+### Cambio 11 - Mostrar turnos tras cerrar desde reloj
+
+#### Código anterior
+```kotlin
+            } else if ("OK" == json.optString("type")) {
+                performFeedback(json.optString("message", "Hecho"), strong = false)
+                currentScreen.value = ScreenState.ACTIVE_TURNO
+                requestStatus()
+            } else if ("ERROR" == json.optString("type")) {
+```
+
+#### Código nuevo
+```kotlin
+            } else if ("OK" == json.optString("type")) {
+                performFeedback(json.optString("message", "Hecho"), strong = false)
+                if (openTurnosAfterOk) {
+                    openTurnosAfterOk = false
+                    sendGetTurnos()
+                } else {
+                    currentScreen.value = ScreenState.ACTIVE_TURNO
+                    requestStatus()
+                }
+            } else if ("ERROR" == json.optString("type")) {
+                openTurnosAfterOk = false
+```
+
+#### Por qué se cambió
+Al cerrar un turno desde el reloj, el móvil guarda el turno y después el reloj pide la lista actualizada para mostrarlo como en la app móvil.
+
+### Cambio 12 - Pantalla Turnos Wear
+
+#### Código anterior
+`No existía TurnosScreen.kt.`
+
+#### Código nuevo
+```kotlin
+@Composable
+fun TurnosScreen(
+    turnos: List<WatchTurno>,
+    onBack: () -> Unit,
+    onOpenTurno: (WatchTurno) -> Unit
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(ColorBackground)
+            .verticalScroll(rememberScrollState())
+            .padding(start = 18.dp, end = 18.dp, top = 20.dp, bottom = 22.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(0.88f),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Text("‹", color = ColorGrey, fontSize = 22.sp, modifier = Modifier.clickable { onBack() })
+            Text("Turnos", color = ColorWhite, fontSize = 17.sp, fontWeight = FontWeight.Bold)
+            Spacer(modifier = Modifier.width(22.dp))
+        }
+
+        Spacer(modifier = Modifier.height(12.dp))
+
+        if (turnos.isEmpty()) {
+            Text("No hay Turnos Anteriores.", color = ColorGrey, fontSize = 12.sp)
+        } else {
+            turnos.forEach { turno ->
+                TurnoCard(turno = turno, onClick = { onOpenTurno(turno) })
+                Spacer(modifier = Modifier.height(9.dp))
+            }
+        }
+    }
+}
+```
+
+#### Por qué se cambió
+Se añadió una pantalla de turnos cerrados equivalente a `PantallaTurnos`, adaptada a pantalla redonda.
+
+### Cambio 13 - Pantalla resumen de turno Wear
+
+#### Código anterior
+`No existía TurnoSummaryScreen.kt.`
+
+#### Código nuevo
+```kotlin
+@Composable
+fun TurnoSummaryScreen(
+    turno: WatchTurno,
+    onBack: () -> Unit
+) {
+    val notasTurno = turno.entradas.filter { it.type == "nota" && it.note.isNotBlank() }
+    val notasDetalladas = turno.entradas.filter { it.type != "nota" && it.note.isNotBlank() }
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(ColorBackground)
+            .verticalScroll(rememberScrollState())
+            .padding(start = 18.dp, end = 18.dp, top = 20.dp, bottom = 22.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(0.88f),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Text("‹", color = ColorGrey, fontSize = 22.sp, modifier = Modifier.clickable { onBack() })
+            Text("Resumen del Turno", color = ColorWhite, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+            Text("✎", color = ColorAgencia, fontSize = 15.sp)
+        }
+```
+
+#### Por qué se cambió
+Se añadió una pantalla de resumen con los mismos bloques de la app móvil: fecha/hora, métricas principales, categorías, notas y totales finales.
+
+### Cambio 14 - Pruebas de pantallas Wear
+
+#### Código anterior
+`No existían las pruebas "ofrece home y turnos Wear parecidos al movil sin guardar historial en el reloj" ni "muestra lista y resumen de turnos Wear como la app movil adaptada" en src/__tests__/android-wear-bridge.test.ts.`
+
+#### Código nuevo
+```ts
+  it("ofrece home y turnos Wear parecidos al movil sin guardar historial en el reloj", () => {
+    const noActive = readFileSync(
+      resolve(root, "android/wear/src/main/java/com/mijornada/app/screens/NoActiveTurnoScreen.kt"),
+      "utf8",
+    );
+    const main = readFileSync(
+      resolve(root, "android/wear/src/main/java/com/mijornada/app/WearMainActivity.kt"),
+      "utf8",
+    );
+
+    expect(noActive).toContain("Mi Turno");
+    expect(noActive).toContain("fechaLabel");
+    expect(noActive).toContain("Iniciar Turno");
+    expect(noActive).toContain("Turnos");
+    expect(noActive).toContain("Móvil conectado");
+    expect(main).toContain("ScreenState.TURNOS");
+    expect(main).toContain("sendGetTurnos()");
+    expect(main).toContain(`put("type", "GET_TURNOS")`);
+    expect(main).toContain("parseTurnos(json.optJSONArray(\"turnos\"))");
+    expect(main).not.toContain("FirebaseFirestore");
+  });
+```
+
+#### Por qué se cambió
+Se añadieron pruebas para fijar que el reloj ofrece acceso a turnos desde la home, pide datos al móvil y no introduce acceso directo a Firestore.
+
+## 2026-06-02 19:56 - Corregir botón activo Wear
+
+**Archivos modificados:** `android/wear/src/main/java/com/mijornada/app/screens/ActiveTurnoScreen.kt`, `src/__tests__/android-wear-bridge.test.ts`
+
+### Cambio 1 - Prueba del botón dentro del scroll
+
+#### Código anterior
+```ts
+  it("usa anchura segura en las filas principales del turno activo", () => {
+    const source = readFileSync(
+      resolve(root, "android/wear/src/main/java/com/mijornada/app/screens/ActiveTurnoScreen.kt"),
+      "utf8",
+    );
+
+    expect(source).toContain("WatchSafeRowWidth");
+    expect(source).toContain("fillMaxWidth(WatchSafeRowWidth)");
+    expect(source).toContain("top = 26.dp");
+    expect(source).toContain("WatchSafeButtonWidth = 0.86f");
+    expect(source).toContain("align(Alignment.BottomCenter)");
+    expect(source).toContain("bottom = 88.dp");
+    expect(source).toContain("verticalScroll(rememberScrollState())");
+    expect(source).not.toContain("ScalingLazyColumn");
+  });
+```
+
+#### Código nuevo
+```ts
+  it("mantiene el boton de terminar turno dentro del scroll del turno activo", () => {
+    const source = readFileSync(
+      resolve(root, "android/wear/src/main/java/com/mijornada/app/screens/ActiveTurnoScreen.kt"),
+      "utf8",
+    );
+
+    expect(source).toContain("WatchSafeRowWidth");
+    expect(source).toContain("fillMaxWidth(WatchSafeRowWidth)");
+    expect(source).toContain("top = 26.dp");
+    expect(source).toContain("WatchSafeButtonWidth = 0.86f");
+    expect(source).toContain("bottom = 22.dp");
+    expect(source).toContain(`Text("Terminar turno"`);
+    expect(source).toContain("verticalScroll(rememberScrollState())");
+    expect(source).not.toContain("align(Alignment.BottomCenter)");
+    expect(source).not.toContain("ScalingLazyColumn");
+  });
+```
+
+#### Por qué se cambió
+La prueba anterior exigía que el botón estuviera alineado fijo abajo. La nueva prueba exige que no use `align(Alignment.BottomCenter)` y que el contenido con scroll tenga padding inferior normal.
+
+### Cambio 2 - Botón Terminar turno
+
+#### Código anterior
+```kotlin
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState())
+                .padding(start = 18.dp, end = 18.dp, top = 26.dp, bottom = 88.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+```
+
+```kotlin
+        Box(
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .padding(bottom = 16.dp)
+                .fillMaxWidth(WatchSafeButtonWidth)
+                .clip(RoundedCornerShape(16.dp))
+                .background(ColorGasolinaBg)
+                .clickable { onEndTurno() }
+                .padding(vertical = 11.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            Text("Terminar turno", color = ColorGasolina, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+        }
+```
+
+#### Código nuevo
+```kotlin
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState())
+                .padding(start = 18.dp, end = 18.dp, top = 26.dp, bottom = 22.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+```
+
+```kotlin
+            Spacer(modifier = Modifier.height(10.dp))
+
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth(WatchSafeButtonWidth)
+                    .clip(RoundedCornerShape(16.dp))
+                    .background(ColorGasolinaBg)
+                    .clickable { onEndTurno() }
+                    .padding(vertical = 11.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Text("Terminar turno", color = ColorGasolina, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+            }
+```
+
+#### Por qué se cambió
+El botón fijo se superponía al contenido al desplazarse. Al colocarlo al final del `Column` con `verticalScroll`, el botón forma parte del scroll y deja de quedar incrustado sobre `Añadir nota al turno` o las últimas entradas.
+
+## 2026-06-02 18:43 - Renombrar reloj Wear
+
+**Archivos modificados:** `android/wear/src/main/res/values/strings.xml`, `src/__tests__/android-wear-bridge.test.ts`
+
+### Cambio 1 - Prueba de nombres visibles nativos
+
+#### Código anterior
+`No existía la prueba "mantiene nombres visibles nativos Mi Turno y Mi Turno Watch" en src/__tests__/android-wear-bridge.test.ts.`
+
+#### Código nuevo
+```ts
+  it("mantiene nombres visibles nativos Mi Turno y Mi Turno Watch", () => {
+    const mobileStrings = readFileSync(
+      resolve(root, "android/app/src/main/res/values/strings.xml"),
+      "utf8",
+    );
+    const wearStrings = readFileSync(
+      resolve(root, "android/wear/src/main/res/values/strings.xml"),
+      "utf8",
+    );
+    const capacitorConfig = readFileSync(
+      resolve(root, "capacitor.config.ts"),
+      "utf8",
+    );
+
+    expect(mobileStrings).toContain(`<string name="app_name">Mi Turno</string>`);
+    expect(mobileStrings).toContain(`<string name="title_activity_main">Mi Turno</string>`);
+    expect(capacitorConfig).toContain("appName: 'Mi Turno'");
+    expect(wearStrings).toContain(`<string name="app_name">Mi Turno Watch</string>`);
+    expect(wearStrings).not.toContain("Mi Jornada");
+  });
+```
+
+#### Por qué se cambió
+Se añadió una prueba para fijar que el nombre visible nativo del móvil sea `Mi Turno`, que el nombre visible nativo del reloj sea `Mi Turno Watch` y que el recurso del reloj no vuelva a contener `Mi Jornada`.
+
+### Cambio 2 - Nombre visible del reloj
+
+#### Código anterior
+```xml
+<string name="app_name">Mi Jornada Watch</string>
+```
+
+#### Código nuevo
+```xml
+<string name="app_name">Mi Turno Watch</string>
+```
+
+#### Por qué se cambió
+El nombre visible del reloj seguía usando el nombre inicial de la app. Se cambió a `Mi Turno Watch` manteniendo intacto el identificador técnico `com.mijornada.app`.
+
+## 2026-06-02 18:31 - Unificar cierre Wear
+
+**Archivos modificados:** `android/wear/src/main/java/com/mijornada/app/screens/EndTurnoScreen.kt`, `android/wear/src/main/java/com/mijornada/app/WearMainActivity.kt`, `src/__tests__/android-wear-bridge.test.ts`
+
+### Cambio 1 - Pruebas de pantalla única de cierre
+
+#### Código anterior
+```ts
+    expect(source).toContain("activeField");
+    expect(source).toContain("CampoCierre");
+    expect(source).toContain("reviewLabel");
+    expect(source).toContain("Falta km");
+    expect(source).toContain("keyHeight = 20.dp");
+    expect(source).toContain("verticalScroll(rememberScrollState())");
+    expect(source).not.toContain("var step");
+```
+
+#### Código nuevo
+```ts
+    expect(source).toContain("activeField");
+    expect(source).toContain("CampoCierre");
+    expect(source).toContain("Resumen de hoy");
+    expect(source).toContain("Notas del turno");
+    expect(source).toContain("Notas detalladas");
+    expect(source).toContain("TecladoCierreOverlay");
+    expect(source).toContain("keyHeight = 20.dp");
+    expect(source).toContain("verticalScroll(rememberScrollState())");
+    expect(source).not.toContain("var confirming");
+    expect(source).not.toContain("ConfirmarCierre(");
+    expect(source).not.toContain("Revisar");
+    expect(source).not.toContain("Falta €");
+    expect(source).not.toContain("Falta km");
+```
+
+#### Por qué se cambió
+La prueba anterior aceptaba el flujo viejo con revisión. La nueva prueba exige una sola pantalla de cierre con resumen, notas y teclado como overlay.
+
+### Cambio 2 - Prueba de datos para cierre Wear
+
+#### Código anterior
+`No existía la prueba "pasa entradas y contadores a la pantalla unica de cierre Wear" en src/__tests__/android-wear-bridge.test.ts.`
+
+#### Código nuevo
+```ts
+  it("pasa entradas y contadores a la pantalla unica de cierre Wear", () => {
+    const source = readFileSync(
+      resolve(root, "android/wear/src/main/java/com/mijornada/app/WearMainActivity.kt"),
+      "utf8",
+    );
+
+    expect(source).toContain("numPorTipo = numPorTipo.value");
+    expect(source).toContain("entradas = entradas.value");
+  });
+```
+
+#### Por qué se cambió
+La pantalla nueva necesita mostrar conteos y notas igual que la app móvil. Se añadió una prueba para asegurar que `WearMainActivity` pasa esos datos al cierre.
+
+### Cambio 3 - Firma y estado de EndTurnoScreen
+
+#### Código anterior
+```kotlin
+fun EndTurnoScreen(
+    totalsPorTipo: Map<String, Double>,
+    onConfirm: (dinero: Double, km: Double, note: String) -> Unit,
+    onCancel: () -> Unit,
+    onRequestNote: (current: String, onResult: (String) -> Unit) -> Unit
+) {
+    var activeField by remember { mutableStateOf("dinero") }
+    var confirming by remember { mutableStateOf(false) }
+    var dineroText by remember { mutableStateOf("") }
+    var kmText by remember { mutableStateOf("") }
+    var note by remember { mutableStateOf("") }
+
+    val dinero = parseAmount(dineroText)
+    val km = parseAmount(kmText)
+    val canReview = dinero > 0.0 && km > 0.0
+    val reviewLabel = when {
+        dinero <= 0.0 -> "Falta €"
+        km <= 0.0 -> "Falta km"
+        else -> "Revisar"
+    }
+    val activeColor = if (activeField == "dinero") ColorAgencia else ColorExtra
+```
+
+#### Código nuevo
+```kotlin
+fun EndTurnoScreen(
+    totalsPorTipo: Map<String, Double>,
+    numPorTipo: Map<String, Int>,
+    entradas: List<WatchEntry>,
+    onConfirm: (dinero: Double, km: Double) -> Unit,
+    onCancel: () -> Unit
+) {
+    var activeField by remember { mutableStateOf<String?>(null) }
+    var dineroText by remember { mutableStateOf("") }
+    var kmText by remember { mutableStateOf("") }
+
+    val dinero = parseAmount(dineroText)
+    val km = parseAmount(kmText)
+    val notasTurno = entradas.filter { it.type == "nota" && it.note.isNotBlank() }
+    val notasDetalladas = entradas.filter { it.type != "nota" && it.note.isNotBlank() }
+```
+
+#### Por qué se cambió
+Se eliminó el estado de confirmación y la nota propia del cierre para que el reloj use una sola pantalla como la app móvil. Se añadieron contadores y entradas para poder mostrar resumen, notas del turno y notas detalladas.
+
+### Cambio 4 - Estructura principal del cierre
+
+#### Código anterior
+```kotlin
+        if (confirming) {
+            ConfirmarCierre(
+                totalsPorTipo = totalsPorTipo,
+                dinero = dinero,
+                kmText = kmText,
+                note = note,
+                onBack = { confirming = false },
+                onConfirm = { onConfirm(dinero, km, note) }
+            )
+        } else {
+            Column(
+```
+
+#### Código nuevo
+```kotlin
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState())
+                .padding(start = 18.dp, end = 18.dp, top = 20.dp, bottom = 18.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(0.86f),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Text("‹", color = ColorGrey, fontSize = 22.sp, modifier = Modifier.clickable { onCancel() })
+                Text("Terminar Turno", color = ColorWhite, fontSize = 15.sp, fontWeight = FontWeight.Bold)
+                Spacer(modifier = Modifier.width(22.dp))
+            }
+```
+
+#### Por qué se cambió
+El flujo anterior separaba entrada y confirmación. La nueva estructura empieza directamente con la pantalla única de cierre equivalente a la del móvil.
+
+### Cambio 5 - Cierre desde WearMainActivity
+
+#### Código anterior
+```kotlin
+            ScreenState.END_TURNO -> EndTurnoScreen(
+                totalsPorTipo = totalsPorTipo.value,
+                onConfirm = { dinero, km, note ->
+                    sendEndTurno(dinero, km, note)
+                },
+                onCancel = {
+                    currentScreen.value = ScreenState.ACTIVE_TURNO
+                },
+                onRequestNote = { current, onResult -> requestNote(current, onResult) }
+            )
+```
+
+#### Código nuevo
+```kotlin
+            ScreenState.END_TURNO -> EndTurnoScreen(
+                totalsPorTipo = totalsPorTipo.value,
+                numPorTipo = numPorTipo.value,
+                entradas = entradas.value,
+                onConfirm = { dinero, km ->
+                    sendEndTurno(dinero, km, "")
+                },
+                onCancel = {
+                    currentScreen.value = ScreenState.ACTIVE_TURNO
+                }
+            )
+```
+
+#### Por qué se cambió
+La pantalla de cierre ya no edita una nota propia. Recibe contadores y entradas del estado existente del reloj y al cerrar sigue enviando `END_TURNO` al móvil.
+
+### Cambio 6 - ResumenHoyCard
+
+#### Código anterior
+`No existía ResumenHoyCard en android/wear/src/main/java/com/mijornada/app/screens/EndTurnoScreen.kt.`
+
+#### Código nuevo
+```kotlin
+@Composable
+private fun ResumenHoyCard(
+    totalsPorTipo: Map<String, Double>,
+    numPorTipo: Map<String, Int>,
+    notasTurno: List<WatchEntry>
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth(0.88f)
+            .clip(RoundedCornerShape(18.dp))
+            .background(Color(0xFF15151C))
+            .border(1.dp, Color(0xFF252631), RoundedCornerShape(18.dp))
+            .padding(horizontal = 10.dp, vertical = 11.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        SectionTitle("Resumen de hoy", ColorGrey)
+```
+
+#### Por qué se cambió
+La app móvil muestra `Resumen de hoy` dentro de una tarjeta antes de confirmar. Este bloque replica esa estructura de forma compacta para pantalla redonda.
+
+### Cambio 7 - ResumenCategoriaCard
+
+#### Código anterior
+`No existía ResumenCategoriaCard en android/wear/src/main/java/com/mijornada/app/screens/EndTurnoScreen.kt.`
+
+#### Código nuevo
+```kotlin
+@Composable
+private fun ResumenCategoriaCard(
+    type: String,
+    total: Double,
+    count: Int,
+    modifier: Modifier = Modifier
+) {
+    val meta = categoriaMeta(type)
+    val label = if (type == "agencia_bono") "Agencias/Bonos" else meta.label
+    Column(
+```
+
+#### Por qué se cambió
+La pantalla móvil muestra seis tarjetas de categoría con importe y número de entradas. Este bloque adapta cada tarjeta al tamaño del reloj.
+
+### Cambio 8 - SectionTitle
+
+#### Código anterior
+`No existía SectionTitle en android/wear/src/main/java/com/mijornada/app/screens/EndTurnoScreen.kt.`
+
+#### Código nuevo
+```kotlin
+@Composable
+private fun SectionTitle(label: String, color: Color) {
+    Text(
+        text = label,
+        color = color,
+        fontSize = 9.sp,
+        fontWeight = FontWeight.Bold,
+        modifier = Modifier.fillMaxWidth()
+    )
+}
+```
+
+#### Por qué se cambió
+Se necesitaban encabezados compactos y consistentes para `Resumen de hoy`, `Notas del turno` y `Notas detalladas`.
+
+### Cambio 9 - NotaTurnoRow
+
+#### Código anterior
+`No existía NotaTurnoRow en android/wear/src/main/java/com/mijornada/app/screens/EndTurnoScreen.kt.`
+
+#### Código nuevo
+```kotlin
+@Composable
+private fun NotaTurnoRow(entry: WatchEntry) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(10.dp))
+            .background(Color(0xFF1B1C23))
+            .padding(horizontal = 8.dp, vertical = 7.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(entry.time, color = ColorGrey, fontSize = 8.sp, fontWeight = FontWeight.Bold)
+        Spacer(modifier = Modifier.width(6.dp))
+        Text("Nota", color = ColorWhite, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+        Spacer(modifier = Modifier.width(6.dp))
+        Text(entry.note.take(24), color = ColorWhite, fontSize = 9.sp)
+    }
+}
+```
+
+#### Por qué se cambió
+La app móvil muestra notas generales del turno dentro del resumen. Este bloque permite mostrarlas en el reloj sin abrir otra pantalla.
+
+### Cambio 10 - NotaDetalladaRow
+
+#### Código anterior
+`No existía NotaDetalladaRow en android/wear/src/main/java/com/mijornada/app/screens/EndTurnoScreen.kt.`
+
+#### Código nuevo
+```kotlin
+@Composable
+private fun NotaDetalladaRow(entry: WatchEntry) {
+    val meta = categoriaMeta(entry.type)
+    Row(
+        modifier = Modifier
+            .fillMaxWidth(0.88f)
+            .clip(RoundedCornerShape(12.dp))
+            .background(Color(0xFF15151C))
+            .border(1.dp, Color(0xFF252631), RoundedCornerShape(12.dp))
+            .padding(horizontal = 9.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+```
+
+#### Por qué se cambió
+La pantalla móvil separa `Notas detalladas` de las notas generales. Este bloque muestra las notas de entradas con categoría, texto e importe.
+
+### Cambio 11 - TecladoCierreOverlay
+
+#### Código anterior
+`No existía TecladoCierreOverlay en android/wear/src/main/java/com/mijornada/app/screens/EndTurnoScreen.kt.`
+
+#### Código nuevo
+```kotlin
+@Composable
+private fun TecladoCierreOverlay(
+    field: String,
+    value: String,
+    onKey: (String) -> Unit,
+    onDone: () -> Unit
+) {
+    val color = if (field == "dinero") ColorAgencia else ColorExtra
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color(0xDD000000)),
+        contentAlignment = Alignment.Center
+    ) {
+```
+
+#### Por qué se cambió
+En la app móvil el teclado aparece como overlay al tocar `Total Taxímetro` o `Total KM`. Este bloque replica ese patrón sin crear otra pantalla de navegación.
+
+## 2026-06-02 18:16 - Renombrar eliminación Wear
+
+**Archivos modificados:** `android/wear/src/main/java/com/mijornada/app/screens/AddEntryScreen.kt`, `src/__tests__/android-wear-bridge.test.ts`
+
+### Cambio 1 - Prueba de acción peligrosa en edición
+
+#### Código anterior
+```ts
+  it("mantiene el cierre de turno en una entrada compacta antes de confirmar", () => {
+    const source = readFileSync(
+      resolve(root, "android/wear/src/main/java/com/mijornada/app/screens/EndTurnoScreen.kt"),
+      "utf8",
+    );
+```
+
+#### Código nuevo
+```ts
+  it("nombra la accion peligrosa de edicion como eliminar entrada", () => {
+    const source = readFileSync(
+      resolve(root, "android/wear/src/main/java/com/mijornada/app/screens/AddEntryScreen.kt"),
+      "utf8",
+    );
+
+    expect(source).toContain(`Text("Eliminar entrada", color = ColorGasolina`);
+    expect(source).not.toContain(`Text("Borrar entrada"`);
+  });
+
+  it("mantiene el cierre de turno en una entrada compacta antes de confirmar", () => {
+    const source = readFileSync(
+      resolve(root, "android/wear/src/main/java/com/mijornada/app/screens/EndTurnoScreen.kt"),
+      "utf8",
+    );
+```
+
+#### Por qué se cambió
+Se añadió una prueba para evitar que la acción peligrosa de editar vuelva a mostrarse como `Borrar entrada`, que podía confundirse con borrar números del teclado.
+
+### Cambio 2 - Texto de eliminar entrada
+
+#### Código anterior
+```kotlin
+                    Text("Borrar entrada", color = ColorGasolina, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+```
+
+#### Código nuevo
+```kotlin
+                    Text("Eliminar entrada", color = ColorGasolina, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+```
+
+#### Por qué se cambió
+`Eliminar entrada` describe mejor una acción destructiva sobre la entrada completa y evita confusión con la tecla de borrar del teclado numérico.
+
+## 2026-06-02 18:14 - Marcar edición Wear en rojo
+
+**Archivos modificados:** `android/wear/src/main/java/com/mijornada/app/screens/AddEntryScreen.kt`, `src/__tests__/android-wear-bridge.test.ts`
+
+### Cambio 1 - Prueba del título de edición
+
+#### Código anterior
+```ts
+  it("mantiene el cierre de turno en una entrada compacta antes de confirmar", () => {
+    const source = readFileSync(
+      resolve(root, "android/wear/src/main/java/com/mijornada/app/screens/EndTurnoScreen.kt"),
+      "utf8",
+    );
+```
+
+#### Código nuevo
+```ts
+  it("muestra Editar en rojo y mantiene la categoria con su color en Wear", () => {
+    const source = readFileSync(
+      resolve(root, "android/wear/src/main/java/com/mijornada/app/screens/AddEntryScreen.kt"),
+      "utf8",
+    );
+
+    expect(source).toContain("EntryTitle(");
+    expect(source).toContain(`Text("Editar", color = ColorGasolina`);
+    expect(source).toContain("Text(categoryLabel, color = categoryColor");
+    expect(source).not.toContain(`text = if (onDelete != null) "Editar $categoryLabel" else categoryLabel`);
+  });
+
+  it("mantiene el cierre de turno en una entrada compacta antes de confirmar", () => {
+    const source = readFileSync(
+      resolve(root, "android/wear/src/main/java/com/mijornada/app/screens/EndTurnoScreen.kt"),
+      "utf8",
+    );
+```
+
+#### Por qué se cambió
+Se añadió una prueba para verificar que el modo edición no pinta todo el título con el color de la categoría y que el prefijo `Editar` queda en rojo.
+
+### Cambio 2 - Título de entrada en edición
+
+#### Código anterior
+```kotlin
+                Text(
+                    text = if (onDelete != null) "Editar $categoryLabel" else categoryLabel,
+                    color = categoryColor, fontSize = 13.sp, fontWeight = FontWeight.Bold
+                )
+```
+
+#### Código nuevo
+```kotlin
+                EntryTitle(
+                    categoryLabel = categoryLabel,
+                    categoryColor = categoryColor,
+                    editing = onDelete != null
+                )
+```
+
+#### Por qué se cambió
+El texto `Editar Agencia/Bono` era un único `Text`, por lo que no podía colorear solo `Editar` en rojo. Se sustituyó por un componente que separa el prefijo de la categoría.
+
+### Cambio 3 - Componente EntryTitle
+
+#### Código anterior
+`No existía EntryTitle en android/wear/src/main/java/com/mijornada/app/screens/AddEntryScreen.kt.`
+
+#### Código nuevo
+```kotlin
+@Composable
+private fun EntryTitle(
+    categoryLabel: String,
+    categoryColor: Color,
+    editing: Boolean
+) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.Center
+    ) {
+        if (editing) {
+            Text("Editar", color = ColorGasolina, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+            Spacer(modifier = Modifier.width(4.dp))
+        }
+        Text(categoryLabel, color = categoryColor, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+    }
+}
+```
+
+#### Por qué se cambió
+Separar `Editar` y la categoría permite que `Editar` sea rojo y que `Agencia/Bono`, `Propinas` u otra categoría mantenga su color propio.
+
+## 2026-06-02 18:07 - Centrar entrada Wear
+
+**Archivos modificados:** `android/wear/src/main/java/com/mijornada/app/screens/AddEntryScreen.kt`, `android/wear/src/main/java/com/mijornada/app/screens/NumericKeypad.kt`, `src/__tests__/android-wear-bridge.test.ts`
+
+### Cambio 1 - Pruebas de teclado y entrada Wear
+
+#### Código anterior
+```ts
+  it("mantiene el cierre de turno en una entrada compacta antes de confirmar", () => {
+    const source = readFileSync(
+      resolve(root, "android/wear/src/main/java/com/mijornada/app/screens/EndTurnoScreen.kt"),
+      "utf8",
+    );
+```
+
+#### Código nuevo
+```ts
+  it("deja el teclado de entrada con borrar cero coma en la ultima fila", () => {
+    const source = readFileSync(
+      resolve(root, "android/wear/src/main/java/com/mijornada/app/screens/NumericKeypad.kt"),
+      "utf8",
+    );
+
+    expect(source).toContain(`listOf("DEL", "0", ",")`);
+    expect(source).not.toContain("SaveKey(");
+    expect(source).not.toContain("saveEnabled");
+  });
+
+  it("centra la entrada Wear con guardar junto al importe y nota abajo", () => {
+    const source = readFileSync(
+      resolve(root, "android/wear/src/main/java/com/mijornada/app/screens/AddEntryScreen.kt"),
+      "utf8",
+    );
+
+    expect(source).toContain("GuardarImporteButton(");
+    expect(source).toContain("modifier = Modifier.fillMaxWidth(0.74f)");
+    expect(source).toContain("horizontalArrangement = Arrangement.Center");
+    expect(source).toContain("NotaButton(");
+    expect(source).not.toContain("onSave = { if (amount > 0.0) onSave(amount, note) }");
+    expect(source).not.toContain("saveEnabled = amount > 0.0");
+  });
+
+  it("mantiene el cierre de turno en una entrada compacta antes de confirmar", () => {
+    const source = readFileSync(
+      resolve(root, "android/wear/src/main/java/com/mijornada/app/screens/EndTurnoScreen.kt"),
+      "utf8",
+    );
+```
+
+#### Por qué se cambió
+Se añadieron pruebas antes de modificar la UI para verificar que el teclado usa la última fila `borrar, 0, coma` y que la pantalla de entrada mueve guardar junto al importe y nota bajo el teclado.
+
+### Cambio 2 - Teclado numérico Wear
+
+#### Código anterior
+```kotlin
+/**
+ * Teclado numérico in-app (estilo app del móvil): 1-9, coma decimal y 0.
+ * La última celda es la tecla Guardar (✓) si se pasa [onSave]; si no, es Borrar (⌫).
+ * Cabe entero en pantalla redonda sin scroll (ancho 0.72, teclas compactas).
+ */
+@Composable
+fun NumericKeypad(
+    onKey: (String) -> Unit,
+    color: Color,
+    modifier: Modifier = Modifier,
+    onSave: (() -> Unit)? = null,
+    saveEnabled: Boolean = false,
+    widthFraction: Float = 0.72f,
+    keyHeight: Dp = 28.dp,
+    keyFontSize: TextUnit = 15.sp
+) {
+    val baseRows = listOf(
+        listOf("1", "2", "3"),
+        listOf("4", "5", "6"),
+        listOf("7", "8", "9")
+    )
+```
+
+#### Código nuevo
+```kotlin
+/**
+ * Teclado numérico in-app (estilo app del móvil): 1-9, coma decimal y 0.
+ * La última fila mantiene el orden de la app móvil: borrar, 0 y coma.
+ * Cabe entero en pantalla redonda sin scroll (ancho 0.72, teclas compactas).
+ */
+@Composable
+fun NumericKeypad(
+    onKey: (String) -> Unit,
+    color: Color,
+    modifier: Modifier = Modifier,
+    widthFraction: Float = 0.72f,
+    keyHeight: Dp = 28.dp,
+    keyFontSize: TextUnit = 15.sp
+) {
+    val rows = listOf(
+        listOf("1", "2", "3"),
+        listOf("4", "5", "6"),
+        listOf("7", "8", "9"),
+        listOf("DEL", "0", ",")
+    )
+```
+
+#### Por qué se cambió
+El botón de guardar dentro del teclado desplazaba la coma y hacía que el teclado no fuese fiel al patrón pedido. El teclado queda dedicado solo a introducir y borrar importe.
+
+### Cambio 3 - Fila inferior del teclado
+
+#### Código anterior
+```kotlin
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(4.dp)
+        ) {
+            KeyButton(",", ColorWhite, keyHeight, keyFontSize, Modifier.weight(1f)) { onKey(",") }
+            KeyButton("0", ColorWhite, keyHeight, keyFontSize, Modifier.weight(1f)) { onKey("0") }
+            if (onSave != null) {
+                SaveKey(color, saveEnabled, keyHeight, keyFontSize, Modifier.weight(1f), onSave)
+            } else {
+                KeyButton("DEL", color, keyHeight, keyFontSize, Modifier.weight(1f)) { onKey("DEL") }
+            }
+        }
+```
+
+#### Código nuevo
+```kotlin
+        rows.forEach { row ->
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                row.forEach { key ->
+                    val keyColor = if (key == "DEL") color else ColorWhite
+                    KeyButton(key, keyColor, keyHeight, keyFontSize, Modifier.weight(1f)) { onKey(key) }
+                }
+            }
+        }
+```
+
+#### Por qué se cambió
+La última fila anterior podía mostrar guardar en vez de coma. El nuevo bucle renderiza todas las filas de la misma lista y garantiza `⌫`, `0`, `,`.
+
+### Cambio 4 - Guardar junto al importe
+
+#### Código anterior
+```kotlin
+            Text(
+                text = "${if (amountText.isEmpty()) "0" else amountText}€",
+                color = ColorWhite,
+                fontSize = 26.sp,
+                fontWeight = FontWeight.Bold
+            )
+```
+
+#### Código nuevo
+```kotlin
+            Row(
+                modifier = Modifier.fillMaxWidth(0.74f),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.Center
+            ) {
+                Text(
+                    text = "${if (amountText.isEmpty()) "0" else amountText}€",
+                    color = ColorWhite,
+                    fontSize = 28.sp,
+                    fontWeight = FontWeight.Bold
+                )
+                Spacer(modifier = Modifier.width(9.dp))
+                GuardarImporteButton(
+                    enabled = amount > 0.0,
+                    color = categoryColor,
+                    onClick = { onSave(amount, note) }
+                )
+            }
+```
+
+#### Por qué se cambió
+El usuario indicó que guardar debía quedar arriba junto al importe. Se centró el conjunto importe + guardar para que la acción principal esté visible sin ocupar una tecla del teclado.
+
+### Cambio 5 - Nota bajo el teclado
+
+#### Código anterior
+```kotlin
+            Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+                Text(
+                    text = if (note.isBlank()) "+ Nota" else "✓ ${note.take(12)}",
+                    color = if (note.isBlank()) ColorGrey else ColorWhite,
+                    fontSize = 12.sp,
+                    modifier = Modifier
+                        .padding(vertical = 3.dp)
+                        .clickable { onRequestNote(note) { result -> note = result } }
+                )
+                if (onDelete != null) {
+                    Text(
+                        text = "Borrar",
+                        color = ColorGasolina,
+                        fontSize = 12.sp,
+                        modifier = Modifier
+                            .padding(vertical = 3.dp)
+                            .clickable { onDelete() }
+                    )
+                }
+            }
+```
+
+#### Código nuevo
+```kotlin
+            NotaButton(
+                text = if (note.isBlank()) "+ Nota" else "✓ ${note.take(12)}",
+                selected = note.isNotBlank(),
+                onClick = { onRequestNote(note) { result -> note = result } }
+            )
+
+            if (onDelete != null) {
+                Spacer(modifier = Modifier.height(5.dp))
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth(0.72f)
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(ColorGasolinaBg)
+                        .clickable { onDelete() }
+                        .padding(vertical = 7.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text("Borrar entrada", color = ColorGasolina, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                }
+            }
+```
+
+#### Por qué se cambió
+La nota estaba encima del teclado y restaba claridad a la entrada del importe. Se movió bajo el teclado como botón centrado y se mantuvo la acción de borrar solo para edición.
+
+### Cambio 6 - Botón de guardar importe
+
+#### Código anterior
+`No existía GuardarImporteButton en android/wear/src/main/java/com/mijornada/app/screens/AddEntryScreen.kt.`
+
+#### Código nuevo
+```kotlin
+@Composable
+private fun GuardarImporteButton(
+    enabled: Boolean,
+    color: Color,
+    onClick: () -> Unit
+) {
+    Box(
+        modifier = Modifier
+            .size(width = 42.dp, height = 34.dp)
+            .clip(RoundedCornerShape(12.dp))
+            .background(if (enabled) color else ColorDisabledBg)
+            .clickable(enabled = enabled) { onClick() },
+        contentAlignment = Alignment.Center
+    ) {
+        Text(
+            text = "✓",
+            color = if (enabled) ColorBackground else ColorDisabledText,
+            fontSize = 18.sp,
+            fontWeight = FontWeight.Bold
+        )
+    }
+}
+```
+
+#### Por qué se cambió
+Guardar necesitaba un control propio fuera del teclado para quedar junto al importe y poder mostrarse desactivado cuando el importe es cero.
+
+### Cambio 7 - Botón de nota centrado
+
+#### Código anterior
+`No existía NotaButton en android/wear/src/main/java/com/mijornada/app/screens/AddEntryScreen.kt.`
+
+#### Código nuevo
+```kotlin
+@Composable
+private fun NotaButton(
+    text: String,
+    selected: Boolean,
+    onClick: () -> Unit
+) {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth(0.72f)
+            .clip(RoundedCornerShape(12.dp))
+            .background(ColorNuloBg)
+            .clickable { onClick() }
+            .padding(vertical = 8.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(
+            text = text,
+            color = if (selected) ColorWhite else ColorGrey,
+            fontSize = 12.sp,
+            fontWeight = FontWeight.Bold
+        )
+    }
+}
+```
+
+#### Por qué se cambió
+La acción de nota necesitaba una forma consistente y centrada bajo el teclado en vez de ser texto suelto sobre el importe.
+
 ## 2026-06-02 04:10 - Optimizar experiencia Wear
 
 **Archivos modificados:** `android/wear/src/main/java/com/mijornada/app/theme/Color.kt`, `android/wear/src/main/java/com/mijornada/app/screens/ActiveTurnoScreen.kt`, `android/wear/src/main/java/com/mijornada/app/screens/EndTurnoScreen.kt`, `src/__tests__/android-wear-bridge.test.ts`

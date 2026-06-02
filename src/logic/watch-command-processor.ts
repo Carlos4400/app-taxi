@@ -1,7 +1,8 @@
 import type { AppSettings, CurrentState, Turno } from "../shared/types";
-import type { WatchCommand, WatchCommandResponse, WatchEntry, WatchEntryType, WatchTurnoTotals } from "../shared/watch-commands";
-import { buildTurnoConfigFromSettings } from "./accounting";
-import { mergeTurnos } from "./turnos";
+import type { WatchCommand, WatchCommandResponse, WatchEntry, WatchEntryType, WatchTurno, WatchTurnoTotals } from "../shared/watch-commands";
+import { buildTurnoConfigFromSettings, calcularTurnoContable } from "./accounting";
+import { fmtDuration } from "./formatters";
+import { mergeTurnos, sortTurnosByDateDesc } from "./turnos";
 
 export type WatchCommandProcessorState = {
   current: CurrentState;
@@ -72,6 +73,78 @@ export function buildWatchEntradas(current: CurrentState): WatchEntry[] {
     .reverse();
 }
 
+function buildWatchTotalsFromTurno(turno: Turno): WatchTurnoTotals {
+  const porTipo: Record<WatchEntryType, number> = {
+    propina: turno.totalP || 0,
+    datafono: turno.totalD || 0,
+    agencia_bono: turno.totalA || 0,
+    extra: turno.totalE || 0,
+    gasolina: turno.totalF || 0,
+    nulo: turno.totalN || 0,
+  };
+  const numPorTipo: Record<WatchEntryType, number> = {
+    propina: 0,
+    datafono: 0,
+    agencia_bono: 0,
+    extra: 0,
+    gasolina: 0,
+    nulo: 0,
+  };
+
+  for (const entry of turno.entries) {
+    if (entry.type in numPorTipo) {
+      numPorTipo[entry.type as WatchEntryType] += 1;
+    }
+  }
+
+  return { porTipo, numPorTipo, numEntradas: turno.entries.length };
+}
+
+function buildWatchEntradasFromTurno(turno: Turno): WatchEntry[] {
+  return turno.entries
+    .map((e) => ({
+      id: e.id,
+      type: e.type as WatchEntry["type"],
+      amount: e.amount,
+      note: e.note,
+      time: e.time,
+    }))
+    .reverse();
+}
+
+export function buildWatchTurnos(history: Turno[], settings: WatchCommandProcessorState["settings"]): WatchTurno[] {
+  return sortTurnosByDateDesc(history).slice(0, 30).map((turno) => {
+    let totalMins = 0;
+    if (turno.startTime && turno.endTime) {
+      const [startH, startM] = turno.startTime.split(":").map(Number);
+      const [endH, endM] = turno.endTime.split(":").map(Number);
+      if (Number.isFinite(startH) && Number.isFinite(startM) && Number.isFinite(endH) && Number.isFinite(endM)) {
+        totalMins = (endH * 60 + endM) - (startH * 60 + startM);
+        if (totalMins < 0) totalMins += 24 * 60;
+        totalMins = Math.max(0, totalMins - (turno.totalPausedMinutes || 0));
+      }
+    }
+    const calculo = calcularTurnoContable(turno, settings);
+
+    return {
+      id: turno.id,
+      date: turno.date,
+      startDate: turno.startDate,
+      startTime: turno.startTime,
+      endTime: turno.endTime,
+      dinero: turno.dinero || 0,
+      km: turno.km || 0,
+      totalTaximetro: calculo.dineroBase,
+      miGanancia: calculo.miGanancia,
+      totalADescontar: calculo.totalDescontar,
+      totalADar: calculo.totalADar,
+      tiempoTrabajado: fmtDuration(totalMins),
+      totals: buildWatchTotalsFromTurno(turno),
+      entradas: buildWatchEntradasFromTurno(turno),
+    };
+  });
+}
+
 function emptyCurrent(): CurrentState {
   return {
     entries: [],
@@ -123,6 +196,17 @@ export function processWatchCommand(
         startDate: state.current.startDate,
         totals: computeWatchTotals(state.current),
         entradas: buildWatchEntradas(state.current),
+      },
+    };
+  }
+
+  if (command.type === "GET_TURNOS") {
+    return {
+      ...state,
+      response: {
+        type: "TURNOS_STATUS",
+        connected: true,
+        turnos: buildWatchTurnos(state.history, state.settings),
       },
     };
   }

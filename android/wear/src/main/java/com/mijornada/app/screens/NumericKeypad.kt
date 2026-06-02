@@ -19,7 +19,7 @@ import com.mijornada.app.theme.ColorWhite
 
 /**
  * Teclado numérico in-app (estilo app del móvil): 1-9, coma decimal y 0.
- * La última celda es la tecla Guardar (✓) si se pasa [onSave]; si no, es Borrar (⌫).
+ * La última fila mantiene el orden de la app móvil: borrar, 0 y coma.
  * Cabe entero en pantalla redonda sin scroll (ancho 0.72, teclas compactas).
  */
 @Composable
@@ -27,41 +27,29 @@ fun NumericKeypad(
     onKey: (String) -> Unit,
     color: Color,
     modifier: Modifier = Modifier,
-    onSave: (() -> Unit)? = null,
-    saveEnabled: Boolean = false,
     widthFraction: Float = 0.72f,
     keyHeight: Dp = 28.dp,
     keyFontSize: TextUnit = 15.sp
 ) {
-    val baseRows = listOf(
+    val rows = listOf(
         listOf("1", "2", "3"),
         listOf("4", "5", "6"),
-        listOf("7", "8", "9")
+        listOf("7", "8", "9"),
+        listOf("DEL", "0", ",")
     )
     Column(
         modifier = modifier.fillMaxWidth(widthFraction),
         verticalArrangement = Arrangement.spacedBy(4.dp)
     ) {
-        baseRows.forEach { row ->
+        rows.forEach { row ->
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(4.dp)
             ) {
                 row.forEach { key ->
-                    KeyButton(key, ColorWhite, keyHeight, keyFontSize, Modifier.weight(1f)) { onKey(key) }
+                    val keyColor = if (key == "DEL") color else ColorWhite
+                    KeyButton(key, keyColor, keyHeight, keyFontSize, Modifier.weight(1f)) { onKey(key) }
                 }
-            }
-        }
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(4.dp)
-        ) {
-            KeyButton(",", ColorWhite, keyHeight, keyFontSize, Modifier.weight(1f)) { onKey(",") }
-            KeyButton("0", ColorWhite, keyHeight, keyFontSize, Modifier.weight(1f)) { onKey("0") }
-            if (onSave != null) {
-                SaveKey(color, saveEnabled, keyHeight, keyFontSize, Modifier.weight(1f), onSave)
-            } else {
-                KeyButton("DEL", color, keyHeight, keyFontSize, Modifier.weight(1f)) { onKey("DEL") }
             }
         }
     }
@@ -87,32 +75,6 @@ private fun KeyButton(
         Text(
             text = if (label == "DEL") "⌫" else label,
             color = if (label == "DEL") color else ColorWhite,
-            fontSize = keyFontSize,
-            fontWeight = FontWeight.Bold
-        )
-    }
-}
-
-@Composable
-private fun SaveKey(
-    color: Color,
-    enabled: Boolean,
-    keyHeight: Dp,
-    keyFontSize: TextUnit,
-    modifier: Modifier = Modifier,
-    onClick: () -> Unit
-) {
-    Box(
-        modifier = modifier
-            .height(keyHeight)
-            .clip(RoundedCornerShape(9.dp))
-            .background(if (enabled) color else Color(0xFF1C1C24))
-            .clickable(enabled = enabled) { onClick() },
-        contentAlignment = Alignment.Center
-    ) {
-        Text(
-            text = "✓",
-            color = if (enabled) Color(0xFF0D0D14) else Color(0xFF4A4A4A),
             fontSize = keyFontSize,
             fontWeight = FontWeight.Bold
         )

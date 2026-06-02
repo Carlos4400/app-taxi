@@ -13,6 +13,29 @@ data class WatchEntry(
     val time: String
 )
 
+data class WatchTurnoTotals(
+    val porTipo: Map<String, Double>,
+    val numPorTipo: Map<String, Int>,
+    val numEntradas: Int
+)
+
+data class WatchTurno(
+    val id: Long,
+    val date: String,
+    val startDate: String,
+    val startTime: String,
+    val endTime: String,
+    val dinero: Double,
+    val km: Double,
+    val totalTaximetro: Double,
+    val miGanancia: Double,
+    val totalADescontar: Double,
+    val totalADar: Double,
+    val tiempoTrabajado: String,
+    val totals: WatchTurnoTotals,
+    val entradas: List<WatchEntry>
+)
+
 /** Metadatos visuales de una categoría: etiqueta, color de texto y color de fondo. */
 data class CategoriaMeta(
     val label: String,
@@ -57,6 +80,18 @@ fun formatFechaTurno(iso: String): String {
     return try {
         val date = java.time.LocalDate.parse(iso)
         val fmt = java.time.format.DateTimeFormatter.ofPattern("EEEE, d 'de' MMMM", esES)
+        date.format(fmt).replaceFirstChar { it.uppercase(esES) }
+    } catch (e: Exception) {
+        iso
+    }
+}
+
+/** Convierte "2026-06-01" en "Lun, 1 jun 2026". Si falla, devuelve el original. */
+fun formatFechaResumen(iso: String): String {
+    if (iso.isBlank()) return ""
+    return try {
+        val date = java.time.LocalDate.parse(iso)
+        val fmt = java.time.format.DateTimeFormatter.ofPattern("EEE, d MMM yyyy", esES)
         date.format(fmt).replaceFirstChar { it.uppercase(esES) }
     } catch (e: Exception) {
         iso

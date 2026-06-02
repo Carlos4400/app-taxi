@@ -91,6 +91,93 @@ describe("processWatchCommand", () => {
     });
   });
 
+  it("GET_TURNOS devuelve turnos guardados preparados para el reloj", () => {
+    const command: WatchCommand = {
+      operationId: "op-turnos-1",
+      type: "GET_TURNOS",
+      createdAt: "2026-06-01T13:00:00",
+    };
+
+    const state = baseState({
+      history: [{
+        id: 2000,
+        date: "2026-06-01",
+        startTime: "10:35",
+        endTime: "12:00",
+        entries: [
+          { id: 10, type: "propina", amount: 2, note: "", time: "10:40" },
+          { id: 11, type: "datafono", amount: 20, note: "tarjeta", time: "10:45" },
+          { id: 12, type: "nota", amount: 0, note: "Nota general", time: "10:50" },
+        ],
+        totalP: 2,
+        totalD: 20,
+        totalA: 0,
+        totalE: 5,
+        totalF: 0,
+        totalN: 3,
+        dinero: 80,
+        km: 42,
+        notes: "",
+        startDate: "2026-06-01",
+        totalPausedMinutes: 5,
+        configTurno: {
+          porcentajeJefe: 50,
+          porcentajeChofer: 50,
+          descDatafono: true,
+          descAgencia: true,
+          descExtra: false,
+          descGasolina: true,
+        },
+        diaLibreContable: 0,
+      }],
+    });
+
+    const result = processWatchCommand(command, state);
+
+    expect(result.response).toMatchObject({
+      type: "TURNOS_STATUS",
+      connected: true,
+      turnos: [{
+        id: 2000,
+        date: "2026-06-01",
+        startDate: "2026-06-01",
+        startTime: "10:35",
+        endTime: "12:00",
+        dinero: 80,
+        km: 42,
+        totalTaximetro: 77,
+        miGanancia: 40.5,
+        totalADescontar: 20,
+        totalADar: 18.5,
+        tiempoTrabajado: "1h 20m",
+        totals: {
+          porTipo: {
+            propina: 2,
+            datafono: 20,
+            agencia_bono: 0,
+            extra: 5,
+            gasolina: 0,
+            nulo: 3,
+          },
+          numPorTipo: {
+            propina: 1,
+            datafono: 1,
+            agencia_bono: 0,
+            extra: 0,
+            gasolina: 0,
+            nulo: 0,
+          },
+        },
+      }],
+    });
+    if (result.response.type !== "TURNOS_STATUS") throw new Error("Se esperaba TURNOS_STATUS");
+    expect(result.response.turnos[0].entradas).toEqual([
+      { id: 12, type: "nota", amount: 0, note: "Nota general", time: "10:50" },
+      { id: 11, type: "datafono", amount: 20, note: "tarjeta", time: "10:45" },
+      { id: 10, type: "propina", amount: 2, note: "", time: "10:40" },
+    ]);
+  });
+
   it("EDIT_ENTRY actualiza importe y nota de una entrada existente", () => {
     const state = baseState({
       current: {

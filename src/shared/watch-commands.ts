@@ -22,10 +22,27 @@ export type WatchTurnoTotals = {
   numEntradas: number;
 };
 
+export type WatchTurno = {
+  id: number;
+  date: string;
+  startDate: string | null;
+  startTime: string | null;
+  endTime: string;
+  dinero: number;
+  km: number;
+  totalTaximetro: number;
+  miGanancia: number;
+  totalADescontar: number;
+  totalADar: number;
+  tiempoTrabajado: string;
+  totals: WatchTurnoTotals;
+  entradas: WatchEntry[];
+};
+
 export type WatchCommand =
   | {
       operationId: string;
-      type: "GET_STATUS" | "START_TURNO";
+      type: "GET_STATUS" | "GET_TURNOS" | "START_TURNO";
       createdAt: string;
     }
   | {
@@ -84,6 +101,11 @@ export type WatchCommandResponse =
       startDate: string | null;
       totals: WatchTurnoTotals;
       entradas: WatchEntry[];
+    }
+  | {
+      type: "TURNOS_STATUS";
+      connected: true;
+      turnos: WatchTurno[];
     }
   | {
       type: "OK";

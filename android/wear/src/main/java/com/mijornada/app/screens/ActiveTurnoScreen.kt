@@ -41,7 +41,7 @@ fun ActiveTurnoScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .verticalScroll(rememberScrollState())
-                .padding(start = 18.dp, end = 18.dp, top = 26.dp, bottom = 88.dp),
+                .padding(start = 18.dp, end = 18.dp, top = 26.dp, bottom = 22.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -112,20 +112,19 @@ fun ActiveTurnoScreen(
                 }
             }
 
-        }
+            Spacer(modifier = Modifier.height(10.dp))
 
-        Box(
-            modifier = Modifier
-                .align(Alignment.BottomCenter)
-                .padding(bottom = 16.dp)
-                .fillMaxWidth(WatchSafeButtonWidth)
-                .clip(RoundedCornerShape(16.dp))
-                .background(ColorGasolinaBg)
-                .clickable { onEndTurno() }
-                .padding(vertical = 11.dp),
-            contentAlignment = Alignment.Center
-        ) {
-            Text("Terminar turno", color = ColorGasolina, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth(WatchSafeButtonWidth)
+                    .clip(RoundedCornerShape(16.dp))
+                    .background(ColorGasolinaBg)
+                    .clickable { onEndTurno() }
+                    .padding(vertical = 11.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Text("Terminar turno", color = ColorGasolina, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+            }
         }
     }
 }

@@ -57,62 +57,135 @@ fun AddEntryScreen(
             verticalArrangement = Arrangement.Center
         ) {
             Row(
-                modifier = Modifier.fillMaxWidth(0.84f),
+                modifier = Modifier.fillMaxWidth(0.78f),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
                 Text("‹", color = ColorGrey, fontSize = 22.sp, modifier = Modifier.clickable { onCancel() })
-                Text(
-                    text = if (onDelete != null) "Editar $categoryLabel" else categoryLabel,
-                    color = categoryColor, fontSize = 13.sp, fontWeight = FontWeight.Bold
+                EntryTitle(
+                    categoryLabel = categoryLabel,
+                    categoryColor = categoryColor,
+                    editing = onDelete != null
                 )
+                Spacer(modifier = Modifier.width(22.dp))
+            }
+
+            Spacer(modifier = Modifier.height(3.dp))
+
+            Row(
+                modifier = Modifier.fillMaxWidth(0.74f),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.Center
+            ) {
                 Text(
-                    "⌫",
-                    color = if (amountText.isEmpty()) Color(0xFF3A3A3A) else ColorWhite,
-                    fontSize = 18.sp,
-                    modifier = Modifier.clickable(enabled = amountText.isNotEmpty()) {
-                        amountText = applyKey(amountText, "DEL")
-                    }
+                    text = "${if (amountText.isEmpty()) "0" else amountText}€",
+                    color = ColorWhite,
+                    fontSize = 28.sp,
+                    fontWeight = FontWeight.Bold
+                )
+                Spacer(modifier = Modifier.width(9.dp))
+                GuardarImporteButton(
+                    enabled = amount > 0.0,
+                    color = categoryColor,
+                    onClick = { onSave(amount, note) }
                 )
             }
 
-            Text(
-                text = "${if (amountText.isEmpty()) "0" else amountText}€",
-                color = ColorWhite,
-                fontSize = 26.sp,
-                fontWeight = FontWeight.Bold
-            )
-
-            Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-                Text(
-                    text = if (note.isBlank()) "+ Nota" else "✓ ${note.take(12)}",
-                    color = if (note.isBlank()) ColorGrey else ColorWhite,
-                    fontSize = 12.sp,
-                    modifier = Modifier
-                        .padding(vertical = 3.dp)
-                        .clickable { onRequestNote(note) { result -> note = result } }
-                )
-                if (onDelete != null) {
-                    Text(
-                        text = "Borrar",
-                        color = ColorGasolina,
-                        fontSize = 12.sp,
-                        modifier = Modifier
-                            .padding(vertical = 3.dp)
-                            .clickable { onDelete() }
-                    )
-                }
-            }
-
-            Spacer(modifier = Modifier.height(4.dp))
+            Spacer(modifier = Modifier.height(6.dp))
 
             NumericKeypad(
                 onKey = { key -> amountText = applyKey(amountText, key) },
-                color = categoryColor,
-                onSave = { if (amount > 0.0) onSave(amount, note) },
-                saveEnabled = amount > 0.0
+                color = categoryColor
             )
+
+            Spacer(modifier = Modifier.height(7.dp))
+
+            NotaButton(
+                text = if (note.isBlank()) "+ Nota" else "✓ ${note.take(12)}",
+                selected = note.isNotBlank(),
+                onClick = { onRequestNote(note) { result -> note = result } }
+            )
+
+            if (onDelete != null) {
+                Spacer(modifier = Modifier.height(5.dp))
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth(0.72f)
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(ColorGasolinaBg)
+                        .clickable { onDelete() }
+                        .padding(vertical = 7.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text("Eliminar entrada", color = ColorGasolina, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                }
+            }
         }
+    }
+}
+
+@Composable
+private fun EntryTitle(
+    categoryLabel: String,
+    categoryColor: Color,
+    editing: Boolean
+) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.Center
+    ) {
+        if (editing) {
+            Text("Editar", color = ColorGasolina, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+            Spacer(modifier = Modifier.width(4.dp))
+        }
+        Text(categoryLabel, color = categoryColor, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+    }
+}
+
+@Composable
+private fun GuardarImporteButton(
+    enabled: Boolean,
+    color: Color,
+    onClick: () -> Unit
+) {
+    Box(
+        modifier = Modifier
+            .size(width = 42.dp, height = 34.dp)
+            .clip(RoundedCornerShape(12.dp))
+            .background(if (enabled) color else ColorDisabledBg)
+            .clickable(enabled = enabled) { onClick() },
+        contentAlignment = Alignment.Center
+    ) {
+        Text(
+            text = "✓",
+            color = if (enabled) ColorBackground else ColorDisabledText,
+            fontSize = 18.sp,
+            fontWeight = FontWeight.Bold
+        )
+    }
+}
+
+@Composable
+private fun NotaButton(
+    text: String,
+    selected: Boolean,
+    onClick: () -> Unit
+) {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth(0.72f)
+            .clip(RoundedCornerShape(12.dp))
+            .background(ColorNuloBg)
+            .clickable { onClick() }
+            .padding(vertical = 8.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(
+            text = text,
+            color = if (selected) ColorWhite else ColorGrey,
+            fontSize = 12.sp,
+            fontWeight = FontWeight.Bold
+        )
     }
 }
 
