@@ -6,6 +6,22 @@ export type WatchEntryType =
   | "gasolina"
   | "nulo";
 
+/** Una entrada del turno tal y como se muestra en el historial del reloj. */
+export type WatchEntry = {
+  id: number;
+  type: WatchEntryType | "nota";
+  amount: number;
+  note: string;
+  time: string;
+};
+
+/** Importe y recuento acumulados del turno en curso, por categoría. */
+export type WatchTurnoTotals = {
+  porTipo: Record<WatchEntryType, number>;
+  numPorTipo: Record<WatchEntryType, number>;
+  numEntradas: number;
+};
+
 export type WatchCommand =
   | {
       operationId: string;
@@ -32,6 +48,24 @@ export type WatchCommand =
     }
   | {
       operationId: string;
+      type: "EDIT_ENTRY";
+      createdAt: string;
+      payload: {
+        id: number;
+        amount: number;
+        note: string;
+      };
+    }
+  | {
+      operationId: string;
+      type: "DELETE_ENTRY";
+      createdAt: string;
+      payload: {
+        id: number;
+      };
+    }
+  | {
+      operationId: string;
       type: "END_TURNO";
       createdAt: string;
       payload: {
@@ -48,6 +82,8 @@ export type WatchCommandResponse =
       activeTurno: boolean;
       startTime: string | null;
       startDate: string | null;
+      totals: WatchTurnoTotals;
+      entradas: WatchEntry[];
     }
   | {
       type: "OK";

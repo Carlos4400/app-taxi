@@ -1,6 +1,6 @@
 import { registerPlugin, Capacitor } from "@capacitor/core";
 import { useAppStore } from "./store";
-import { processWatchCommand } from "../logic/watch-command-processor";
+import { processWatchCommand, computeWatchTotals, buildWatchEntradas } from "../logic/watch-command-processor";
 import type { WatchCommand, WatchCommandResponse } from "../shared/watch-commands";
 import { auth } from "./firebase";
 
@@ -109,7 +109,7 @@ export function setupWatchBridge(uid: string) {
       const result = processWatchCommand(command, processorState);
 
       if (result.response.type === "OK") {
-        if (command.type === "START_TURNO" || command.type === "ADD_ENTRY" || command.type === "ADD_NOTE" || command.type === "END_TURNO") {
+        if (command.type === "START_TURNO" || command.type === "ADD_ENTRY" || command.type === "ADD_NOTE" || command.type === "EDIT_ENTRY" || command.type === "DELETE_ENTRY" || command.type === "END_TURNO") {
           store.setCurrent(result.current);
           store.setHistory(result.history);
         }
@@ -148,6 +148,8 @@ export async function sendWatchStatus() {
       activeTurno: isActive,
       startTime: store.current.startTime,
       startDate: store.current.startDate,
+      totals: computeWatchTotals(store.current),
+      entradas: buildWatchEntradas(store.current),
     };
 
     await WearOsBridge.sendResponse({

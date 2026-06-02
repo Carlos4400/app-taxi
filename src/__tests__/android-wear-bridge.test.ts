@@ -24,8 +24,8 @@ describe("Android Wear bridge", () => {
                     currentScreen.value = ScreenState.ACTIVE_TURNO`);
     expect(source).not.toContain(`sendEndTurno(dinero, km)
                     currentScreen.value = ScreenState.NO_CONNECTED`);
-    expect(source).toContain(`} else if ("OK" == json.optString("type")) {
-                currentScreen.value = ScreenState.ACTIVE_TURNO`);
+    expect(source).toContain(`} else if ("OK" == json.optString("type")) {`);
+    expect(source).toContain("currentScreen.value = ScreenState.ACTIVE_TURNO");
   });
 
   it("envia cada comando del reloj a un unico nodo conectado", () => {
@@ -36,5 +36,98 @@ describe("Android Wear bridge", () => {
 
     expect(source).not.toContain("for (node in nodes)");
     expect(source).toContain("val node = nodes.first()");
+  });
+
+  it("firma el APK Wear con la misma clave debug fija que la app movil", () => {
+    const source = readFileSync(
+      resolve(root, "android/wear/build.gradle"),
+      "utf8",
+    );
+
+    expect(source).toContain("storeFile file('../app/debug.keystore')");
+    expect(source).toContain("debug {");
+    expect(source).toContain("signingConfig signingConfigs.debug");
+  });
+
+  it("pide confirmacion antes de borrar una entrada desde el reloj", () => {
+    const source = readFileSync(
+      resolve(root, "android/wear/src/main/java/com/mijornada/app/WearMainActivity.kt"),
+      "utf8",
+    );
+
+    expect(source).toContain("CONFIRM_DELETE");
+    expect(source).toContain("onDelete = { currentScreen.value = ScreenState.CONFIRM_DELETE }");
+    expect(source).toContain("sendDeleteEntry(e.id)");
+  });
+
+  it("gestiona el boton atras nativo sin cerrar la app durante flujos de trabajo", () => {
+    const source = readFileSync(
+      resolve(root, "android/wear/src/main/java/com/mijornada/app/WearMainActivity.kt"),
+      "utf8",
+    );
+
+    expect(source).toContain("BackHandler");
+    expect(source).toContain("handleBack()");
+    expect(source).toContain("ScreenState.ADD_ENTRY -> currentScreen.value = ScreenState.ACTIVE_TURNO");
+    expect(source).toContain("ScreenState.EDIT_ENTRY -> currentScreen.value = ScreenState.ACTIVE_TURNO");
+    expect(source).toContain("ScreenState.END_TURNO -> currentScreen.value = ScreenState.ACTIVE_TURNO");
+  });
+
+  it("muestra feedback visible y haptico despues de respuestas del movil", () => {
+    const source = readFileSync(
+      resolve(root, "android/wear/src/main/java/com/mijornada/app/WearMainActivity.kt"),
+      "utf8",
+    );
+
+    expect(source).toContain("Toast.makeText");
+    expect(source).toContain("VibrationEffect");
+    expect(source).toContain("performFeedback(");
+  });
+
+  it("el instalador del reloj no fija un puerto adb concreto", () => {
+    const source = readFileSync(
+      resolve(root, "instalar_reloj.bat"),
+      "utf8",
+    );
+
+    expect(source).not.toContain('set "WATCH=192.168.3.59:40201"');
+    expect(source).toContain("if not defined WATCH");
+    expect(source).toContain("devices -l");
+  });
+
+  it("compacta el teclado numerico para que no corte botones en pantalla redonda", () => {
+    const source = readFileSync(
+      resolve(root, "android/wear/src/main/java/com/mijornada/app/screens/NumericKeypad.kt"),
+      "utf8",
+    );
+
+    expect(source).toContain("widthFraction: Float = 0.72f");
+    expect(source).toContain("keyHeight: Dp = 28.dp");
+    expect(source).not.toContain("modifier.fillMaxWidth(0.80f)");
+  });
+
+  it("mantiene el cierre de turno en una entrada compacta antes de confirmar", () => {
+    const source = readFileSync(
+      resolve(root, "android/wear/src/main/java/com/mijornada/app/screens/EndTurnoScreen.kt"),
+      "utf8",
+    );
+
+    expect(source).toContain("activeField");
+    expect(source).toContain("CampoCierre");
+    expect(source).toContain("keyHeight = 22.dp");
+    expect(source).not.toContain("var step");
+  });
+
+  it("usa anchura segura en las filas principales del turno activo", () => {
+    const source = readFileSync(
+      resolve(root, "android/wear/src/main/java/com/mijornada/app/screens/ActiveTurnoScreen.kt"),
+      "utf8",
+    );
+
+    expect(source).toContain("WatchSafeRowWidth");
+    expect(source).toContain("fillMaxWidth(WatchSafeRowWidth)");
+    expect(source).toContain("top = 44.dp");
+    expect(source).toContain("verticalScroll(rememberScrollState())");
+    expect(source).not.toContain("ScalingLazyColumn");
   });
 });

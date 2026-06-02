@@ -1,5 +1,5 @@
 import type { AppSettings, CurrentState, Turno } from "../shared/types";
-import type { WatchCommand, WatchCommandResponse } from "../shared/watch-commands";
+import type { WatchCommand, WatchCommandResponse, WatchEntry, WatchEntryType, WatchTurnoTotals } from "../shared/watch-commands";
 import { buildTurnoConfigFromSettings } from "./accounting";
 import { mergeTurnos } from "./turnos";
 
@@ -30,6 +30,46 @@ export type WatchCommandProcessorResult = WatchCommandProcessorState & {
 
 function isActive(current: CurrentState): boolean {
   return current.entries.length > 0 || !!current.startTime;
+}
+
+/** Suma importes y recuenta entradas del turno en curso, por categoría. */
+export function computeWatchTotals(current: CurrentState): WatchTurnoTotals {
+  const porTipo: Record<WatchEntryType, number> = {
+    propina: 0,
+    datafono: 0,
+    agencia_bono: 0,
+    extra: 0,
+    gasolina: 0,
+    nulo: 0,
+  };
+  const numPorTipo: Record<WatchEntryType, number> = {
+    propina: 0,
+    datafono: 0,
+    agencia_bono: 0,
+    extra: 0,
+    gasolina: 0,
+    nulo: 0,
+  };
+  for (const entry of current.entries) {
+    if (entry.type in porTipo) {
+      porTipo[entry.type as WatchEntryType] += entry.amount;
+      numPorTipo[entry.type as WatchEntryType] += 1;
+    }
+  }
+  return { porTipo, numPorTipo, numEntradas: current.entries.length };
+}
+
+/** Historial del turno para el reloj: más recientes primero. */
+export function buildWatchEntradas(current: CurrentState): WatchEntry[] {
+  return current.entries
+    .map((e) => ({
+      id: e.id,
+      type: e.type as WatchEntry["type"],
+      amount: e.amount,
+      note: e.note,
+      time: e.time,
+    }))
+    .reverse();
 }
 
 function emptyCurrent(): CurrentState {
@@ -81,6 +121,8 @@ export function processWatchCommand(
         activeTurno: isActive(state.current),
         startTime: state.current.startTime,
         startDate: state.current.startDate,
+        totals: computeWatchTotals(state.current),
+        entradas: buildWatchEntradas(state.current),
       },
     };
   }
@@ -193,6 +235,76 @@ export function processWatchCommand(
         type: "OK",
         operationId: command.operationId,
         message: "Nota anadida",
+      },
+    };
+  }
+
+  if (command.type === "EDIT_ENTRY") {
+    if (!state.current.startTime) {
+      return {
+        ...state,
+        response: errorResponse(command, "NO_ACTIVE_TURNO", "No hay turno activo"),
+      };
+    }
+    const target = state.current.entries.find((e) => e.id === command.payload.id);
+    if (!target) {
+      return {
+        ...state,
+        response: errorResponse(command, "ENTRY_NOT_FOUND", "Entrada no encontrada"),
+      };
+    }
+    if (target.type !== "nota" && !(command.payload.amount > 0)) {
+      return {
+        ...state,
+        response: errorResponse(command, "INVALID_AMOUNT", "Importe invalido"),
+      };
+    }
+
+    return {
+      ...state,
+      current: {
+        ...state.current,
+        entries: state.current.entries.map((e) =>
+          e.id === command.payload.id
+            ? { ...e, amount: e.type === "nota" ? e.amount : command.payload.amount, note: command.payload.note.trim() }
+            : e,
+        ),
+      },
+      processedOperationIds: withProcessedOperationId(state, command.operationId),
+      response: {
+        type: "OK",
+        operationId: command.operationId,
+        message: "Entrada editada",
+      },
+    };
+  }
+
+  if (command.type === "DELETE_ENTRY") {
+    if (!state.current.startTime) {
+      return {
+        ...state,
+        response: errorResponse(command, "NO_ACTIVE_TURNO", "No hay turno activo"),
+      };
+    }
+    const exists = state.current.entries.some((e) => e.id === command.payload.id);
+    if (!exists) {
+      return {
+        ...state,
+        response: errorResponse(command, "ENTRY_NOT_FOUND", "Entrada no encontrada"),
+      };
+    }
+
+    return {
+      ...state,
+      current: {
+        ...state.current,
+        entries: state.current.entries.filter((e) => e.id !== command.payload.id),
+      },
+      processedOperationIds: withProcessedOperationId(state, command.operationId),
+      response: {
+        type: "OK",
+        operationId: command.operationId,
+        message: "Entrada borrada",
       },
     };
   }

@@ -1,16 +1,20 @@
 package com.mijornada.app.screens
 
-import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.*
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.wear.compose.foundation.lazy.ScalingLazyColumn
-import androidx.wear.compose.material.*
+import androidx.wear.compose.material.Text
 import com.mijornada.app.theme.*
 
 @Composable
@@ -18,10 +22,28 @@ fun AddEntryScreen(
     categoryLabel: String,
     categoryColor: Color,
     onSave: (amount: Double, note: String) -> Unit,
-    onCancel: () -> Unit
+    onCancel: () -> Unit,
+    onRequestNote: (current: String, onResult: (String) -> Unit) -> Unit,
+    initialAmount: Double = 0.0,
+    initialNote: String = "",
+    onDelete: (() -> Unit)? = null,
+    esNota: Boolean = false
 ) {
-    var amount by remember { mutableStateOf(0) }
-    var note by remember { mutableStateOf("") }
+    var amountText by remember { mutableStateOf(amountToText(initialAmount)) }
+    var note by remember { mutableStateOf(initialNote) }
+
+    val amount = parseAmount(amountText)
+
+    if (esNota) {
+        NotaEditor(
+            note = note,
+            onEditarTexto = { onRequestNote(note) { result -> note = result } },
+            onSave = { if (note.isNotBlank()) onSave(0.0, note) },
+            onCancel = onCancel,
+            onDelete = onDelete
+        )
+        return
+    }
 
     Box(
         modifier = Modifier
@@ -29,142 +51,149 @@ fun AddEntryScreen(
             .background(ColorBackground),
         contentAlignment = Alignment.Center
     ) {
-        ScalingLazyColumn(
+        Column(
             modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 20.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
         ) {
-            item {
+            Row(
+                modifier = Modifier.fillMaxWidth(0.84f),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Text("‹", color = ColorGrey, fontSize = 22.sp, modifier = Modifier.clickable { onCancel() })
                 Text(
-                    text = categoryLabel,
-                    color = categoryColor,
-                    fontSize = 14.sp
+                    text = if (onDelete != null) "Editar $categoryLabel" else categoryLabel,
+                    color = categoryColor, fontSize = 13.sp, fontWeight = FontWeight.Bold
+                )
+                Text(
+                    "⌫",
+                    color = if (amountText.isEmpty()) Color(0xFF3A3A3A) else ColorWhite,
+                    fontSize = 18.sp,
+                    modifier = Modifier.clickable(enabled = amountText.isNotEmpty()) {
+                        amountText = applyKey(amountText, "DEL")
+                    }
                 )
             }
 
-            item {
+            Text(
+                text = "${if (amountText.isEmpty()) "0" else amountText}€",
+                color = ColorWhite,
+                fontSize = 26.sp,
+                fontWeight = FontWeight.Bold
+            )
+
+            Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
                 Text(
-                    text = "${amount}€",
-                    color = ColorWhite,
-                    fontSize = 24.sp
+                    text = if (note.isBlank()) "+ Nota" else "✓ ${note.take(12)}",
+                    color = if (note.isBlank()) ColorGrey else ColorWhite,
+                    fontSize = 12.sp,
+                    modifier = Modifier
+                        .padding(vertical = 3.dp)
+                        .clickable { onRequestNote(note) { result -> note = result } }
                 )
-            }
-
-            item {
-                Row(
-                    modifier = Modifier.fillMaxWidth(0.9f),
-                    horizontalArrangement = Arrangement.spacedBy(4.dp)
-                ) {
-                    IncrementButton(text = "+1", onClick = { amount += 1 }, color = categoryColor, modifier = Modifier.weight(1f))
-                    IncrementButton(text = "+2", onClick = { amount += 2 }, color = categoryColor, modifier = Modifier.weight(1f))
-                    IncrementButton(text = "+5", onClick = { amount += 5 }, color = categoryColor, modifier = Modifier.weight(1f))
-                    IncrementButton(text = "+10", onClick = { amount += 10 }, color = categoryColor, modifier = Modifier.weight(1f))
-                }
-            }
-
-            item {
-                Row(
-                    modifier = Modifier.fillMaxWidth(0.9f),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    Chip(
-                        onClick = { amount = 0 },
-                        label = {
-                            Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-                                Text("C", color = ColorGrey, fontSize = 12.sp)
-                            }
-                        },
-                        colors = ChipDefaults.chipColors(
-                            backgroundColor = ColorNuloBg,
-                            contentColor = ColorGrey
-                        ),
-                        border = ChipDefaults.chipBorder(BorderStroke(1.dp, ColorGrey)),
-                        modifier = Modifier.weight(1f)
-                    )
-                    Chip(
-                        onClick = {
-                            // Entrada de nota sencilla (opcional, en esta fase fija)
-                            note = if (note.isEmpty()) "Reloj" else ""
-                        },
-                        label = {
-                            Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-                                Text(if (note.isEmpty()) "+Nota" else "✓Nota", color = ColorWhite, fontSize = 12.sp)
-                            }
-                        },
-                        colors = ChipDefaults.chipColors(
-                            backgroundColor = ColorNuloBg,
-                            contentColor = ColorWhite
-                        ),
-                        border = ChipDefaults.chipBorder(BorderStroke(1.dp, ColorWhite)),
-                        modifier = Modifier.weight(1f)
+                if (onDelete != null) {
+                    Text(
+                        text = "Borrar",
+                        color = ColorGasolina,
+                        fontSize = 12.sp,
+                        modifier = Modifier
+                            .padding(vertical = 3.dp)
+                            .clickable { onDelete() }
                     )
                 }
             }
 
-            item {
-                Spacer(modifier = Modifier.height(6.dp))
-            }
+            Spacer(modifier = Modifier.height(4.dp))
 
-            item {
-                Row(
-                    modifier = Modifier.fillMaxWidth(0.9f),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    Chip(
-                        onClick = onCancel,
-                        label = {
-                            Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-                                Text("Volver", color = ColorNulo, fontSize = 12.sp)
-                            }
-                        },
-                        colors = ChipDefaults.chipColors(
-                            backgroundColor = ColorNuloBg,
-                            contentColor = ColorNulo
-                        ),
-                        border = ChipDefaults.chipBorder(BorderStroke(1.dp, ColorNulo)),
-                        modifier = Modifier.weight(1f)
-                    )
-                    Chip(
-                        onClick = {
-                            if (amount > 0) {
-                                onSave(amount.toDouble(), note)
-                            }
-                        },
-                        enabled = amount > 0,
-                        label = {
-                            Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-                                Text("Guardar", color = ColorPropina, fontSize = 12.sp)
-                            }
-                        },
-                        colors = ChipDefaults.chipColors(
-                            backgroundColor = ColorPropinaBg,
-                            contentColor = ColorPropina
-                        ),
-                        border = ChipDefaults.chipBorder(BorderStroke(1.5.dp, ColorPropina)),
-                        modifier = Modifier.weight(1f)
-                    )
-                }
-            }
+            NumericKeypad(
+                onKey = { key -> amountText = applyKey(amountText, key) },
+                color = categoryColor,
+                onSave = { if (amount > 0.0) onSave(amount, note) },
+                saveEnabled = amount > 0.0
+            )
         }
     }
 }
 
 @Composable
-fun IncrementButton(
-    text: String,
-    onClick: () -> Unit,
-    color: Color,
-    modifier: Modifier = Modifier
+private fun NotaEditor(
+    note: String,
+    onEditarTexto: () -> Unit,
+    onSave: () -> Unit,
+    onCancel: () -> Unit,
+    onDelete: (() -> Unit)?
 ) {
-    Button(
-        onClick = onClick,
-        colors = ButtonDefaults.buttonColors(
-            backgroundColor = ColorBackground,
-            contentColor = color
-        ),
-        border = ButtonDefaults.buttonBorder(BorderStroke(1.dp, color)),
-        modifier = modifier.height(32.dp)
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(ColorBackground),
+        contentAlignment = Alignment.Center
     ) {
-        Text(text, color = color, fontSize = 11.sp)
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState()),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Spacer(modifier = Modifier.height(22.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(0.86f),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Text("‹", color = ColorGrey, fontSize = 22.sp, modifier = Modifier.clickable { onCancel() })
+                Text("Nota del turno", color = ColorWhite, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                Spacer(modifier = Modifier.width(16.dp))
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth(0.86f)
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(Color(0xFF15151C))
+                    .clickable { onEditarTexto() }
+                    .padding(12.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = if (note.isBlank()) "Toca para escribir…" else note,
+                    color = if (note.isBlank()) ColorGrey else ColorWhite,
+                    fontSize = 13.sp
+                )
+            }
+            Text("✎ Editar texto", color = ColorGrey, fontSize = 11.sp, modifier = Modifier.padding(top = 4.dp).clickable { onEditarTexto() })
+
+            Spacer(modifier = Modifier.height(10.dp))
+
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth(0.86f)
+                    .clip(RoundedCornerShape(14.dp))
+                    .background(if (note.isNotBlank()) ColorPropina else ColorNuloBg)
+                    .clickable(enabled = note.isNotBlank()) { onSave() }
+                    .padding(vertical = 11.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Text("Guardar", color = if (note.isNotBlank()) ColorBackground else ColorGrey, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+            }
+            if (onDelete != null) {
+                Spacer(modifier = Modifier.height(6.dp))
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth(0.86f)
+                        .clip(RoundedCornerShape(14.dp))
+                        .background(ColorGasolinaBg)
+                        .clickable { onDelete() }
+                        .padding(vertical = 10.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text("Eliminar nota", color = ColorGasolina, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                }
+            }
+            Spacer(modifier = Modifier.height(20.dp))
+        }
     }
 }

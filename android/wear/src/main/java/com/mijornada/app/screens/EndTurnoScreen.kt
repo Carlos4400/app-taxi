@@ -1,25 +1,40 @@
 package com.mijornada.app.screens
 
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.wear.compose.foundation.lazy.ScalingLazyColumn
-import androidx.wear.compose.material.*
+import androidx.wear.compose.material.Text
 import com.mijornada.app.theme.*
 
 @Composable
 fun EndTurnoScreen(
-    onConfirm: (dinero: Double, km: Double) -> Unit,
-    onCancel: () -> Unit
+    totalsPorTipo: Map<String, Double>,
+    onConfirm: (dinero: Double, km: Double, note: String) -> Unit,
+    onCancel: () -> Unit,
+    onRequestNote: (current: String, onResult: (String) -> Unit) -> Unit
 ) {
-    var step by remember { mutableStateOf(1) } // 1: Dinero, 2: Kilometros
-    var dinero by remember { mutableStateOf(0) }
-    var km by remember { mutableStateOf(0) }
+    var activeField by remember { mutableStateOf("dinero") }
+    var confirming by remember { mutableStateOf(false) }
+    var dineroText by remember { mutableStateOf("") }
+    var kmText by remember { mutableStateOf("") }
+    var note by remember { mutableStateOf("") }
+
+    val dinero = parseAmount(dineroText)
+    val km = parseAmount(kmText)
+    val canReview = dinero > 0.0 && km > 0.0
+    val activeColor = if (activeField == "dinero") ColorAgencia else ColorExtra
 
     Box(
         modifier = Modifier
@@ -27,104 +42,190 @@ fun EndTurnoScreen(
             .background(ColorBackground),
         contentAlignment = Alignment.Center
     ) {
-        ScalingLazyColumn(
-            modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 20.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            if (step == 1) {
-                item {
-                    Text("Total Taxímetro", color = ColorAgencia, fontSize = 14.sp)
+        if (confirming) {
+            ConfirmarCierre(
+                totalsPorTipo = totalsPorTipo,
+                dinero = dinero,
+                kmText = kmText,
+                note = note,
+                onBack = { confirming = false },
+                onConfirm = { onConfirm(dinero, km, note) }
+            )
+        } else {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(horizontal = 28.dp, vertical = 4.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center
+            ) {
+                Text("Terminar turno", color = ColorWhite, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                Spacer(modifier = Modifier.height(4.dp))
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(0.82f),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    CampoCierre(
+                        label = "Taximetro",
+                        value = "${dineroText.ifEmpty { "0" }}€",
+                        color = ColorAgencia,
+                        active = activeField == "dinero",
+                        modifier = Modifier.weight(1f)
+                    ) { activeField = "dinero" }
+                    CampoCierre(
+                        label = "Km",
+                        value = "${kmText.ifEmpty { "0" }} km",
+                        color = ColorExtra,
+                        active = activeField == "km",
+                        modifier = Modifier.weight(1f)
+                    ) { activeField = "km" }
                 }
-                item {
-                    Text("${dinero}€", color = ColorWhite, fontSize = 24.sp)
+
+                Spacer(modifier = Modifier.height(4.dp))
+
+                NumericKeypad(
+                    onKey = { key ->
+                        if (activeField == "dinero") {
+                            dineroText = applyKey(dineroText, key)
+                        } else {
+                            kmText = applyKey(kmText, key)
+                        }
+                    },
+                    color = activeColor,
+                    keyHeight = 22.dp,
+                    keyFontSize = 13.sp
+                )
+
+                Spacer(modifier = Modifier.height(4.dp))
+
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth(0.72f)
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(if (note.isBlank()) ColorNuloBg else Color(0xFF2A2A33))
+                        .clickable { onRequestNote(note) { result -> note = result } }
+                        .padding(vertical = 5.dp, horizontal = 8.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(if (note.isBlank()) "+ Nota" else "✓ ${note.take(14)}", color = ColorWhite, fontSize = 10.sp)
                 }
-                item {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(0.9f),
-                        horizontalArrangement = Arrangement.spacedBy(4.dp)
-                    ) {
-                        IncrementButton(text = "+5", onClick = { dinero += 5 }, color = ColorAgencia, modifier = Modifier.weight(1f))
-                        IncrementButton(text = "+20", onClick = { dinero += 20 }, color = ColorAgencia, modifier = Modifier.weight(1f))
-                        IncrementButton(text = "+50", onClick = { dinero += 50 }, color = ColorAgencia, modifier = Modifier.weight(1f))
-                        IncrementButton(text = "+100", onClick = { dinero += 100 }, color = ColorAgencia, modifier = Modifier.weight(1f))
-                    }
-                }
-                item {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(0.9f),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        Chip(
-                            onClick = { dinero = 0 },
-                            label = { Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) { Text("Borrar", color = ColorGrey, fontSize = 12.sp) } },
-                            colors = ChipDefaults.chipColors(backgroundColor = ColorNuloBg),
-                            border = ChipDefaults.chipBorder(BorderStroke(1.dp, ColorGrey)),
-                            modifier = Modifier.weight(1f)
-                        )
-                        Chip(
-                            onClick = { if (dinero > 0) step = 2 },
-                            enabled = dinero > 0,
-                            label = { Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) { Text("Siguiente", color = ColorPropina, fontSize = 12.sp) } },
-                            colors = ChipDefaults.chipColors(backgroundColor = ColorPropinaBg),
-                            border = ChipDefaults.chipBorder(BorderStroke(1.5.dp, ColorPropina)),
-                            modifier = Modifier.weight(1f)
-                        )
-                    }
-                }
-                item {
-                    Spacer(modifier = Modifier.height(6.dp))
-                }
-                item {
-                    Chip(
-                        onClick = onCancel,
-                        label = { Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) { Text("Cancelar", color = ColorNulo, fontSize = 12.sp) } },
-                        colors = ChipDefaults.chipColors(backgroundColor = ColorNuloBg),
-                        border = ChipDefaults.chipBorder(BorderStroke(1.1.dp, ColorNulo)),
-                        modifier = Modifier.fillMaxWidth(0.5f)
-                    )
-                }
-            } else {
-                item {
-                    Text("Kilómetros Recorridos", color = ColorExtra, fontSize = 14.sp)
-                }
-                item {
-                    Text("${km} km", color = ColorWhite, fontSize = 24.sp)
-                }
-                item {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(0.9f),
-                        horizontalArrangement = Arrangement.spacedBy(4.dp)
-                    ) {
-                        IncrementButton(text = "+10", onClick = { km += 10 }, color = ColorExtra, modifier = Modifier.weight(1f))
-                        IncrementButton(text = "+50", onClick = { km += 50 }, color = ColorExtra, modifier = Modifier.weight(1f))
-                        IncrementButton(text = "+100", onClick = { km += 100 }, color = ColorExtra, modifier = Modifier.weight(1f))
-                        IncrementButton(text = "+200", onClick = { km += 200 }, color = ColorExtra, modifier = Modifier.weight(1f))
-                    }
-                }
-                item {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(0.9f),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        Chip(
-                            onClick = { step = 1 },
-                            label = { Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) { Text("Atrás", color = ColorGrey, fontSize = 12.sp) } },
-                            colors = ChipDefaults.chipColors(backgroundColor = ColorNuloBg),
-                            border = ChipDefaults.chipBorder(BorderStroke(1.dp, ColorGrey)),
-                            modifier = Modifier.weight(1f)
-                        )
-                        Chip(
-                            onClick = { if (km > 0) onConfirm(dinero.toDouble(), km.toDouble()) },
-                            enabled = km > 0,
-                            label = { Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) { Text("Finalizar", color = ColorGasolina, fontSize = 12.sp) } },
-                            colors = ChipDefaults.chipColors(backgroundColor = ColorGasolinaBg),
-                            border = ChipDefaults.chipBorder(BorderStroke(1.5.dp, ColorGasolina)),
-                            modifier = Modifier.weight(1f)
-                        )
-                    }
+
+                Spacer(modifier = Modifier.height(4.dp))
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(0.78f),
+                    horizontalArrangement = Arrangement.spacedBy(7.dp)
+                ) {
+                    BotonPlano("Atras", ColorGrey, ColorNuloBg, Modifier.weight(1f)) { onCancel() }
+                    BotonPlano(
+                        "Revisar",
+                        ColorBackground,
+                        if (canReview) ColorPropina else ColorNuloBg,
+                        Modifier.weight(1f),
+                        enabled = canReview
+                    ) { confirming = true }
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun CampoCierre(
+    label: String,
+    value: String,
+    color: Color,
+    active: Boolean,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit
+) {
+    val shape = RoundedCornerShape(12.dp)
+    Column(
+        modifier = modifier
+            .clip(shape)
+            .background(if (active) color.copy(alpha = 0.18f) else ColorNuloBg)
+            .border(1.dp, if (active) color else Color.Transparent, shape)
+            .clickable { onClick() }
+            .padding(horizontal = 7.dp, vertical = 4.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Text(label, color = color, fontSize = 8.sp, fontWeight = FontWeight.Bold)
+        Text(value, color = ColorWhite, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+    }
+}
+
+@Composable
+private fun ConfirmarCierre(
+    totalsPorTipo: Map<String, Double>,
+    dinero: Double,
+    kmText: String,
+    note: String,
+    onBack: () -> Unit,
+    onConfirm: () -> Unit
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .verticalScroll(rememberScrollState())
+            .padding(vertical = 18.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Text("¿Terminar turno?", color = ColorGasolina, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+        Spacer(modifier = Modifier.height(7.dp))
+        ResumenFila("Taximetro", fmtEur(dinero), ColorAgencia)
+        ResumenFila("Kilometros", "${kmText.ifEmpty { "0" }} km", ColorExtra)
+        listOf("propina", "datafono", "agencia_bono", "extra", "gasolina", "nulo").forEach { tipo ->
+            val v = totalsPorTipo[tipo] ?: 0.0
+            if (v > 0.0) {
+                val meta = categoriaMeta(tipo)
+                ResumenFila(meta.label, fmtEur(v), meta.color)
+            }
+        }
+        if (note.isNotBlank()) ResumenFila("Nota", note.take(14), ColorWhite)
+        Spacer(modifier = Modifier.height(9.dp))
+        Row(
+            modifier = Modifier.fillMaxWidth(0.76f),
+            horizontalArrangement = Arrangement.spacedBy(7.dp)
+        ) {
+            BotonPlano("Atras", ColorGrey, ColorNuloBg, Modifier.weight(1f), onClick = onBack)
+            BotonPlano("Cerrar", ColorWhite, ColorGasolina, Modifier.weight(1f), onClick = onConfirm)
+        }
+        Spacer(modifier = Modifier.height(18.dp))
+    }
+}
+
+@Composable
+private fun BotonPlano(
+    label: String,
+    textColor: Color,
+    bg: Color,
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true,
+    onClick: () -> Unit
+) {
+    Box(
+        modifier = modifier
+            .clip(RoundedCornerShape(13.dp))
+            .background(bg)
+            .clickable(enabled = enabled) { onClick() }
+            .padding(vertical = 7.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(label, color = if (enabled) textColor else ColorGrey, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+    }
+}
+
+@Composable
+private fun ResumenFila(label: String, value: String, color: Color) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth(0.72f)
+            .padding(vertical = 2.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(label, color = ColorGrey, fontSize = 10.sp)
+        Spacer(modifier = Modifier.weight(1f))
+        Text(value, color = color, fontSize = 12.sp, fontWeight = FontWeight.Bold)
     }
 }

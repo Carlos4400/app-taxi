@@ -1,3 +1,807 @@
+## 2026-06-02 03:20 - Corregir pantallas del reloj
+
+**Archivos modificados:** `android/wear/src/main/java/com/mijornada/app/screens/ActiveTurnoScreen.kt`, `android/wear/src/main/java/com/mijornada/app/screens/EndTurnoScreen.kt`, `android/wear/src/main/java/com/mijornada/app/screens/NumericKeypad.kt`, `src/__tests__/android-wear-bridge.test.ts`
+
+### Cambio 1 - Pruebas de layout Wear
+
+#### Código anterior
+```ts
+No existían pruebas de regresión para compactar el teclado numérico, mantener el cierre de turno en una entrada compacta ni usar anchura segura en las filas principales del turno activo en src/__tests__/android-wear-bridge.test.ts.
+```
+
+#### Código nuevo
+```ts
+  it("compacta el teclado numerico para que no corte botones en pantalla redonda", () => {
+    const source = readFileSync(
+      resolve(root, "android/wear/src/main/java/com/mijornada/app/screens/NumericKeypad.kt"),
+      "utf8",
+    );
+
+    expect(source).toContain("widthFraction: Float = 0.72f");
+    expect(source).toContain("keyHeight: Dp = 28.dp");
+    expect(source).not.toContain("modifier.fillMaxWidth(0.80f)");
+  });
+
+  it("mantiene el cierre de turno en una entrada compacta antes de confirmar", () => {
+    const source = readFileSync(
+      resolve(root, "android/wear/src/main/java/com/mijornada/app/screens/EndTurnoScreen.kt"),
+      "utf8",
+    );
+
+    expect(source).toContain("activeField");
+    expect(source).toContain("CampoCierre");
+    expect(source).toContain("keyHeight = 22.dp");
+    expect(source).not.toContain("var step");
+  });
+
+  it("usa anchura segura en las filas principales del turno activo", () => {
+    const source = readFileSync(
+      resolve(root, "android/wear/src/main/java/com/mijornada/app/screens/ActiveTurnoScreen.kt"),
+      "utf8",
+    );
+
+    expect(source).toContain("WatchSafeRowWidth");
+    expect(source).toContain("fillMaxWidth(WatchSafeRowWidth)");
+    expect(source).toContain("top = 44.dp");
+    expect(source).toContain("verticalScroll(rememberScrollState())");
+    expect(source).not.toContain("ScalingLazyColumn");
+  });
+```
+
+#### Por qué se cambió
+Las fotos del reloj mostraban recortes en pantalla redonda. Se añadieron pruebas para fijar que el teclado sea compacto, que el cierre no use un flujo por pasos alto y que la pantalla activa use anchura y scroll seguros.
+
+### Cambio 2 - Teclado numérico compacto
+
+#### Código anterior
+```kotlin
+fun NumericKeypad(
+    onKey: (String) -> Unit,
+    color: Color,
+    modifier: Modifier = Modifier,
+    onSave: (() -> Unit)? = null,
+    saveEnabled: Boolean = false
+) {
+```
+
+#### Código nuevo
+```kotlin
+fun NumericKeypad(
+    onKey: (String) -> Unit,
+    color: Color,
+    modifier: Modifier = Modifier,
+    onSave: (() -> Unit)? = null,
+    saveEnabled: Boolean = false,
+    widthFraction: Float = 0.72f,
+    keyHeight: Dp = 28.dp,
+    keyFontSize: TextUnit = 15.sp
+) {
+```
+
+#### Por qué se cambió
+El teclado anterior usaba ancho fijo `0.80f` y teclas de `34.dp`, lo que dejaba botones fuera de la zona visible en el reloj. Se hizo parametrizable y más compacto para que pueda caber en pantallas redondas.
+
+### Cambio 3 - Turno activo con scroll táctil estable
+
+#### Código anterior
+```kotlin
+        ScalingLazyColumn(
+            modifier = Modifier.fillMaxSize(),
+            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 28.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+```
+
+#### Código nuevo
+```kotlin
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState())
+                .padding(start = 18.dp, end = 18.dp, top = 44.dp, bottom = 28.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+```
+
+#### Por qué se cambió
+`ScalingLazyColumn` dejaba acciones inferiores con zonas táctiles poco fiables al desplazarse. Se cambió a `Column` con `verticalScroll` para mantener un scroll simple, cabecera visible y botones pulsables.
+
+### Cambio 4 - Cierre de turno compacto
+
+#### Código anterior
+```kotlin
+    var step by remember { mutableStateOf(1) } // 1: Dinero, 2: Km + nota, 3: Confirmar
+    var dineroText by remember { mutableStateOf("") }
+    var kmText by remember { mutableStateOf("") }
+    var note by remember { mutableStateOf("") }
+```
+
+#### Código nuevo
+```kotlin
+    var activeField by remember { mutableStateOf("dinero") }
+    var confirming by remember { mutableStateOf(false) }
+    var dineroText by remember { mutableStateOf("") }
+    var kmText by remember { mutableStateOf("") }
+    var note by remember { mutableStateOf("") }
+```
+
+#### Por qué se cambió
+El cierre por pasos generaba pantallas altas con teclado y botones recortados. Se cambió a una pantalla compacta con campos `Taximetro` y `Km` visibles, teclado único y pantalla de confirmación aparte.
+
+## 2026-06-02 00:31 - Blindar acciones sensibles del reloj
+
+**Archivos modificados:** `android/wear/src/main/AndroidManifest.xml`, `android/wear/src/main/java/com/mijornada/app/WearMainActivity.kt`, `android/wear/src/main/java/com/mijornada/app/screens/AddEntryScreen.kt`, `src/__tests__/android-wear-bridge.test.ts`, `src/__tests__/watch-command-processor.test.ts`, `instalar_reloj.bat`
+
+### Cambio 1 - Confirmación antes de borrar entrada
+
+#### Código anterior
+```kotlin
+                        onRequestNote = { current, onResult -> requestNote(current, onResult) },
+                        onDelete = { sendDeleteEntry(e.id) },
+                        esNota = e.type == "nota"
+```
+
+#### Código nuevo
+```kotlin
+                        onRequestNote = { current, onResult -> requestNote(current, onResult) },
+                        onDelete = { currentScreen.value = ScreenState.CONFIRM_DELETE },
+                        esNota = e.type == "nota"
+```
+
+#### Por qué se cambió
+Borrar una entrada desde el reloj era una acción directa. Se cambió para abrir `ScreenState.CONFIRM_DELETE` y exigir confirmación explícita antes de enviar `DELETE_ENTRY` al móvil.
+
+### Cambio 2 - Pantalla de confirmación de borrado
+
+#### Código anterior
+```kotlin
+No existía ConfirmDeleteScreen en android/wear/src/main/java/com/mijornada/app/WearMainActivity.kt.
+```
+
+#### Código nuevo
+```kotlin
+@Composable
+private fun ConfirmDeleteScreen(
+    entry: WatchEntry,
+    onCancel: () -> Unit,
+    onConfirm: () -> Unit
+) {
+    val meta = categoriaMeta(entry.type)
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(ColorBackground),
+        contentAlignment = Alignment.Center
+    ) {
+        Column(
+            modifier = Modifier.fillMaxWidth(0.88f),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Text("Borrar entrada", color = ColorGasolina, fontSize = 15.sp, fontWeight = FontWeight.Bold)
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(categoriaLabelSingular(entry.type), color = meta.color, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+            if (entry.type != "nota") {
+                Text(fmtEur(entry.amount), color = ColorWhite, fontSize = 20.sp, fontWeight = FontWeight.Bold)
+            }
+            if (entry.note.isNotBlank()) {
+                Text(entry.note.take(32), color = ColorGrey, fontSize = 11.sp)
+            }
+            Spacer(modifier = Modifier.height(14.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                ConfirmDeleteButton(
+                    label = "Cancelar",
+                    textColor = ColorGrey,
+                    bg = ColorNuloBg,
+                    modifier = Modifier.weight(1f),
+                    onClick = onCancel
+                )
+                ConfirmDeleteButton(
+                    label = "Borrar",
+                    textColor = ColorWhite,
+                    bg = ColorGasolina,
+                    modifier = Modifier.weight(1f),
+                    onClick = onConfirm
+                )
+            }
+        }
+    }
+}
+```
+
+#### Por qué se cambió
+Se añadió una pantalla compacta de confirmación para mostrar qué entrada se va a borrar y separar cancelar de confirmar. El reloj sigue sin escribir datos: al confirmar solo llama a `sendDeleteEntry(e.id)`.
+
+### Cambio 3 - Botón atrás nativo en flujos del reloj
+
+#### Código anterior
+```kotlin
+    @Composable
+    fun MainContent() {
+        when (currentScreen.value) {
+```
+
+#### Código nuevo
+```kotlin
+    @Composable
+    fun MainContent() {
+        BackHandler(enabled = currentScreen.value != ScreenState.NO_CONNECTED) {
+            handleBack()
+        }
+
+        when (currentScreen.value) {
+```
+
+#### Por qué se cambió
+El botón atrás nativo no tenía una regla explícita dentro de los flujos de trabajo. Se añadió `BackHandler` para que añadir, editar, confirmar borrado y cerrar turno vuelvan a la pantalla esperada sin cerrar acciones por accidente.
+
+### Cambio 4 - Feedback visible y háptico tras respuesta del móvil
+
+#### Código anterior
+```kotlin
+            } else if ("OK" == json.optString("type")) {
+                currentScreen.value = ScreenState.ACTIVE_TURNO
+                requestStatus()
+            } else if ("ERROR" == json.optString("type")) {
+                Log.e(TAG, "Error desde movil: ${json.optString("message")}")
+            }
+```
+
+#### Código nuevo
+```kotlin
+            } else if ("OK" == json.optString("type")) {
+                performFeedback(json.optString("message", "Hecho"), strong = false)
+                currentScreen.value = ScreenState.ACTIVE_TURNO
+                requestStatus()
+            } else if ("ERROR" == json.optString("type")) {
+                Log.e(TAG, "Error desde movil: ${json.optString("message")}")
+                performFeedback(json.optString("message", "Error"), strong = true)
+            }
+```
+
+#### Por qué se cambió
+El reloj no confirmaba físicamente ni visualmente si el móvil había aceptado una acción. Se añadió `performFeedback` para mostrar un `Toast` y vibrar solo después de recibir respuesta del móvil.
+
+### Cambio 5 - Permiso de vibración en Wear
+
+#### Código anterior
+```xml
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+```
+
+#### Código nuevo
+```xml
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <uses-permission android:name="android.permission.VIBRATE" />
+```
+
+#### Por qué se cambió
+La vibración de confirmación necesita permiso explícito en el manifiesto del módulo Wear.
+
+### Cambio 6 - Texto simple para borrar
+
+#### Código anterior
+```kotlin
+                        text = "🗑 Borrar",
+```
+
+#### Código nuevo
+```kotlin
+                        text = "Borrar",
+```
+
+#### Por qué se cambió
+Los símbolos pueden renderizar distinto según la fuente del reloj. Se sustituyó el icono de papelera por texto estable.
+
+### Cambio 7 - Instalador sin puerto fijo
+
+#### Código anterior
+```bat
+set "WATCH=192.168.3.59:40201"
+```
+
+#### Código nuevo
+```bat
+set "WATCH="
+```
+
+#### Por qué se cambió
+El puerto ADB por Wi-Fi del reloj cambia. El instalador ahora detecta un Xiaomi Watch 5 conectado con `adb devices -l` o pide la IP:PUERTO si no lo encuentra.
+
+### Cambio 8 - Pruebas de seguridad del reloj
+
+#### Código anterior
+```ts
+No existían pruebas específicas para confirmación de borrado, botón atrás, feedback háptico/visual, instalador sin puerto fijo ni duplicados de EDIT_ENTRY, DELETE_ENTRY y END_TURNO.
+```
+
+#### Código nuevo
+```ts
+  it("pide confirmacion antes de borrar una entrada desde el reloj", () => {
+    const source = readFileSync(
+      resolve(root, "android/wear/src/main/java/com/mijornada/app/WearMainActivity.kt"),
+      "utf8",
+    );
+
+    expect(source).toContain("CONFIRM_DELETE");
+    expect(source).toContain("onDelete = { currentScreen.value = ScreenState.CONFIRM_DELETE }");
+    expect(source).toContain("sendDeleteEntry(e.id)");
+  });
+```
+
+#### Por qué se cambió
+Se añadieron pruebas para fijar las reglas profesionales nuevas: acciones sensibles confirmadas, back nativo controlado, feedback tras respuesta del móvil, script de instalación sin puerto rígido y anti-duplicado explícito para edición, borrado y cierre.
+
+### Cambio 9 - Configuración de turno en test duplicado
+
+#### Código anterior
+```ts
+        configTurno: { porcentajeJefe: 50, porcentajeChofer: 50, descontar: { datafono: true, agenciaBono: true, extra: false, gasolina: true } },
+```
+
+#### Código nuevo
+```ts
+        configTurno: {
+          porcentajeJefe: 50,
+          porcentajeChofer: 50,
+          descDatafono: true,
+          descAgencia: true,
+          descExtra: false,
+          descGasolina: true,
+        },
+```
+
+#### Por qué se cambió
+El test de cierre duplicado debe respetar el tipo real `TurnoConfig`, que usa propiedades `desc*` en lugar de un objeto `descontar`.
+
+## 2026-06-01 20:33 - Corregir edición de notas y añadir confirmación de cierre en el reloj
+
+**Archivos modificados:** `android/wear/src/main/java/com/mijornada/app/screens/AddEntryScreen.kt`, `android/wear/src/main/java/com/mijornada/app/screens/EndTurnoScreen.kt`, `android/wear/src/main/java/com/mijornada/app/WearMainActivity.kt`
+
+### Cambio 1 - Modo nota en AddEntryScreen
+
+#### Código anterior
+```kotlin
+    initialAmount: Double = 0.0,
+    initialNote: String = "",
+    onDelete: (() -> Unit)? = null
+) {
+    var amountText by remember { mutableStateOf(amountToText(initialAmount)) }
+    var note by remember { mutableStateOf(initialNote) }
+
+    val amount = parseAmount(amountText)
+
+    Box(
+```
+
+#### Código nuevo
+```kotlin
+    initialAmount: Double = 0.0,
+    initialNote: String = "",
+    onDelete: (() -> Unit)? = null,
+    esNota: Boolean = false
+) {
+    var amountText by remember { mutableStateOf(amountToText(initialAmount)) }
+    var note by remember { mutableStateOf(initialNote) }
+
+    val amount = parseAmount(amountText)
+
+    if (esNota) {
+        NotaEditor(
+            note = note,
+            onEditarTexto = { onRequestNote(note) { result -> note = result } },
+            onSave = { if (note.isNotBlank()) onSave(0.0, note) },
+            onCancel = onCancel,
+            onDelete = onDelete
+        )
+        return
+    }
+
+    Box(
+```
+
+#### Por qué se cambió
+Editar una nota desde el historial no funcionaba: el botón Guardar exigía importe > 0 y una nota tiene importe 0. El nuevo modo nota (composable `NotaEditor`) edita solo el texto (teclado/voz del sistema) y permite eliminar, como el diálogo de edición del móvil. `WearMainActivity` pasa `esNota = e.type == "nota"`.
+
+### Cambio 2 - Paso de confirmación con resumen al cerrar turno
+
+#### Código anterior
+```kotlin
+fun EndTurnoScreen(
+    onConfirm: (dinero: Double, km: Double, note: String) -> Unit,
+    onCancel: () -> Unit,
+    onRequestNote: (current: String, onResult: (String) -> Unit) -> Unit
+) {
+    var step by remember { mutableStateOf(1) } // 1: Dinero, 2: Kilómetros
+```
+(con 2 pasos; "Finalizar" en el paso 2 llamaba directamente a `onConfirm`)
+
+#### Código nuevo
+```kotlin
+fun EndTurnoScreen(
+    totalsPorTipo: Map<String, Double>,
+    onConfirm: (dinero: Double, km: Double, note: String) -> Unit,
+    onCancel: () -> Unit,
+    onRequestNote: (current: String, onResult: (String) -> Unit) -> Unit
+) {
+    var step by remember { mutableStateOf(1) } // 1: Dinero, 2: Km + nota, 3: Confirmar
+```
+(el paso 2 pasa a "Revisar" -> paso 3 con resumen de taxímetro, km y desglose por categoría; "Cerrar" confirma; "Atrás" vuelve al paso 2)
+
+#### Por qué se cambió
+Cerrar turno es irreversible y no tenía confirmación. Se añade un paso final con resumen (taxímetro, km y totales por categoría recibidos en `totalsPorTipo`) antes de cerrar definitivamente.
+
+---
+
+## 2026-06-01 20:15 - Añadir pantalla de turno tipo móvil y edición de entradas en el reloj
+
+**Archivos modificados:** `src/shared/watch-commands.ts`, `src/logic/watch-command-processor.ts`, `src/services/watch-bridge.ts`, `src/__tests__/watch-command-processor.test.ts`, `android/wear/src/main/java/com/mijornada/app/screens/WatchModels.kt`, `android/wear/src/main/java/com/mijornada/app/screens/NumericKeypad.kt`, `android/wear/src/main/java/com/mijornada/app/screens/AddEntryScreen.kt`, `android/wear/src/main/java/com/mijornada/app/screens/ActiveTurnoScreen.kt`, `android/wear/src/main/java/com/mijornada/app/WearMainActivity.kt`
+
+### Cambio 1 - Tipo WatchEntry y totales con recuento en el contrato
+
+#### Código anterior
+```ts
+export type WatchEntryType =
+  | "propina"
+  | "datafono"
+  | "agencia_bono"
+  | "extra"
+  | "gasolina"
+  | "nulo";
+
+/** Importe acumulado del turno en curso, sumado por categoría, y nº de entradas. */
+export type WatchTurnoTotals = {
+  porTipo: Record<WatchEntryType, number>;
+  numEntradas: number;
+};
+```
+
+#### Código nuevo
+```ts
+export type WatchEntryType =
+  | "propina"
+  | "datafono"
+  | "agencia_bono"
+  | "extra"
+  | "gasolina"
+  | "nulo";
+
+/** Una entrada del turno tal y como se muestra en el historial del reloj. */
+export type WatchEntry = {
+  id: number;
+  type: WatchEntryType | "nota";
+  amount: number;
+  note: string;
+  time: string;
+};
+
+/** Importe y recuento acumulados del turno en curso, por categoría. */
+export type WatchTurnoTotals = {
+  porTipo: Record<WatchEntryType, number>;
+  numPorTipo: Record<WatchEntryType, number>;
+  numEntradas: number;
+};
+```
+
+#### Por qué se cambió
+El reloj necesita pintar el historial (lista de entradas) y, en cada tarjeta, el nº de entradas además del importe. Se añade `WatchEntry` y `numPorTipo`.
+
+### Cambio 2 - Comandos EDIT_ENTRY y DELETE_ENTRY y ampliación del STATUS
+
+#### Código anterior
+```ts
+  | {
+      operationId: string;
+      type: "END_TURNO";
+      createdAt: string;
+      payload: {
+        dinero: number;
+        km: number;
+        note: string;
+      };
+    };
+
+export type WatchCommandResponse =
+  | {
+      type: "STATUS";
+      connected: true;
+      activeTurno: boolean;
+      startTime: string | null;
+      startDate: string | null;
+    }
+```
+
+#### Código nuevo
+```ts
+  | {
+      operationId: string;
+      type: "EDIT_ENTRY";
+      createdAt: string;
+      payload: {
+        id: number;
+        amount: number;
+        note: string;
+      };
+    }
+  | {
+      operationId: string;
+      type: "DELETE_ENTRY";
+      createdAt: string;
+      payload: {
+        id: number;
+      };
+    }
+  | {
+      operationId: string;
+      type: "END_TURNO";
+      createdAt: string;
+      payload: {
+        dinero: number;
+        km: number;
+        note: string;
+      };
+    };
+
+export type WatchCommandResponse =
+  | {
+      type: "STATUS";
+      connected: true;
+      activeTurno: boolean;
+      startTime: string | null;
+      startDate: string | null;
+      totals: WatchTurnoTotals;
+      entradas: WatchEntry[];
+    }
+```
+
+#### Por qué se cambió
+Para editar y borrar entradas desde el reloj hacían falta comandos nuevos, y el STATUS debe transportar el desglose acumulado y el historial.
+
+### Cambio 3 - computeWatchTotals y buildWatchEntradas
+
+#### Código anterior
+`No existía computeWatchTotals ni buildWatchEntradas en src/logic/watch-command-processor.ts (el STATUS solo devolvía connected/activeTurno/startTime/startDate).`
+
+#### Código nuevo
+```ts
+export function computeWatchTotals(current: CurrentState): WatchTurnoTotals {
+  const porTipo: Record<WatchEntryType, number> = { propina: 0, datafono: 0, agencia_bono: 0, extra: 0, gasolina: 0, nulo: 0 };
+  const numPorTipo: Record<WatchEntryType, number> = { propina: 0, datafono: 0, agencia_bono: 0, extra: 0, gasolina: 0, nulo: 0 };
+  for (const entry of current.entries) {
+    if (entry.type in porTipo) {
+      porTipo[entry.type as WatchEntryType] += entry.amount;
+      numPorTipo[entry.type as WatchEntryType] += 1;
+    }
+  }
+  return { porTipo, numPorTipo, numEntradas: current.entries.length };
+}
+
+export function buildWatchEntradas(current: CurrentState): WatchEntry[] {
+  return current.entries
+    .map((e) => ({ id: e.id, type: e.type as WatchEntry["type"], amount: e.amount, note: e.note, time: e.time }))
+    .reverse();
+}
+```
+
+#### Por qué se cambió
+Se centralizan en el procesador (lógica pura) el cálculo del desglose por categoría y la construcción del historial, reutilizados por GET_STATUS y por el bridge.
+
+### Cambio 4 - Manejo de EDIT_ENTRY y DELETE_ENTRY en el procesador
+
+#### Código anterior
+`No existía el manejo de EDIT_ENTRY ni DELETE_ENTRY en processWatchCommand (se pasaba directamente de ADD_NOTE a END_TURNO).`
+
+#### Código nuevo
+```ts
+  if (command.type === "EDIT_ENTRY") {
+    if (!state.current.startTime) return { ...state, response: errorResponse(command, "NO_ACTIVE_TURNO", "No hay turno activo") };
+    const target = state.current.entries.find((e) => e.id === command.payload.id);
+    if (!target) return { ...state, response: errorResponse(command, "ENTRY_NOT_FOUND", "Entrada no encontrada") };
+    if (target.type !== "nota" && !(command.payload.amount > 0)) return { ...state, response: errorResponse(command, "INVALID_AMOUNT", "Importe invalido") };
+    return { ...state, current: { ...state.current, entries: state.current.entries.map((e) => e.id === command.payload.id ? { ...e, amount: e.type === "nota" ? e.amount : command.payload.amount, note: command.payload.note.trim() } : e) }, processedOperationIds: withProcessedOperationId(state, command.operationId), response: { type: "OK", operationId: command.operationId, message: "Entrada editada" } };
+  }
+
+  if (command.type === "DELETE_ENTRY") {
+    if (!state.current.startTime) return { ...state, response: errorResponse(command, "NO_ACTIVE_TURNO", "No hay turno activo") };
+    const exists = state.current.entries.some((e) => e.id === command.payload.id);
+    if (!exists) return { ...state, response: errorResponse(command, "ENTRY_NOT_FOUND", "Entrada no encontrada") };
+    return { ...state, current: { ...state.current, entries: state.current.entries.filter((e) => e.id !== command.payload.id) }, processedOperationIds: withProcessedOperationId(state, command.operationId), response: { type: "OK", operationId: command.operationId, message: "Entrada borrada" } };
+  }
+```
+
+#### Por qué se cambió
+Implementa la edición y borrado de entradas validando turno activo, existencia de la entrada e importe (las notas mantienen importe 0).
+
+### Cambio 5 - GET_STATUS y bridge incluyen totals y entradas
+
+#### Código anterior
+```ts
+        startDate: state.current.startDate,
+      },
+```
+(y en `watch-bridge.ts` el objeto `response` del STATUS terminaba en `startDate: store.current.startDate,`)
+
+#### Código nuevo
+```ts
+        startDate: state.current.startDate,
+        totals: computeWatchTotals(state.current),
+        entradas: buildWatchEntradas(state.current),
+      },
+```
+(y en `watch-bridge.ts` se añadió `totals: computeWatchTotals(store.current),` y `entradas: buildWatchEntradas(store.current),`, además de incluir `EDIT_ENTRY`/`DELETE_ENTRY` en el `if` que persiste el resultado en el store)
+
+#### Por qué se cambió
+Tanto la respuesta a GET_STATUS como el envío proactivo de estado deben llevar el desglose y el historial para que el reloj los muestre.
+
+### Cambio 6 - Tests del desglose, edición y borrado
+
+#### Código anterior
+`No existían tests de GET_STATUS con desglose, EDIT_ENTRY ni DELETE_ENTRY en src/__tests__/watch-command-processor.test.ts.`
+
+#### Código nuevo
+Se añaden 4 casos: GET_STATUS devuelve `totals` (porTipo + numPorTipo) y `entradas` ordenadas (recientes primero); EDIT_ENTRY actualiza importe y nota (trim); DELETE_ENTRY elimina por id; EDIT_ENTRY con id inexistente devuelve `ENTRY_NOT_FOUND`. Resultado: 9/9 en verde.
+
+#### Por qué se cambió
+Tests de caracterización para fijar el comportamiento del puente del reloj (no toca `accounting.ts`/`week-logic.ts`).
+
+### Cambio 7 - WatchModels.kt (modelos y formato del reloj)
+
+#### Código anterior
+`No existía WatchModels.kt en android/wear/.../screens.`
+
+#### Código nuevo
+Define `data class WatchEntry`, `categoriaMeta`/`categoriaLabelSingular` (etiqueta, color y fondo por categoría), `fmtEur`/`fmtEurSigned` (formato € español con coma) y `formatFechaTurno` (ISO -> "Lunes, 1 de junio").
+
+#### Por qué se cambió
+La pantalla principal y el historial necesitan etiquetas, colores y formato de importe/fecha coherentes con el móvil.
+
+### Cambio 8 - NumericKeypad: tecla Guardar configurable y amountToText
+
+#### Código anterior
+```kotlin
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+            KeyButton(",", ColorWhite, Modifier.weight(1f)) { onKey(",") }
+            KeyButton("0", ColorWhite, Modifier.weight(1f)) { onKey("0") }
+            KeyButton("DEL", color, Modifier.weight(1f)) { onKey("DEL") }
+        }
+```
+
+#### Código nuevo
+```kotlin
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+            KeyButton(",", ColorWhite, Modifier.weight(1f)) { onKey(",") }
+            KeyButton("0", ColorWhite, Modifier.weight(1f)) { onKey("0") }
+            if (onSave != null) {
+                SaveKey(color, saveEnabled, Modifier.weight(1f), onSave)
+            } else {
+                KeyButton("DEL", color, Modifier.weight(1f)) { onKey("DEL") }
+            }
+        }
+```
+
+#### Por qué se cambió
+Permite integrar Guardar (✓) como última tecla del teclado (sin scroll ni botón aparte) manteniendo la coma visible; se añade `amountToText` para precargar el importe al editar.
+
+### Cambio 9 - AddEntryScreen sin scroll y con modo edición
+
+#### Código anterior
+`AddEntryScreen usaba Column con verticalScroll, fila de botones Volver/Guardar aparte (provocaba scroll) y botón Nota con texto fijo; sin modo edición.`
+
+#### Código nuevo
+Layout fijo centrado (sin scroll): fila superior con ‹ volver, etiqueta y ⌫; importe grande; acceso a Nota (teclado/voz del sistema) y, en edición, "Borrar"; teclado con coma y Guardar ✓. Nuevos parámetros `initialAmount`, `initialNote` y `onDelete` para reutilizarla al editar.
+
+#### Por qué se cambió
+El teclado anterior obligaba a hacer scroll para guardar y no se veía profesional; además se reutiliza la misma pantalla para editar/borrar entradas.
+
+### Cambio 10 - ActiveTurnoScreen: pantalla de turno tipo móvil
+
+#### Código anterior
+`ActiveTurnoScreen mostraba solo un menú de 6 categorías con chips de borde neón y un botón Terminar; sin fecha, sin totales y sin historial.`
+
+#### Código nuevo
+Cabecera con fecha (`formatFechaTurno`) y "desde HH:MM"; tarjetas por categoría (Datáfono/Propinas grandes, resto pequeñas) con total y nº de entradas que al tocarlas abren el teclado de esa categoría; botón "Añadir nota al turno"; lista "Últimas entradas" tocable para editar; botón "Terminar turno". Relleno sólido en lugar de bordes neón.
+
+#### Por qué se cambió
+Replica la pantalla del móvil optimizada para la esfera redonda y da doble función a las tarjetas (ver total + añadir).
+
+### Cambio 11 - WearMainActivity: estado, navegación de edición y comandos
+
+#### Código anterior
+`WearMainActivity no parseaba totals ni entradas, no tenía estado de startDate/edición, ni comandos de editar/borrar; ScreenState no incluía EDIT_ENTRY.`
+
+#### Código nuevo
+Nuevos estados (`startDate`, `totalsPorTipo`, `numPorTipo`, `entradas`, `editingEntry`); `parseTotals`/`parseEntradas` desde el JSON del STATUS; `ScreenState.EDIT_ENTRY` y rama que abre `AddEntryScreen` en modo edición; comandos `sendEditEntry`/`sendDeleteEntry`; la pantalla de turno recibe fecha, totales, recuento e historial.
+
+#### Por qué se cambió
+Conecta el nuevo contrato (totales + historial + edición) con la UI del reloj.
+
+---
+
+## 2026-06-01 12:54 - Añadir teclado numérico decimal y notas reales en el reloj
+
+**Archivos modificados:** `android/wear/build.gradle`, `android/wear/src/main/java/com/mijornada/app/screens/NumericKeypad.kt`, `android/wear/src/main/java/com/mijornada/app/screens/AddEntryScreen.kt`, `android/wear/src/main/java/com/mijornada/app/screens/EndTurnoScreen.kt`, `android/wear/src/main/java/com/mijornada/app/WearMainActivity.kt`
+
+### Cambio 1 - Dependencia wear-input
+
+#### Código anterior
+```gradle
+    implementation 'androidx.wear:wear:1.3.0'
+
+    // Jetpack Compose Básico
+```
+
+#### Código nuevo
+```gradle
+    implementation 'androidx.wear:wear:1.3.0'
+    // Teclado / voz del sistema (RemoteInput) para entrada de notas
+    implementation 'androidx.wear:wear-input:1.1.0'
+
+    // Jetpack Compose Básico
+```
+
+#### Por qué se cambió
+`RemoteInputIntentHelper` (teclado/voz del sistema para notas) vive en `androidx.wear:wear-input`, que no estaba declarado.
+
+### Cambio 2 - Componente NumericKeypad
+
+#### Código anterior
+`No existía NumericKeypad.kt; el importe se introducía con botones fijos +1/+2/+5/+10 sin decimales.`
+
+#### Código nuevo
+Teclado in-app 3x4 (1-9, coma, 0, borrar) con `applyKey` (máx. 2 decimales, sin ceros a la izquierda) y `parseAmount`.
+
+#### Por qué se cambió
+Permite introducir la cantidad exacta con decimales, como en el móvil, en lugar de sumar con botones fijos.
+
+### Cambio 3 - AddEntryScreen con teclado y nota real (estado inicial de la sesión)
+
+#### Código anterior
+```kotlin
+var amount by remember { mutableStateOf(0) }
+```
+(importe entero; botones +1/+2/+5/+10; nota fija "Reloj")
+
+#### Código nuevo
+Importe como texto decimal con `NumericKeypad`; importe `Double` real; botón Nota que abre el teclado/voz del sistema.
+
+#### Por qué se cambió
+El importe entero y la nota fija no servían para datos reales; se alinea con el móvil.
+
+### Cambio 4 - EndTurnoScreen con teclado decimal y nota del cierre
+
+#### Código anterior
+```kotlin
+var dinero by remember { mutableStateOf(0) }
+var km by remember { mutableStateOf(0) }
+```
+(botones +5/+20/+50/+100; nota fija "Cierre desde reloj")
+
+#### Código nuevo
+Dinero y km con teclado decimal (`parseAmount`); nota opcional del cierre; `onConfirm` incluye `note`.
+
+#### Por qué se cambió
+Coherencia con el teclado de entradas y para permitir decimales y nota real al cerrar el turno.
+
+### Cambio 5 - RemoteInput en WearMainActivity
+
+#### Código anterior
+```kotlin
+onAddNote = {
+    sendAddNote("Nota desde reloj")
+},
+```
+(y `sendEndTurno(dinero, km)` con nota fija "Cierre desde reloj")
+
+#### Código nuevo
+`ActivityResultLauncher` + `requestNote()` con `RemoteInputIntentHelper`; `ADD_NOTE` y `END_TURNO` envían el texto real introducido por el usuario.
+
+#### Por qué se cambió
+Sustituye los textos de nota fijos por entrada de texto real (teclado/voz) del sistema Wear.
+
+---
+
 ## 2026-06-01 02:14 - Añadir contrato Wear seguro
 
 **Archivos modificados:** `src/shared/watch-commands.ts`, `src/logic/watch-command-processor.ts`, `src/__tests__/watch-command-processor.test.ts`
@@ -8215,6 +9019,94 @@ Los iconos de tipo de entrada (IconCoin, IconPercent, IconCard, IconAgency, Icon
 #### Código anterior
 ```tsx
 const IconCoin = ({ s = 24, c = G }: { s?: number; c?: str
+## 2026-06-01 14:17 - Igualar firma Wear
+
+**Archivos modificados:** `android/wear/build.gradle`, `src/__tests__/android-wear-bridge.test.ts`
+
+### Cambio 1 - Firma del modulo Wear
+
+#### Codigo anterior
+```gradle
+    buildTypes {
+        release {
+            minifyEnabled true
+            shrinkResources true
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+        }
+    }
+```
+
+#### Codigo nuevo
+```gradle
+    signingConfigs {
+        debug {
+            storeFile file('../app/debug.keystore')
+            storePassword 'android'
+            keyAlias 'androiddebugkey'
+            keyPassword 'android'
+        }
+    }
+
+    buildTypes {
+        debug {
+            signingConfig signingConfigs.debug
+        }
+        release {
+            signingConfig signingConfigs.debug
+            minifyEnabled true
+            shrinkResources true
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+        }
+    }
+```
+
+#### Por que se cambio
+El APK movil y el APK Wear estaban firmados con certificados distintos. Se configuro Wear para usar la misma `debug.keystore` fija que el modulo movil y permitir que ambos APK compartan identidad de firma.
+
+### Cambio 2 - Test de firma Wear
+
+#### Codigo anterior
+```ts
+  it("envia cada comando del reloj a un unico nodo conectado", () => {
+    const source = readFileSync(
+      resolve(root, "android/wear/src/main/java/com/mijornada/app/WearMainActivity.kt"),
+      "utf8",
+    );
+
+    expect(source).not.toContain("for (node in nodes)");
+    expect(source).toContain("val node = nodes.first()");
+  });
+});
+```
+
+#### Codigo nuevo
+```ts
+  it("envia cada comando del reloj a un unico nodo conectado", () => {
+    const source = readFileSync(
+      resolve(root, "android/wear/src/main/java/com/mijornada/app/WearMainActivity.kt"),
+      "utf8",
+    );
+
+    expect(source).not.toContain("for (node in nodes)");
+    expect(source).toContain("val node = nodes.first()");
+  });
+
+  it("firma el APK Wear con la misma clave debug fija que la app movil", () => {
+    const source = readFileSync(
+      resolve(root, "android/wear/build.gradle"),
+      "utf8",
+    );
+
+    expect(source).toContain("storeFile file('../app/debug.keystore')");
+    expect(source).toContain("debug {");
+    expect(source).toContain("signingConfig signingConfigs.debug");
+  });
+});
+```
+
+#### Por que se cambio
+Se anadio una regresion para impedir que el modulo Wear vuelva a compilarse con una firma distinta a la del modulo movil.
+
 ## 2026-06-01 13:49 - Blindar puente Wear OS
 
 **Archivos modificados:**
