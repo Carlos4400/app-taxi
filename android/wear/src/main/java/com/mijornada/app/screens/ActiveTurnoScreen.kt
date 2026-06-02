@@ -17,8 +17,8 @@ import androidx.compose.ui.unit.sp
 import androidx.wear.compose.material.Text
 import com.mijornada.app.theme.*
 
-private const val WatchSafeRowWidth = 0.82f
-private const val WatchSafeButtonWidth = 0.78f
+private const val WatchSafeRowWidth = 0.84f
+private const val WatchSafeButtonWidth = 0.86f
 
 @Composable
 fun ActiveTurnoScreen(
@@ -41,7 +41,7 @@ fun ActiveTurnoScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .verticalScroll(rememberScrollState())
-                .padding(start = 18.dp, end = 18.dp, top = 44.dp, bottom = 28.dp),
+                .padding(start = 18.dp, end = 18.dp, top = 26.dp, bottom = 88.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -55,7 +55,7 @@ fun ActiveTurnoScreen(
                 )
             }
 
-            Spacer(modifier = Modifier.height(10.dp))
+            Spacer(modifier = Modifier.height(7.dp))
 
             Row(
                 modifier = Modifier.fillMaxWidth(WatchSafeRowWidth),
@@ -65,7 +65,7 @@ fun ActiveTurnoScreen(
                 TarjetaCategoria("propina", totalsPorTipo, numPorTipo, grande = true, modifier = Modifier.weight(1f)) { onSelectCategory("propina") }
             }
 
-            Spacer(modifier = Modifier.height(7.dp))
+            Spacer(modifier = Modifier.height(5.dp))
 
             Row(
                 modifier = Modifier.fillMaxWidth(WatchSafeRowWidth),
@@ -75,7 +75,7 @@ fun ActiveTurnoScreen(
                 TarjetaCategoria("extra", totalsPorTipo, numPorTipo, grande = false, modifier = Modifier.weight(1f)) { onSelectCategory("extra") }
             }
 
-            Spacer(modifier = Modifier.height(7.dp))
+            Spacer(modifier = Modifier.height(5.dp))
 
             Row(
                 modifier = Modifier.fillMaxWidth(WatchSafeRowWidth),
@@ -85,7 +85,7 @@ fun ActiveTurnoScreen(
                 TarjetaCategoria("nulo", totalsPorTipo, numPorTipo, grande = false, modifier = Modifier.weight(1f)) { onSelectCategory("nulo") }
             }
 
-            Spacer(modifier = Modifier.height(10.dp))
+            Spacer(modifier = Modifier.height(8.dp))
 
             Box(
                 modifier = Modifier
@@ -93,10 +93,10 @@ fun ActiveTurnoScreen(
                     .clip(RoundedCornerShape(14.dp))
                     .background(ColorNuloBg)
                     .clickable { onAddNote() }
-                    .padding(vertical = 12.dp),
+                    .padding(vertical = 9.dp),
                 contentAlignment = Alignment.Center
             ) {
-                Text("✎  Añadir nota al turno", color = ColorWhite, fontSize = 12.sp)
+                Text("✎  Añadir nota al turno", color = ColorWhite, fontSize = 11.sp, fontWeight = FontWeight.Bold)
             }
 
             if (entradas.isNotEmpty()) {
@@ -112,19 +112,20 @@ fun ActiveTurnoScreen(
                 }
             }
 
-            Spacer(modifier = Modifier.height(10.dp))
+        }
 
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth(WatchSafeButtonWidth)
-                    .clip(RoundedCornerShape(16.dp))
-                    .background(ColorGasolinaBg)
-                    .clickable { onEndTurno() }
-                    .padding(vertical = 12.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                Text("Terminar turno", color = ColorGasolina, fontSize = 13.sp, fontWeight = FontWeight.Bold)
-            }
+        Box(
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .padding(bottom = 16.dp)
+                .fillMaxWidth(WatchSafeButtonWidth)
+                .clip(RoundedCornerShape(16.dp))
+                .background(ColorGasolinaBg)
+                .clickable { onEndTurno() }
+                .padding(vertical = 11.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            Text("Terminar turno", color = ColorGasolina, fontSize = 13.sp, fontWeight = FontWeight.Bold)
         }
     }
 }
@@ -146,17 +147,22 @@ private fun TarjetaCategoria(
             .clip(RoundedCornerShape(14.dp))
             .background(meta.bg)
             .clickable { onClick() }
-            .padding(horizontal = 8.dp, vertical = if (grande) 10.dp else 8.dp)
+            .padding(horizontal = 8.dp, vertical = if (grande) 8.dp else 6.dp)
     ) {
-        Text(meta.label, color = meta.color.copy(alpha = 0.9f), fontSize = if (grande) 11.sp else 10.sp)
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            CategoriaIcon(type, meta.color, if (grande) 16.dp else 13.dp)
+            Spacer(modifier = Modifier.width(5.dp))
+            Text(meta.label, color = meta.color, fontSize = if (grande) 11.sp else 10.sp, fontWeight = FontWeight.Medium)
+        }
+        Spacer(modifier = Modifier.height(2.dp))
         Text(
             fmtEur(total),
             color = meta.color,
-            fontSize = if (grande) 18.sp else 13.sp,
+            fontSize = if (grande) 18.sp else 14.sp,
             fontWeight = FontWeight.Bold
         )
         if (grande) {
-            Text("$count ${if (count == 1) "entrada" else "entradas"}", color = ColorGrey, fontSize = 10.sp)
+            Text("$count ${if (count == 1) "entrada" else "entradas"}", color = ColorGrey, fontSize = 9.sp)
         }
     }
 }
@@ -173,6 +179,8 @@ private fun EntradaHistorial(entry: WatchEntry, onClick: () -> Unit) {
             .padding(horizontal = 12.dp, vertical = 9.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
+        CategoriaIcon(entry.type, meta.color, 14.dp)
+        Spacer(modifier = Modifier.width(7.dp))
         Text(categoriaLabelSingular(entry.type), color = meta.color, fontSize = 12.sp, fontWeight = FontWeight.Bold)
         Spacer(modifier = Modifier.weight(1f))
         Text(entry.time, color = ColorGrey, fontSize = 10.sp)

@@ -114,7 +114,10 @@ describe("Android Wear bridge", () => {
 
     expect(source).toContain("activeField");
     expect(source).toContain("CampoCierre");
-    expect(source).toContain("keyHeight = 22.dp");
+    expect(source).toContain("reviewLabel");
+    expect(source).toContain("Falta km");
+    expect(source).toContain("keyHeight = 20.dp");
+    expect(source).toContain("verticalScroll(rememberScrollState())");
     expect(source).not.toContain("var step");
   });
 
@@ -126,8 +129,23 @@ describe("Android Wear bridge", () => {
 
     expect(source).toContain("WatchSafeRowWidth");
     expect(source).toContain("fillMaxWidth(WatchSafeRowWidth)");
-    expect(source).toContain("top = 44.dp");
+    expect(source).toContain("top = 26.dp");
+    expect(source).toContain("WatchSafeButtonWidth = 0.86f");
+    expect(source).toContain("align(Alignment.BottomCenter)");
+    expect(source).toContain("bottom = 88.dp");
     expect(source).toContain("verticalScroll(rememberScrollState())");
     expect(source).not.toContain("ScalingLazyColumn");
+  });
+
+  it("usa fondos Wear apagados como la app movil", () => {
+    const source = readFileSync(
+      resolve(root, "android/wear/src/main/java/com/mijornada/app/theme/Color.kt"),
+      "utf8",
+    );
+
+    expect(source).toContain("ColorDatafonoBg = Color(0xFF151032)");
+    expect(source).toContain("ColorPropinaBg = Color(0xFF06240D)");
+    expect(source).toContain("ColorNuloBg = Color(0xFF151922)");
+    expect(source).toContain("ColorDisabledBg");
   });
 });

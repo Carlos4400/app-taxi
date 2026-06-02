@@ -34,6 +34,11 @@ fun EndTurnoScreen(
     val dinero = parseAmount(dineroText)
     val km = parseAmount(kmText)
     val canReview = dinero > 0.0 && km > 0.0
+    val reviewLabel = when {
+        dinero <= 0.0 -> "Falta €"
+        km <= 0.0 -> "Falta km"
+        else -> "Revisar"
+    }
     val activeColor = if (activeField == "dinero") ColorAgencia else ColorExtra
 
     Box(
@@ -55,11 +60,11 @@ fun EndTurnoScreen(
             Column(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(horizontal = 28.dp, vertical = 4.dp),
+                    .verticalScroll(rememberScrollState())
+                    .padding(start = 28.dp, end = 28.dp, top = 14.dp, bottom = 18.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.Center
             ) {
-                Text("Terminar turno", color = ColorWhite, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                Text("Terminar turno", color = ColorWhite, fontSize = 13.sp, fontWeight = FontWeight.Bold)
                 Spacer(modifier = Modifier.height(4.dp))
 
                 Row(
@@ -67,7 +72,7 @@ fun EndTurnoScreen(
                     horizontalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
                     CampoCierre(
-                        label = "Taximetro",
+                        label = "Taxímetro",
                         value = "${dineroText.ifEmpty { "0" }}€",
                         color = ColorAgencia,
                         active = activeField == "dinero",
@@ -93,8 +98,8 @@ fun EndTurnoScreen(
                         }
                     },
                     color = activeColor,
-                    keyHeight = 22.dp,
-                    keyFontSize = 13.sp
+                    keyHeight = 20.dp,
+                    keyFontSize = 12.sp
                 )
 
                 Spacer(modifier = Modifier.height(4.dp))
@@ -117,11 +122,11 @@ fun EndTurnoScreen(
                     modifier = Modifier.fillMaxWidth(0.78f),
                     horizontalArrangement = Arrangement.spacedBy(7.dp)
                 ) {
-                    BotonPlano("Atras", ColorGrey, ColorNuloBg, Modifier.weight(1f)) { onCancel() }
+                    BotonPlano("Atrás", ColorGrey, ColorNuloBg, Modifier.weight(1f)) { onCancel() }
                     BotonPlano(
-                        "Revisar",
-                        ColorBackground,
-                        if (canReview) ColorPropina else ColorNuloBg,
+                        reviewLabel,
+                        if (canReview) ColorBackground else ColorDisabledText,
+                        if (canReview) ColorPropina else ColorDisabledBg,
                         Modifier.weight(1f),
                         enabled = canReview
                     ) { confirming = true }
@@ -171,10 +176,10 @@ private fun ConfirmarCierre(
             .padding(vertical = 18.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Text("¿Terminar turno?", color = ColorGasolina, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+        Text("¿Terminar turno?", color = ColorGasolina, fontSize = 14.sp, fontWeight = FontWeight.Bold)
         Spacer(modifier = Modifier.height(7.dp))
-        ResumenFila("Taximetro", fmtEur(dinero), ColorAgencia)
-        ResumenFila("Kilometros", "${kmText.ifEmpty { "0" }} km", ColorExtra)
+        ResumenFila("Taxímetro", fmtEur(dinero), ColorAgencia)
+        ResumenFila("Kilómetros", "${kmText.ifEmpty { "0" }} km", ColorExtra)
         listOf("propina", "datafono", "agencia_bono", "extra", "gasolina", "nulo").forEach { tipo ->
             val v = totalsPorTipo[tipo] ?: 0.0
             if (v > 0.0) {
@@ -188,7 +193,7 @@ private fun ConfirmarCierre(
             modifier = Modifier.fillMaxWidth(0.76f),
             horizontalArrangement = Arrangement.spacedBy(7.dp)
         ) {
-            BotonPlano("Atras", ColorGrey, ColorNuloBg, Modifier.weight(1f), onClick = onBack)
+            BotonPlano("Atrás", ColorGrey, ColorNuloBg, Modifier.weight(1f), onClick = onBack)
             BotonPlano("Cerrar", ColorWhite, ColorGasolina, Modifier.weight(1f), onClick = onConfirm)
         }
         Spacer(modifier = Modifier.height(18.dp))
@@ -212,7 +217,7 @@ private fun BotonPlano(
             .padding(vertical = 7.dp),
         contentAlignment = Alignment.Center
     ) {
-        Text(label, color = if (enabled) textColor else ColorGrey, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+        Text(label, color = if (enabled) textColor else ColorDisabledText, fontSize = 10.sp, fontWeight = FontWeight.Bold)
     }
 }
 

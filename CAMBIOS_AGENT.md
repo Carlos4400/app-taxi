@@ -1,3 +1,212 @@
+## 2026-06-02 04:10 - Optimizar experiencia Wear
+
+**Archivos modificados:** `android/wear/src/main/java/com/mijornada/app/theme/Color.kt`, `android/wear/src/main/java/com/mijornada/app/screens/ActiveTurnoScreen.kt`, `android/wear/src/main/java/com/mijornada/app/screens/EndTurnoScreen.kt`, `src/__tests__/android-wear-bridge.test.ts`
+
+### Cambio 1 - Colores Wear apagados
+
+#### Código anterior
+```kotlin
+val ColorPropina = Color(0xFF4EE47C)
+val ColorPropinaBg = Color(0xFF0F3214)
+
+val ColorDatafono = Color(0xFFC070FF)
+val ColorDatafonoBg = Color(0xFF261230)
+
+val ColorAgencia = Color(0xFFFFB03A)
+val ColorAgenciaBg = Color(0xFF331E00)
+
+val ColorExtra = Color(0xFF4AC4FF)
+val ColorExtraBg = Color(0xFF00223D)
+
+val ColorGasolina = Color(0xFFFF5252)
+val ColorGasolinaBg = Color(0xFF380C0C)
+
+val ColorNulo = Color(0xFF9E9E9E)
+val ColorNuloBg = Color(0xFF1F1F1F)
+```
+
+#### Código nuevo
+```kotlin
+val ColorPropina = Color(0xFF38D66F)
+val ColorPropinaBg = Color(0xFF06240D)
+
+val ColorDatafono = Color(0xFF8C7CFF)
+val ColorDatafonoBg = Color(0xFF151032)
+
+val ColorAgencia = Color(0xFFFFB03A)
+val ColorAgenciaBg = Color(0xFF2D1A05)
+
+val ColorExtra = Color(0xFF22D0E5)
+val ColorExtraBg = Color(0xFF052C32)
+
+val ColorGasolina = Color(0xFFFF6868)
+val ColorGasolinaBg = Color(0xFF3A0A0A)
+
+val ColorNulo = Color(0xFF9AA8C7)
+val ColorNuloBg = Color(0xFF151922)
+```
+
+#### Por qué se cambió
+Los fondos de las tarjetas del reloj se veían demasiado sólidos frente a la app móvil. Se apagaron los fondos y se mantuvo contraste alto en el texto para parecerse más al estilo móvil.
+
+### Cambio 2 - Estados desactivados
+
+#### Código anterior
+```kotlin
+val ColorWhite = Color(0xFFFFFFFF)
+val ColorGrey = Color(0xFF8E8E93)
+```
+
+#### Código nuevo
+```kotlin
+val ColorWhite = Color(0xFFFFFFFF)
+val ColorGrey = Color(0xFF8E8E93)
+val ColorDisabledBg = Color(0xFF20232C)
+val ColorDisabledText = Color(0xFF5E6472)
+```
+
+#### Por qué se cambió
+El botón `Revisar` podía parecer pulsable aunque estuviera bloqueado. Se añadieron colores específicos de estado desactivado para distinguir un botón bloqueado de un botón secundario activo.
+
+### Cambio 3 - Primera vista del turno activo
+
+#### Código anterior
+```kotlin
+private const val WatchSafeRowWidth = 0.82f
+private const val WatchSafeButtonWidth = 0.78f
+```
+
+#### Código nuevo
+```kotlin
+private const val WatchSafeRowWidth = 0.84f
+private const val WatchSafeButtonWidth = 0.86f
+```
+
+#### Por qué se cambió
+La primera vista cortaba parcialmente `Añadir nota al turno`. Se ajustó la anchura de filas y botones para que las acciones principales queden más visibles y centradas en pantalla redonda.
+
+### Cambio 4 - Margen y tamaño de tarjetas
+
+#### Código anterior
+```kotlin
+                .padding(start = 18.dp, end = 18.dp, top = 44.dp, bottom = 28.dp),
+```
+
+#### Código nuevo
+```kotlin
+                .padding(start = 18.dp, end = 18.dp, top = 26.dp, bottom = 30.dp),
+```
+
+#### Por qué se cambió
+El margen superior anterior consumía demasiada altura en el reloj y empujaba la acción de nota hacia el borde inferior. Se redujo para aprovechar mejor la pantalla sin volver a cortar la cabecera.
+
+### Cambio 5 - Revisión de cierre con mensaje claro
+
+#### Código anterior
+```kotlin
+    val dinero = parseAmount(dineroText)
+    val km = parseAmount(kmText)
+    val canReview = dinero > 0.0 && km > 0.0
+    val activeColor = if (activeField == "dinero") ColorAgencia else ColorExtra
+```
+
+#### Código nuevo
+```kotlin
+    val dinero = parseAmount(dineroText)
+    val km = parseAmount(kmText)
+    val canReview = dinero > 0.0 && km > 0.0
+    val reviewLabel = when {
+        dinero <= 0.0 -> "Falta €"
+        km <= 0.0 -> "Falta km"
+        else -> "Revisar"
+    }
+    val activeColor = if (activeField == "dinero") ColorAgencia else ColorExtra
+```
+
+#### Por qué se cambió
+Cuando faltaba taxímetro o kilómetros, `Revisar` no hacía nada porque estaba desactivado. Se cambió el texto del botón para explicar qué falta y evitar una tecla aparentemente sin función.
+
+### Cambio 6 - Cierre más compacto
+
+#### Código anterior
+```kotlin
+                    color = activeColor,
+                    keyHeight = 22.dp,
+                    keyFontSize = 13.sp
+```
+
+#### Código nuevo
+```kotlin
+                    color = activeColor,
+                    keyHeight = 20.dp,
+                    keyFontSize = 12.sp
+```
+
+#### Por qué se cambió
+El teclado de cierre seguía dejando botones inferiores demasiado cerca del borde. Se hizo más compacto para que `+ Nota`, `Atrás` y el botón de revisión tengan más espacio útil.
+
+### Cambio 7 - Pruebas de experiencia Wear
+
+#### Código anterior
+```ts
+No existía la prueba usa fondos Wear apagados como la app movil en src/__tests__/android-wear-bridge.test.ts.
+```
+
+#### Código nuevo
+```ts
+  it("usa fondos Wear apagados como la app movil", () => {
+    const source = readFileSync(
+      resolve(root, "android/wear/src/main/java/com/mijornada/app/theme/Color.kt"),
+      "utf8",
+    );
+
+    expect(source).toContain("ColorDatafonoBg = Color(0xFF151032)");
+    expect(source).toContain("ColorPropinaBg = Color(0xFF06240D)");
+    expect(source).toContain("ColorNuloBg = Color(0xFF151922)");
+    expect(source).toContain("ColorDisabledBg");
+  });
+```
+
+#### Por qué se cambió
+Se añadió una prueba para que los fondos del reloj no vuelvan a un estilo demasiado saturado y para que existan colores de estado desactivado.
+
+### Cambio 8 - Botón de cierre fijo
+
+#### Código anterior
+```kotlin
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth(WatchSafeButtonWidth)
+                    .clip(RoundedCornerShape(16.dp))
+                    .background(ColorGasolinaBg)
+                    .clickable { onEndTurno() }
+                    .padding(vertical = 10.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Text("Terminar turno", color = ColorGasolina, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+            }
+```
+
+#### Código nuevo
+```kotlin
+        Box(
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .padding(bottom = 16.dp)
+                .fillMaxWidth(WatchSafeButtonWidth)
+                .clip(RoundedCornerShape(16.dp))
+                .background(ColorGasolinaBg)
+                .clickable { onEndTurno() }
+                .padding(vertical = 11.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            Text("Terminar turno", color = ColorGasolina, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+        }
+```
+
+#### Por qué se cambió
+`Terminar turno` dependía del desplazamiento dentro de la lista y podía quedar cerca del borde inferior. Se sacó de la lista y se fijó abajo para que sea una acción principal estable, más parecida a la app móvil.
+
 ## 2026-06-02 03:20 - Corregir pantallas del reloj
 
 **Archivos modificados:** `android/wear/src/main/java/com/mijornada/app/screens/ActiveTurnoScreen.kt`, `android/wear/src/main/java/com/mijornada/app/screens/EndTurnoScreen.kt`, `android/wear/src/main/java/com/mijornada/app/screens/NumericKeypad.kt`, `src/__tests__/android-wear-bridge.test.ts`
@@ -355,6 +564,52 @@ Se añadieron pruebas para fijar las reglas profesionales nuevas: acciones sensi
 
 #### Por qué se cambió
 El test de cierre duplicado debe respetar el tipo real `TurnoConfig`, que usa propiedades `desc*` en lugar de un objeto `descontar`.
+
+## 2026-06-02 02:48 - Añadir iconos de categoría en el reloj como en la app del móvil
+
+**Archivos modificados:** `android/wear/src/main/java/com/mijornada/app/screens/CategoriaIcons.kt`, `android/wear/src/main/java/com/mijornada/app/screens/ActiveTurnoScreen.kt`
+
+### Cambio 1 - Componente CategoriaIcon
+
+#### Código anterior
+`No existía CategoriaIcons.kt; las tarjetas e historial del reloj mostraban solo texto de color, sin los iconos que tiene la app del móvil.`
+
+#### Código nuevo
+`CategoriaIcon(type, color, size)` dibuja con Canvas (viewBox 24) los mismos iconos de `src/components/entry-icons.tsx`: moneda € (propina), tarjeta (datáfono), casa (agencia_bono), cruz en círculo (extra), surtidor (gasolina), prohibido (nulo) y lápiz (nota).
+
+#### Por qué se cambió
+Igualar el aspecto del reloj al de la app del móvil, que muestra un icono por categoría.
+
+### Cambio 2 - Tarjetas e historial con icono y tamaños legibles
+
+#### Código anterior
+```kotlin
+        Text(meta.label, color = meta.color.copy(alpha = 0.9f), fontSize = if (grande) 10.sp else 9.sp)
+        Text(
+            fmtEur(total),
+            color = meta.color,
+            fontSize = if (grande) 17.sp else 13.sp,
+            fontWeight = FontWeight.Bold
+        )
+```
+(y en `EntradaHistorial` la fila empezaba directamente con el `Text` de la etiqueta, sin icono)
+
+#### Código nuevo
+```kotlin
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            CategoriaIcon(type, meta.color, if (grande) 16.dp else 13.dp)
+            Spacer(modifier = Modifier.width(5.dp))
+            Text(meta.label, color = meta.color, fontSize = if (grande) 11.sp else 10.sp, fontWeight = FontWeight.Medium)
+        }
+        Spacer(modifier = Modifier.height(2.dp))
+        Text(fmtEur(total), color = meta.color, fontSize = if (grande) 18.sp else 14.sp, fontWeight = FontWeight.Bold)
+```
+(y en `EntradaHistorial` se antepone `CategoriaIcon(entry.type, meta.color, 14.dp)` antes de la etiqueta)
+
+#### Por qué se cambió
+Replica la estructura de tarjeta del móvil (icono + nombre + importe) y mejora la legibilidad en el reloj.
+
+---
 
 ## 2026-06-01 20:33 - Corregir edición de notas y añadir confirmación de cierre en el reloj
 
