@@ -35,6 +35,7 @@ export type WatchTurno = {
   totalADescontar: number;
   totalADar: number;
   tiempoTrabajado: string;
+  totalPausedMinutes: number;
   totals: WatchTurnoTotals;
   entradas: WatchEntry[];
 };
@@ -42,7 +43,7 @@ export type WatchTurno = {
 export type WatchCommand =
   | {
       operationId: string;
-      type: "GET_STATUS" | "GET_TURNOS" | "START_TURNO";
+      type: "GET_STATUS" | "GET_TURNOS" | "START_TURNO" | "PAUSE_TURNO" | "RESUME_TURNO";
       createdAt: string;
     }
   | {
@@ -93,7 +94,7 @@ export type WatchCommand =
     };
 
 export type WatchCommandResponse =
-  | {
+  | ({
       type: "STATUS";
       connected: true;
       activeTurno: boolean;
@@ -101,7 +102,10 @@ export type WatchCommandResponse =
       startDate: string | null;
       totals: WatchTurnoTotals;
       entradas: WatchEntry[];
-    }
+      isPaused: boolean;
+      pauseStartTime: string | null;
+      totalPausedMinutes: number;
+    } & { userSessionId?: string })
   | {
       type: "TURNOS_STATUS";
       connected: true;

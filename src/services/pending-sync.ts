@@ -7,7 +7,8 @@ export type PendingSyncArea =
   | "turnos"
   | "reservations"
   | "notes"
-  | "weekOverrides";
+  | "weekOverrides"
+  | "processedOperationIds";
 
 export type PendingSyncState = Partial<Record<PendingSyncArea, true>>;
 

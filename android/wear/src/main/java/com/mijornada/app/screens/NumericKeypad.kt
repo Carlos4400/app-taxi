@@ -17,6 +17,8 @@ import androidx.compose.ui.unit.sp
 import androidx.wear.compose.material.Text
 import com.mijornada.app.theme.ColorWhite
 
+private const val MAX_AMOUNT_LENGTH = 9
+
 /**
  * Teclado numérico in-app (estilo app del móvil): 1-9, coma decimal y 0.
  * La última fila mantiene el orden de la app móvil: borrar, 0 y coma.
@@ -98,7 +100,7 @@ fun applyKey(current: String, key: String): String {
             when {
                 commaIdx >= 0 && current.length - commaIdx > 2 -> current
                 current == "0" -> key
-                current.length >= 9 -> current
+                current.length >= MAX_AMOUNT_LENGTH -> current
                 else -> current + key
             }
         }

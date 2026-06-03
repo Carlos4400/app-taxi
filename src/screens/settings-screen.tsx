@@ -22,6 +22,7 @@ import { resolveLatestApkUpdate, type UpdateState } from "../logic/update-flow";
 import { IconDel } from "../components/navigation-icons";
 import { hapticDanger, hapticKey, hapticOpen, hapticSave } from "../services/haptics";
 import { BrandTaxiLogo } from "../components/brand-assets";
+import { getCompanionWatchStatus, pairCompanionWatch } from "../services/companion-device";
 
 interface SettingsScreenProps {
   isAdmin: boolean;
@@ -200,6 +201,37 @@ export const SettingsScreen: FC<SettingsScreenProps> = ({
   onSetScreen,
 }) => {
   const backupMenuActionIds = getBackupMenuActionIds(isAdmin);
+  const [watchAssociated, setWatchAssociated] = React.useState<boolean | null>(null);
+  const [watchPairing, setWatchPairing] = React.useState(false);
+  const [watchMessage, setWatchMessage] = React.useState("");
+
+  React.useEffect(() => {
+    let active = true;
+    getCompanionWatchStatus()
+      .then((status) => {
+        if (!active || !status.available) return;
+        setWatchAssociated(status.associated);
+      })
+      .catch(() => {
+        if (active) setWatchMessage("No se pudo consultar el reloj.");
+      });
+    return () => { active = false; };
+  }, []);
+
+  async function handlePairWatch() {
+    hapticOpen();
+    setWatchPairing(true);
+    setWatchMessage("");
+    try {
+      const result = await pairCompanionWatch();
+      setWatchAssociated(result.associated);
+      setWatchMessage(result.associated ? "Reloj asociado correctamente." : "No se completo la asociacion.");
+    } catch (error) {
+      setWatchMessage(error instanceof Error ? error.message : "No se pudo asociar el reloj.");
+    } finally {
+      setWatchPairing(false);
+    }
+  }
 
   return (
     <Shell burst={false}>
@@ -275,6 +307,38 @@ export const SettingsScreen: FC<SettingsScreenProps> = ({
             </button>
           )}
         </div>
+
+        {Capacitor.isNativePlatform() && Capacitor.getPlatform() === "android" && (
+          <div style={{ background: "rgba(255,255,255,0.03)", borderRadius: 22, padding: "20px", border: "1px solid rgba(255,255,255,0.07)" }}>
+            <div style={{ fontSize: 13, fontWeight: 800, color: E, textTransform: "uppercase", letterSpacing: "1px", marginBottom: 10 }}>
+              Reloj Wear OS
+            </div>
+            <div style={{ fontSize: 13, color: "rgba(255,255,255,0.55)", lineHeight: 1.45, marginBottom: 14 }}>
+              Estado: {watchAssociated === null ? "Comprobando..." : watchAssociated ? "Asociado" : "No asociado"}
+            </div>
+            <button
+              onClick={handlePairWatch}
+              disabled={watchPairing}
+              style={{
+                width: "100%",
+                padding: "14px",
+                borderRadius: 14,
+                border: `1px solid ${E}`,
+                background: "rgba(0,210,255,0.08)",
+                color: E,
+                fontSize: 15,
+                fontWeight: 800,
+                cursor: watchPairing ? "default" : "pointer",
+                opacity: watchPairing ? 0.6 : 1,
+              }}
+            >
+              {watchPairing ? "Abriendo selector..." : watchAssociated ? "Cambiar reloj asociado" : "Emparejar reloj"}
+            </button>
+            {watchMessage && (
+              <div style={{ marginTop: 12, fontSize: 13, color: "rgba(255,255,255,0.6)" }}>{watchMessage}</div>
+            )}
+          </div>
+        )}
 
         <div style={{ background: "rgba(255,255,255,0.03)", borderRadius: 22, padding: "20px", border: "1px solid rgba(255,255,255,0.07)" }}>
           <div style={{ fontSize: 12, fontWeight: 800, color: G, textTransform: "uppercase", letterSpacing: "1px", marginBottom: 14, display: "flex", alignItems: "center", gap: 8 }}>

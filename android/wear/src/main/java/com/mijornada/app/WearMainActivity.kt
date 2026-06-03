@@ -6,7 +6,6 @@ import android.os.Build
 import android.os.Bundle
 import android.os.VibrationEffect
 import android.os.Vibrator
-import android.util.Log
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.activity.ComponentActivity
@@ -27,14 +26,12 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.wear.compose.material.Text
 import androidx.wear.input.RemoteInputIntentHelper
-import com.google.android.gms.wearable.MessageClient
-import com.google.android.gms.wearable.MessageEvent
+import com.google.android.gms.wearable.PutDataMapRequest
 import com.google.android.gms.wearable.Wearable
 import com.mijornada.app.screens.*
 import com.mijornada.app.theme.*
 import org.json.JSONArray
 import org.json.JSONObject
-import java.nio.charset.StandardCharsets
 import java.util.UUID
 
 enum class ScreenState {
@@ -49,7 +46,7 @@ enum class ScreenState {
     END_TURNO
 }
 
-class WearMainActivity : ComponentActivity(), MessageClient.OnMessageReceivedListener {
+class WearMainActivity : ComponentActivity() {
 
     private val TAG = "WearMainActivity"
 
@@ -63,6 +60,10 @@ class WearMainActivity : ComponentActivity(), MessageClient.OnMessageReceivedLis
     private var selectedCategoryColor = mutableStateOf(ColorPropina)
 
     private var startDate = mutableStateOf("")
+    private var userSessionId = mutableStateOf("")
+    private var isPaused = mutableStateOf(false)
+    private var pauseStartTime = mutableStateOf("")
+    private var totalPausedMinutes = mutableStateOf(0)
     private var totalsPorTipo = mutableStateOf<Map<String, Double>>(emptyMap())
     private var numPorTipo = mutableStateOf<Map<String, Int>>(emptyMap())
     private var entradas = mutableStateOf<List<WatchEntry>>(emptyList())
@@ -70,6 +71,10 @@ class WearMainActivity : ComponentActivity(), MessageClient.OnMessageReceivedLis
     private var selectedTurno = mutableStateOf<WatchTurno?>(null)
     private var editingEntry = mutableStateOf<WatchEntry?>(null)
     private var openTurnosAfterOk = false
+    private var isUiActive = false
+
+    private val prefs by lazy { getSharedPreferences(WearConstants.Response.PREFS, MODE_PRIVATE) }
+    private var lastKnownResponseTimestamp = 0L
 
     // Entrada de texto (nota) vía teclado / voz del sistema (RemoteInput)
     private val NOTE_KEY = "wear_note"
@@ -100,13 +105,91 @@ class WearMainActivity : ComponentActivity(), MessageClient.OnMessageReceivedLis
 
     override fun onResume() {
         super.onResume()
-        Wearable.getMessageClient(this).addListener(this)
+        isUiActive = true
+        pollResponseState()
         requestStatus()
     }
 
     override fun onPause() {
-        Wearable.getMessageClient(this).removeListener(this)
+        isUiActive = false
         super.onPause()
+    }
+
+    private fun pollResponseState() {
+        val ts = prefs.getLong(WearConstants.Response.RESPONSE_TIMESTAMP, 0L)
+        if (ts != lastKnownResponseTimestamp) {
+            lastKnownResponseTimestamp = ts
+            val responseJson = prefs.getString(WearConstants.Response.LAST_RESPONSE, null) ?: return
+            processResponseFromPrefs(responseJson)
+        }
+    }
+
+    private fun processResponseFromPrefs(responseJson: String) {
+        try {
+            val json = JSONObject(responseJson)
+            val responseType = json.optString("type")
+            val operationId = json.optString("operationId", "")
+            val isTerminal = isTerminalResponse(responseType, json.optString("code", ""))
+            if (operationId.isNotBlank() && isTerminal) {
+                WatchOutbox.remove(this, operationId)
+            }
+            if (responseType == "STATUS") {
+                val nextUserSessionId = json.optString("userSessionId", "")
+                if (nextUserSessionId.isNotBlank()) {
+                    WatchOutbox.removeCommandsFromOtherSessions(this, nextUserSessionId)
+                }
+                userSessionId.value = nextUserSessionId
+                isConnected.value = json.optBoolean("connected", false)
+                activeTurno.value = json.optBoolean("activeTurno", false)
+                startTime.value = json.optString("startTime", "")
+                startDate.value = json.optString("startDate", "")
+                isPaused.value = json.optBoolean("isPaused", false)
+                pauseStartTime.value = json.optString("pauseStartTime", "")
+                totalPausedMinutes.value = json.optInt("totalPausedMinutes", 0)
+                parseTotals(json.optJSONObject("totals"))
+                parseEntradas(json.optJSONArray("entradas"))
+                MobileResponseService.enqueueOutboxRetry(this)
+
+                if (!isConnected.value) {
+                    currentScreen.value = ScreenState.NO_CONNECTED
+                } else if (activeTurno.value) {
+                    if (currentScreen.value == ScreenState.NO_CONNECTED || currentScreen.value == ScreenState.NO_ACTIVE_TURNO) {
+                        currentScreen.value = ScreenState.ACTIVE_TURNO
+                    }
+                } else {
+                    if (currentScreen.value != ScreenState.TURNOS && currentScreen.value != ScreenState.TURNO_SUMMARY) {
+                        currentScreen.value = ScreenState.NO_ACTIVE_TURNO
+                    }
+                }
+            } else if ("TURNOS_STATUS" == json.optString("type")) {
+                isConnected.value = json.optBoolean("connected", false)
+                parseTurnos(json.optJSONArray("turnos"))
+                if (isConnected.value) {
+                    currentScreen.value = ScreenState.TURNOS
+                } else {
+                    currentScreen.value = ScreenState.NO_CONNECTED
+                }
+            } else if ("OK" == json.optString("type")) {
+                performFeedback(json.optString("message", "Hecho"), strong = false)
+                if (openTurnosAfterOk) {
+                    openTurnosAfterOk = false
+                    sendGetTurnos()
+                } else {
+                    currentScreen.value = ScreenState.ACTIVE_TURNO
+                    requestStatus()
+                }
+            } else if ("DUPLICATE_IGNORED" == json.optString("type")) {
+                performFeedback(json.optString("message", "Ya aplicado"), strong = false)
+                currentScreen.value = if (activeTurno.value) ScreenState.ACTIVE_TURNO else ScreenState.NO_ACTIVE_TURNO
+                requestStatus()
+                MobileResponseService.enqueueOutboxRetry(this)
+            } else if ("ERROR" == json.optString("type")) {
+                openTurnosAfterOk = false
+                performFeedback(json.optString("message", "Error"), strong = true)
+            }
+        } catch (e: Exception) {
+            performFeedback("Error al leer respuesta", strong = true)
+        }
     }
 
     @Composable
@@ -124,9 +207,14 @@ class WearMainActivity : ComponentActivity(), MessageClient.OnMessageReceivedLis
             ScreenState.ACTIVE_TURNO -> ActiveTurnoScreen(
                 fechaTurno = formatFechaTurno(startDate.value),
                 startTime = startTime.value,
+                isPaused = isPaused.value,
+                totalPausedMinutes = totalPausedMinutes.value,
                 totalsPorTipo = totalsPorTipo.value,
                 numPorTipo = numPorTipo.value,
                 entradas = entradas.value,
+                onTogglePause = {
+                    if (isPaused.value) sendResumeTurno() else sendPauseTurno()
+                },
                 onSelectCategory = { category ->
                     selectedCategory.value = category
                     setupCategoryMeta(category)
@@ -192,7 +280,7 @@ class WearMainActivity : ComponentActivity(), MessageClient.OnMessageReceivedLis
                 numPorTipo = numPorTipo.value,
                 entradas = entradas.value,
                 onConfirm = { dinero, km ->
-                    sendEndTurno(dinero, km, "")
+                    sendEndTurno(dinero, km)
                 },
                 onCancel = {
                     currentScreen.value = ScreenState.ACTIVE_TURNO
@@ -230,7 +318,7 @@ class WearMainActivity : ComponentActivity(), MessageClient.OnMessageReceivedLis
             ScreenState.END_TURNO -> currentScreen.value = ScreenState.ACTIVE_TURNO
             ScreenState.TURNOS -> currentScreen.value = if (activeTurno.value) ScreenState.ACTIVE_TURNO else ScreenState.NO_ACTIVE_TURNO
             ScreenState.TURNO_SUMMARY -> currentScreen.value = ScreenState.TURNOS
-            ScreenState.NO_ACTIVE_TURNO -> currentScreen.value = ScreenState.NO_CONNECTED
+            ScreenState.NO_ACTIVE_TURNO -> Unit
             ScreenState.ACTIVE_TURNO -> Unit
             ScreenState.NO_CONNECTED -> Unit
         }
@@ -265,60 +353,6 @@ class WearMainActivity : ComponentActivity(), MessageClient.OnMessageReceivedLis
         }
     }
 
-    override fun onMessageReceived(messageEvent: MessageEvent) {
-        val path = messageEvent.path
-        val data = String(messageEvent.data, StandardCharsets.UTF_8)
-        Log.d(TAG, "Mensaje recibido: path=$path, data=$data")
-
-        try {
-            val json = JSONObject(data)
-            if ("/watch-status" == path || "STATUS" == json.optString("type")) {
-                isConnected.value = json.optBoolean("connected", false)
-                activeTurno.value = json.optBoolean("activeTurno", false)
-                startTime.value = json.optString("startTime", "")
-                startDate.value = json.optString("startDate", "")
-                parseTotals(json.optJSONObject("totals"))
-                parseEntradas(json.optJSONArray("entradas"))
-
-                if (!isConnected.value) {
-                    currentScreen.value = ScreenState.NO_CONNECTED
-                } else if (activeTurno.value) {
-                    if (currentScreen.value == ScreenState.NO_CONNECTED || currentScreen.value == ScreenState.NO_ACTIVE_TURNO) {
-                        currentScreen.value = ScreenState.ACTIVE_TURNO
-                    }
-                } else {
-                    if (currentScreen.value != ScreenState.TURNOS && currentScreen.value != ScreenState.TURNO_SUMMARY) {
-                        currentScreen.value = ScreenState.NO_ACTIVE_TURNO
-                    }
-                }
-            } else if ("TURNOS_STATUS" == json.optString("type")) {
-                isConnected.value = json.optBoolean("connected", false)
-                parseTurnos(json.optJSONArray("turnos"))
-                if (isConnected.value) {
-                    currentScreen.value = ScreenState.TURNOS
-                } else {
-                    currentScreen.value = ScreenState.NO_CONNECTED
-                }
-            } else if ("OK" == json.optString("type")) {
-                performFeedback(json.optString("message", "Hecho"), strong = false)
-                if (openTurnosAfterOk) {
-                    openTurnosAfterOk = false
-                    sendGetTurnos()
-                } else {
-                    currentScreen.value = ScreenState.ACTIVE_TURNO
-                    requestStatus()
-                }
-            } else if ("ERROR" == json.optString("type")) {
-                openTurnosAfterOk = false
-                Log.e(TAG, "Error desde movil: ${json.optString("message")}")
-                performFeedback(json.optString("message", "Error"), strong = true)
-            }
-        } catch (e: Exception) {
-            Log.e(TAG, "Error al procesar mensaje", e)
-            performFeedback("Error al leer respuesta", strong = true)
-        }
-    }
-
     private fun requestStatus() {
         val command = JSONObject().apply {
             put("operationId", UUID.randomUUID().toString())
@@ -329,9 +363,21 @@ class WearMainActivity : ComponentActivity(), MessageClient.OnMessageReceivedLis
     }
 
     private fun sendStartTurno() {
+        sendTurnoStateCommand("START_TURNO")
+    }
+
+    private fun sendPauseTurno() {
+        sendTurnoStateCommand("PAUSE_TURNO")
+    }
+
+    private fun sendResumeTurno() {
+        sendTurnoStateCommand("RESUME_TURNO")
+    }
+
+    private fun sendTurnoStateCommand(type: String) {
         val command = JSONObject().apply {
             put("operationId", UUID.randomUUID().toString())
-            put("type", "START_TURNO")
+            put("type", type)
             put("createdAt", System.currentTimeMillis().toString())
         }
         sendCommand(command.toString())
@@ -492,8 +538,7 @@ class WearMainActivity : ComponentActivity(), MessageClient.OnMessageReceivedLis
         sendCommand(command.toString())
     }
 
-    private fun sendEndTurno(dinero: Double, km: Double, note: String) {
-        openTurnosAfterOk = true
+    private fun sendEndTurno(dinero: Double, km: Double) {
         val command = JSONObject().apply {
             put("operationId", UUID.randomUUID().toString())
             put("type", "END_TURNO")
@@ -501,10 +546,10 @@ class WearMainActivity : ComponentActivity(), MessageClient.OnMessageReceivedLis
             put("payload", JSONObject().apply {
                 put("dinero", dinero)
                 put("km", km)
-                put("note", if (note.isBlank()) "Cierre desde reloj" else note)
+                put("note", "Cierre desde reloj")
             })
         }
-        sendCommand(command.toString())
+        openTurnosAfterOk = sendCommand(command.toString())
     }
 
     /** Lanza el teclado / voz del sistema para introducir una nota de texto libre. */
@@ -532,27 +577,125 @@ class WearMainActivity : ComponentActivity(), MessageClient.OnMessageReceivedLis
         }
     }
 
-    private fun sendCommand(commandJson: String) {
+    private fun sendCommand(rawCommandJson: String, isRetry: Boolean = false): Boolean {
+        if (!isRetry && shouldPersistOutbox(rawCommandJson) && hasPendingCriticalOperation()) {
+            performFeedback("Operacion pendiente", strong = true)
+            return false
+        }
+        if (shouldPersistOutbox(rawCommandJson) && userSessionId.value.isBlank()) {
+            if (!isRetry) {
+                performFeedback("Esperando movil...", strong = false)
+                requestStatus()
+            }
+            return false
+        }
+        val commandJson = attachUserSession(rawCommandJson) ?: return false
+        if (isRetry && !matchesCurrentSession(commandJson)) {
+            return false
+        }
+        if (!isRetry && shouldPersistOutbox(commandJson)) {
+            val operationId = JSONObject(commandJson).optString("operationId", "")
+            WatchOutbox.save(this, operationId, commandJson)
+            MobileResponseService.enqueueOutboxRetry(this)
+        }
         Wearable.getNodeClient(this).connectedNodes
             .addOnSuccessListener { nodes ->
-                if (nodes.isEmpty()) {
-                    isConnected.value = false
-                    currentScreen.value = ScreenState.NO_CONNECTED
-                } else {
-                    val data = commandJson.toByteArray(StandardCharsets.UTF_8)
-                    val node = nodes.first()
-                    Wearable.getMessageClient(this)
-                        .sendMessage(node.id, "/watch-command", data)
-                        .addOnFailureListener {
-                            isConnected.value = false
-                            currentScreen.value = ScreenState.NO_CONNECTED
-                        }
-                }
+                val nodeId = nodes.firstOrNull()?.id ?: ""
+                writeCommandDataItem(commandJson, nodeId)
             }
             .addOnFailureListener {
-                isConnected.value = false
-                currentScreen.value = ScreenState.NO_CONNECTED
+                writeCommandDataItem(commandJson, "")
             }
+        return true
+    }
+
+    /**
+     * Anade [userSessionId] al comando si todavia no lo tiene. Se asume que
+     * `userSessionId.value` no esta en blanco: [sendCommand] bloquea los comandos
+     * persistentes hasta recibir una sesion valida del movil.
+     */
+    private fun attachUserSession(commandJson: String): String? {
+        if (!shouldPersistOutbox(commandJson)) return commandJson
+        return try {
+            val command = JSONObject(commandJson)
+            val existingSessionId = command.optString("userSessionId", "")
+            when {
+                existingSessionId.isNotBlank() -> command.toString()
+                userSessionId.value.isBlank() -> null
+                else -> command.put("userSessionId", userSessionId.value).toString()
+            }
+        } catch (e: Exception) {
+            performFeedback("Comando invalido", strong = true)
+            null
+        }
+    }
+
+    private fun writeCommandDataItem(commandJson: String, nodeId: String) {
+        val operationId = try {
+            JSONObject(commandJson).optString("operationId", "")
+        } catch (e: Exception) {
+            ""
+        }
+
+        if (operationId.isBlank()) {
+            performFeedback("operationId invalido", strong = true)
+            return
+        }
+
+        val request = PutDataMapRequest.create("/watch-command/$operationId")
+        val dataMap = request.dataMap
+        dataMap.putString("command", commandJson)
+        dataMap.putString("targetNodeId", nodeId)
+        dataMap.putLong("createdAt", System.currentTimeMillis())
+        val dataRequest = request.asPutDataRequest()
+        dataRequest.setUrgent()
+
+        Wearable.getDataClient(this).putDataItem(dataRequest)
+            .addOnFailureListener {
+                showDisconnectedIfUiActive()
+            }
+    }
+
+    private fun showDisconnectedIfUiActive() {
+        if (!isUiActive) return
+        isConnected.value = false
+        currentScreen.value = ScreenState.NO_CONNECTED
+    }
+
+    private fun hasPendingCriticalOperation(): Boolean {
+        return WatchOutbox.pendingCommands(this).isNotEmpty()
+    }
+
+    private fun matchesCurrentSession(commandJson: String): Boolean {
+        if (!shouldPersistOutbox(commandJson) || userSessionId.value.isBlank()) {
+            return !shouldPersistOutbox(commandJson)
+        }
+        return try {
+            JSONObject(commandJson).optString("userSessionId", "") == userSessionId.value
+        } catch (e: Exception) {
+            false
+        }
+    }
+
+    private fun isTerminalResponse(responseType: String, code: String): Boolean {
+        if (responseType == "OK" || responseType == "DUPLICATE_IGNORED") return true
+        return responseType == "ERROR" && code != "USER_NOT_PREPARED" && code != "APP_NOT_READY"
+    }
+
+    private fun shouldPersistOutbox(commandJson: String): Boolean {
+        return try {
+            val type = JSONObject(commandJson).optString("type", "")
+            type == "START_TURNO"
+                || type == "PAUSE_TURNO"
+                || type == "RESUME_TURNO"
+                || type == "ADD_ENTRY"
+                || type == "ADD_NOTE"
+                || type == "EDIT_ENTRY"
+                || type == "DELETE_ENTRY"
+                || type == "END_TURNO"
+        } catch (e: Exception) {
+            false
+        }
     }
 }
 

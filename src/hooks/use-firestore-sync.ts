@@ -19,7 +19,7 @@ import { KEY_CURRENT, KEY_HISTORY, KEY_SETTINGS, KEY_WEEK_OVERRIDES, KEY_RESERVA
 import { loadSettings, loadProcessedOperationIds } from "../logic/state-loaders";
 import { ensureTurnosDiaLibreContable, mergeTurnos, sortTurnosByDateDesc } from "../logic/turnos";
 import type { CurrentState, AppSettings, Turno, Reserva, NotaCalendario, WeekOverride } from "../shared/types";
-import { setupWatchBridge, sendWatchStatus } from "../services/watch-bridge";
+import { setupWatchBridge, teardownWatchBridge } from "../services/watch-bridge";
 
 const LOCAL_MIGRATION_KEY = "taxi_migration_done_v2";
 const LOAD_TIMEOUT_MS = 15000;
@@ -218,7 +218,13 @@ export function useFirestoreSync(uid: string) {
     if (!writableUid) return;
     if (sameJSON(processedOperationIds, lastProcessedOperationIdsRef.current)) return;
     writeUserLocalJSON(writableUid, KEY_PROCESSED_OPERATIONS, processedOperationIds);
-    lastProcessedOperationIdsRef.current = processedOperationIds;
+    markUserPendingSync(writableUid, "processedOperationIds");
+    saveUserDoc(db, writableUid, "processedOperationIds", processedOperationIds)
+      .then(() => {
+        lastProcessedOperationIdsRef.current = processedOperationIds;
+        clearUserPendingSync(writableUid, "processedOperationIds");
+      })
+      .catch((err) => console.error("Save processedOperationIds failed:", err));
   }, [processedOperationIds, dataLoaded, uid]);
 
   useEffect(() => {
@@ -401,14 +407,11 @@ export function useFirestoreSync(uid: string) {
   useEffect(() => {
     if (dataLoaded && uid) {
       setupWatchBridge(uid);
+      return () => {
+        teardownWatchBridge(uid).catch((err) => console.error("Error al cerrar sesion Wear OS:", err));
+      };
     }
   }, [dataLoaded, uid]);
-
-  useEffect(() => {
-    if (dataLoaded && uid) {
-      sendWatchStatus().catch((err) => console.error("Error al actualizar estado al reloj:", err));
-    }
-  }, [current.startTime, current.entries.length, dataLoaded, uid]);
 
   return { dataLoaded, loadTimedOut };
 }

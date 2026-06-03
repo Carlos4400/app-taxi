@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { subscribeWithSelector } from "zustand/middleware";
 import type {
   AppSettings,
   CurrentState,
@@ -84,7 +85,8 @@ export type AppStore = BusinessSlice & NavigationSlice;
 
 const INITIAL_SCREEN = "home";
 
-export const useAppStore = create<AppStore>((set, get) => ({
+export const useAppStore = create(
+  subscribeWithSelector<AppStore>((set, get) => ({
   // --- negocio: estado inicial leído de localStorage (igual que antes) ---
   current: loadCurrent(),
   history: loadHistory(),
@@ -146,4 +148,4 @@ export const useAppStore = create<AppStore>((set, get) => ({
 
   resetNavigation: (root = INITIAL_SCREEN) =>
     set({ screen: root, navigationStack: [root] }),
-}));
+})));

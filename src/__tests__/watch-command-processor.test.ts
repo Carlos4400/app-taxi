@@ -88,6 +88,9 @@ describe("processWatchCommand", () => {
         { id: 2, type: "propina", amount: 3.5, note: "", time: "10:50" },
         { id: 1, type: "propina", amount: 5, note: "", time: "10:40" },
       ],
+      isPaused: false,
+      pauseStartTime: null,
+      totalPausedMinutes: 0,
     });
   });
 
@@ -259,6 +262,83 @@ describe("processWatchCommand", () => {
     expect(result.current.startTime).toBe("10:35");
     expect(result.current.startDate).toBe("2026-06-01");
     expect(result.processedOperationIds).toEqual(["op-start-1"]);
+  });
+
+  it("pausa y reanuda un turno acumulando los minutos pausados", () => {
+    const active = baseState({
+      current: {
+        entries: [],
+        startTime: "10:00",
+        startDate: "2026-06-01",
+        isPaused: false,
+        pauseStartTime: null,
+        totalPausedMinutes: 5,
+      },
+    });
+
+    const paused = processWatchCommand({
+      operationId: "op-pause-1",
+      type: "PAUSE_TURNO",
+      createdAt: "2026-06-01T10:35:00",
+    }, active);
+
+    expect(paused.response).toEqual({
+      type: "OK",
+      operationId: "op-pause-1",
+      message: "Turno pausado",
+    });
+    expect(paused.current).toMatchObject({
+      isPaused: true,
+      pauseStartTime: "10:35",
+      totalPausedMinutes: 5,
+    });
+
+    const resumed = processWatchCommand({
+      operationId: "op-resume-1",
+      type: "RESUME_TURNO",
+      createdAt: "2026-06-01T10:50:00",
+    }, {
+      ...active,
+      current: paused.current,
+      processedOperationIds: paused.processedOperationIds,
+      now: { date: "2026-06-01", time: "10:50", id: 1001 },
+    });
+
+    expect(resumed.response).toEqual({
+      type: "OK",
+      operationId: "op-resume-1",
+      message: "Turno reanudado",
+    });
+    expect(resumed.current).toMatchObject({
+      isPaused: false,
+      pauseStartTime: null,
+      totalPausedMinutes: 20,
+    });
+  });
+
+  it("incluye la pausa abierta al terminar el turno", () => {
+    const result = processWatchCommand({
+      operationId: "op-end-paused",
+      type: "END_TURNO",
+      createdAt: "2026-06-01T10:50:00",
+      payload: {
+        dinero: 50,
+        km: 25,
+        note: "",
+      },
+    }, baseState({
+      current: {
+        entries: [],
+        startTime: "10:00",
+        startDate: "2026-06-01",
+        isPaused: true,
+        pauseStartTime: "10:35",
+        totalPausedMinutes: 5,
+      },
+      now: { date: "2026-06-01", time: "10:50", id: 1002 },
+    }));
+
+    expect(result.history[0].totalPausedMinutes).toBe(20);
   });
 
   it("ignora comandos duplicados sin modificar el turno", () => {

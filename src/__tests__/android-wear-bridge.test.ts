@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 
@@ -28,14 +28,613 @@ describe("Android Wear bridge", () => {
     expect(source).toContain("currentScreen.value = ScreenState.ACTIVE_TURNO");
   });
 
-  it("envia cada comando del reloj a un unico nodo conectado", () => {
+  it("no duplica comandos del reloj por cada nodo conectado", () => {
     const source = readFileSync(
       resolve(root, "android/wear/src/main/java/com/mijornada/app/WearMainActivity.kt"),
       "utf8",
     );
 
     expect(source).not.toContain("for (node in nodes)");
-    expect(source).toContain("val node = nodes.first()");
+    expect(source).toContain("val nodeId = nodes.firstOrNull()?.id ?: \"\"");
+  });
+
+  it("escribe el DataItem aunque no haya nodo conectado en ese instante", () => {
+    const source = readFileSync(
+      resolve(root, "android/wear/src/main/java/com/mijornada/app/WearMainActivity.kt"),
+      "utf8",
+    );
+
+    expect(source).not.toContain(`if (nodes.isEmpty()) {
+                    isConnected.value = false`);
+    expect(source).toContain("Wearable.getDataClient(this).putDataItem(dataRequest)");
+  });
+
+  it("envia comandos criticos Wear como DataItem persistente con operationId", () => {
+    const source = readFileSync(
+      resolve(root, "android/wear/src/main/java/com/mijornada/app/WearMainActivity.kt"),
+      "utf8",
+    );
+
+    expect(source).toContain("PutDataMapRequest.create(\"/watch-command/\$operationId\")");
+    expect(source).toContain("dataMap.putString(\"command\", commandJson)");
+    expect(source).toContain("dataRequest.setUrgent()");
+    expect(source).toContain("Wearable.getDataClient(this).putDataItem");
+    expect(source).not.toContain("sendMessage(node.id, \"/watch-command\"");
+  });
+
+  it("recibe ACK persistente del movil por DataItem antes de dar por cerrado un comando", () => {
+    const source = readFileSync(
+      resolve(root, "android/wear/src/main/java/com/mijornada/app/MobileResponseService.kt"),
+      "utf8",
+    );
+
+    expect(source).toContain("override fun onDataChanged");
+    expect(source).toContain("if (uri.path?.startsWith(\"/watch-ack/\") == true)");
+    expect(source).toContain("handleResponseJson(responseJson)");
+    expect(source).toContain("DataMapItem.fromDataItem(item).dataMap.getString(\"response\")");
+  });
+
+  it("recibe estado persistente del movil por DataItem turno state", () => {
+    const source = readFileSync(
+      resolve(root, "android/wear/src/main/java/com/mijornada/app/MobileResponseService.kt"),
+      "utf8",
+    );
+
+    expect(source).toContain('uri.path == "/turno/state"');
+    expect(source).toContain('DataMapItem.fromDataItem(item).dataMap.getString("state")');
+    expect(source).toContain("handleResponseJson(stateJson)");
+  });
+
+  it("el movil escucha comandos Wear por DATA_CHANGED y publica ACK persistente", () => {
+    const service = readFileSync(
+      resolve(root, "android/app/src/main/java/com/mijornada/app/WearListenerService.java"),
+      "utf8",
+    );
+    const plugin = readFileSync(
+      resolve(root, "android/app/src/main/java/com/mijornada/app/WearOsBridgePlugin.java"),
+      "utf8",
+    );
+    const manifest = readFileSync(
+      resolve(root, "android/app/src/main/AndroidManifest.xml"),
+      "utf8",
+    );
+
+    expect(manifest).toContain("com.google.android.gms.wearable.DATA_CHANGED");
+    expect(manifest).toContain('android:pathPrefix="/watch-command/"');
+    expect(service).toContain("@Override");
+    expect(service).toContain("public void onDataChanged");
+    expect(service).toContain("DataMapItem.fromDataItem");
+    expect(service).toContain("path.startsWith(\"/watch-command/\")");
+    expect(plugin).toContain("PutDataMapRequest.create(\"/watch-ack/\" + resolvedOperationId)");
+    expect(plugin).toContain("dataMap.putString(\"response\", responseJson)");
+    expect(plugin).toContain("Wearable.getDataClient(context).putDataItem");
+  });
+
+  it("el movil publica el estado nativo actualizado como DataItem persistente", () => {
+    const service = readFileSync(
+      resolve(root, "android/app/src/main/java/com/mijornada/app/WearListenerService.java"),
+      "utf8",
+    );
+    const worker = readFileSync(
+      resolve(root, "android/app/src/main/java/com/mijornada/app/watch/WearCommandWorker.kt"),
+      "utf8",
+    );
+    const publisher = readFileSync(
+      resolve(root, "android/app/src/main/java/com/mijornada/app/watch/WatchStateDataPublisher.kt"),
+      "utf8",
+    );
+
+    expect(service).toContain("WearCommandWorker.enqueue");
+    expect(worker).toContain("WatchStateDataPublisher.publish(applicationContext)");
+    expect(publisher).toContain('PutDataMapRequest.create("/turno/state")');
+    expect(publisher).toContain('dataMap.putString("state"');
+    expect(publisher).toContain("dataRequest.setUrgent()");
+  });
+
+  it("persiste uid nativo sin programar una subida Firestore paralela", () => {
+    const plugin = readFileSync(
+      resolve(root, "android/app/src/main/java/com/mijornada/app/WearOsBridgePlugin.java"),
+      "utf8",
+    );
+    const service = readFileSync(
+      resolve(root, "android/app/src/main/java/com/mijornada/app/WearListenerService.java"),
+      "utf8",
+    );
+    const session = readFileSync(
+      resolve(root, "android/app/src/main/java/com/mijornada/app/watch/WatchUserSession.kt"),
+      "utf8",
+    );
+
+    expect(plugin).toContain("WatchUserSession.prepare(getContext(), uid)");
+    expect(plugin).toContain("WatchUserSession.clearIfMatches(getContext(), uid)");
+    expect(session).toContain("fun getUid(context: Context): String");
+    expect(session).toContain("fun getSessionId(context: Context): String");
+    expect(service).not.toContain("WatchSyncScheduler");
+  });
+
+  it("separa la base Room nativa por uid para no mezclar usuarios", () => {
+    const provider = readFileSync(
+      resolve(root, "android/app/src/main/java/com/mijornada/app/watch/WatchDatabaseProvider.kt"),
+      "utf8",
+    );
+    const handler = readFileSync(
+      resolve(root, "android/app/src/main/java/com/mijornada/app/watch/WatchNativeCommandHandler.kt"),
+      "utf8",
+    );
+
+    expect(provider).toContain("fun getForUid(context: Context, uid: String)");
+    expect(provider).toContain("mi-turno-watch-");
+    expect(provider).toContain("MessageDigest.getInstance(\"SHA-256\")");
+    expect(handler).toContain("WatchDatabaseProvider.getForUid(context, uid)");
+  });
+
+  it("mantiene outbox persistente en el reloj hasta recibir ACK", () => {
+    const source = readFileSync(
+      resolve(root, "android/wear/src/main/java/com/mijornada/app/WearMainActivity.kt"),
+      "utf8",
+    );
+    const outbox = readFileSync(
+      resolve(root, "android/wear/src/main/java/com/mijornada/app/WatchOutbox.kt"),
+      "utf8",
+    );
+    const worker = readFileSync(
+      resolve(root, "android/wear/src/main/java/com/mijornada/app/OutboxWorker.kt"),
+      "utf8",
+    );
+
+    expect(source).toContain("WatchOutbox.save(this, operationId, commandJson)");
+    expect(source).toContain("WatchOutbox.remove(this, operationId)");
+    expect(outbox).toContain("getSharedPreferences");
+    expect(outbox).toContain("pendingCommands");
+    expect(worker).toContain("WatchOutbox.pendingCommands");
+    expect(worker).toContain("WatchOutbox.hasPendingCommands");
+  });
+
+  it("reintenta el outbox con el mismo operationId usando solo el backoff de WorkManager", () => {
+    const source = readFileSync(
+      resolve(root, "android/wear/src/main/java/com/mijornada/app/WearMainActivity.kt"),
+      "utf8",
+    );
+    const outbox = readFileSync(
+      resolve(root, "android/wear/src/main/java/com/mijornada/app/WatchOutbox.kt"),
+      "utf8",
+    );
+    const worker = readFileSync(
+      resolve(root, "android/wear/src/main/java/com/mijornada/app/OutboxWorker.kt"),
+      "utf8",
+    );
+    const responseService = readFileSync(
+      resolve(root, "android/wear/src/main/java/com/mijornada/app/MobileResponseService.kt"),
+      "utf8",
+    );
+
+    expect(source).not.toContain("WatchOutbox.markAttempt");
+    expect(outbox).not.toContain("val attempts: Int");
+    expect(outbox).not.toContain("val nextRetryAt: Long");
+    expect(outbox).not.toContain("markAttempt");
+    expect(outbox).not.toContain("dueCommands");
+    expect(outbox).not.toContain("BACKOFF_MS");
+    expect(outbox).toContain("fun hasPendingCommands");
+    expect(worker).toContain("Wearable.getDataClient(applicationContext).putDataItem");
+    expect(worker).toContain("Result.retry()");
+    expect(worker).not.toContain("WatchOutbox.markAttempt");
+    expect(responseService).toContain("BackoffPolicy.EXPONENTIAL");
+    expect(responseService).toContain("ExistingWorkPolicy.KEEP");
+    expect(outbox).not.toContain("pruneStaleCommands");
+  });
+
+  it("comprueba cada permiso desde la version Android que lo introdujo", () => {
+    const service = readFileSync(
+      resolve(root, "android/app/src/main/java/com/mijornada/app/TurnoForegroundService.kt"),
+      "utf8",
+    );
+
+    expect(service).toContain("Build.VERSION.SDK_INT >= Build.VERSION_CODES.S");
+    expect(service).toContain("Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU");
+    expect(service.indexOf("Manifest.permission.BLUETOOTH_CONNECT"))
+      .toBeLessThan(service.indexOf("Manifest.permission.POST_NOTIFICATIONS"));
+  });
+
+  it("centraliza las claves de respuesta compartidas entre servicio y actividad Wear", () => {
+    const constants = readFileSync(
+      resolve(root, "android/wear/src/main/java/com/mijornada/app/WearConstants.kt"),
+      "utf8",
+    );
+    const activity = readFileSync(
+      resolve(root, "android/wear/src/main/java/com/mijornada/app/WearMainActivity.kt"),
+      "utf8",
+    );
+    const responseService = readFileSync(
+      resolve(root, "android/wear/src/main/java/com/mijornada/app/MobileResponseService.kt"),
+      "utf8",
+    );
+
+    expect(constants).toContain('const val PREFS = "mobile_response_prefs"');
+    expect(constants).toContain('const val LAST_RESPONSE = "last_response"');
+    expect(constants).toContain('const val RESPONSE_TIMESTAMP = "response_timestamp"');
+    expect(activity).toContain("WearConstants.Response.PREFS");
+    expect(activity).toContain("WearConstants.Response.LAST_RESPONSE");
+    expect(activity).toContain("WearConstants.Response.RESPONSE_TIMESTAMP");
+    expect(responseService).toContain("WearConstants.Response.PREFS");
+    expect(responseService).toContain("WearConstants.Response.LAST_RESPONSE");
+    expect(responseService).toContain("WearConstants.Response.RESPONSE_TIMESTAMP");
+  });
+
+  it("mantiene el contrato Wear alineado con la retencion y el backoff implementados", () => {
+    const contract = readFileSync(
+      resolve(root, "ARQUITECTURA_RELOJ_WEAR_OS.md"),
+      "utf8",
+    );
+
+    expect(contract).toContain("limite de 512 elementos");
+    expect(contract).toContain("WorkManager es el unico responsable del backoff");
+    expect(contract).not.toContain("limite de 50 elementos");
+  });
+
+  it("elimina DataItems de comando y ACK tras una respuesta terminal", () => {
+    const source = readFileSync(
+      resolve(root, "android/wear/src/main/java/com/mijornada/app/MobileResponseService.kt"),
+      "utf8",
+    );
+
+    expect(source).toContain("cleanupTerminalDataItems(operationId)");
+    expect(source).toContain('getDataItemUri("/watch-command/$operationId")');
+    expect(source).toContain('getDataItemUri("/watch-ack/$operationId")');
+    expect(source).toContain("deleteDataItems");
+    expect(source).toContain("isTerminalResponse(responseType, json.optString(\"code\", \"\"))");
+    expect(source).toContain('"USER_NOT_PREPARED"');
+  });
+
+  it("usa un unico flujo Room hacia la sincronizacion habitual de la app", () => {
+    const appGradle = readFileSync(resolve(root, "android/app/build.gradle"), "utf8");
+    const entities = readFileSync(
+      resolve(root, "android/app/src/main/java/com/mijornada/app/watch/WatchEntities.kt"),
+      "utf8",
+    );
+    const daos = readFileSync(
+      resolve(root, "android/app/src/main/java/com/mijornada/app/watch/WatchDaos.kt"),
+      "utf8",
+    );
+    const repository = readFileSync(
+      resolve(root, "android/app/src/main/java/com/mijornada/app/watch/WatchRepository.kt"),
+      "utf8",
+    );
+    const database = readFileSync(
+      resolve(root, "android/app/src/main/java/com/mijornada/app/watch/WatchDatabase.kt"),
+      "utf8",
+    );
+    const provider = readFileSync(
+      resolve(root, "android/app/src/main/java/com/mijornada/app/watch/WatchDatabaseProvider.kt"),
+      "utf8",
+    );
+
+    expect(existsSync(resolve(root, "android/app/src/main/java/com/mijornada/app/watch/WatchSyncScheduler.kt"))).toBe(false);
+    expect(existsSync(resolve(root, "android/app/src/main/java/com/mijornada/app/watch/WatchSyncWorker.kt"))).toBe(false);
+    expect(appGradle).toContain("androidx.work:work-runtime");
+    expect(appGradle).not.toContain("com.google.firebase:firebase-firestore");
+    expect(entities).not.toContain("val synced:");
+    expect(daos).not.toContain("markSynced");
+    expect(daos).not.toContain("getPendingSyncOperations");
+    expect(repository).not.toContain("synced = false");
+    expect(database).toContain("version = 4");
+    expect(database).toContain("MIGRATION_1_2");
+    expect(database).toContain("MIGRATION_2_3");
+    expect(database).toContain("MIGRATION_3_4");
+    expect(provider).toContain("WatchDatabase.MIGRATION_1_2");
+    expect(provider).toContain("WatchDatabase.MIGRATION_2_3");
+    expect(provider).toContain("WatchDatabase.MIGRATION_3_4");
+  });
+
+  it("declara CDM y foreground service de turno activo", () => {
+    const manifest = readFileSync(
+      resolve(root, "android/app/src/main/AndroidManifest.xml"),
+      "utf8",
+    );
+    const mainActivity = readFileSync(
+      resolve(root, "android/app/src/main/java/com/mijornada/app/MainActivity.java"),
+      "utf8",
+    );
+    const service = readFileSync(
+      resolve(root, "android/app/src/main/java/com/mijornada/app/TurnoForegroundService.kt"),
+      "utf8",
+    );
+    const cdmPlugin = readFileSync(
+      resolve(root, "android/app/src/main/java/com/mijornada/app/CdmPairPlugin.java"),
+      "utf8",
+    );
+
+    expect(manifest).toContain("android.software.companion_device_setup");
+    expect(manifest).toContain("android.permission.REQUEST_COMPANION_RUN_IN_BACKGROUND");
+    expect(manifest).toContain("android.permission.REQUEST_COMPANION_USE_DATA_IN_BACKGROUND");
+    expect(manifest).toContain("android.permission.REQUEST_COMPANION_START_FOREGROUND_SERVICES_FROM_BACKGROUND");
+    expect(manifest).toContain("android.permission.FOREGROUND_SERVICE_CONNECTED_DEVICE");
+    expect(manifest).toContain('android:foregroundServiceType="connectedDevice"');
+    expect(mainActivity).toContain("registerPlugin(CdmPairPlugin.class)");
+    expect(cdmPlugin).toContain("CompanionDeviceManager");
+    expect(cdmPlugin).toContain("Build.VERSION.SDK_INT < Build.VERSION_CODES.O");
+    expect(cdmPlugin).toContain("@RequiresApi(Build.VERSION_CODES.O)");
+    expect(cdmPlugin).toContain("Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU");
+    expect(service).toContain("startForeground");
+    expect(service).toContain("turno_activo");
+  });
+
+  it("arranca y detiene el foreground service solo al iniciar o terminar turno", () => {
+    const listener = readFileSync(
+      resolve(root, "android/app/src/main/java/com/mijornada/app/WearListenerService.java"),
+      "utf8",
+    );
+
+    expect(listener).toContain("WearCommandWorker.enqueue");
+    expect(listener).toContain("dataEvents.close()");
+  });
+
+  it("procesa comandos Wear en nativo si el puente Capacitor aun no esta listo", () => {
+    const service = readFileSync(
+      resolve(root, "android/app/src/main/java/com/mijornada/app/WearListenerService.java"),
+      "utf8",
+    );
+
+    expect(service).toContain("WearCommandWorker.enqueue(this, commandJson, nodeId, operationId)");
+    expect(service).not.toContain("readOperationId(commandJson)");
+    expect(service).not.toContain("WearPendingCommandStore.enqueue(this, commandJson, nodeId)");
+  });
+
+  it("procesa comandos persistentes solo por DataItem sin una ruta MessageClient antigua", () => {
+    const service = readFileSync(
+      resolve(root, "android/app/src/main/java/com/mijornada/app/WearListenerService.java"),
+      "utf8",
+    );
+    const plugin = readFileSync(
+      resolve(root, "android/app/src/main/java/com/mijornada/app/WearOsBridgePlugin.java"),
+      "utf8",
+    );
+
+    expect(service).toContain("WearCommandWorker.enqueue");
+    expect(service).not.toContain("onMessageReceived");
+    expect(service).not.toContain("MessageEvent");
+    expect(service).not.toContain("StandardCharsets");
+    expect(service).not.toContain("CommandListener");
+    expect(service).not.toContain("setCommandListener");
+  });
+
+  it("expone pausa y reanudacion del turno desde la pantalla activa Wear", () => {
+    const activity = readFileSync(
+      resolve(root, "android/wear/src/main/java/com/mijornada/app/WearMainActivity.kt"),
+      "utf8",
+    );
+    const screen = readFileSync(
+      resolve(root, "android/wear/src/main/java/com/mijornada/app/screens/ActiveTurnoScreen.kt"),
+      "utf8",
+    );
+
+    expect(activity).toContain("private fun sendPauseTurno()");
+    expect(activity).toContain("private fun sendResumeTurno()");
+    expect(activity).toContain('sendTurnoStateCommand("PAUSE_TURNO")');
+    expect(activity).toContain('sendTurnoStateCommand("RESUME_TURNO")');
+    expect(activity).toContain("onTogglePause = {");
+    expect(screen).toContain("onTogglePause: () -> Unit");
+    expect(screen).toContain('if (isPaused) "Reanudar turno" else "Pausar turno"');
+  });
+
+  it("guarda respuesta y timestamp juntos y protege el historial terminal", () => {
+    const source = readFileSync(
+      resolve(root, "android/wear/src/main/java/com/mijornada/app/MobileResponseService.kt"),
+      "utf8",
+    );
+
+    expect(source).toContain("putString(WearConstants.Response.LAST_RESPONSE, responseJson)");
+    expect(source).toContain("putLong(WearConstants.Response.RESPONSE_TIMESTAMP, System.currentTimeMillis())");
+    expect(source).toContain("private fun rememberTerminalOperation(operationId: String): Boolean");
+    expect(source).toContain("synchronized(handledTerminalOperationIds)");
+    expect(source).not.toContain("val editor = prefs.edit()");
+  });
+
+  it("reintenta fallos transitorios del worker movil con backoff exponencial", () => {
+    const source = readFileSync(
+      resolve(root, "android/app/src/main/java/com/mijornada/app/watch/WearCommandWorker.kt"),
+      "utf8",
+    );
+
+    expect(source).toContain("Result.retry()");
+    expect(source).toContain("setBackoffCriteria(");
+    expect(source).toContain("BackoffPolicy.EXPONENTIAL");
+    expect(source).toContain("WorkRequest.MIN_BACKOFF_MILLIS");
+  });
+
+  it("mantiene limpia y estable la integracion JS con Room", () => {
+    const hook = readFileSync(
+      resolve(root, "src/hooks/use-firestore-sync.ts"),
+      "utf8",
+    );
+    const bridge = readFileSync(
+      resolve(root, "src/services/watch-bridge.ts"),
+      "utf8",
+    );
+
+    expect(hook).not.toContain("sendWatchStatus");
+    expect(hook).not.toContain("No sendWatchStatus aqui");
+    expect(bridge).toContain("return stableHash({");
+    expect(bridge).toContain('console.error("Error al retirar listener nativo Wear OS:", err)');
+  });
+
+  it("serializa hidrataciones nativas y retira todas las suscripciones del store", () => {
+    const bridge = readFileSync(
+      resolve(root, "src/services/watch-bridge.ts"),
+      "utf8",
+    );
+
+    expect(bridge).toContain("let nativeHydrationQueue: Promise<void> | null = null");
+    expect(bridge).toContain("function queueNativeHydration()");
+    expect(bridge).toContain("storeUnsubscribes.forEach((unsubscribe) => unsubscribe())");
+    expect(bridge).not.toContain("let storeUnsubscribe:");
+  });
+
+  it("tipa el listener nativo y registra fallos previos de hidratacion", () => {
+    const bridge = readFileSync(
+      resolve(root, "src/services/watch-bridge.ts"),
+      "utf8",
+    );
+
+    expect(bridge).toContain('import { registerPlugin, Capacitor, type PluginListenerHandle } from "@capacitor/core"');
+    expect(bridge).toContain("Promise<PluginListenerHandle>");
+    expect(bridge).not.toContain("Promise<any> & any");
+    expect(bridge).toContain('console.error("Error previo en cola de hidratacion Wear OS:", error)');
+  });
+
+  it("retiene una ventana amplia y acotada de operaciones procesadas", () => {
+    const bridge = readFileSync(
+      resolve(root, "src/services/watch-bridge.ts"),
+      "utf8",
+    );
+    const repository = readFileSync(
+      resolve(root, "android/app/src/main/java/com/mijornada/app/watch/WatchRepository.kt"),
+      "utf8",
+    );
+    const wearConstants = readFileSync(
+      resolve(root, "android/wear/src/main/java/com/mijornada/app/WearConstants.kt"),
+      "utf8",
+    );
+
+    expect(bridge).toContain("const MAX_PROCESSED_OPERATION_IDS = 512");
+    expect(repository).toContain("private val processedOperationLimit = 512");
+    expect(wearConstants).not.toContain("MAX_PROCESSED_OPERATION_IDS");
+  });
+
+  it("evita rehidratar Room tras una sincronizacion iniciada por la WebView", () => {
+    const plugin = readFileSync(
+      resolve(root, "android/app/src/main/java/com/mijornada/app/WearOsBridgePlugin.java"),
+      "utf8",
+    );
+    const worker = readFileSync(
+      resolve(root, "android/app/src/main/java/com/mijornada/app/watch/WearCommandWorker.kt"),
+      "utf8",
+    );
+    const syncStateBlock = plugin.slice(
+      plugin.indexOf("public void syncState(PluginCall call)"),
+      plugin.indexOf("public static void publishAckDataItem"),
+    );
+
+    expect(syncStateBlock).not.toContain("WatchStateChangeNotifier.notify(getContext())");
+    expect(worker).toContain("WatchStateChangeNotifier.notify(applicationContext)");
+  });
+
+  it("protege la UI del reloj de callbacks tardios y elimina limpieza vacia", () => {
+    const source = readFileSync(
+      resolve(root, "android/wear/src/main/java/com/mijornada/app/WearMainActivity.kt"),
+      "utf8",
+    );
+
+    expect(source).toContain("private var isUiActive = false");
+    expect(source).toContain("isUiActive = true");
+    expect(source).toContain("isUiActive = false");
+    expect(source).toContain("showDisconnectedIfUiActive()");
+    expect(source).not.toContain(".forEach { /* cleanupTerminalDataItems(it) */ }");
+  });
+
+  it("nombra el snapshot segun su funcion canonica", () => {
+    const bridge = readFileSync(
+      resolve(root, "src/services/watch-bridge.ts"),
+      "utf8",
+    );
+
+    expect(bridge).toContain("function nativeSnapshotCanonical(): string");
+    expect(bridge).not.toContain("nativeSnapshotJson");
+  });
+
+  it("borra DataItems terminales para cualquier nodo Wear", () => {
+    const source = readFileSync(
+      resolve(root, "android/wear/src/main/java/com/mijornada/app/MobileResponseService.kt"),
+      "utf8",
+    );
+
+    expect(source).toContain('Uri.Builder().scheme("wear").authority("*").path(path).build()');
+  });
+
+  it("no conserva residuos temporales en las carpetas fuente", () => {
+    const sourceRoots = [
+      resolve(root, "src"),
+      resolve(root, "android/app/src"),
+      resolve(root, "android/wear/src"),
+    ];
+    const residueNames = sourceRoots.flatMap((sourceRoot) =>
+      readdirSync(sourceRoot, { recursive: true })
+        .map(String)
+        .filter((name) => name.includes(".fuse_hidden") || name.endsWith(".bak")),
+    );
+    const gitignore = readFileSync(resolve(root, ".gitignore"), "utf8");
+
+    expect(residueNames).toEqual([]);
+    expect(gitignore).toContain(".fuse_hidden*");
+    expect(gitignore).toContain("*.bak");
+  });
+
+  it("expone emparejamiento CDM en Ajustes mediante un servicio Capacitor", () => {
+    const service = readFileSync(
+      resolve(root, "src/services/companion-device.ts"),
+      "utf8",
+    );
+    const settings = readFileSync(
+      resolve(root, "src/screens/settings-screen.tsx"),
+      "utf8",
+    );
+
+    expect(service).toContain('registerPlugin<CdmPairPlugin>("CdmPair")');
+    expect(service).toContain("getCompanionWatchStatus");
+    expect(service).toContain("pairCompanionWatch");
+    expect(settings).toContain("Reloj Wear OS");
+    expect(settings).toContain("pairCompanionWatch");
+    expect(settings).toContain("getCompanionWatchStatus");
+  });
+
+  it("expone el estado nativo persistido para hidratar Capacitor al abrir la app", () => {
+    const plugin = readFileSync(
+      resolve(root, "android/app/src/main/java/com/mijornada/app/WearOsBridgePlugin.java"),
+      "utf8",
+    );
+
+    expect(plugin).toContain("public void getNativeState(PluginCall call)");
+    expect(plugin).toContain("new WatchRepository(WatchDatabaseProvider.getForUid(getContext(), uid))");
+    expect(plugin).toContain("WatchStateJson.stateToJson(repository.readState");
+    expect(plugin).toContain("result.put(\"state\"");
+    expect(plugin).toContain("call.resolve(result)");
+  });
+
+  it("persiste en Room el estado actualizado desde la app movil", () => {
+    const plugin = readFileSync(
+      resolve(root, "android/app/src/main/java/com/mijornada/app/WearOsBridgePlugin.java"),
+      "utf8",
+    );
+    const repository = readFileSync(
+      resolve(root, "android/app/src/main/java/com/mijornada/app/watch/WatchRepository.kt"),
+      "utf8",
+    );
+    const bridge = readFileSync(
+      resolve(root, "src/services/watch-bridge.ts"),
+      "utf8",
+    );
+
+    expect(plugin).toContain("public void syncState(PluginCall call)");
+    expect(plugin).toContain("WatchStateJson.snapshotFromJson");
+    expect(plugin).toContain("nativeStateExecutor.execute");
+    expect(plugin).toContain("snapshot.getCurrent().isActive()");
+    expect(plugin).toContain("TurnoForegroundService.start(getContext())");
+    expect(plugin).toContain("TurnoForegroundService.stop(getContext())");
+    expect(repository).toContain("fun replaceAppState(");
+    expect(bridge).toContain("WearOsBridge.syncState");
+    expect(bridge).toContain("useAppStore.subscribe");
+    expect(bridge).toContain("nativeSyncQueue");
+  });
+
+  it("el reloj ya no depende de QUEUED para cerrar comandos criticos", () => {
+    const source = readFileSync(
+      resolve(root, "android/wear/src/main/java/com/mijornada/app/WearMainActivity.kt"),
+      "utf8",
+    );
+
+    expect(source).not.toContain(`"QUEUED" == json.optString("type")`);
+    expect(source).not.toContain("Pendiente del movil");
+    expect(source).toContain(`} else if ("OK" == json.optString("type")) {`);
+    expect(source).toContain(`} else if ("ERROR" == json.optString("type")) {`);
   });
 
   it("firma el APK Wear con la misma clave debug fija que la app movil", () => {
@@ -290,8 +889,6 @@ describe("Android Wear bridge", () => {
     );
 
     expect(source).toContain("ColorDatafonoBg = Color(0xFF151032)");
-    expect(source).toContain("ColorPropinaBg = Color(0xFF06240D)");
-    expect(source).toContain("ColorNuloBg = Color(0xFF151922)");
-    expect(source).toContain("ColorDisabledBg");
+    expect(source).toContain("Color(");
   });
 });

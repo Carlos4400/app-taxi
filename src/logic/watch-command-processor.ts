@@ -139,6 +139,7 @@ export function buildWatchTurnos(history: Turno[], settings: WatchCommandProcess
       totalADescontar: calculo.totalDescontar,
       totalADar: calculo.totalADar,
       tiempoTrabajado: fmtDuration(totalMins),
+      totalPausedMinutes: turno.totalPausedMinutes || 0,
       totals: buildWatchTotalsFromTurno(turno),
       entradas: buildWatchEntradasFromTurno(turno),
     };
@@ -174,6 +175,16 @@ function errorResponse(command: WatchCommand, code: string, message: string): Wa
   };
 }
 
+function elapsedMinutes(startTime: string | null | undefined, endTime: string): number {
+  if (!startTime) return 0;
+  const [startHour, startMinute] = startTime.split(":").map(Number);
+  const [endHour, endMinute] = endTime.split(":").map(Number);
+  if (![startHour, startMinute, endHour, endMinute].every(Number.isFinite)) return 0;
+  let elapsed = (endHour * 60 + endMinute) - (startHour * 60 + startMinute);
+  if (elapsed < 0) elapsed += 24 * 60;
+  return elapsed;
+}
+
 export function processWatchCommand(
   command: WatchCommand,
   state: WatchCommandProcessorState,
@@ -196,6 +207,9 @@ export function processWatchCommand(
         startDate: state.current.startDate,
         totals: computeWatchTotals(state.current),
         entradas: buildWatchEntradas(state.current),
+        isPaused: state.current.isPaused ?? false,
+        pauseStartTime: state.current.pauseStartTime ?? null,
+        totalPausedMinutes: state.current.totalPausedMinutes ?? 0,
       },
     };
   }
@@ -242,6 +256,69 @@ export function processWatchCommand(
         type: "OK",
         operationId: command.operationId,
         message: "Turno iniciado",
+      },
+    };
+  }
+
+  if (command.type === "PAUSE_TURNO") {
+    if (!state.current.startTime) {
+      return {
+        ...state,
+        response: errorResponse(command, "NO_ACTIVE_TURNO", "No hay turno activo"),
+      };
+    }
+    if (state.current.isPaused) {
+      return {
+        ...state,
+        response: errorResponse(command, "ALREADY_PAUSED", "El turno ya esta pausado"),
+      };
+    }
+
+    return {
+      ...state,
+      current: {
+        ...state.current,
+        isPaused: true,
+        pauseStartTime: state.now.time,
+      },
+      processedOperationIds: withProcessedOperationId(state, command.operationId),
+      response: {
+        type: "OK",
+        operationId: command.operationId,
+        message: "Turno pausado",
+      },
+    };
+  }
+
+  if (command.type === "RESUME_TURNO") {
+    if (!state.current.startTime) {
+      return {
+        ...state,
+        response: errorResponse(command, "NO_ACTIVE_TURNO", "No hay turno activo"),
+      };
+    }
+    if (!state.current.isPaused || !state.current.pauseStartTime) {
+      return {
+        ...state,
+        response: errorResponse(command, "NOT_PAUSED", "El turno no esta pausado"),
+      };
+    }
+
+    return {
+      ...state,
+      current: {
+        ...state.current,
+        isPaused: false,
+        pauseStartTime: null,
+        totalPausedMinutes:
+          (state.current.totalPausedMinutes || 0) +
+          elapsedMinutes(state.current.pauseStartTime, state.now.time),
+      },
+      processedOperationIds: withProcessedOperationId(state, command.operationId),
+      response: {
+        type: "OK",
+        operationId: command.operationId,
+        message: "Turno reanudado",
       },
     };
   }
@@ -424,7 +501,9 @@ export function processWatchCommand(
       km: command.payload.km,
       notes: command.payload.note.trim(),
       startDate: state.current.startDate,
-      totalPausedMinutes: state.current.totalPausedMinutes || 0,
+      totalPausedMinutes:
+        (state.current.totalPausedMinutes || 0) +
+        (state.current.isPaused ? elapsedMinutes(state.current.pauseStartTime, state.now.time) : 0),
       configTurno: buildTurnoConfigFromSettings(state.settings),
       diaLibreContable: state.settings.diaLibre,
     };

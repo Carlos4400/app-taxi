@@ -24,10 +24,13 @@ private const val WatchSafeButtonWidth = 0.86f
 fun ActiveTurnoScreen(
     fechaTurno: String,
     startTime: String,
+    isPaused: Boolean,
+    totalPausedMinutes: Int,
     totalsPorTipo: Map<String, Double>,
     numPorTipo: Map<String, Int>,
     entradas: List<WatchEntry>,
     onSelectCategory: (String) -> Unit,
+    onTogglePause: () -> Unit,
     onAddNote: () -> Unit,
     onEditEntry: (WatchEntry) -> Unit,
     onEndTurno: () -> Unit
@@ -52,6 +55,32 @@ fun ActiveTurnoScreen(
                 Text(
                     text = if (startTime.isBlank()) "" else "desde $startTime",
                     color = ColorGrey, fontSize = 11.sp
+                )
+                if (isPaused) {
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = "⏸ Pausado ${totalPausedMinutes}m",
+                        color = ColorGrey, fontSize = 11.sp, fontWeight = FontWeight.Bold
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(7.dp))
+
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth(WatchSafeButtonWidth)
+                    .clip(RoundedCornerShape(14.dp))
+                    .background(if (isPaused) ColorPropinaBg else ColorNuloBg)
+                    .clickable { onTogglePause() }
+                    .padding(vertical = 8.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = if (isPaused) "Reanudar turno" else "Pausar turno",
+                    color = if (isPaused) ColorPropina else ColorWhite,
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Bold
                 )
             }
 

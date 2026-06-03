@@ -18,6 +18,8 @@ Thumbs.db
 .vscode/
 .idea/
 *.swp
+.fuse_hidden*
+*.bak
 
 # ── Android (lo generado por Capacitor / Gradle) ─────────────
 android/app/src/main/assets/public/
