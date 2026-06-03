@@ -113,6 +113,11 @@ export type WatchCommandResponse =
       message: string;
     }
   | {
+      type: "QUEUED";
+      operationId: string;
+      message: string;
+    }
+  | {
       type: "ERROR";
       operationId: string;
       code: string;

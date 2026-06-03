@@ -1,5 +1,8 @@
 package com.mijornada.app;
 
+import android.content.Intent;
+import android.os.Build;
+import com.getcapacitor.JSArray;
 import com.getcapacitor.JSObject;
 import com.getcapacitor.Plugin;
 import com.getcapacitor.PluginCall;
@@ -8,6 +11,7 @@ import com.getcapacitor.annotation.CapacitorPlugin;
 import com.google.android.gms.wearable.Wearable;
 import com.google.android.gms.wearable.Node;
 import java.nio.charset.StandardCharsets;
+import org.json.JSONArray;
 
 @CapacitorPlugin(name = "WearOsBridge")
 public class WearOsBridgePlugin extends Plugin {
@@ -30,10 +34,53 @@ public class WearOsBridgePlugin extends Plugin {
     public void setPrepared(PluginCall call) {
         String uid = call.getString("uid");
         if (uid != null && !uid.trim().isEmpty()) {
+            JSONArray processedOperationIds = new JSONArray();
+            try {
+                JSArray processed = call.getArray("processedOperationIds");
+                processedOperationIds = processed == null ? new JSONArray() : new JSONArray(processed.toString());
+            } catch (Exception ignored) {}
+            WatchCommandQueue.setPrepared(getContext(), uid, processedOperationIds);
             call.resolve();
         } else {
             call.reject("uid es obligatorio");
         }
+    }
+
+    @PluginMethod
+    public void drainQueue(PluginCall call) {
+        JSObject result = new JSObject();
+        result.put("commands", WatchCommandQueue.drainQueue(getContext()));
+        call.resolve(result);
+    }
+
+    @PluginMethod
+    public void confirmProcessed(PluginCall call) {
+        try {
+            JSArray ids = call.getArray("operationIds");
+            JSONArray operationIds = ids == null ? new JSONArray() : new JSONArray(ids.toString());
+            WatchCommandQueue.confirmProcessed(getContext(), operationIds);
+            call.resolve();
+        } catch (Exception e) {
+            call.reject("operationIds invalido");
+        }
+    }
+
+    @PluginMethod
+    public void startTurnoForegroundService(PluginCall call) {
+        Intent intent = new Intent(getContext(), WatchForegroundService.class);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            getContext().startForegroundService(intent);
+        } else {
+            getContext().startService(intent);
+        }
+        call.resolve();
+    }
+
+    @PluginMethod
+    public void stopTurnoForegroundService(PluginCall call) {
+        Intent intent = new Intent(getContext(), WatchForegroundService.class);
+        getContext().stopService(intent);
+        call.resolve();
     }
 
     @PluginMethod

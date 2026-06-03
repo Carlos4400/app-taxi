@@ -38,6 +38,60 @@ describe("Android Wear bridge", () => {
     expect(source).toContain("val node = nodes.first()");
   });
 
+  it("envia acciones de trabajo del reloj como DataItems persistentes", () => {
+    const source = readFileSync(
+      resolve(root, "android/wear/src/main/java/com/mijornada/app/WearMainActivity.kt"),
+      "utf8",
+    );
+
+    expect(source).toContain("PutDataMapRequest");
+    expect(source).toContain("sendPersistentCommand(");
+    expect(source).toContain(`"/watch-cmd/$operationId"`);
+    expect(source).toContain("Wearable.getDataClient(this).putDataItem");
+    expect(source).toContain("private fun requestStatus()");
+    expect(source).toContain("sendEphemeralCommand(command.toString())");
+  });
+
+  it("encola comandos Wear en nativo movil sin tocar Firestore ni contabilidad", () => {
+    const service = readFileSync(
+      resolve(root, "android/app/src/main/java/com/mijornada/app/WearListenerService.java"),
+      "utf8",
+    );
+    const queue = readFileSync(
+      resolve(root, "android/app/src/main/java/com/mijornada/app/WatchCommandQueue.java"),
+      "utf8",
+    );
+
+    expect(service).toContain("onDataChanged");
+    expect(service).toContain("WatchCommandQueue.enqueue");
+    expect(service).toContain("json.put(\"type\", result.status)");
+    expect(service).toContain("listener.onCommandReceived(commandJson, nodeId)");
+    expect(queue).toContain("SharedPreferences");
+    expect(queue).toContain("operationId");
+    expect(queue).toContain("confirmProcessed");
+    expect(queue).toContain("\"QUEUED\"");
+    expect(queue).not.toContain("FirebaseFirestore");
+    expect(queue).not.toContain("calcularTurnoContable");
+  });
+
+  it("declara servicio foreground de turno y permisos nativos requeridos", () => {
+    const manifest = readFileSync(
+      resolve(root, "android/app/src/main/AndroidManifest.xml"),
+      "utf8",
+    );
+    const service = readFileSync(
+      resolve(root, "android/app/src/main/java/com/mijornada/app/WatchForegroundService.java"),
+      "utf8",
+    );
+
+    expect(manifest).toContain("android.permission.FOREGROUND_SERVICE");
+    expect(manifest).toContain("android.permission.FOREGROUND_SERVICE_DATA_SYNC");
+    expect(manifest).toContain("WatchForegroundService");
+    expect(manifest).toContain("android:foregroundServiceType=\"dataSync\"");
+    expect(service).toContain("startForeground");
+    expect(service).toContain("Mi Turno activo");
+  });
+
   it("firma el APK Wear con la misma clave debug fija que la app movil", () => {
     const source = readFileSync(
       resolve(root, "android/wear/build.gradle"),

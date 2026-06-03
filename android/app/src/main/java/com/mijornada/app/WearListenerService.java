@@ -3,7 +3,11 @@ package com.mijornada.app;
 import com.google.android.gms.wearable.MessageEvent;
 import com.google.android.gms.wearable.WearableListenerService;
 import com.google.android.gms.wearable.Wearable;
+import com.google.android.gms.wearable.DataEvent;
+import com.google.android.gms.wearable.DataEventBuffer;
+import com.google.android.gms.wearable.DataMapItem;
 import java.nio.charset.StandardCharsets;
+import org.json.JSONObject;
 
 public class WearListenerService extends WearableListenerService {
 
@@ -31,5 +35,39 @@ public class WearListenerService extends WearableListenerService {
                 Wearable.getMessageClient(this).sendMessage(nodeId, "/watch-response", responseData);
             }
         }
+    }
+
+    @Override
+    public void onDataChanged(DataEventBuffer dataEvents) {
+        for (DataEvent event : dataEvents) {
+            if (event.getType() != DataEvent.TYPE_CHANGED) continue;
+            String path = event.getDataItem().getUri().getPath();
+            if (path == null || !path.startsWith("/watch-cmd/")) continue;
+
+            String nodeId = event.getDataItem().getUri().getHost();
+            String commandJson = DataMapItem.fromDataItem(event.getDataItem())
+                .getDataMap()
+                .getString("command", "");
+            WatchCommandQueue.EnqueueResult result = WatchCommandQueue.enqueue(this, commandJson, nodeId);
+            sendQueueResult(nodeId, result);
+            if ("QUEUED".equals(result.status) && listener != null) {
+                listener.onCommandReceived(commandJson, nodeId);
+            }
+        }
+    }
+
+    private void sendQueueResult(String nodeId, WatchCommandQueue.EnqueueResult result) {
+        if (nodeId == null || nodeId.trim().isEmpty()) return;
+        JSONObject json = new JSONObject();
+        try {
+            json.put("type", result.status);
+            json.put("operationId", result.operationId);
+            json.put("message", result.message);
+            if (!result.code.isEmpty()) {
+                json.put("code", result.code);
+            }
+        } catch (Exception ignored) {}
+        byte[] responseData = json.toString().getBytes(StandardCharsets.UTF_8);
+        Wearable.getMessageClient(this).sendMessage(nodeId, "/watch-response", responseData);
     }
 }

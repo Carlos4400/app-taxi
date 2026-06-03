@@ -29,6 +29,7 @@ import androidx.wear.compose.material.Text
 import androidx.wear.input.RemoteInputIntentHelper
 import com.google.android.gms.wearable.MessageClient
 import com.google.android.gms.wearable.MessageEvent
+import com.google.android.gms.wearable.PutDataMapRequest
 import com.google.android.gms.wearable.Wearable
 import com.mijornada.app.screens.*
 import com.mijornada.app.theme.*
@@ -312,6 +313,11 @@ class WearMainActivity : ComponentActivity(), MessageClient.OnMessageReceivedLis
                 openTurnosAfterOk = false
                 Log.e(TAG, "Error desde movil: ${json.optString("message")}")
                 performFeedback(json.optString("message", "Error"), strong = true)
+            } else if ("QUEUED" == json.optString("type")) {
+                performFeedback(json.optString("message", "Pendiente en movil"), strong = false)
+            } else if ("DUPLICATE_IGNORED" == json.optString("type")) {
+                performFeedback(json.optString("message", "Operacion ya procesada"), strong = false)
+                requestStatus()
             }
         } catch (e: Exception) {
             Log.e(TAG, "Error al procesar mensaje", e)
@@ -325,7 +331,7 @@ class WearMainActivity : ComponentActivity(), MessageClient.OnMessageReceivedLis
             put("type", "GET_STATUS")
             put("createdAt", System.currentTimeMillis().toString())
         }
-        sendCommand(command.toString())
+        sendEphemeralCommand(command.toString())
     }
 
     private fun sendStartTurno() {
@@ -334,7 +340,7 @@ class WearMainActivity : ComponentActivity(), MessageClient.OnMessageReceivedLis
             put("type", "START_TURNO")
             put("createdAt", System.currentTimeMillis().toString())
         }
-        sendCommand(command.toString())
+        sendPersistentCommand(command.toString())
     }
 
     private fun sendGetTurnos() {
@@ -343,7 +349,7 @@ class WearMainActivity : ComponentActivity(), MessageClient.OnMessageReceivedLis
             put("type", "GET_TURNOS")
             put("createdAt", System.currentTimeMillis().toString())
         }
-        sendCommand(command.toString())
+        sendEphemeralCommand(command.toString())
     }
 
     private fun sendAddEntry(entryType: String, amount: Double, note: String) {
@@ -357,7 +363,7 @@ class WearMainActivity : ComponentActivity(), MessageClient.OnMessageReceivedLis
                 put("note", note)
             })
         }
-        sendCommand(command.toString())
+        sendPersistentCommand(command.toString())
     }
 
     private fun parseTotals(totals: JSONObject?) {
@@ -465,7 +471,7 @@ class WearMainActivity : ComponentActivity(), MessageClient.OnMessageReceivedLis
                 put("note", note)
             })
         }
-        sendCommand(command.toString())
+        sendPersistentCommand(command.toString())
     }
 
     private fun sendDeleteEntry(id: Long) {
@@ -477,7 +483,7 @@ class WearMainActivity : ComponentActivity(), MessageClient.OnMessageReceivedLis
                 put("id", id)
             })
         }
-        sendCommand(command.toString())
+        sendPersistentCommand(command.toString())
     }
 
     private fun sendAddNote(noteText: String) {
@@ -489,7 +495,7 @@ class WearMainActivity : ComponentActivity(), MessageClient.OnMessageReceivedLis
                 put("note", noteText)
             })
         }
-        sendCommand(command.toString())
+        sendPersistentCommand(command.toString())
     }
 
     private fun sendEndTurno(dinero: Double, km: Double, note: String) {
@@ -504,7 +510,7 @@ class WearMainActivity : ComponentActivity(), MessageClient.OnMessageReceivedLis
                 put("note", if (note.isBlank()) "Cierre desde reloj" else note)
             })
         }
-        sendCommand(command.toString())
+        sendPersistentCommand(command.toString())
     }
 
     /** Lanza el teclado / voz del sistema para introducir una nota de texto libre. */
@@ -532,7 +538,7 @@ class WearMainActivity : ComponentActivity(), MessageClient.OnMessageReceivedLis
         }
     }
 
-    private fun sendCommand(commandJson: String) {
+    private fun sendEphemeralCommand(commandJson: String) {
         Wearable.getNodeClient(this).connectedNodes
             .addOnSuccessListener { nodes ->
                 if (nodes.isEmpty()) {
@@ -548,6 +554,26 @@ class WearMainActivity : ComponentActivity(), MessageClient.OnMessageReceivedLis
                             currentScreen.value = ScreenState.NO_CONNECTED
                         }
                 }
+            }
+            .addOnFailureListener {
+                isConnected.value = false
+                currentScreen.value = ScreenState.NO_CONNECTED
+            }
+    }
+
+    private fun sendPersistentCommand(commandJson: String) {
+        val operationId = try {
+            JSONObject(commandJson).optString("operationId", UUID.randomUUID().toString())
+        } catch (e: Exception) {
+            UUID.randomUUID().toString()
+        }
+        val request = PutDataMapRequest.create("/watch-cmd/$operationId")
+        request.dataMap.putString("command", commandJson)
+        request.dataMap.putLong("createdAt", System.currentTimeMillis())
+        val putDataRequest = request.asPutDataRequest().setUrgent()
+        Wearable.getDataClient(this).putDataItem(putDataRequest)
+            .addOnSuccessListener {
+                performFeedback("Enviado al movil", strong = false)
             }
             .addOnFailureListener {
                 isConnected.value = false

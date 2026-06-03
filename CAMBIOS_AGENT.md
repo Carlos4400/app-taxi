@@ -1,3 +1,453 @@
+## 2026-06-03 21:43 - Añadir cola nativa Wear
+
+**Archivos modificados:**
+- `android/app/src/main/AndroidManifest.xml`
+- `android/app/src/main/java/com/mijornada/app/WatchCommandQueue.java`
+- `android/app/src/main/java/com/mijornada/app/WatchForegroundService.java`
+- `android/app/src/main/java/com/mijornada/app/WearListenerService.java`
+- `android/app/src/main/java/com/mijornada/app/WearOsBridgePlugin.java`
+- `android/wear/src/main/java/com/mijornada/app/WearMainActivity.kt`
+- `src/__tests__/android-wear-bridge.test.ts`
+- `src/__tests__/watch-bridge.test.ts`
+- `src/services/watch-bridge.ts`
+- `src/shared/watch-commands.ts`
+
+### Cambio 1 - Contrato de pruebas Wear persistente
+
+#### Código anterior
+```ts
+const capacitorMock = vi.hoisted(() => ({
+  isNative: true,
+  setPrepared: vi.fn(() => Promise.resolve()),
+  sendResponse: vi.fn(() => Promise.resolve()),
+  addListener: vi.fn((_eventName: string, listener: (data: { command: string; nodeId: string }) => void) => {
+    capacitorMock.listener = listener;
+    return Promise.resolve({ remove: vi.fn() });
+  }),
+  listener: null as null | ((data: { command: string; nodeId: string }) => void),
+}));
+```
+
+#### Código nuevo
+```ts
+type MockPendingWatchCommand = {
+  operationId?: string;
+  nodeId?: string;
+  command?: string;
+};
+
+const capacitorMock = vi.hoisted(() => ({
+  isNative: true,
+  setPrepared: vi.fn(() => Promise.resolve()),
+  drainQueue: vi.fn((): Promise<{ commands: MockPendingWatchCommand[] }> => Promise.resolve({ commands: [] })),
+  confirmProcessed: vi.fn(() => Promise.resolve()),
+  startTurnoForegroundService: vi.fn(() => Promise.resolve()),
+  stopTurnoForegroundService: vi.fn(() => Promise.resolve()),
+  sendResponse: vi.fn(() => Promise.resolve()),
+  addListener: vi.fn((_eventName: string, listener: (data: { command: string; nodeId: string }) => void) => {
+    capacitorMock.listener = listener;
+    return Promise.resolve({ remove: vi.fn() });
+  }),
+  listener: null as null | ((data: { command: string; nodeId: string }) => void),
+}));
+```
+
+```ts
+  it("envia acciones de trabajo del reloj como DataItems persistentes", () => {
+    const source = readFileSync(
+      resolve(root, "android/wear/src/main/java/com/mijornada/app/WearMainActivity.kt"),
+      "utf8",
+    );
+
+    expect(source).toContain("PutDataMapRequest");
+    expect(source).toContain("sendPersistentCommand(");
+    expect(source).toContain(`"/watch-cmd/$operationId"`);
+    expect(source).toContain("Wearable.getDataClient(this).putDataItem");
+    expect(source).toContain("private fun requestStatus()");
+    expect(source).toContain("sendEphemeralCommand(command.toString())");
+  });
+```
+
+#### Por qué se cambió
+Las pruebas anteriores solo cubrian mensajes directos. Se añadieron verificaciones para DataItems persistentes, cola nativa, confirmacion de operaciones y servicio foreground.
+
+### Cambio 2 - Cola nativa de comandos Wear
+
+#### Código anterior
+`No existía WatchCommandQueue en android/app/src/main/java/com/mijornada/app/WatchCommandQueue.java.`
+
+#### Código nuevo
+```java
+public final class WatchCommandQueue {
+    private static final String PREFS = "mi_turno_watch_queue";
+    private static final String KEY_PREPARED_UID = "prepared_uid";
+    private static final String KEY_PROCESSED_IDS = "processed_operation_ids";
+    private static final String KEY_QUEUE = "pending_commands";
+    private static final int MAX_PROCESSED_IDS = 500;
+
+    private WatchCommandQueue() {}
+
+    public static void setPrepared(Context context, String uid, JSONArray processedOperationIds) {
+        SharedPreferences prefs = prefs(context);
+        prefs.edit()
+            .putString(KEY_PREPARED_UID, uid)
+            .putString(KEY_PROCESSED_IDS, processedOperationIds == null ? "[]" : processedOperationIds.toString())
+            .apply();
+    }
+
+    public static EnqueueResult enqueue(Context context, String commandJson, String nodeId) {
+        String preparedUid = getPreparedUid(context);
+        if (preparedUid == null || preparedUid.trim().isEmpty()) {
+            return EnqueueResult.error("", "APP_NOT_READY", "App movil no preparada");
+        }
+```
+
+```java
+    public static void confirmProcessed(Context context, JSONArray operationIds) {
+        if (operationIds == null || operationIds.length() == 0) return;
+
+        SharedPreferences prefs = prefs(context);
+        Set<String> confirmed = new HashSet<>();
+        for (int i = 0; i < operationIds.length(); i++) {
+            String id = operationIds.optString(i, "").trim();
+            if (!id.isEmpty()) confirmed.add(id);
+        }
+        if (confirmed.isEmpty()) return;
+```
+
+#### Por qué se cambió
+El reloj necesitaba entregar acciones al movil aunque la pantalla no estuviera preparada. La cola guarda comandos por `operationId`, evita duplicados ya procesados y no contiene Firestore ni calculos de contabilidad.
+
+### Cambio 3 - Servicio foreground del puente Wear
+
+#### Código anterior
+`No existía WatchForegroundService en android/app/src/main/java/com/mijornada/app/WatchForegroundService.java.`
+
+#### Código nuevo
+```java
+public class WatchForegroundService extends Service {
+    private static final String CHANNEL_ID = "mi_turno_watch_service";
+    private static final int NOTIFICATION_ID = 4401;
+
+    @Override
+    public int onStartCommand(Intent intent, int flags, int startId) {
+        startForeground(NOTIFICATION_ID, buildNotification());
+        return START_STICKY;
+    }
+```
+
+```java
+        return builder
+            .setContentTitle("Mi Turno activo")
+            .setContentText("Puente del reloj preparado durante el turno.")
+            .setSmallIcon(getApplicationInfo().icon)
+            .setOngoing(true)
+            .build();
+```
+
+#### Por qué se cambió
+Durante un turno activo el puente del reloj necesita un servicio nativo visible para reducir la probabilidad de que Android detenga el proceso del movil.
+
+### Cambio 4 - Manifest para Data Layer y foreground
+
+#### Código anterior
+```xml
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <application
+        android:allowBackup="true"
+```
+
+```xml
+        </service>
+    </application>
+
+    <!-- Permissions -->
+
+    <uses-permission android:name="android.permission.INTERNET" />
+</manifest>
+```
+
+#### Código nuevo
+```xml
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
+
+    <application
+        android:allowBackup="true"
+```
+
+```xml
+            <intent-filter>
+                <action android:name="com.google.android.gms.wearable.DATA_CHANGED" />
+                <data android:scheme="wear" android:host="*" android:pathPrefix="/watch-cmd" />
+            </intent-filter>
+        </service>
+
+        <service
+            android:name="com.mijornada.app.WatchForegroundService"
+            android:exported="false"
+            android:foregroundServiceType="dataSync">
+        </service>
+    </application>
+</manifest>
+```
+
+#### Por qué se cambió
+El movil debe recibir DataItems de Wear OS y declarar el tipo de foreground service usado por el puente del reloj.
+
+### Cambio 5 - Recepción nativa de DataItems
+
+#### Código anterior
+```java
+import com.google.android.gms.wearable.MessageEvent;
+import com.google.android.gms.wearable.WearableListenerService;
+import com.google.android.gms.wearable.Wearable;
+import java.nio.charset.StandardCharsets;
+```
+
+```java
+    @Override
+    public void onMessageReceived(MessageEvent messageEvent) {
+        if ("/watch-command".equals(messageEvent.getPath())) {
+            String commandJson = new String(messageEvent.getData(), StandardCharsets.UTF_8);
+            if (listener != null) {
+                listener.onCommandReceived(commandJson, messageEvent.getSourceNodeId());
+```
+
+#### Código nuevo
+```java
+import com.google.android.gms.wearable.MessageEvent;
+import com.google.android.gms.wearable.WearableListenerService;
+import com.google.android.gms.wearable.Wearable;
+import com.google.android.gms.wearable.DataEvent;
+import com.google.android.gms.wearable.DataEventBuffer;
+import com.google.android.gms.wearable.DataMapItem;
+import java.nio.charset.StandardCharsets;
+import org.json.JSONObject;
+```
+
+```java
+    @Override
+    public void onDataChanged(DataEventBuffer dataEvents) {
+        for (DataEvent event : dataEvents) {
+            if (event.getType() != DataEvent.TYPE_CHANGED) continue;
+            String path = event.getDataItem().getUri().getPath();
+            if (path == null || !path.startsWith("/watch-cmd/")) continue;
+
+            String nodeId = event.getDataItem().getUri().getHost();
+            String commandJson = DataMapItem.fromDataItem(event.getDataItem())
+                .getDataMap()
+                .getString("command", "");
+            WatchCommandQueue.EnqueueResult result = WatchCommandQueue.enqueue(this, commandJson, nodeId);
+            sendQueueResult(nodeId, result);
+            if ("QUEUED".equals(result.status) && listener != null) {
+                listener.onCommandReceived(commandJson, nodeId);
+            }
+        }
+    }
+```
+
+#### Por qué se cambió
+Los mensajes directos se perdian si la app movil no estaba lista. El listener ahora acepta DataItems persistentes, los encola y avisa al puente JS cuando esta disponible.
+
+### Cambio 6 - API nativa del plugin Wear
+
+#### Código anterior
+```java
+    @PluginMethod
+    public void setPrepared(PluginCall call) {
+        String uid = call.getString("uid");
+        if (uid != null && !uid.trim().isEmpty()) {
+            call.resolve();
+        } else {
+            call.reject("uid es obligatorio");
+        }
+    }
+```
+
+#### Código nuevo
+```java
+    @PluginMethod
+    public void setPrepared(PluginCall call) {
+        String uid = call.getString("uid");
+        if (uid != null && !uid.trim().isEmpty()) {
+            JSONArray processedOperationIds = new JSONArray();
+            try {
+                JSArray processed = call.getArray("processedOperationIds");
+                processedOperationIds = processed == null ? new JSONArray() : new JSONArray(processed.toString());
+            } catch (Exception ignored) {}
+            WatchCommandQueue.setPrepared(getContext(), uid, processedOperationIds);
+            call.resolve();
+        } else {
+            call.reject("uid es obligatorio");
+        }
+    }
+
+    @PluginMethod
+    public void drainQueue(PluginCall call) {
+        JSObject result = new JSObject();
+        result.put("commands", WatchCommandQueue.drainQueue(getContext()));
+        call.resolve(result);
+    }
+
+    @PluginMethod
+    public void confirmProcessed(PluginCall call) {
+        try {
+            JSArray ids = call.getArray("operationIds");
+            JSONArray operationIds = ids == null ? new JSONArray() : new JSONArray(ids.toString());
+            WatchCommandQueue.confirmProcessed(getContext(), operationIds);
+            call.resolve();
+        } catch (Exception e) {
+            call.reject("operationIds invalido");
+        }
+    }
+```
+
+#### Por qué se cambió
+El codigo web necesitaba preparar la cola por usuario, drenar comandos pendientes, confirmar operaciones procesadas y controlar el servicio foreground sin escribir en Firestore desde nativo.
+
+### Cambio 7 - Envio persistente desde el reloj
+
+#### Código anterior
+```kotlin
+        sendCommand(command.toString())
+```
+
+```kotlin
+    private fun sendCommand(commandJson: String) {
+        Wearable.getNodeClient(this).connectedNodes
+            .addOnSuccessListener { nodes ->
+```
+
+#### Código nuevo
+```kotlin
+        sendPersistentCommand(command.toString())
+```
+
+```kotlin
+    private fun sendEphemeralCommand(commandJson: String) {
+        Wearable.getNodeClient(this).connectedNodes
+            .addOnSuccessListener { nodes ->
+```
+
+```kotlin
+    private fun sendPersistentCommand(commandJson: String) {
+        val operationId = try {
+            JSONObject(commandJson).optString("operationId", UUID.randomUUID().toString())
+        } catch (e: Exception) {
+            UUID.randomUUID().toString()
+        }
+        val request = PutDataMapRequest.create("/watch-cmd/$operationId")
+        request.dataMap.putString("command", commandJson)
+        request.dataMap.putLong("createdAt", System.currentTimeMillis())
+        val putDataRequest = request.asPutDataRequest().setUrgent()
+        Wearable.getDataClient(this).putDataItem(putDataRequest)
+            .addOnSuccessListener {
+                performFeedback("Enviado al movil", strong = false)
+            }
+            .addOnFailureListener {
+                isConnected.value = false
+                currentScreen.value = ScreenState.NO_CONNECTED
+            }
+    }
+```
+
+#### Por qué se cambió
+Las acciones de trabajo del reloj debian llegar al movil mediante Data Layer persistente. Las consultas de estado siguen usando mensaje efimero.
+
+### Cambio 8 - Drenado y confirmacion en el puente web
+
+#### Código anterior
+```ts
+export interface WearOsBridgePlugin {
+  setPrepared(options: { uid: string }): Promise<void>;
+  sendResponse(options: { response: string; nodeId?: string }): Promise<void>;
+  addListener(
+    eventName: "onCommandReceived",
+    listenerFunc: (data: { command: string; nodeId?: string }) => void
+  ): Promise<any> & any;
+}
+```
+
+```ts
+  WearOsBridge.addListener("onCommandReceived", async (data: { command: string; nodeId?: string }) => {
+    try {
+      const command = JSON.parse(data.command) as WatchCommand;
+      const operationId = readOperationId(command);
+      const store = useAppStore.getState();
+```
+
+#### Código nuevo
+```ts
+export interface WearOsBridgePlugin {
+  setPrepared(options: { uid: string; processedOperationIds: string[] }): Promise<void>;
+  drainQueue(): Promise<{ commands?: PendingWatchCommand[] }>;
+  confirmProcessed(options: { operationIds: string[] }): Promise<void>;
+  startTurnoForegroundService(): Promise<void>;
+  stopTurnoForegroundService(): Promise<void>;
+  sendResponse(options: { response: string; nodeId?: string }): Promise<void>;
+  addListener(
+    eventName: "onCommandReceived",
+    listenerFunc: (data: { command: string; nodeId?: string }) => void
+  ): Promise<any> & any;
+}
+```
+
+```ts
+async function drainNativeQueue(): Promise<void> {
+  if (drainingQueue) return;
+  drainingQueue = true;
+  try {
+    const result = await WearOsBridge.drainQueue();
+    const commands = Array.isArray(result.commands) ? result.commands : [];
+    const confirmedOperationIds: string[] = [];
+```
+
+```ts
+  WearOsBridge.addListener("onCommandReceived", async (data: { command: string; nodeId?: string }) => {
+    try {
+      await handleWatchCommand(data.command, data.nodeId, { confirmNative: true });
+```
+
+#### Por qué se cambió
+El puente web ahora procesa la cola nativa cuando se prepara, confirma comandos ya aplicados y arranca o para el foreground service al iniciar o terminar turno desde el reloj.
+
+### Cambio 9 - Respuesta QUEUED compartida
+
+#### Código anterior
+```ts
+  | {
+      type: "OK";
+      operationId: string;
+      message: string;
+    }
+  | {
+      type: "ERROR";
+      operationId: string;
+```
+
+#### Código nuevo
+```ts
+  | {
+      type: "OK";
+      operationId: string;
+      message: string;
+    }
+  | {
+      type: "QUEUED";
+      operationId: string;
+      message: string;
+    }
+  | {
+      type: "ERROR";
+      operationId: string;
+```
+
+#### Por qué se cambió
+El reloj necesita distinguir una accion aceptada por la cola nativa de una accion ya procesada o de un error.
+
 ## 2026-06-03 00:17 - Integrar logo de Home
 
 **Archivos modificados:** `src/components/brand-assets.tsx`, `src/screens/home-screen.tsx`, `src/__tests__/brand-assets.test.ts`
