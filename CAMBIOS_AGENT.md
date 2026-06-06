@@ -1,3 +1,48 @@
+## 2026-06-06 23:30 - Restaurar orden de permisos en TurnoForegroundService
+
+**Archivos modificados:** `android/app/src/main/java/com/mijornada/app/TurnoForegroundService.kt`
+
+### Cambio 1 - Orden de comprobación de permisos
+
+#### Código anterior
+```kotlin
+if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+    if (checkSelfPermission(Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED) {
+        android.util.Log.w("TurnoForegroundService", "BLUETOOTH_CONNECT permission not granted")
+        stopSelf()
+        return START_NOT_STICKY
+    }
+}
+if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+    if (checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+        android.util.Log.w("TurnoForegroundService", "POST_NOTIFICATIONS permission not granted")
+        stopSelf()
+        return START_NOT_STICKY
+    }
+}
+```
+
+#### Código nuevo
+```kotlin
+if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+    if (checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+        android.util.Log.w("TurnoForegroundService", "POST_NOTIFICATIONS permission not granted")
+        stopSelf()
+        return START_NOT_STICKY
+    }
+}
+if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+    if (checkSelfPermission(Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED) {
+        android.util.Log.w("TurnoForegroundService", "BLUETOOTH_CONNECT permission not granted")
+        stopSelf()
+        return START_NOT_STICKY
+    }
+}
+```
+
+#### Por qué se cambió
+Se revierte el cambio anterior que había invertido el orden. TIRAMISU (API 33) debe comprobarse antes que S (API 31) porque la versión más reciente de Android es la que primero alcanza el código.
+
 ## 2026-06-06 21:35 - Unificar reintentos y contrato Wear
 
 **Archivos modificados:** `ARQUITECTURA_RELOJ_WEAR_OS.md`, `android/app/src/main/java/com/mijornada/app/TurnoForegroundService.kt`, `android/wear/src/main/java/com/mijornada/app/MobileResponseService.kt`, `android/wear/src/main/java/com/mijornada/app/OutboxWorker.kt`, `android/wear/src/main/java/com/mijornada/app/WatchOutbox.kt`, `android/wear/src/main/java/com/mijornada/app/WearConstants.kt`, `android/wear/src/main/java/com/mijornada/app/WearMainActivity.kt`, `android/wear/src/main/java/com/mijornada/app/screens/NumericKeypad.kt`, `src/__tests__/android-wear-bridge.test.ts`
