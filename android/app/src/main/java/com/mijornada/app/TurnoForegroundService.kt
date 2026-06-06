@@ -21,16 +21,16 @@ class TurnoForegroundService : Service() {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            if (checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
-                android.util.Log.w("TurnoForegroundService", "POST_NOTIFICATIONS permission not granted")
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            if (checkSelfPermission(Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED) {
+                android.util.Log.w("TurnoForegroundService", "BLUETOOTH_CONNECT permission not granted")
                 stopSelf()
                 return START_NOT_STICKY
             }
         }
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            if (checkSelfPermission(Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED) {
-                android.util.Log.w("TurnoForegroundService", "BLUETOOTH_CONNECT permission not granted")
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            if (checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+                android.util.Log.w("TurnoForegroundService", "POST_NOTIFICATIONS permission not granted")
                 stopSelf()
                 return START_NOT_STICKY
             }
