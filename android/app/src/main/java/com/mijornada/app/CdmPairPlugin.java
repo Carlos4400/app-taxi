@@ -77,6 +77,36 @@ public class CdmPairPlugin extends Plugin {
         call.resolve(result);
     }
 
+    @PluginMethod
+    public void disassociate(PluginCall call) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) {
+            call.reject("Companion Device Manager requiere Android 8 o superior");
+            return;
+        }
+        CompanionDeviceManager manager = manager();
+        int removed = 0;
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                for (AssociationInfo info : manager.getMyAssociations()) {
+                    manager.disassociate(info.getId());
+                    removed++;
+                }
+            } else {
+                for (String address : manager.getAssociations()) {
+                    manager.disassociate(address);
+                    removed++;
+                }
+            }
+        } catch (Exception e) {
+            call.reject("No se pudo desasociar el reloj: " + e.getMessage());
+            return;
+        }
+        JSObject result = new JSObject();
+        result.put("associated", false);
+        result.put("removed", removed);
+        call.resolve(result);
+    }
+
     @PermissionCallback
     private void bluetoothPermissionCallback(PluginCall call) {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) {
@@ -92,13 +122,17 @@ public class CdmPairPlugin extends Plugin {
 
     @RequiresApi(Build.VERSION_CODES.O)
     private void startAssociation(PluginCall call) {
-        BluetoothDeviceFilter filter = new BluetoothDeviceFilter.Builder()
-            .setNamePattern(Pattern.compile(".*(Xiaomi|Watch|Wear).*", Pattern.CASE_INSENSITIVE))
-            .build();
-        AssociationRequest request = new AssociationRequest.Builder()
-            .addDeviceFilter(filter)
-            .setSingleDevice(false)
-            .build();
+        AssociationRequest.Builder requestBuilder = new AssociationRequest.Builder()
+            .setSingleDevice(false);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            requestBuilder.setDeviceProfile(AssociationRequest.DEVICE_PROFILE_WATCH);
+        } else {
+            BluetoothDeviceFilter filter = new BluetoothDeviceFilter.Builder()
+                .setNamePattern(Pattern.compile(".*(Xiaomi|Watch|Wear).*", Pattern.CASE_INSENSITIVE))
+                .build();
+            requestBuilder.addDeviceFilter(filter);
+        }
+        AssociationRequest request = requestBuilder.build();
 
         saveCall(call);
         manager().associate(request, new CompanionDeviceManager.Callback() {

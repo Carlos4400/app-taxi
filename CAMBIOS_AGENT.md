@@ -1,3 +1,273 @@
+## 2026-06-07 00:45 - Anadir boton Desasociar reloj en Ajustes
+
+**Archivos modificados:** `android/app/src/main/java/com/mijornada/app/CdmPairPlugin.java`, `src/services/companion-device.ts`, `src/screens/settings-screen.tsx`, `src/__tests__/companion-device.test.ts`
+
+### Cambio 1 - Metodo disassociate en CdmPairPlugin
+
+#### Código anterior
+`No existía el metodo disassociate en CdmPairPlugin.java.`
+
+#### Código nuevo
+```java
+    @PluginMethod
+    public void disassociate(PluginCall call) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) {
+            call.reject("Companion Device Manager requiere Android 8 o superior");
+            return;
+        }
+        CompanionDeviceManager manager = manager();
+        int removed = 0;
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                for (AssociationInfo info : manager.getMyAssociations()) {
+                    manager.disassociate(info.getId());
+                    removed++;
+                }
+            } else {
+                for (String address : manager.getAssociations()) {
+                    manager.disassociate(address);
+                    removed++;
+                }
+            }
+        } catch (Exception e) {
+            call.reject("No se pudo desasociar el reloj: " + e.getMessage());
+            return;
+        }
+        JSObject result = new JSObject();
+        result.put("associated", false);
+        result.put("removed", removed);
+        call.resolve(result);
+    }
+```
+
+#### Por qué se cambió
+La UI ofrecia "Emparejar reloj" pero no via para revertirlo. Cuando el usuario quiere reasociar limpio o cambiar de reloj, no hay forma de retirar la asociacion CDM sin "Borrar datos" de la app desde Ajustes del sistema. El nuevo metodo elimina todas las asociaciones de la app via `CompanionDeviceManager.disassociate`, usando la firma por `associationId` en API 33+ y la deprecated por MAC en API 26-32. No requiere permiso BLUETOOTH_CONNECT runtime (no escanea, solo retira). Devuelve el contador `removed` para feedback al usuario.
+
+### Cambio 2 - Tipo y funcion unpairCompanionWatch en companion-device.ts
+
+#### Código anterior
+```ts
+interface CdmPairPlugin {
+  getStatus(): Promise<CompanionStatus>;
+  pair(): Promise<CompanionStatus>;
+}
+```
+
+#### Código nuevo
+```ts
+interface CdmPairPlugin {
+  getStatus(): Promise<CompanionStatus>;
+  pair(): Promise<CompanionStatus>;
+  disassociate(): Promise<CompanionStatus & { removed: number }>;
+}
+```
+
+Tambien se anadio al final del archivo:
+
+```ts
+export async function unpairCompanionWatch(): Promise<CompanionStatus & { removed: number }> {
+  if (!Capacitor.isNativePlatform() || Capacitor.getPlatform() !== "android") {
+    throw new Error("El emparejamiento Wear OS solo esta disponible en Android");
+  }
+  return CdmPair.disassociate();
+}
+```
+
+#### Por qué se cambió
+Exponer el nuevo metodo nativo `disassociate` al lado JS con la misma forma que `pairCompanionWatch`. El tipo de retorno incluye `removed: number` para que el llamador pueda dar feedback diferenciado segun si habia algo que retirar.
+
+### Cambio 3 - Boton Desasociar en SettingsScreen
+
+#### Código anterior
+```tsx
+import { getCompanionWatchStatus, pairCompanionWatch } from "../services/companion-device";
+```
+
+```tsx
+  async function handlePairWatch() {
+    hapticOpen();
+    setWatchPairing(true);
+    setWatchMessage("");
+    try {
+      const result = await pairCompanionWatch();
+      setWatchAssociated(result.associated);
+      setWatchMessage(result.associated ? "Reloj asociado correctamente." : "No se completo la asociacion.");
+    } catch (error) {
+      setWatchMessage(error instanceof Error ? error.message : "No se pudo asociar el reloj.");
+    } finally {
+      setWatchPairing(false);
+    }
+  }
+```
+
+```tsx
+              {watchPairing ? "Abriendo selector..." : watchAssociated ? "Cambiar reloj asociado" : "Emparejar reloj"}
+            </button>
+            {watchMessage && (
+              <div style={{ marginTop: 12, fontSize: 13, color: "rgba(255,255,255,0.6)" }}>{watchMessage}</div>
+            )}
+```
+
+#### Código nuevo
+```tsx
+import { getCompanionWatchStatus, pairCompanionWatch, unpairCompanionWatch } from "../services/companion-device";
+```
+
+Nuevo handler `handleUnpairWatch` despues de `handlePairWatch`:
+
+```tsx
+  async function handleUnpairWatch() {
+    const ok = window.confirm(
+      "¿Seguro que quieres desasociar el reloj? La app móvil dejará de tener los permisos especiales para procesar comandos del reloj con el móvil bloqueado hasta que vuelvas a emparejar."
+    );
+    if (!ok) return;
+    hapticDanger();
+    setWatchPairing(true);
+    setWatchMessage("Desasociando...");
+    try {
+      const result = await unpairCompanionWatch();
+      setWatchAssociated(result.associated);
+      if (result.removed === 0) {
+        setWatchMessage("No habia ninguna asociacion que retirar.");
+      } else {
+        const label = result.removed === 1 ? "asociacion eliminada" : "asociaciones eliminadas";
+        setWatchMessage(`Reloj desasociado (${result.removed} ${label}).`);
+      }
+    } catch (error) {
+      setWatchMessage(error instanceof Error ? error.message : "No se pudo desasociar el reloj.");
+    } finally {
+      setWatchPairing(false);
+    }
+  }
+```
+
+Boton nuevo condicional debajo del existente "Emparejar reloj":
+
+```tsx
+              {watchPairing ? "Procesando..." : watchAssociated ? "Cambiar reloj asociado" : "Emparejar reloj"}
+            </button>
+            {watchAssociated && (
+              <button
+                onClick={handleUnpairWatch}
+                disabled={watchPairing}
+                style={{
+                  width: "100%",
+                  marginTop: 10,
+                  padding: "14px",
+                  borderRadius: 14,
+                  border: "1px solid rgba(255,80,80,0.4)",
+                  background: "rgba(255,80,80,0.08)",
+                  color: "#ff8080",
+                  fontSize: 15,
+                  fontWeight: 800,
+                  cursor: watchPairing ? "default" : "pointer",
+                  opacity: watchPairing ? 0.6 : 1,
+                }}
+              >
+                Desasociar reloj
+              </button>
+            )}
+            {watchMessage && (
+              <div style={{ marginTop: 12, fontSize: 13, color: "rgba(255,255,255,0.6)" }}>{watchMessage}</div>
+            )}
+```
+
+Tambien se cambio el texto "Abriendo selector..." por "Procesando..." porque el boton ahora dispara ambas operaciones.
+
+#### Por qué se cambió
+Antes el boton "Cambiar reloj asociado" llamaba directamente a `pairCompanionWatch` sin retirar la anterior, lo que en algunos OEMs deja asociaciones huerfanas. El boton "Desasociar reloj" expone la accion explicita y solo aparece cuando hay asociacion (`watchAssociated === true`), evitando un boton inutil en estado "No asociado". El diálogo `window.confirm` evita borrados accidentales y avisa al usuario de la consecuencia (perder los permisos companion para background). El estilo rojizo lo identifica como accion destructiva sin chocar con la paleta neon del tema.
+
+### Cambio 4 - Test para unpairCompanionWatch
+
+#### Código anterior
+```ts
+const cdmMock = vi.hoisted(() => ({
+  getStatus: vi.fn(),
+  pair: vi.fn(),
+}));
+```
+
+```ts
+  it("inicia el selector nativo para emparejar el reloj", async () => {
+    cdmMock.pair.mockResolvedValue({ associated: true });
+    const { pairCompanionWatch } = await import("../services/companion-device");
+
+    await expect(pairCompanionWatch()).resolves.toEqual({ associated: true });
+    expect(cdmMock.pair).toHaveBeenCalledTimes(1);
+  });
+});
+```
+
+#### Código nuevo
+```ts
+const cdmMock = vi.hoisted(() => ({
+  getStatus: vi.fn(),
+  pair: vi.fn(),
+  disassociate: vi.fn(),
+}));
+```
+
+```ts
+  it("inicia el selector nativo para emparejar el reloj", async () => {
+    cdmMock.pair.mockResolvedValue({ associated: true });
+    const { pairCompanionWatch } = await import("../services/companion-device");
+
+    await expect(pairCompanionWatch()).resolves.toEqual({ associated: true });
+    expect(cdmMock.pair).toHaveBeenCalledTimes(1);
+  });
+
+  it("desasocia las asociaciones companion existentes", async () => {
+    cdmMock.disassociate.mockResolvedValue({ associated: false, removed: 1 });
+    const { unpairCompanionWatch } = await import("../services/companion-device");
+
+    await expect(unpairCompanionWatch()).resolves.toEqual({ associated: false, removed: 1 });
+    expect(cdmMock.disassociate).toHaveBeenCalledTimes(1);
+  });
+});
+```
+
+#### Por qué se cambió
+Cubrir el nuevo metodo en el mismo nivel de test que `pair` y `getStatus`. El mock incluye `disassociate` para que `registerPlugin` devuelva el objeto completo; el caso de uso verifica que `unpairCompanionWatch` reenvia el resultado del nativo y llama exactamente una vez al plugin.
+
+## 2026-06-07 00:20 - Usar perfil Wear OS en CompanionDeviceManager
+
+**Archivos modificados:** `android/app/src/main/java/com/mijornada/app/CdmPairPlugin.java`
+
+### Cambio 1 - Declarar AssociationRequest.DEVICE_PROFILE_WATCH en startAssociation
+
+#### Código anterior
+```java
+    @RequiresApi(Build.VERSION_CODES.O)
+    private void startAssociation(PluginCall call) {
+        BluetoothDeviceFilter filter = new BluetoothDeviceFilter.Builder()
+            .setNamePattern(Pattern.compile(".*(Xiaomi|Watch|Wear).*", Pattern.CASE_INSENSITIVE))
+            .build();
+        AssociationRequest request = new AssociationRequest.Builder()
+            .addDeviceFilter(filter)
+            .setSingleDevice(false)
+            .build();
+```
+
+#### Código nuevo
+```java
+    @RequiresApi(Build.VERSION_CODES.O)
+    private void startAssociation(PluginCall call) {
+        AssociationRequest.Builder requestBuilder = new AssociationRequest.Builder()
+            .setSingleDevice(false);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            requestBuilder.setDeviceProfile(AssociationRequest.DEVICE_PROFILE_WATCH);
+        } else {
+            BluetoothDeviceFilter filter = new BluetoothDeviceFilter.Builder()
+                .setNamePattern(Pattern.compile(".*(Xiaomi|Watch|Wear).*", Pattern.CASE_INSENSITIVE))
+                .build();
+            requestBuilder.addDeviceFilter(filter);
+        }
+        AssociationRequest request = requestBuilder.build();
+```
+
+#### Por qué se cambió
+El selector CDM aparecia vacio con relojes Wear OS ya gestionados por otra app companion (Mi Fitness en el caso del usuario), respondiendo `user_rejected` aunque el reloj estuviera emparejado en Bluetooth y el filtro de nombre lo aceptara. Sin `DEVICE_PROFILE_WATCH`, Android lanza el selector generico que algunos fabricantes ocultan cuando ya existe otra asociacion companion para ese dispositivo. Con el perfil declarado, el sistema lanza el wizard especifico para wearables (introducido en API 31 / S), detecta el reloj aunque comparta companion con otra app y solicita los permisos tipicos de companion Wear durante la asociacion. La rama API 31+ se construye sin `addDeviceFilter` porque el wizard de `DEVICE_PROFILE_WATCH` usa su propio escaneo de wearables; el filtro por nombre `Xiaomi|Watch|Wear` queda confinado a la rama API 26-30 como fallback para versiones donde la constante no existe y el selector cae al modo generico de Bluetooth. El guard `Build.VERSION.SDK_INT >= S` mantiene el comportamiento anterior en API 30 e inferiores.
+
 ## 2026-06-06 23:30 - Restaurar orden de permisos en TurnoForegroundService
 
 **Archivos modificados:** `android/app/src/main/java/com/mijornada/app/TurnoForegroundService.kt`
@@ -16686,21 +16956,4 @@ describe("brand taxi assets", () => {
 
     expect(main).toContain("<BrandTaxiIcon size={20}");
     expect(home).toContain("<BrandTaxiLogo");
-    expect(settings).toContain("<BrandTaxiLogo");
-    expect(wearHome).toContain("BrandTaxiLogo(");
-    expect(home).not.toContain("ðŸš•");
-    expect(settings).not.toContain("ðŸš•");
-    expect(wearHome).not.toContain("ðŸš•");
-  });
-
-  it("mantiene iconos launcher actualizados para PWA Android y Wear", () => {
-    expect(existsSync(resolve(root, "public/icon-192.png"))).toBe(true);
-    expect(existsSync(resolve(root, "public/icon-512.png"))).toBe(true);
-    expect(existsSync(resolve(root, "android/app/src/main/res/mipmap-xxxhdpi/ic_launcher.png"))).toBe(true);
-    expect(existsSync(resolve(root, "android/wear/src/main/res/mipmap-xxxhdpi/ic_launcher.png"))).toBe(true);
-  });
-});
-```
-
-#### Por quÃ© se cambiÃ³
-Se aÃ±adiÃ³ cobertura para verificar que la identidad visual queda centralizada, que las pantallas visibles usan los assets nuevos y que existen iconos launcher para PWA, Android mÃ³vil y Wear.
+    expect(settings).toContain("<

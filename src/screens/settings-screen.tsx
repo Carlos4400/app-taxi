@@ -22,7 +22,7 @@ import { resolveLatestApkUpdate, type UpdateState } from "../logic/update-flow";
 import { IconDel } from "../components/navigation-icons";
 import { hapticDanger, hapticKey, hapticOpen, hapticSave } from "../services/haptics";
 import { BrandTaxiLogo } from "../components/brand-assets";
-import { getCompanionWatchStatus, pairCompanionWatch } from "../services/companion-device";
+import { getCompanionWatchStatus, pairCompanionWatch, unpairCompanionWatch } from "../services/companion-device";
 
 interface SettingsScreenProps {
   isAdmin: boolean;
@@ -233,6 +233,30 @@ export const SettingsScreen: FC<SettingsScreenProps> = ({
     }
   }
 
+  async function handleUnpairWatch() {
+    const ok = window.confirm(
+      "¿Seguro que quieres desasociar el reloj? La app móvil dejará de tener los permisos especiales para procesar comandos del reloj con el móvil bloqueado hasta que vuelvas a emparejar."
+    );
+    if (!ok) return;
+    hapticDanger();
+    setWatchPairing(true);
+    setWatchMessage("Desasociando...");
+    try {
+      const result = await unpairCompanionWatch();
+      setWatchAssociated(result.associated);
+      if (result.removed === 0) {
+        setWatchMessage("No habia ninguna asociacion que retirar.");
+      } else {
+        const label = result.removed === 1 ? "asociacion eliminada" : "asociaciones eliminadas";
+        setWatchMessage(`Reloj desasociado (${result.removed} ${label}).`);
+      }
+    } catch (error) {
+      setWatchMessage(error instanceof Error ? error.message : "No se pudo desasociar el reloj.");
+    } finally {
+      setWatchPairing(false);
+    }
+  }
+
   return (
     <Shell burst={false}>
       <div style={{ flex: 1, padding: "16px 20px", display: "flex", flexDirection: "column", gap: 16, overflowY: "auto" }}>
@@ -332,8 +356,29 @@ export const SettingsScreen: FC<SettingsScreenProps> = ({
                 opacity: watchPairing ? 0.6 : 1,
               }}
             >
-              {watchPairing ? "Abriendo selector..." : watchAssociated ? "Cambiar reloj asociado" : "Emparejar reloj"}
+              {watchPairing ? "Procesando..." : watchAssociated ? "Cambiar reloj asociado" : "Emparejar reloj"}
             </button>
+            {watchAssociated && (
+              <button
+                onClick={handleUnpairWatch}
+                disabled={watchPairing}
+                style={{
+                  width: "100%",
+                  marginTop: 10,
+                  padding: "14px",
+                  borderRadius: 14,
+                  border: "1px solid rgba(255,80,80,0.4)",
+                  background: "rgba(255,80,80,0.08)",
+                  color: "#ff8080",
+                  fontSize: 15,
+                  fontWeight: 800,
+                  cursor: watchPairing ? "default" : "pointer",
+                  opacity: watchPairing ? 0.6 : 1,
+                }}
+              >
+                Desasociar reloj
+              </button>
+            )}
             {watchMessage && (
               <div style={{ marginTop: 12, fontSize: 13, color: "rgba(255,255,255,0.6)" }}>{watchMessage}</div>
             )}

@@ -14,6 +14,7 @@ type CompanionStatus = {
 interface CdmPairPlugin {
   getStatus(): Promise<CompanionStatus>;
   pair(): Promise<CompanionStatus>;
+  disassociate(): Promise<CompanionStatus & { removed: number }>;
 }
 
 const CdmPair = registerPlugin<CdmPairPlugin>("CdmPair");
@@ -31,4 +32,11 @@ export async function pairCompanionWatch(): Promise<CompanionStatus> {
     throw new Error("El emparejamiento Wear OS solo esta disponible en Android");
   }
   return CdmPair.pair();
+}
+
+export async function unpairCompanionWatch(): Promise<CompanionStatus & { removed: number }> {
+  if (!Capacitor.isNativePlatform() || Capacitor.getPlatform() !== "android") {
+    throw new Error("El emparejamiento Wear OS solo esta disponible en Android");
+  }
+  return CdmPair.disassociate();
 }
