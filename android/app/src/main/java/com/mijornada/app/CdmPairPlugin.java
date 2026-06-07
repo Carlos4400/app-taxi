@@ -176,6 +176,8 @@ public class CdmPairPlugin extends Plugin {
             );
         } catch (IntentSender.SendIntentException e) {
             call.reject("No se pudo abrir el selector de reloj: " + e.getMessage());
+        } catch (Exception e) {
+            call.reject("El selector de reloj no esta disponible en este dispositivo: " + e.getClass().getSimpleName() + ": " + e.getMessage());
         }
     }
 

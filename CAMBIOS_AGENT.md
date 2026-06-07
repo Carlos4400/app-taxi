@@ -1,3 +1,50 @@
+## 2026-06-07 01:00 - Capturar excepciones del wizard CDM
+
+**Archivos modificados:** `android/app/src/main/java/com/mijornada/app/CdmPairPlugin.java`
+
+### Cambio 1 - Catch generico en launchChooser
+
+#### Código anterior
+```java
+    private void launchChooser(IntentSender intentSender, PluginCall call) {
+        try {
+            getActivity().startIntentSenderForResult(
+                intentSender,
+                ASSOCIATION_REQUEST_CODE,
+                null,
+                0,
+                0,
+                0
+            );
+        } catch (IntentSender.SendIntentException e) {
+            call.reject("No se pudo abrir el selector de reloj: " + e.getMessage());
+        }
+    }
+```
+
+#### Código nuevo
+```java
+    private void launchChooser(IntentSender intentSender, PluginCall call) {
+        try {
+            getActivity().startIntentSenderForResult(
+                intentSender,
+                ASSOCIATION_REQUEST_CODE,
+                null,
+                0,
+                0,
+                0
+            );
+        } catch (IntentSender.SendIntentException e) {
+            call.reject("No se pudo abrir el selector de reloj: " + e.getMessage());
+        } catch (Exception e) {
+            call.reject("El selector de reloj no esta disponible en este dispositivo: " + e.getClass().getSimpleName() + ": " + e.getMessage());
+        }
+    }
+```
+
+#### Por qué se cambió
+Al pulsar "Emparejar reloj" en Samsung One UI con la version 1.0.94, `startIntentSenderForResult` lanzaba una excepcion distinta a `SendIntentException` (probable `ActivityNotFoundException` o `RuntimeException` del wizard de wearables cuando no encuentra companions candidatos por estar el reloj recien reseteado sin Wear OS by Google ni Mi Fitness activos). El catch original solo atrapaba `SendIntentException`, asi que el resto subia y mataba el proceso de la app sin feedback al usuario, mostrando el dialogo del sistema "Mi turno sigue sin funcionar". El catch generico no oculta el bug: `call.reject` con el nombre de la clase de excepcion y el mensaje permite mostrar el error en la UI de Ajustes en lugar de matar la app, y deja rastro en logcat para diagnostico.
+
 ## 2026-06-07 00:45 - Anadir boton Desasociar reloj en Ajustes
 
 **Archivos modificados:** `android/app/src/main/java/com/mijornada/app/CdmPairPlugin.java`, `src/services/companion-device.ts`, `src/screens/settings-screen.tsx`, `src/__tests__/companion-device.test.ts`
