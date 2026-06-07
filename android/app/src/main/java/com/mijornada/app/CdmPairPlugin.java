@@ -2,15 +2,21 @@ package com.mijornada.app;
 
 import android.Manifest;
 import android.app.Activity;
+import android.bluetooth.BluetoothAdapter;
+import android.bluetooth.BluetoothDevice;
+import android.bluetooth.BluetoothManager;
+import android.bluetooth.le.ScanFilter;
 import android.companion.AssociationInfo;
 import android.companion.AssociationRequest;
 import android.companion.BluetoothDeviceFilter;
+import android.companion.BluetoothLeDeviceFilter;
 import android.companion.CompanionDeviceManager;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentSender;
 import android.content.pm.PackageManager;
 import android.os.Build;
+import java.util.Set;
 import androidx.annotation.RequiresApi;
 import com.getcapacitor.JSArray;
 import com.getcapacitor.JSObject;
@@ -48,6 +54,66 @@ public class CdmPairPlugin extends Plugin {
         }
 
         startAssociation(call);
+    }
+
+    @PluginMethod
+    public void listPairedWatches(PluginCall call) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) {
+            call.reject("Companion Device Manager requiere Android 8 o superior");
+            return;
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && !"granted".equals(getPermissionState("bluetooth").toString())) {
+            requestPermissionForAlias("bluetooth", call, "listPairedWatchesPermissionCallback");
+            return;
+        }
+        resolvePairedWatches(call);
+    }
+
+    @PermissionCallback
+    private void listPairedWatchesPermissionCallback(PluginCall call) {
+        if ("granted".equals(getPermissionState("bluetooth").toString())) {
+            resolvePairedWatches(call);
+        } else {
+            call.reject("Permiso Bluetooth denegado");
+        }
+    }
+
+    private void resolvePairedWatches(PluginCall call) {
+        JSArray watches = new JSArray();
+        try {
+            BluetoothManager btManager = (BluetoothManager) getContext().getSystemService(Context.BLUETOOTH_SERVICE);
+            BluetoothAdapter adapter = btManager != null ? btManager.getAdapter() : null;
+            if (adapter == null || !adapter.isEnabled()) {
+                JSObject result = new JSObject();
+                result.put("watches", watches);
+                result.put("bluetoothEnabled", false);
+                call.resolve(result);
+                return;
+            }
+            Set<BluetoothDevice> bonded = adapter.getBondedDevices();
+            if (bonded != null) {
+                java.util.regex.Pattern namePattern = java.util.regex.Pattern.compile(".*(Xiaomi|Watch|Wear|Mi Band|Amazfit).*", java.util.regex.Pattern.CASE_INSENSITIVE);
+                for (BluetoothDevice device : bonded) {
+                    String name = device.getName();
+                    if (name == null) continue;
+                    if (!namePattern.matcher(name).matches()) continue;
+                    JSObject item = new JSObject();
+                    item.put("name", name);
+                    item.put("address", device.getAddress());
+                    watches.put(item);
+                }
+            }
+        } catch (SecurityException e) {
+            call.reject("Permiso Bluetooth denegado: " + e.getMessage());
+            return;
+        } catch (Exception e) {
+            call.reject("Error al listar relojes emparejados: " + e.getClass().getSimpleName() + ": " + e.getMessage());
+            return;
+        }
+        JSObject result = new JSObject();
+        result.put("watches", watches);
+        result.put("bluetoothEnabled", true);
+        call.resolve(result);
     }
 
     @PluginMethod
@@ -122,11 +188,23 @@ public class CdmPairPlugin extends Plugin {
 
     @RequiresApi(Build.VERSION_CODES.O)
     private void startAssociation(PluginCall call) {
+        String targetAddress = call != null ? call.getString("targetAddress", "") : "";
+        boolean hasTarget = targetAddress != null && !targetAddress.isEmpty() && BluetoothAdapter.checkBluetoothAddress(targetAddress);
+
         AssociationRequest.Builder requestBuilder = new AssociationRequest.Builder()
-            .setSingleDevice(false);
+            .setSingleDevice(hasTarget);
+        if (hasTarget) {
+            ScanFilter scanFilter = new ScanFilter.Builder()
+                .setDeviceAddress(targetAddress)
+                .build();
+            BluetoothLeDeviceFilter leFilter = new BluetoothLeDeviceFilter.Builder()
+                .setScanFilter(scanFilter)
+                .build();
+            requestBuilder.addDeviceFilter(leFilter);
+        }
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             requestBuilder.setDeviceProfile(AssociationRequest.DEVICE_PROFILE_WATCH);
-        } else {
+        } else if (!hasTarget) {
             BluetoothDeviceFilter filter = new BluetoothDeviceFilter.Builder()
                 .setNamePattern(Pattern.compile(".*(Xiaomi|Watch|Wear).*", Pattern.CASE_INSENSITIVE))
                 .build();

@@ -11,10 +11,21 @@ type CompanionStatus = {
   associations?: CompanionAssociation[];
 };
 
+export type PairedWatch = {
+  name: string;
+  address: string;
+};
+
+export type PairedWatchesResult = {
+  watches: PairedWatch[];
+  bluetoothEnabled: boolean;
+};
+
 interface CdmPairPlugin {
   getStatus(): Promise<CompanionStatus>;
-  pair(): Promise<CompanionStatus>;
+  pair(options?: { targetAddress?: string }): Promise<CompanionStatus>;
   disassociate(): Promise<CompanionStatus & { removed: number }>;
+  listPairedWatches(): Promise<PairedWatchesResult>;
 }
 
 const CdmPair = registerPlugin<CdmPairPlugin>("CdmPair");
@@ -27,11 +38,11 @@ export async function getCompanionWatchStatus(): Promise<CompanionStatus & { ava
   return { available: true, ...status };
 }
 
-export async function pairCompanionWatch(): Promise<CompanionStatus> {
+export async function pairCompanionWatch(targetAddress?: string): Promise<CompanionStatus> {
   if (!Capacitor.isNativePlatform() || Capacitor.getPlatform() !== "android") {
     throw new Error("El emparejamiento Wear OS solo esta disponible en Android");
   }
-  return CdmPair.pair();
+  return CdmPair.pair(targetAddress ? { targetAddress } : undefined);
 }
 
 export async function unpairCompanionWatch(): Promise<CompanionStatus & { removed: number }> {
@@ -39,4 +50,11 @@ export async function unpairCompanionWatch(): Promise<CompanionStatus & { remove
     throw new Error("El emparejamiento Wear OS solo esta disponible en Android");
   }
   return CdmPair.disassociate();
+}
+
+export async function listPairedWatches(): Promise<PairedWatchesResult> {
+  if (!Capacitor.isNativePlatform() || Capacitor.getPlatform() !== "android") {
+    return { watches: [], bluetoothEnabled: false };
+  }
+  return CdmPair.listPairedWatches();
 }

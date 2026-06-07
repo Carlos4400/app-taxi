@@ -1,3 +1,364 @@
+## 2026-06-07 02:00 - Patron hibrido CDM con MAC del reloj ya emparejado
+
+**Archivos modificados:** `android/app/src/main/java/com/mijornada/app/CdmPairPlugin.java`, `src/services/companion-device.ts`, `src/screens/settings-screen.tsx`, `src/__tests__/companion-device.test.ts`
+
+### Cambio 1 - listPairedWatches en CdmPairPlugin
+
+#### Código anterior
+`No existia el metodo listPairedWatches en CdmPairPlugin.java.`
+
+#### Código nuevo
+```java
+    @PluginMethod
+    public void listPairedWatches(PluginCall call) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) {
+            call.reject("Companion Device Manager requiere Android 8 o superior");
+            return;
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && !"granted".equals(getPermissionState("bluetooth").toString())) {
+            requestPermissionForAlias("bluetooth", call, "listPairedWatchesPermissionCallback");
+            return;
+        }
+        resolvePairedWatches(call);
+    }
+
+    @PermissionCallback
+    private void listPairedWatchesPermissionCallback(PluginCall call) {
+        if ("granted".equals(getPermissionState("bluetooth").toString())) {
+            resolvePairedWatches(call);
+        } else {
+            call.reject("Permiso Bluetooth denegado");
+        }
+    }
+
+    private void resolvePairedWatches(PluginCall call) {
+        JSArray watches = new JSArray();
+        try {
+            BluetoothManager btManager = (BluetoothManager) getContext().getSystemService(Context.BLUETOOTH_SERVICE);
+            BluetoothAdapter adapter = btManager != null ? btManager.getAdapter() : null;
+            if (adapter == null || !adapter.isEnabled()) {
+                JSObject result = new JSObject();
+                result.put("watches", watches);
+                result.put("bluetoothEnabled", false);
+                call.resolve(result);
+                return;
+            }
+            Set<BluetoothDevice> bonded = adapter.getBondedDevices();
+            if (bonded != null) {
+                java.util.regex.Pattern namePattern = java.util.regex.Pattern.compile(".*(Xiaomi|Watch|Wear|Mi Band|Amazfit).*", java.util.regex.Pattern.CASE_INSENSITIVE);
+                for (BluetoothDevice device : bonded) {
+                    String name = device.getName();
+                    if (name == null) continue;
+                    if (!namePattern.matcher(name).matches()) continue;
+                    JSObject item = new JSObject();
+                    item.put("name", name);
+                    item.put("address", device.getAddress());
+                    watches.put(item);
+                }
+            }
+        } catch (SecurityException e) {
+            call.reject("Permiso Bluetooth denegado: " + e.getMessage());
+            return;
+        } catch (Exception e) {
+            call.reject("Error al listar relojes emparejados: " + e.getClass().getSimpleName() + ": " + e.getMessage());
+            return;
+        }
+        JSObject result = new JSObject();
+        result.put("watches", watches);
+        result.put("bluetoothEnabled", true);
+        call.resolve(result);
+    }
+```
+
+Imports anadidos al principio del archivo:
+```java
+import android.bluetooth.BluetoothAdapter;
+import android.bluetooth.BluetoothDevice;
+import android.bluetooth.BluetoothManager;
+import android.bluetooth.le.ScanFilter;
+import android.companion.BluetoothLeDeviceFilter;
+import android.os.ParcelUuid;
+import java.util.Set;
+```
+
+#### Por qué se cambió
+En Samsung One UI con el reloj ya emparejado y gestionado por Mi Fitness, el wizard CDM con `DEVICE_PROFILE_WATCH` mostraba routers Wi-Fi cercanos en lugar del reloj. Mi Fitness mantiene el reloj con conexion Bluetooth Classic exclusiva y el reloj no advertisea BLE para companion CDM. La documentacion oficial (`BluetoothDeviceFilter`, `BluetoothLeDeviceFilter`, `ScanFilter`) confirma que el wizard CDM se puede dirigir a una MAC concreta via `ScanFilter.setDeviceAddress(...)`, lo que aumenta la probabilidad de detectar el reloj aunque otro companion app lo este usando. El nuevo metodo `listPairedWatches` devuelve las MACs de los dispositivos Bluetooth ya emparejados con el sistema cuyo nombre matchea Xiaomi/Watch/Wear/Mi Band/Amazfit, permitiendo a la UI mostrar al usuario una lista de candidatos antes de iniciar la asociacion CDM dirigida.
+
+### Cambio 2 - startAssociation acepta targetAddress y usa BluetoothLeDeviceFilter
+
+#### Código anterior
+```java
+    @RequiresApi(Build.VERSION_CODES.O)
+    private void startAssociation(PluginCall call) {
+        AssociationRequest.Builder requestBuilder = new AssociationRequest.Builder()
+            .setSingleDevice(false);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            requestBuilder.setDeviceProfile(AssociationRequest.DEVICE_PROFILE_WATCH);
+        } else {
+            BluetoothDeviceFilter filter = new BluetoothDeviceFilter.Builder()
+                .setNamePattern(Pattern.compile(".*(Xiaomi|Watch|Wear).*", Pattern.CASE_INSENSITIVE))
+                .build();
+            requestBuilder.addDeviceFilter(filter);
+        }
+        AssociationRequest request = requestBuilder.build();
+```
+
+#### Código nuevo
+```java
+    @RequiresApi(Build.VERSION_CODES.O)
+    private void startAssociation(PluginCall call) {
+        String targetAddress = call != null ? call.getString("targetAddress", "") : "";
+        boolean hasTarget = targetAddress != null && !targetAddress.isEmpty() && BluetoothAdapter.checkBluetoothAddress(targetAddress);
+
+        AssociationRequest.Builder requestBuilder = new AssociationRequest.Builder()
+            .setSingleDevice(hasTarget);
+        if (hasTarget) {
+            ScanFilter scanFilter = new ScanFilter.Builder()
+                .setDeviceAddress(targetAddress)
+                .build();
+            BluetoothLeDeviceFilter leFilter = new BluetoothLeDeviceFilter.Builder()
+                .setScanFilter(scanFilter)
+                .build();
+            requestBuilder.addDeviceFilter(leFilter);
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            requestBuilder.setDeviceProfile(AssociationRequest.DEVICE_PROFILE_WATCH);
+        } else if (!hasTarget) {
+            BluetoothDeviceFilter filter = new BluetoothDeviceFilter.Builder()
+                .setNamePattern(Pattern.compile(".*(Xiaomi|Watch|Wear).*", Pattern.CASE_INSENSITIVE))
+                .build();
+            requestBuilder.addDeviceFilter(filter);
+        }
+        AssociationRequest request = requestBuilder.build();
+```
+
+#### Por qué se cambió
+`pair(PluginCall)` ahora acepta un parametro opcional `targetAddress` con la MAC del reloj que el usuario ha seleccionado en la lista. Cuando esta presente y es una MAC valida (`BluetoothAdapter.checkBluetoothAddress`), el AssociationRequest se construye con `BluetoothLeDeviceFilter` + `ScanFilter.setDeviceAddress(...)` y `setSingleDevice(true)`. Esto enfoca el escaneo CDM unicamente a esa MAC en lugar de escanear todos los dispositivos BLE cercanos (que incluian routers Wi-Fi). En paralelo se sigue declarando `setDeviceProfile(DEVICE_PROFILE_WATCH)` en API 31+ para conservar los permisos companion bundle, y se mantiene el fallback `BluetoothDeviceFilter` por nombre para API 26-30 cuando no hay MAC.
+
+### Cambio 3 - Servicio TypeScript listPairedWatches y pair con targetAddress
+
+#### Código anterior
+```ts
+interface CdmPairPlugin {
+  getStatus(): Promise<CompanionStatus>;
+  pair(): Promise<CompanionStatus>;
+  disassociate(): Promise<CompanionStatus & { removed: number }>;
+}
+```
+
+```ts
+export async function pairCompanionWatch(): Promise<CompanionStatus> {
+  if (!Capacitor.isNativePlatform() || Capacitor.getPlatform() !== "android") {
+    throw new Error("El emparejamiento Wear OS solo esta disponible en Android");
+  }
+  return CdmPair.pair();
+}
+```
+
+#### Código nuevo
+```ts
+export type PairedWatch = {
+  name: string;
+  address: string;
+};
+
+export type PairedWatchesResult = {
+  watches: PairedWatch[];
+  bluetoothEnabled: boolean;
+};
+
+interface CdmPairPlugin {
+  getStatus(): Promise<CompanionStatus>;
+  pair(options?: { targetAddress?: string }): Promise<CompanionStatus>;
+  disassociate(): Promise<CompanionStatus & { removed: number }>;
+  listPairedWatches(): Promise<PairedWatchesResult>;
+}
+```
+
+```ts
+export async function pairCompanionWatch(targetAddress?: string): Promise<CompanionStatus> {
+  if (!Capacitor.isNativePlatform() || Capacitor.getPlatform() !== "android") {
+    throw new Error("El emparejamiento Wear OS solo esta disponible en Android");
+  }
+  return CdmPair.pair(targetAddress ? { targetAddress } : undefined);
+}
+
+export async function listPairedWatches(): Promise<PairedWatchesResult> {
+  if (!Capacitor.isNativePlatform() || Capacitor.getPlatform() !== "android") {
+    return { watches: [], bluetoothEnabled: false };
+  }
+  return CdmPair.listPairedWatches();
+}
+```
+
+#### Por qué se cambió
+Exponer al lado JS los nuevos tipos `PairedWatch`/`PairedWatchesResult`, el metodo `listPairedWatches` y la firma extendida de `pair`. `pairCompanionWatch(targetAddress?)` acepta una MAC opcional que se reenvia como `options.targetAddress` al plugin nativo. Si no hay MAC se llama sin opciones (comportamiento anterior). En no-Android, `listPairedWatches` devuelve `{ watches: [], bluetoothEnabled: false }` sin lanzar para mantener el patron de degradacion grace.
+
+### Cambio 4 - UI con lista de relojes detectados
+
+#### Código anterior
+```tsx
+import { getCompanionWatchStatus, pairCompanionWatch, unpairCompanionWatch } from "../services/companion-device";
+```
+
+```tsx
+  const [watchAssociated, setWatchAssociated] = React.useState<boolean | null>(null);
+  const [watchPairing, setWatchPairing] = React.useState(false);
+  const [watchMessage, setWatchMessage] = React.useState("");
+```
+
+```tsx
+  async function handlePairWatch() {
+    hapticOpen();
+    setWatchPairing(true);
+    setWatchMessage("");
+    try {
+      const result = await pairCompanionWatch();
+      setWatchAssociated(result.associated);
+      setWatchMessage(result.associated ? "Reloj asociado correctamente." : "No se completo la asociacion.");
+    } catch (error) {
+      setWatchMessage(error instanceof Error ? error.message : "No se pudo asociar el reloj.");
+    } finally {
+      setWatchPairing(false);
+    }
+  }
+```
+
+```tsx
+            <button
+              onClick={handlePairWatch}
+              ...
+```
+
+#### Código nuevo
+```tsx
+import { getCompanionWatchStatus, pairCompanionWatch, unpairCompanionWatch, listPairedWatches, type PairedWatch } from "../services/companion-device";
+```
+
+```tsx
+  const [watchAssociated, setWatchAssociated] = React.useState<boolean | null>(null);
+  const [watchPairing, setWatchPairing] = React.useState(false);
+  const [watchMessage, setWatchMessage] = React.useState("");
+  const [pairedWatches, setPairedWatches] = React.useState<PairedWatch[]>([]);
+  const [showPairedList, setShowPairedList] = React.useState(false);
+```
+
+```tsx
+  async function handlePairWatch(targetAddress?: string) {
+    hapticOpen();
+    setWatchPairing(true);
+    setWatchMessage("");
+    setShowPairedList(false);
+    try {
+      const result = await pairCompanionWatch(targetAddress);
+      setWatchAssociated(result.associated);
+      setWatchMessage(result.associated ? "Reloj asociado correctamente." : "No se completo la asociacion.");
+    } catch (error) {
+      setWatchMessage(error instanceof Error ? error.message : "No se pudo asociar el reloj.");
+    } finally {
+      setWatchPairing(false);
+    }
+  }
+
+  async function handleOpenPairedList() {
+    hapticOpen();
+    setWatchPairing(true);
+    setWatchMessage("");
+    try {
+      const result = await listPairedWatches();
+      if (!result.bluetoothEnabled) {
+        setWatchMessage("Activa el Bluetooth para emparejar el reloj.");
+        return;
+      }
+      if (result.watches.length === 0) {
+        setPairedWatches([]);
+        setShowPairedList(false);
+        setWatchMessage("No hay relojes emparejados con el sistema. Empareja primero desde Ajustes > Bluetooth.");
+        return;
+      }
+      setPairedWatches(result.watches);
+      setShowPairedList(true);
+    } catch (error) {
+      setWatchMessage(error instanceof Error ? error.message : "No se pudo listar los relojes.");
+    } finally {
+      setWatchPairing(false);
+    }
+  }
+```
+
+```tsx
+            <button onClick={() => handleOpenPairedList()} ... >
+              {watchPairing ? "Procesando..." : watchAssociated ? "Cambiar reloj asociado" : "Emparejar reloj"}
+            </button>
+            {showPairedList && pairedWatches.length > 0 && (
+              <div style={{ marginTop: 12, display: "flex", flexDirection: "column", gap: 8 }}>
+                <div style={{ fontSize: 12, color: "rgba(255,255,255,0.55)", marginBottom: 4 }}>Toca el reloj que quieres asociar a Mi Turno:</div>
+                {pairedWatches.map((w) => (
+                  <button key={w.address} onClick={() => handlePairWatch(w.address)} ... >
+                    <div>{w.name}</div>
+                    <div style={{ fontSize: 11, ... }}>{w.address}</div>
+                  </button>
+                ))}
+                <button onClick={() => handlePairWatch()} ... >
+                  No es ninguno de estos (buscar otros)
+                </button>
+              </div>
+            )}
+```
+
+#### Por qué se cambió
+El boton "Emparejar reloj" ahora abre una lista de candidatos antes de lanzar el wizard CDM. Si Bluetooth esta off, mensaje "Activa el Bluetooth". Si no hay relojes emparejados, mensaje "Empareja primero desde Ajustes > Bluetooth". Si hay candidatos, lista clickable con nombre + MAC. Al tocar uno, `handlePairWatch(address)` lanza el wizard CDM dirigido a esa MAC (alto exito esperado). Si el usuario considera que ninguno corresponde, boton "No es ninguno de estos (buscar otros)" lanza el wizard generico sin MAC, manteniendo el comportamiento original como fallback. El flujo es seguro: el unico camino al CDM sigue siendo `pairCompanionWatch`, solo cambia si lleva o no `targetAddress`.
+
+### Cambio 5 - Tests del servicio
+
+#### Código anterior
+```ts
+const cdmMock = vi.hoisted(() => ({
+  getStatus: vi.fn(),
+  pair: vi.fn(),
+  disassociate: vi.fn(),
+}));
+```
+
+#### Código nuevo
+```ts
+const cdmMock = vi.hoisted(() => ({
+  getStatus: vi.fn(),
+  pair: vi.fn(),
+  disassociate: vi.fn(),
+  listPairedWatches: vi.fn(),
+}));
+```
+
+Tambien se anadieron dos casos:
+
+```ts
+  it("emparejar dirigido envia targetAddress al nativo", async () => {
+    cdmMock.pair.mockResolvedValue({ associated: true });
+    const { pairCompanionWatch } = await import("../services/companion-device");
+
+    await pairCompanionWatch("AA:BB:CC:DD:EE:FF");
+    expect(cdmMock.pair).toHaveBeenCalledWith({ targetAddress: "AA:BB:CC:DD:EE:FF" });
+  });
+
+  it("lista los relojes emparejados a nivel sistema", async () => {
+    cdmMock.listPairedWatches.mockResolvedValue({
+      watches: [{ name: "Carlos' Xiaomi Watch 5", address: "AA:BB:CC:DD:EE:FF" }],
+      bluetoothEnabled: true,
+    });
+    const { listPairedWatches } = await import("../services/companion-device");
+
+    await expect(listPairedWatches()).resolves.toEqual({
+      watches: [{ name: "Carlos' Xiaomi Watch 5", address: "AA:BB:CC:DD:EE:FF" }],
+      bluetoothEnabled: true,
+    });
+    expect(cdmMock.listPairedWatches).toHaveBeenCalledTimes(1);
+  });
+```
+
+#### Por qué se cambió
+Cubrir las dos firmas nuevas: `pairCompanionWatch(mac)` que envia `options.targetAddress` y `listPairedWatches()` que devuelve la lista nativa. Tests previos siguen verdes.
+
 ## 2026-06-07 01:30 - Declarar REQUEST_COMPANION_PROFILE_WATCH y envolver associate en try-catch
 
 **Archivos modificados:** `android/app/src/main/AndroidManifest.xml`, `android/app/src/main/java/com/mijornada/app/CdmPairPlugin.java`
@@ -17067,119 +17428,4 @@ import { hapticDanger, hapticKey, hapticOpen, hapticSave } from "../services/hap
 #### CÃ³digo nuevo
 ```tsx
 import { hapticDanger, hapticKey, hapticOpen, hapticSave } from "../services/haptics";
-import { BrandTaxiLogo } from "../components/brand-assets";
-```
-
-```tsx
-          <BrandTaxiLogo width={120} style={{ marginBottom: 12 }} />
-```
-
-#### Por quÃ© se cambiÃ³
-Se sustituyÃ³ el emoji de la tarjeta de Ajustes por el mismo logo visual usado en Home para mantener una identidad coherente.
-
-### Cambio 5 - Logo inicial de Wear
-
-#### CÃ³digo anterior
-```kt
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.*
-```
-
-```kt
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.unit.dp
-```
-
-```kt
-import androidx.wear.compose.material.Text
-import com.mijornada.app.theme.*
-```
-
-```kt
-            Text("ðŸš•", fontSize = 34.sp)
-            Spacer(modifier = Modifier.height(5.dp))
-```
-
-#### CÃ³digo nuevo
-```kt
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.Image
-import androidx.compose.foundation.layout.*
-```
-
-```kt
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.unit.dp
-```
-
-```kt
-import androidx.wear.compose.material.Text
-import com.mijornada.app.R
-import com.mijornada.app.theme.*
-```
-
-```kt
-            BrandTaxiLogo()
-            Spacer(modifier = Modifier.height(5.dp))
-```
-
-```kt
-@Composable
-private fun BrandTaxiLogo() {
-    Image(
-        painter = painterResource(id = R.drawable.brand_taxi_logo),
-        contentDescription = "Mi Turno Taxi",
-        contentScale = ContentScale.Fit,
-        modifier = Modifier
-            .fillMaxWidth(0.66f)
-            .height(58.dp)
-    )
-}
-```
-
-#### Por quÃ© se cambiÃ³
-Se sustituyÃ³ el emoji de la pantalla inicial del reloj por un recurso nativo del taxi, optimizado para Wear OS y cargado desde `R.drawable.brand_taxi_logo`.
-
-### Cambio 6 - Pruebas de identidad visual
-
-#### CÃ³digo anterior
-`No existÃ­a src/__tests__/brand-assets.test.ts.`
-
-#### CÃ³digo nuevo
-```ts
-import { existsSync, readFileSync } from "node:fs";
-import { resolve } from "node:path";
-import { describe, expect, it } from "vitest";
-
-const root = resolve(__dirname, "..", "..");
-
-describe("brand taxi assets", () => {
-  it("centraliza los assets visuales del taxi para movil web y reloj", () => {
-    const brandAssets = readFileSync(
-      resolve(root, "src/components/brand-assets.tsx"),
-      "utf8",
-    );
-
-    expect(brandAssets).toContain("BrandTaxiIcon");
-    expect(brandAssets).toContain("/brand/brand-taxi-mini-20.png");
-    expect(brandAssets).toContain("/brand/brand-taxi-mini-18.png");
-    expect(brandAssets).toContain("/brand/brand-taxi-logo.png");
-    expect(existsSync(resolve(root, "public/brand/brand-taxi-mini-20.png"))).toBe(true);
-    expect(existsSync(resolve(root, "public/brand/brand-taxi-mini-18.png"))).toBe(true);
-    expect(existsSync(resolve(root, "public/brand/brand-taxi-logo.png"))).toBe(true);
-  });
-
-  it("sustituye los emojis de marca por assets propios en pantallas visibles", () => {
-    const main = readFileSync(resolve(root, "src/main.tsx"), "utf8");
-    const home = readFileSync(resolve(root, "src/screens/home-screen.tsx"), "utf8");
-    const settings = readFileSync(resolve(root, "src/screens/settings-screen.tsx"), "utf8");
-    const wearHome = readFileSync(
-      resolve(root, "android/wear/src/main/java/com/mijornada/app/screens/NoActiveTurnoScreen.kt"),
-      "utf8",
-    );
-
-    expect(main).toContain("<BrandTaxiIcon size={20}");
-    expect(home).toContain("<BrandTaxiLogo");
-    expect(settings).toContain("<
+imp
