@@ -79,13 +79,15 @@ public class CdmPairPlugin extends Plugin {
     }
 
     private void resolvePairedWatches(PluginCall call) {
-        JSArray watches = new JSArray();
+        JSArray connected = new JSArray();
+        JSArray remembered = new JSArray();
         try {
             BluetoothManager btManager = (BluetoothManager) getContext().getSystemService(Context.BLUETOOTH_SERVICE);
             BluetoothAdapter adapter = btManager != null ? btManager.getAdapter() : null;
             if (adapter == null || !adapter.isEnabled()) {
                 JSObject result = new JSObject();
-                result.put("watches", watches);
+                result.put("watches", connected);
+                result.put("remembered", remembered);
                 result.put("bluetoothEnabled", false);
                 call.resolve(result);
                 return;
@@ -97,10 +99,16 @@ public class CdmPairPlugin extends Plugin {
                     String name = device.getName();
                     if (name == null) continue;
                     if (!namePattern.matcher(name).matches()) continue;
+                    boolean isConnected = checkDeviceConnected(device, btManager);
                     JSObject item = new JSObject();
                     item.put("name", name);
                     item.put("address", device.getAddress());
-                    watches.put(item);
+                    item.put("connected", isConnected);
+                    if (isConnected) {
+                        connected.put(item);
+                    } else {
+                        remembered.put(item);
+                    }
                 }
             }
         } catch (SecurityException e) {
@@ -111,9 +119,30 @@ public class CdmPairPlugin extends Plugin {
             return;
         }
         JSObject result = new JSObject();
-        result.put("watches", watches);
+        result.put("watches", connected);
+        result.put("remembered", remembered);
         result.put("bluetoothEnabled", true);
         call.resolve(result);
+    }
+
+    private boolean checkDeviceConnected(BluetoothDevice device, BluetoothManager manager) {
+        try {
+            java.lang.reflect.Method m = device.getClass().getDeclaredMethod("isConnected");
+            m.setAccessible(true);
+            Object result = m.invoke(device);
+            if (result instanceof Boolean) {
+                return (Boolean) result;
+            }
+        } catch (Exception ignored) {
+        }
+        try {
+            int state = manager.getConnectionState(device, android.bluetooth.BluetoothProfile.GATT);
+            if (state == android.bluetooth.BluetoothProfile.STATE_CONNECTED) {
+                return true;
+            }
+        } catch (Exception ignored) {
+        }
+        return false;
     }
 
     @PluginMethod

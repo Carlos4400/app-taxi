@@ -14,10 +14,12 @@ type CompanionStatus = {
 export type PairedWatch = {
   name: string;
   address: string;
+  connected?: boolean;
 };
 
 export type PairedWatchesResult = {
   watches: PairedWatch[];
+  remembered: PairedWatch[];
   bluetoothEnabled: boolean;
 };
 
@@ -54,7 +56,7 @@ export async function unpairCompanionWatch(): Promise<CompanionStatus & { remove
 
 export async function listPairedWatches(): Promise<PairedWatchesResult> {
   if (!Capacitor.isNativePlatform() || Capacitor.getPlatform() !== "android") {
-    return { watches: [], bluetoothEnabled: false };
+    return { watches: [], remembered: [], bluetoothEnabled: false };
   }
   return CdmPair.listPairedWatches();
 }

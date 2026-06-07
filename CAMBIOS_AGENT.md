@@ -1,3 +1,291 @@
+## 2026-06-07 02:30 - Detectar conectados vs recordados en listPairedWatches
+
+**Archivos modificados:** `android/app/src/main/java/com/mijornada/app/CdmPairPlugin.java`, `src/services/companion-device.ts`, `src/screens/settings-screen.tsx`, `src/__tests__/companion-device.test.ts`
+
+### Cambio 1 - resolvePairedWatches separa conectados y recordados, con checkDeviceConnected
+
+#### Código anterior
+```java
+    private void resolvePairedWatches(PluginCall call) {
+        JSArray watches = new JSArray();
+        try {
+            BluetoothManager btManager = (BluetoothManager) getContext().getSystemService(Context.BLUETOOTH_SERVICE);
+            BluetoothAdapter adapter = btManager != null ? btManager.getAdapter() : null;
+            if (adapter == null || !adapter.isEnabled()) {
+                JSObject result = new JSObject();
+                result.put("watches", watches);
+                result.put("bluetoothEnabled", false);
+                call.resolve(result);
+                return;
+            }
+            Set<BluetoothDevice> bonded = adapter.getBondedDevices();
+            if (bonded != null) {
+                java.util.regex.Pattern namePattern = java.util.regex.Pattern.compile(".*(Xiaomi|Watch|Wear|Mi Band|Amazfit).*", java.util.regex.Pattern.CASE_INSENSITIVE);
+                for (BluetoothDevice device : bonded) {
+                    String name = device.getName();
+                    if (name == null) continue;
+                    if (!namePattern.matcher(name).matches()) continue;
+                    JSObject item = new JSObject();
+                    item.put("name", name);
+                    item.put("address", device.getAddress());
+                    watches.put(item);
+                }
+            }
+        } catch (SecurityException e) {
+            call.reject("Permiso Bluetooth denegado: " + e.getMessage());
+            return;
+        } catch (Exception e) {
+            call.reject("Error al listar relojes emparejados: " + e.getClass().getSimpleName() + ": " + e.getMessage());
+            return;
+        }
+        JSObject result = new JSObject();
+        result.put("watches", watches);
+        result.put("bluetoothEnabled", true);
+        call.resolve(result);
+    }
+```
+
+#### Código nuevo
+```java
+    private void resolvePairedWatches(PluginCall call) {
+        JSArray connected = new JSArray();
+        JSArray remembered = new JSArray();
+        try {
+            BluetoothManager btManager = (BluetoothManager) getContext().getSystemService(Context.BLUETOOTH_SERVICE);
+            BluetoothAdapter adapter = btManager != null ? btManager.getAdapter() : null;
+            if (adapter == null || !adapter.isEnabled()) {
+                JSObject result = new JSObject();
+                result.put("watches", connected);
+                result.put("remembered", remembered);
+                result.put("bluetoothEnabled", false);
+                call.resolve(result);
+                return;
+            }
+            Set<BluetoothDevice> bonded = adapter.getBondedDevices();
+            if (bonded != null) {
+                java.util.regex.Pattern namePattern = java.util.regex.Pattern.compile(".*(Xiaomi|Watch|Wear|Mi Band|Amazfit).*", java.util.regex.Pattern.CASE_INSENSITIVE);
+                for (BluetoothDevice device : bonded) {
+                    String name = device.getName();
+                    if (name == null) continue;
+                    if (!namePattern.matcher(name).matches()) continue;
+                    boolean isConnected = checkDeviceConnected(device, btManager);
+                    JSObject item = new JSObject();
+                    item.put("name", name);
+                    item.put("address", device.getAddress());
+                    item.put("connected", isConnected);
+                    if (isConnected) {
+                        connected.put(item);
+                    } else {
+                        remembered.put(item);
+                    }
+                }
+            }
+        } catch (SecurityException e) {
+            call.reject("Permiso Bluetooth denegado: " + e.getMessage());
+            return;
+        } catch (Exception e) {
+            call.reject("Error al listar relojes emparejados: " + e.getClass().getSimpleName() + ": " + e.getMessage());
+            return;
+        }
+        JSObject result = new JSObject();
+        result.put("watches", connected);
+        result.put("remembered", remembered);
+        result.put("bluetoothEnabled", true);
+        call.resolve(result);
+    }
+
+    private boolean checkDeviceConnected(BluetoothDevice device, BluetoothManager manager) {
+        try {
+            java.lang.reflect.Method m = device.getClass().getDeclaredMethod("isConnected");
+            m.setAccessible(true);
+            Object result = m.invoke(device);
+            if (result instanceof Boolean) {
+                return (Boolean) result;
+            }
+        } catch (Exception ignored) {
+        }
+        try {
+            int state = manager.getConnectionState(device, android.bluetooth.BluetoothProfile.GATT);
+            if (state == android.bluetooth.BluetoothProfile.STATE_CONNECTED) {
+                return true;
+            }
+        } catch (Exception ignored) {
+        }
+        return false;
+    }
+```
+
+#### Por qué se cambió
+La lista anterior mostraba todos los dispositivos bonded sin distinguir el estado actual. En el Samsung del usuario aparecian relojes antiguos junto al actual sin senalizar cual estaba realmente conectado. `getBondedDevices()` devuelve el historico completo de emparejamientos del sistema. `checkDeviceConnected` usa primero reflection a `BluetoothDevice.isConnected()` (API hidden pero estable desde 2011, usada por Gadgetbridge y muchas apps) para detectar cualquier conexion activa (Classic + LE). Fallback a `BluetoothManager.getConnectionState(device, BluetoothProfile.GATT)` que es API publica pero solo cubre BLE. Si reflection falla en una futura version de Android, el fallback mantiene funcionalidad parcial. El payload ahora separa `watches` (conectados) de `remembered` (recordados), permitiendo a la UI mostrar solo lo relevante y evitar que el usuario seleccione un dispositivo apagado por error.
+
+### Cambio 2 - Tipo PairedWatchesResult con remembered y PairedWatch.connected
+
+#### Código anterior
+```ts
+export type PairedWatch = {
+  name: string;
+  address: string;
+};
+
+export type PairedWatchesResult = {
+  watches: PairedWatch[];
+  bluetoothEnabled: boolean;
+};
+```
+
+#### Código nuevo
+```ts
+export type PairedWatch = {
+  name: string;
+  address: string;
+  connected?: boolean;
+};
+
+export type PairedWatchesResult = {
+  watches: PairedWatch[];
+  remembered: PairedWatch[];
+  bluetoothEnabled: boolean;
+};
+```
+
+`listPairedWatches` no-Android tambien devuelve `remembered: []`.
+
+#### Por qué se cambió
+Reflejar el nuevo payload del plugin. `connected` es opcional para mantener compatibilidad con consumidores antiguos del tipo, pero el plugin nativo siempre lo rellena.
+
+### Cambio 3 - UI con seccion conectados destacada y recordados colapsada
+
+#### Código anterior
+```tsx
+  const [pairedWatches, setPairedWatches] = React.useState<PairedWatch[]>([]);
+  const [showPairedList, setShowPairedList] = React.useState(false);
+```
+
+```tsx
+  async function handleOpenPairedList() {
+    ...
+    if (result.watches.length === 0) {
+      setPairedWatches([]);
+      setShowPairedList(false);
+      setWatchMessage("No hay relojes emparejados con el sistema. Empareja primero desde Ajustes > Bluetooth.");
+      return;
+    }
+    setPairedWatches(result.watches);
+    setShowPairedList(true);
+    ...
+  }
+```
+
+```tsx
+            {showPairedList && pairedWatches.length > 0 && (
+              <div ...>
+                <div>Toca el reloj que quieres asociar a Mi Turno:</div>
+                {pairedWatches.map((w) => (
+                  <button onClick={() => handlePairWatch(w.address)} ...>
+                    <div>{w.name}</div>
+                    <div ...>{w.address}</div>
+                  </button>
+                ))}
+                <button onClick={() => handlePairWatch()} ...>
+                  No es ninguno de estos (buscar otros)
+                </button>
+              </div>
+            )}
+```
+
+#### Código nuevo
+Estados nuevos:
+```tsx
+  const [pairedWatches, setPairedWatches] = React.useState<PairedWatch[]>([]);
+  const [rememberedWatches, setRememberedWatches] = React.useState<PairedWatch[]>([]);
+  const [showPairedList, setShowPairedList] = React.useState(false);
+  const [showRemembered, setShowRemembered] = React.useState(false);
+```
+
+Handler:
+```tsx
+  async function handleOpenPairedList() {
+    hapticOpen();
+    setWatchPairing(true);
+    setWatchMessage("");
+    setShowRemembered(false);
+    try {
+      const result = await listPairedWatches();
+      if (!result.bluetoothEnabled) {
+        setWatchMessage("Activa el Bluetooth para emparejar el reloj.");
+        return;
+      }
+      setPairedWatches(result.watches);
+      setRememberedWatches(result.remembered ?? []);
+      if (result.watches.length === 0 && (result.remembered ?? []).length === 0) {
+        setShowPairedList(false);
+        setWatchMessage("No hay relojes emparejados con el sistema. Empareja primero desde Ajustes > Bluetooth.");
+        return;
+      }
+      if (result.watches.length === 0) {
+        setShowPairedList(true);
+        setShowRemembered(true);
+        setWatchMessage("Ningun reloj esta conectado ahora mismo. Despierta el reloj y reintenta, o elige uno recordado.");
+        return;
+      }
+      setShowPairedList(true);
+    } catch (error) {
+      setWatchMessage(error instanceof Error ? error.message : "No se pudo listar los relojes.");
+    } finally {
+      setWatchPairing(false);
+    }
+  }
+```
+
+UI separada en dos secciones:
+- Conectados (verde, con punto indicador) tocables directamente.
+- Recordados ocultos por defecto, mostrables via boton "Ver relojes recordados (N)".
+- Fallback "Buscar otros relojes" que dispara el wizard CDM generico sin MAC.
+
+#### Por qué se cambió
+La UX anterior listaba todo plano sin distinguir si el reloj estaba operativo. Ahora la seccion de conectados destaca con borde y fondo verde + punto luminoso (estilo del tema neon, color `G`), porque son los unicos que el wizard CDM puede asociar con alta probabilidad. Si solo hay recordados (todos los relojes apagados), se muestra mensaje explicando como recuperar la situacion y los recordados se exponen abiertos. Si el usuario sospecha que el listado esta incompleto, el boton "Buscar otros relojes" sigue accesible para forzar el wizard generico.
+
+### Cambio 4 - Test cubre la nueva respuesta con remembered y connected
+
+#### Código anterior
+```ts
+  it("lista los relojes emparejados a nivel sistema", async () => {
+    cdmMock.listPairedWatches.mockResolvedValue({
+      watches: [{ name: "Carlos' Xiaomi Watch 5", address: "AA:BB:CC:DD:EE:FF" }],
+      bluetoothEnabled: true,
+    });
+    const { listPairedWatches } = await import("../services/companion-device");
+
+    await expect(listPairedWatches()).resolves.toEqual({
+      watches: [{ name: "Carlos' Xiaomi Watch 5", address: "AA:BB:CC:DD:EE:FF" }],
+      bluetoothEnabled: true,
+    });
+    expect(cdmMock.listPairedWatches).toHaveBeenCalledTimes(1);
+  });
+```
+
+#### Código nuevo
+```ts
+  it("lista relojes conectados y recordados", async () => {
+    cdmMock.listPairedWatches.mockResolvedValue({
+      watches: [{ name: "Carlos' Xiaomi Watch 5", address: "AA:BB:CC:DD:EE:FF", connected: true }],
+      remembered: [{ name: "Mi Band 4", address: "11:22:33:44:55:66", connected: false }],
+      bluetoothEnabled: true,
+    });
+    const { listPairedWatches } = await import("../services/companion-device");
+
+    await expect(listPairedWatches()).resolves.toEqual({
+      watches: [{ name: "Carlos' Xiaomi Watch 5", address: "AA:BB:CC:DD:EE:FF", connected: true }],
+      remembered: [{ name: "Mi Band 4", address: "11:22:33:44:55:66", connected: false }],
+      bluetoothEnabled: true,
+    });
+    expect(cdmMock.listPairedWatches).toHaveBeenCalledTimes(1);
+  });
+```
+
+#### Por qué se cambió
+Refleja el nuevo formato (con `connected` por dispositivo y array `remembered` separado). Confirma que el servicio TS reenvia el payload sin tocarlo.
+
 ## 2026-06-07 02:00 - Patron hibrido CDM con MAC del reloj ya emparejado
 
 **Archivos modificados:** `android/app/src/main/java/com/mijornada/app/CdmPairPlugin.java`, `src/services/companion-device.ts`, `src/screens/settings-screen.tsx`, `src/__tests__/companion-device.test.ts`

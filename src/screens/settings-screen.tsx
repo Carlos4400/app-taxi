@@ -205,7 +205,9 @@ export const SettingsScreen: FC<SettingsScreenProps> = ({
   const [watchPairing, setWatchPairing] = React.useState(false);
   const [watchMessage, setWatchMessage] = React.useState("");
   const [pairedWatches, setPairedWatches] = React.useState<PairedWatch[]>([]);
+  const [rememberedWatches, setRememberedWatches] = React.useState<PairedWatch[]>([]);
   const [showPairedList, setShowPairedList] = React.useState(false);
+  const [showRemembered, setShowRemembered] = React.useState(false);
 
   React.useEffect(() => {
     let active = true;
@@ -240,19 +242,26 @@ export const SettingsScreen: FC<SettingsScreenProps> = ({
     hapticOpen();
     setWatchPairing(true);
     setWatchMessage("");
+    setShowRemembered(false);
     try {
       const result = await listPairedWatches();
       if (!result.bluetoothEnabled) {
         setWatchMessage("Activa el Bluetooth para emparejar el reloj.");
         return;
       }
-      if (result.watches.length === 0) {
-        setPairedWatches([]);
+      setPairedWatches(result.watches);
+      setRememberedWatches(result.remembered ?? []);
+      if (result.watches.length === 0 && (result.remembered ?? []).length === 0) {
         setShowPairedList(false);
         setWatchMessage("No hay relojes emparejados con el sistema. Empareja primero desde Ajustes > Bluetooth.");
         return;
       }
-      setPairedWatches(result.watches);
+      if (result.watches.length === 0) {
+        setShowPairedList(true);
+        setShowRemembered(true);
+        setWatchMessage("Ningun reloj esta conectado ahora mismo. Despierta el reloj y reintenta, o elige uno recordado.");
+        return;
+      }
       setShowPairedList(true);
     } catch (error) {
       setWatchMessage(error instanceof Error ? error.message : "No se pudo listar los relojes.");
@@ -386,32 +395,90 @@ export const SettingsScreen: FC<SettingsScreenProps> = ({
             >
               {watchPairing ? "Procesando..." : watchAssociated ? "Cambiar reloj asociado" : "Emparejar reloj"}
             </button>
-            {showPairedList && pairedWatches.length > 0 && (
+            {showPairedList && (pairedWatches.length > 0 || rememberedWatches.length > 0) && (
               <div style={{ marginTop: 12, display: "flex", flexDirection: "column", gap: 8 }}>
-                <div style={{ fontSize: 12, color: "rgba(255,255,255,0.55)", marginBottom: 4 }}>Toca el reloj que quieres asociar a Mi Turno:</div>
-                {pairedWatches.map((w) => (
-                  <button
-                    key={w.address}
-                    onClick={() => handlePairWatch(w.address)}
-                    disabled={watchPairing}
-                    style={{
-                      width: "100%",
-                      padding: "12px 14px",
-                      borderRadius: 12,
-                      border: "1px solid rgba(255,255,255,0.12)",
-                      background: "rgba(255,255,255,0.04)",
-                      color: "white",
-                      fontSize: 14,
-                      fontWeight: 700,
-                      textAlign: "left",
-                      cursor: watchPairing ? "default" : "pointer",
-                      opacity: watchPairing ? 0.6 : 1,
-                    }}
-                  >
-                    <div>{w.name}</div>
-                    <div style={{ fontSize: 11, color: "rgba(255,255,255,0.45)", fontFamily: "monospace", marginTop: 2 }}>{w.address}</div>
-                  </button>
-                ))}
+                {pairedWatches.length > 0 && (
+                  <>
+                    <div style={{ fontSize: 12, color: "rgba(255,255,255,0.55)", marginBottom: 4 }}>Conectado ahora mismo. Toca para asociar a Mi Turno:</div>
+                    {pairedWatches.map((w) => (
+                      <button
+                        key={w.address}
+                        onClick={() => handlePairWatch(w.address)}
+                        disabled={watchPairing}
+                        style={{
+                          width: "100%",
+                          padding: "12px 14px",
+                          borderRadius: 12,
+                          border: `1px solid ${G}`,
+                          background: "rgba(34,200,135,0.08)",
+                          color: "white",
+                          fontSize: 14,
+                          fontWeight: 700,
+                          textAlign: "left",
+                          cursor: watchPairing ? "default" : "pointer",
+                          opacity: watchPairing ? 0.6 : 1,
+                        }}
+                      >
+                        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                          <span style={{ width: 8, height: 8, borderRadius: 4, background: G, display: "inline-block" }} />
+                          <span>{w.name}</span>
+                        </div>
+                        <div style={{ fontSize: 11, color: "rgba(255,255,255,0.45)", fontFamily: "monospace", marginTop: 2 }}>{w.address}</div>
+                      </button>
+                    ))}
+                  </>
+                )}
+                {rememberedWatches.length > 0 && (
+                  <>
+                    {!showRemembered ? (
+                      <button
+                        onClick={() => { hapticOpen(); setShowRemembered(true); }}
+                        disabled={watchPairing}
+                        style={{
+                          width: "100%",
+                          marginTop: 4,
+                          padding: "10px",
+                          borderRadius: 10,
+                          border: "1px dashed rgba(255,255,255,0.2)",
+                          background: "transparent",
+                          color: "rgba(255,255,255,0.7)",
+                          fontSize: 13,
+                          fontWeight: 700,
+                          cursor: watchPairing ? "default" : "pointer",
+                        }}
+                      >
+                        Ver relojes recordados ({rememberedWatches.length})
+                      </button>
+                    ) : (
+                      <>
+                        <div style={{ fontSize: 12, color: "rgba(255,255,255,0.4)", marginTop: 6, marginBottom: 2 }}>Recordados (no conectados ahora):</div>
+                        {rememberedWatches.map((w) => (
+                          <button
+                            key={w.address}
+                            onClick={() => handlePairWatch(w.address)}
+                            disabled={watchPairing}
+                            style={{
+                              width: "100%",
+                              padding: "12px 14px",
+                              borderRadius: 12,
+                              border: "1px solid rgba(255,255,255,0.1)",
+                              background: "rgba(255,255,255,0.03)",
+                              color: "rgba(255,255,255,0.75)",
+                              fontSize: 14,
+                              fontWeight: 600,
+                              textAlign: "left",
+                              cursor: watchPairing ? "default" : "pointer",
+                              opacity: watchPairing ? 0.6 : 1,
+                            }}
+                          >
+                            <div>{w.name}</div>
+                            <div style={{ fontSize: 11, color: "rgba(255,255,255,0.35)", fontFamily: "monospace", marginTop: 2 }}>{w.address}</div>
+                          </button>
+                        ))}
+                      </>
+                    )}
+                  </>
+                )}
                 <button
                   onClick={() => handlePairWatch()}
                   disabled={watchPairing}
@@ -428,7 +495,7 @@ export const SettingsScreen: FC<SettingsScreenProps> = ({
                     cursor: watchPairing ? "default" : "pointer",
                   }}
                 >
-                  No es ninguno de estos (buscar otros)
+                  Buscar otros relojes
                 </button>
               </div>
             )}

@@ -56,15 +56,17 @@ describe("companion-device", () => {
     expect(cdmMock.disassociate).toHaveBeenCalledTimes(1);
   });
 
-  it("lista los relojes emparejados a nivel sistema", async () => {
+  it("lista relojes conectados y recordados", async () => {
     cdmMock.listPairedWatches.mockResolvedValue({
-      watches: [{ name: "Carlos' Xiaomi Watch 5", address: "AA:BB:CC:DD:EE:FF" }],
+      watches: [{ name: "Carlos' Xiaomi Watch 5", address: "AA:BB:CC:DD:EE:FF", connected: true }],
+      remembered: [{ name: "Mi Band 4", address: "11:22:33:44:55:66", connected: false }],
       bluetoothEnabled: true,
     });
     const { listPairedWatches } = await import("../services/companion-device");
 
     await expect(listPairedWatches()).resolves.toEqual({
-      watches: [{ name: "Carlos' Xiaomi Watch 5", address: "AA:BB:CC:DD:EE:FF" }],
+      watches: [{ name: "Carlos' Xiaomi Watch 5", address: "AA:BB:CC:DD:EE:FF", connected: true }],
+      remembered: [{ name: "Mi Band 4", address: "11:22:33:44:55:66", connected: false }],
       bluetoothEnabled: true,
     });
     expect(cdmMock.listPairedWatches).toHaveBeenCalledTimes(1);
