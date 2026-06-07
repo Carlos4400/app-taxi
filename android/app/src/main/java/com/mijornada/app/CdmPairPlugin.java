@@ -134,34 +134,38 @@ public class CdmPairPlugin extends Plugin {
         }
         AssociationRequest request = requestBuilder.build();
 
-        saveCall(call);
-        manager().associate(request, new CompanionDeviceManager.Callback() {
-            @Override
-            public void onAssociationPending(IntentSender intentSender) {
-                launchChooser(intentSender, call);
-            }
-
-            @Override
-            public void onDeviceFound(IntentSender intentSender) {
-                launchChooser(intentSender, call);
-            }
-
-            @Override
-            public void onAssociationCreated(AssociationInfo associationInfo) {
-                JSObject result = new JSObject();
-                result.put("associated", true);
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                    result.put("id", associationInfo.getId());
-                    result.put("displayName", associationInfo.getDisplayName());
+        try {
+            saveCall(call);
+            manager().associate(request, new CompanionDeviceManager.Callback() {
+                @Override
+                public void onAssociationPending(IntentSender intentSender) {
+                    launchChooser(intentSender, call);
                 }
-                call.resolve(result);
-            }
 
-            @Override
-            public void onFailure(CharSequence error) {
-                call.reject(error == null ? "No se pudo asociar el reloj" : error.toString());
-            }
-        }, null);
+                @Override
+                public void onDeviceFound(IntentSender intentSender) {
+                    launchChooser(intentSender, call);
+                }
+
+                @Override
+                public void onAssociationCreated(AssociationInfo associationInfo) {
+                    JSObject result = new JSObject();
+                    result.put("associated", true);
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                        result.put("id", associationInfo.getId());
+                        result.put("displayName", associationInfo.getDisplayName());
+                    }
+                    call.resolve(result);
+                }
+
+                @Override
+                public void onFailure(CharSequence error) {
+                    call.reject(error == null ? "No se pudo asociar el reloj" : error.toString());
+                }
+            }, null);
+        } catch (Exception e) {
+            call.reject("Fallo al iniciar la asociacion: " + e.getClass().getSimpleName() + ": " + e.getMessage());
+        }
     }
 
     private void launchChooser(IntentSender intentSender, PluginCall call) {

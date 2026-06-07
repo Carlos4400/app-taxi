@@ -1,3 +1,25 @@
+## 2026-06-07 01:30 - Declarar REQUEST_COMPANION_PROFILE_WATCH
+
+**Archivos modificados:** `android/app/src/main/AndroidManifest.xml`
+
+### Cambio 1 - Anadir uses-permission REQUEST_COMPANION_PROFILE_WATCH
+
+#### Código anterior
+```xml
+    <uses-permission android:name="android.permission.REQUEST_COMPANION_START_FOREGROUND_SERVICES_FROM_BACKGROUND" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+```
+
+#### Código nuevo
+```xml
+    <uses-permission android:name="android.permission.REQUEST_COMPANION_START_FOREGROUND_SERVICES_FROM_BACKGROUND" />
+    <uses-permission android:name="android.permission.REQUEST_COMPANION_PROFILE_WATCH" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+```
+
+#### Por qué se cambió
+La 1.0.94 instalada en Samsung One UI cerraba la app al pulsar "Emparejar reloj". La documentacion de `CompanionDeviceManager` declara que el sistema lanza `SecurityException` cuando la app llama `associate(request, ...)` con un `AssociationRequest` que declara un device profile (`DEVICE_PROFILE_WATCH` en este caso) sin tener el `REQUEST_COMPANION_PROFILE_*` correspondiente. El permiso existe en AOSP framework como contrapartida del rol `android.app.role.COMPANION_DEVICE_WATCH` que CDM concede al aceptar la asociacion. Aunque CDM tambien podria asignar el rol automaticamente sin declaracion explicita en algunas versiones, en Android 13+ con Samsung One UI hay precondicion estricta: si el permiso no esta declarado, `associate` rechaza la peticion con SecurityException antes de mostrar el wizard. Sin el catch ampliado de las entradas 01:00, la excepcion sube al thread principal y mata la app; con el catch, se convierte en `call.reject` con mensaje "Fallo al iniciar la asociacion: SecurityException: ...". Anadir el `uses-permission` ataca la causa raiz: si Android lo concede automaticamente (nivel normal), el flujo del wizard pasa sin SecurityException; si lo deniega (nivel signature solo para apps partner), la app sigue fallando y habria que revertir el uso de `DEVICE_PROFILE_WATCH` para volver al wizard generico.
+
 ## 2026-06-07 01:00 - Capturar excepciones del wizard CDM
 
 **Archivos modificados:** `android/app/src/main/java/com/mijornada/app/CdmPairPlugin.java`
@@ -44,6 +66,86 @@
 
 #### Por qué se cambió
 Al pulsar "Emparejar reloj" en Samsung One UI con la version 1.0.94, `startIntentSenderForResult` lanzaba una excepcion distinta a `SendIntentException` (probable `ActivityNotFoundException` o `RuntimeException` del wizard de wearables cuando no encuentra companions candidatos por estar el reloj recien reseteado sin Wear OS by Google ni Mi Fitness activos). El catch original solo atrapaba `SendIntentException`, asi que el resto subia y mataba el proceso de la app sin feedback al usuario, mostrando el dialogo del sistema "Mi turno sigue sin funcionar". El catch generico no oculta el bug: `call.reject` con el nombre de la clase de excepcion y el mensaje permite mostrar el error en la UI de Ajustes en lugar de matar la app, y deja rastro en logcat para diagnostico.
+
+
+### Cambio 2 - Envolver manager().associate en try/catch en startAssociation
+
+#### Código anterior
+```java
+        AssociationRequest request = requestBuilder.build();
+
+        saveCall(call);
+        manager().associate(request, new CompanionDeviceManager.Callback() {
+            @Override
+            public void onAssociationPending(IntentSender intentSender) {
+                launchChooser(intentSender, call);
+            }
+
+            @Override
+            public void onDeviceFound(IntentSender intentSender) {
+                launchChooser(intentSender, call);
+            }
+
+            @Override
+            public void onAssociationCreated(AssociationInfo associationInfo) {
+                JSObject result = new JSObject();
+                result.put("associated", true);
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                    result.put("id", associationInfo.getId());
+                    result.put("displayName", associationInfo.getDisplayName());
+                }
+                call.resolve(result);
+            }
+
+            @Override
+            public void onFailure(CharSequence error) {
+                call.reject(error == null ? "No se pudo asociar el reloj" : error.toString());
+            }
+        }, null);
+    }
+```
+
+#### Código nuevo
+```java
+        AssociationRequest request = requestBuilder.build();
+
+        try {
+            saveCall(call);
+            manager().associate(request, new CompanionDeviceManager.Callback() {
+                @Override
+                public void onAssociationPending(IntentSender intentSender) {
+                    launchChooser(intentSender, call);
+                }
+
+                @Override
+                public void onDeviceFound(IntentSender intentSender) {
+                    launchChooser(intentSender, call);
+                }
+
+                @Override
+                public void onAssociationCreated(AssociationInfo associationInfo) {
+                    JSObject result = new JSObject();
+                    result.put("associated", true);
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                        result.put("id", associationInfo.getId());
+                        result.put("displayName", associationInfo.getDisplayName());
+                    }
+                    call.resolve(result);
+                }
+
+                @Override
+                public void onFailure(CharSequence error) {
+                    call.reject(error == null ? "No se pudo asociar el reloj" : error.toString());
+                }
+            }, null);
+        } catch (Exception e) {
+            call.reject("Fallo al iniciar la asociacion: " + e.getClass().getSimpleName() + ": " + e.getMessage());
+        }
+    }
+```
+
+#### Por qué se cambió
+El Cambio 1 solo protegia `launchChooser`, pero en Samsung One UI con la 1.0.94 la app seguia cerrandose al pulsar "Emparejar reloj" tras la 1.0.94 (incluso con el catch ampliado en launchChooser). El crash ocurre antes del callback: la propia llamada `manager().associate(request, callback, null)` puede lanzar `SecurityException`, `IllegalStateException` o `NullPointerException` cuando el wizard de wearables esta restringido por la OEM o cuando el dispositivo no tiene companion candidato en el momento. Sin try/catch, la excepcion sube al thread principal y mata el proceso. Con la proteccion, cualquier fallo se convierte en `call.reject` con el nombre de la clase y el mensaje, visible en la UI de Ajustes y diagnosticable sin logcat.
 
 ## 2026-06-07 00:45 - Anadir boton Desasociar reloj en Ajustes
 
