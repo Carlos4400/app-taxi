@@ -219,10 +219,18 @@ public class CdmPairPlugin extends Plugin {
     private void startAssociation(PluginCall call) {
         String targetAddress = call != null ? call.getString("targetAddress", "") : "";
         boolean hasTarget = targetAddress != null && !targetAddress.isEmpty() && BluetoothAdapter.checkBluetoothAddress(targetAddress);
+        String bondedName = hasTarget ? findBondedDeviceName(targetAddress) : null;
+        boolean useClassicDiscovery = bondedName != null && !bondedName.isEmpty();
 
         AssociationRequest.Builder requestBuilder = new AssociationRequest.Builder()
             .setSingleDevice(hasTarget);
-        if (hasTarget) {
+
+        if (useClassicDiscovery) {
+            BluetoothDeviceFilter classicFilter = new BluetoothDeviceFilter.Builder()
+                .setNamePattern(Pattern.compile(Pattern.quote(bondedName)))
+                .build();
+            requestBuilder.addDeviceFilter(classicFilter);
+        } else if (hasTarget) {
             ScanFilter scanFilter = new ScanFilter.Builder()
                 .setDeviceAddress(targetAddress)
                 .build();
@@ -230,14 +238,18 @@ public class CdmPairPlugin extends Plugin {
                 .setScanFilter(scanFilter)
                 .build();
             requestBuilder.addDeviceFilter(leFilter);
-        }
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            requestBuilder.setDeviceProfile(AssociationRequest.DEVICE_PROFILE_WATCH);
-        } else if (!hasTarget) {
-            BluetoothDeviceFilter filter = new BluetoothDeviceFilter.Builder()
-                .setNamePattern(Pattern.compile(".*(Xiaomi|Watch|Wear).*", Pattern.CASE_INSENSITIVE))
-                .build();
-            requestBuilder.addDeviceFilter(filter);
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                requestBuilder.setDeviceProfile(AssociationRequest.DEVICE_PROFILE_WATCH);
+            }
+        } else {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                requestBuilder.setDeviceProfile(AssociationRequest.DEVICE_PROFILE_WATCH);
+            } else {
+                BluetoothDeviceFilter filter = new BluetoothDeviceFilter.Builder()
+                    .setNamePattern(Pattern.compile(".*(Xiaomi|Watch|Wear).*", Pattern.CASE_INSENSITIVE))
+                    .build();
+                requestBuilder.addDeviceFilter(filter);
+            }
         }
         AssociationRequest request = requestBuilder.build();
 
@@ -305,6 +317,24 @@ public class CdmPairPlugin extends Plugin {
         } else {
             call.reject("Asociacion cancelada");
         }
+    }
+
+    private String findBondedDeviceName(String address) {
+        try {
+            BluetoothManager btManager = (BluetoothManager) getContext().getSystemService(Context.BLUETOOTH_SERVICE);
+            BluetoothAdapter adapter = btManager != null ? btManager.getAdapter() : null;
+            if (adapter == null || !adapter.isEnabled()) return null;
+            Set<BluetoothDevice> bonded = adapter.getBondedDevices();
+            if (bonded == null) return null;
+            for (BluetoothDevice device : bonded) {
+                if (address.equalsIgnoreCase(device.getAddress())) {
+                    return device.getName();
+                }
+            }
+        } catch (SecurityException ignored) {
+        } catch (Exception ignored) {
+        }
+        return null;
     }
 
     @RequiresApi(Build.VERSION_CODES.O)

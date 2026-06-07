@@ -1,3 +1,111 @@
+## 2026-06-07 02:50 - Classic Bluetooth discovery dirigido por nombre de bonded device
+
+**Archivos modificados:** `android/app/src/main/java/com/mijornada/app/CdmPairPlugin.java`
+
+### Cambio 1 - startAssociation usa BluetoothDeviceFilter Classic cuando hay nombre del bonded
+
+#### Código anterior
+```java
+    @RequiresApi(Build.VERSION_CODES.O)
+    private void startAssociation(PluginCall call) {
+        String targetAddress = call != null ? call.getString("targetAddress", "") : "";
+        boolean hasTarget = targetAddress != null && !targetAddress.isEmpty() && BluetoothAdapter.checkBluetoothAddress(targetAddress);
+
+        AssociationRequest.Builder requestBuilder = new AssociationRequest.Builder()
+            .setSingleDevice(hasTarget);
+        if (hasTarget) {
+            ScanFilter scanFilter = new ScanFilter.Builder()
+                .setDeviceAddress(targetAddress)
+                .build();
+            BluetoothLeDeviceFilter leFilter = new BluetoothLeDeviceFilter.Builder()
+                .setScanFilter(scanFilter)
+                .build();
+            requestBuilder.addDeviceFilter(leFilter);
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            requestBuilder.setDeviceProfile(AssociationRequest.DEVICE_PROFILE_WATCH);
+        } else if (!hasTarget) {
+            BluetoothDeviceFilter filter = new BluetoothDeviceFilter.Builder()
+                .setNamePattern(Pattern.compile(".*(Xiaomi|Watch|Wear).*", Pattern.CASE_INSENSITIVE))
+                .build();
+            requestBuilder.addDeviceFilter(filter);
+        }
+        AssociationRequest request = requestBuilder.build();
+```
+
+#### Código nuevo
+```java
+    @RequiresApi(Build.VERSION_CODES.O)
+    private void startAssociation(PluginCall call) {
+        String targetAddress = call != null ? call.getString("targetAddress", "") : "";
+        boolean hasTarget = targetAddress != null && !targetAddress.isEmpty() && BluetoothAdapter.checkBluetoothAddress(targetAddress);
+        String bondedName = hasTarget ? findBondedDeviceName(targetAddress) : null;
+        boolean useClassicDiscovery = bondedName != null && !bondedName.isEmpty();
+
+        AssociationRequest.Builder requestBuilder = new AssociationRequest.Builder()
+            .setSingleDevice(hasTarget);
+
+        if (useClassicDiscovery) {
+            BluetoothDeviceFilter classicFilter = new BluetoothDeviceFilter.Builder()
+                .setNamePattern(Pattern.compile(Pattern.quote(bondedName)))
+                .build();
+            requestBuilder.addDeviceFilter(classicFilter);
+        } else if (hasTarget) {
+            ScanFilter scanFilter = new ScanFilter.Builder()
+                .setDeviceAddress(targetAddress)
+                .build();
+            BluetoothLeDeviceFilter leFilter = new BluetoothLeDeviceFilter.Builder()
+                .setScanFilter(scanFilter)
+                .build();
+            requestBuilder.addDeviceFilter(leFilter);
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                requestBuilder.setDeviceProfile(AssociationRequest.DEVICE_PROFILE_WATCH);
+            }
+        } else {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                requestBuilder.setDeviceProfile(AssociationRequest.DEVICE_PROFILE_WATCH);
+            } else {
+                BluetoothDeviceFilter filter = new BluetoothDeviceFilter.Builder()
+                    .setNamePattern(Pattern.compile(".*(Xiaomi|Watch|Wear).*", Pattern.CASE_INSENSITIVE))
+                    .build();
+                requestBuilder.addDeviceFilter(filter);
+            }
+        }
+        AssociationRequest request = requestBuilder.build();
+```
+
+#### Por qué se cambió
+La rama anterior con `BluetoothLeDeviceFilter` + `ScanFilter.setDeviceAddress(MAC)` + `DEVICE_PROFILE_WATCH` (API 31+) se quedaba en `RESULT_DISCOVERY_TIMEOUT` cuando el reloj estaba conectado por Bluetooth Classic con Mi Fitness y no advertiseaba BLE. El sample oficial de Google (`CompanionDeviceManagerSample.kt`) confirma que `BluetoothLeDeviceFilter` solo dispara escaneo BLE pasivo. `BluetoothDeviceFilter` (clase distinta) dispara Bluetooth Classic Inquiry, al que los relojes Wear OS y similares suelen responder con su nombre y MAC aunque tengan una conexion privada activa con otra app companion. La rama nueva, cuando hay una MAC dirigida desde la UI y la app puede leer el nombre del dispositivo bonded asociado a esa MAC, monta el filtro Classic con `setNamePattern(Pattern.quote(bondedName))` — patron literal, escapado por seguridad — y omite intencionadamente `setDeviceProfile(DEVICE_PROFILE_WATCH)` porque el profile fuerza al wizard a buscar exclusivamente wearables vía BLE. Se conservan los permisos `REQUEST_COMPANION_RUN_IN_BACKGROUND`, `REQUEST_COMPANION_USE_DATA_IN_BACKGROUND` y `REQUEST_COMPANION_START_FOREGROUND_SERVICES_FROM_BACKGROUND` declarados en el manifest (no dependen del profile, se conceden al aceptar cualquier asociacion CDM). Si la app no consigue obtener el nombre (Bluetooth off, permiso revocado a mitad de flujo, o el dispositivo ya no esta bonded), fallback automatico a la rama anterior con `BluetoothLeDeviceFilter` + `DEVICE_PROFILE_WATCH` (comportamiento anterior, sin regresion). La rama sin MAC (boton "Buscar otros relojes") tambien queda intacta.
+
+### Cambio 2 - Helper privado findBondedDeviceName
+
+#### Código anterior
+`No existia findBondedDeviceName en CdmPairPlugin.java.`
+
+#### Código nuevo
+```java
+    private String findBondedDeviceName(String address) {
+        try {
+            BluetoothManager btManager = (BluetoothManager) getContext().getSystemService(Context.BLUETOOTH_SERVICE);
+            BluetoothAdapter adapter = btManager != null ? btManager.getAdapter() : null;
+            if (adapter == null || !adapter.isEnabled()) return null;
+            Set<BluetoothDevice> bonded = adapter.getBondedDevices();
+            if (bonded == null) return null;
+            for (BluetoothDevice device : bonded) {
+                if (address.equalsIgnoreCase(device.getAddress())) {
+                    return device.getName();
+                }
+            }
+        } catch (SecurityException ignored) {
+        } catch (Exception ignored) {
+        }
+        return null;
+    }
+```
+
+#### Por qué se cambió
+`startAssociation` necesita el nombre del bonded device asociado a la MAC entregada por la UI para construir el filtro Classic. La consulta a `BluetoothAdapter.getBondedDevices()` se hace bajo try/catch para tolerar `SecurityException` (BLUETOOTH_CONNECT revocado a media sesion) y cualquier otra excepcion inesperada (BT off, adapter null). En cualquier camino fallido devuelve `null` para que el caller caiga al fallback BLE sin matar la asociacion. Se reusa el mismo `BluetoothManager` que `resolvePairedWatches` para mantener coherencia.
+
 ## 2026-06-07 02:30 - Detectar conectados vs recordados en listPairedWatches
 
 **Archivos modificados:** `android/app/src/main/java/com/mijornada/app/CdmPairPlugin.java`, `src/services/companion-device.ts`, `src/screens/settings-screen.tsx`, `src/__tests__/companion-device.test.ts`
