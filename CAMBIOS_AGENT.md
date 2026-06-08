@@ -1,3 +1,81 @@
+## 2026-06-08 22:00 - Eliminar permission deprecado BIND_LISTENER de WearListenerService
+
+**Archivos modificados:** `android/app/src/main/AndroidManifest.xml`, `android/app/src/main/res/values/wear.xml`, `android/wear/src/main/res/values/wear.xml`
+
+### Cambio 1 - Eliminar BIND_LISTENER y ampliar intent-filters en WearListenerService
+
+#### Código anterior
+```xml
+        <service
+            android:name="com.mijornada.app.WearListenerService"
+            android:exported="true"
+            android:permission="com.google.android.gms.permission.BIND_LISTENER">
+            <intent-filter>
+                <action android:name="com.google.android.gms.wearable.DATA_CHANGED" />
+                <data android:scheme="wear" android:host="*" android:pathPrefix="/watch-command/" />
+            </intent-filter>
+        </service>
+```
+
+#### Código nuevo
+```xml
+        <service
+            android:name="com.mijornada.app.WearListenerService"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="com.google.android.gms.wearable.DATA_CHANGED" />
+                <data android:scheme="wear" android:host="*" android:pathPrefix="/watch-command/" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="com.google.android.gms.wearable.MESSAGE_RECEIVED" />
+                <data android:scheme="wear" android:host="*" android:pathPrefix="/watch-command" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="com.google.android.gms.wearable.CAPABILITY_CHANGED" />
+                <data android:scheme="wear" android:host="*" android:pathPrefix="/mi_turno_watch" />
+            </intent-filter>
+        </service>
+```
+
+#### Por qué se cambió
+Diagnostico con `dumpsys activity service com.google.android.gms/.wearable.service.WearableService` en el Samsung Z Fold7 mostraba `ServiceRecord[WearListenerService, events=0, bound=false]` para `com.mijornada.app` aunque la app estuviera abierta en foreground y aunque el reloj hubiera enviado 260 DataItems con path `/watch-command/...` que llegaron correctamente al subsistema Wearable del movil (`writes/reads (25/92)` documentados en el dumpsys). El reloj quedaba bloqueado en pantalla "Movil no conectado" porque su `GET_STATUS` enviado via `Wearable.getDataClient().putDataItem("/watch-command/<uuid>")` nunca disparaba el `WearListenerService` del movil. El blog oficial de Android Developers (https://android-developers.googleblog.com/2016/04/deprecation-of-bindlistener.html) confirma desde abril 2016 que el permiso `com.google.android.gms.permission.BIND_LISTENER` esta deprecado en todas las versiones de Android y que Google planea desactivarlo. El sample oficial actual `android/wear-os-samples/DataLayer/Application/src/main/AndroidManifest.xml` declara `WearableListenerService` sin atributo `android:permission`. Mi Fitness (`com.xiaomi.wearable`) en el mismo movil si recibe eventos del reloj por usar el permiso correcto; nuestro modulo wear usa `BIND_DATA_LAYER` y tambien recibe. Sin `BIND_LISTENER` declarado, GMS Wearable identifica el servicio por el intent-filter (`DATA_CHANGED` + `pathPrefix="/watch-command/"`) y lo invoca al recibir el DataItem. Tambien se anaden filtros para `MESSAGE_RECEIVED` (por si se introduce comunicacion rapida desde el reloj via `MessageClient`) y para `CAPABILITY_CHANGED` filtrado por `mi_turno_watch` (capability declarada en el modulo wear) para evitar despertar el servicio en cada cambio de capability ajena.
+
+### Cambio 2 - Declarar capability mi_turno_phone en el modulo app
+
+#### Código anterior
+`No existia android/app/src/main/res/values/wear.xml en el modulo movil.`
+
+#### Código nuevo
+```xml
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string-array name="android_wear_capabilities" translatable="false">
+        <item>mi_turno_phone</item>
+    </string-array>
+</resources>
+```
+
+#### Por qué se cambió
+Al declarar la capability `mi_turno_phone` en el modulo movil, GMS Wearable la registra automaticamente al instalar la APK, sin necesidad de que el usuario abra la app. Esto permite al modulo wear consultar `CapabilityClient.getCapability("mi_turno_phone", FILTER_REACHABLE)` para detectar de forma deterministica si el movil tiene Mi Turno instalada antes de enviar comandos, en lugar de inferir conexion desde la falta de respuesta a `GET_STATUS`. Documentacion oficial `developer.android.com/training/wearables/data/messages#run`.
+
+### Cambio 3 - Declarar capability mi_turno_watch en el modulo wear
+
+#### Código anterior
+`No existia android/wear/src/main/res/values/wear.xml en el modulo wear.`
+
+#### Código nuevo
+```xml
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string-array name="android_wear_capabilities" translatable="false">
+        <item>mi_turno_watch</item>
+    </string-array>
+</resources>
+```
+
+#### Por qué se cambió
+Contraparte simetrica del Cambio 2: el modulo movil consulta `CapabilityClient.getCapability("mi_turno_watch")` para confirmar que el reloj tiene la APK Mi Turno Watch instalada antes de publicar `/turno/state`. El filtro `pathPrefix="/mi_turno_watch"` del Cambio 1 en `CAPABILITY_CHANGED` esta dirigido a esta capability.
+
 ## 2026-06-07 02:50 - Classic Bluetooth discovery dirigido por nombre de bonded device
 
 **Archivos modificados:** `android/app/src/main/java/com/mijornada/app/CdmPairPlugin.java`

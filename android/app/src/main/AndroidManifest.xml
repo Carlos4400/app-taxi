@@ -30,11 +30,18 @@
 
         <service
             android:name="com.mijornada.app.WearListenerService"
-            android:exported="true"
-            android:permission="com.google.android.gms.permission.BIND_LISTENER">
+            android:exported="true">
             <intent-filter>
                 <action android:name="com.google.android.gms.wearable.DATA_CHANGED" />
                 <data android:scheme="wear" android:host="*" android:pathPrefix="/watch-command/" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="com.google.android.gms.wearable.MESSAGE_RECEIVED" />
+                <data android:scheme="wear" android:host="*" android:pathPrefix="/watch-command" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="com.google.android.gms.wearable.CAPABILITY_CHANGED" />
+                <data android:scheme="wear" android:host="*" android:pathPrefix="/mi_turno_watch" />
             </intent-filter>
         </service>
 
