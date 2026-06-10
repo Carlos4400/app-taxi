@@ -927,37 +927,3 @@ describe("Android Wear bridge", () => {
     expect(source).toContain("Color(");
   });
 });
-stateJson = readFileSync(
-      resolve(root, "android/app/src/main/java/com/mijornada/app/watch/WatchStateJson.kt"),
-      "utf8",
-    );
-    const responseJson = readFileSync(
-      resolve(root, "android/app/src/main/java/com/mijornada/app/watch/WatchResponseJson.kt"),
-      "utf8",
-    );
-    const summary = readFileSync(
-      resolve(root, "android/wear/src/main/java/com/mijornada/app/screens/TurnoSummaryScreen.kt"),
-      "utf8",
-    );
-
-    // La app precalcula con la regla de oro y lo envia a Room.
-    expect(bridge).toContain("calcularTurnoContable");
-    expect(bridge).toContain("function turnoContableSnapshot");
-    expect(stateJson).toContain('optJSONObject("contable")');
-    // El nativo no inventa contabilidad: marca pendiente si falta.
-    expect(responseJson).toContain("contablePendiente");
-    expect(responseJson).not.toContain("val miGanancia = turno.dinero - totalDescontar");
-    // El reloj indica pendiente en lugar de mostrar numeros incorrectos.
-    expect(summary).toContain("contablePendiente");
-  });
-
-  it("usa fondos Wear apagados como la app movil", () => {
-    const source = readFileSync(
-      resolve(root, "android/wear/src/main/java/com/mijornada/app/theme/Color.kt"),
-      "utf8",
-    );
-
-    expect(source).toContain("ColorDatafonoBg = Color(0xFF151032)");
-    expect(source).toContain("Color(");
-  });
-});

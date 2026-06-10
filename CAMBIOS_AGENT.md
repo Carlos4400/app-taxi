@@ -1,3 +1,126 @@
+## 2026-06-10 03:25 - Arreglar la X roja del commit dc8f250
+
+**Archivos modificados:** `src/services/watch-bridge.ts`, `src/__tests__/android-wear-bridge.test.ts`
+
+### Contexto
+
+El commit `dc8f250` salía con X roja en la página de Código de GitHub. La X no era cosmética: el workflow `CI` fallaba con 6 errores "Declaration or statement expected" en `src/services/watch-bridge.ts:346` y `src/__tests__/android-wear-bridge.test.ts:952/963`. Causa: dos fragmentos de código huérfanos generados al pegar el bridge nuevo. (1) En `watch-bridge.ts`, tras el cierre de `teardownWatchBridge` quedaba el residuo `d({ uid }).then(async () => { ... }).catch(...);` seguido de un `if (listenerAdded) return; ... addListener(...)` que duplicaba el cuerpo de `setupWatchBridge`. Eso provocaba el error de parseo en la línea 346 (la `}` final de una función inexistente). (2) En el test, tras cerrar el `describe` en la 929, colgaba un duplicado parcial de un `it` anterior y un `it` extra al final, por eso TS marcaba las líneas 952 y 963.
+
+### Cambio 1 - Quitar el residuo duplicado de setupWatchBridge en watch-bridge.ts
+
+**Código anterior:**
+
+```ts
+  await WearOsBridge.clearPrepared({ uid });
+}
+d({ uid })
+    .then(async () => {
+      console.log("WearOsBridge preparado para el usuario:", uid);
+      await queueNativeHydration();
+      await startNativeStateSync();
+    })
+    .catch((err) => {
+      console.error("Error al preparar WearOsBridge:", err);
+    });
+
+  if (listenerAdded) return;
+  listenerAdded = true;
+
+  nativeStateListener = WearOsBridge.addListener("onNativeStateChanged", async () => {
+    try {
+      await queueNativeHydration();
+    } catch (err) {
+      console.error("Error al hidratar estado Wear OS:", err);
+    }
+  });
+}
+
+export async function teardownWatchBridge(uid: string): Promise<void> {
+```
+
+**Código nuevo:**
+
+```ts
+  await WearOsBridge.clearPrepared({ uid });
+}
+
+export async function teardownWatchBridge(uid: string): Promise<void> {
+```
+
+**Por qué se cambió**
+
+`d({ uid })` huérfano es código de `setPrepared` pegado mal y el bloque `if (listenerAdded) return; addListener(...)` ya existe en `setupWatchBridge` (líneas 299-308). TS no podía parsear la `}` final al no haber función que envolver, y `d` no estaba definida. Eliminado el duplicado, el archivo queda con `setupWatchBridge` y `teardownWatchBridge` limpios y sin sintaxis rota.
+
+### Cambio 2 - Quitar el duplicado parcial de un it y cerrar bien el describe en android-wear-bridge.test.ts
+
+**Código anterior:**
+
+```ts
+  it("usa fondos Wear apagados como la app movil", () => {
+    const source = readFileSync(
+      resolve(root, "android/wear/src/main/java/com/mijornada/app/theme/Color.kt"),
+      "utf8",
+    );
+
+    expect(source).toContain("ColorDatafonoBg = Color(0xFF151032)");
+    expect(source).toContain("Color(");
+  });
+});
+stateJson = readFileSync(
+      resolve(root, "android/app/src/main/java/com/mijornada/app/watch/WatchStateJson.kt"),
+      "utf8",
+    );
+    const responseJson = readFileSync(
+      resolve(root, "android/app/src/main/java/com/mijornada/app/watch/WatchResponseJson.kt"),
+      "utf8",
+    );
+    const summary = readFileSync(
+      resolve(root, "android/wear/src/main/java/com/mijornada/app/screens/TurnoSummaryScreen.kt"),
+      "utf8",
+    );
+
+    // La app precalcula con la regla de oro y lo envia a Room.
+    expect(bridge).toContain("calcularTurnoContable");
+    expect(bridge).toContain("function turnoContableSnapshot");
+    expect(stateJson).toContain('optJSONObject("contable")');
+    // El nativo no inventa contabilidad: marca pendiente si falta.
+    expect(responseJson).toContain("contablePendiente");
+    expect(responseJson).not.toContain("val miGanancia = turno.dinero - totalDescontar");
+    // El reloj indica pendiente en lugar de mostrar numeros incorrectos.
+    expect(summary).toContain("contablePendiente");
+  });
+
+  it("usa fondos Wear apagados como la app movil", () => {
+    const source = readFileSync(
+      resolve(root, "android/wear/src/main/java/com/mijornada/app/theme/Color.kt"),
+      "utf8",
+    );
+
+    expect(source).toContain("ColorDatafonoBg = Color(0xFF151032)");
+    expect(source).toContain("Color(");
+  });
+});
+```
+
+**Código nuevo:**
+
+```ts
+  it("usa fondos Wear apagados como la app movil", () => {
+    const source = readFileSync(
+      resolve(root, "android/wear/src/main/java/com/mijornada/app/theme/Color.kt"),
+      "utf8",
+    );
+
+    expect(source).toContain("ColorDatafonoBg = Color(0xFF151032)");
+    expect(source).toContain("Color(");
+  });
+});
+```
+
+**Por qué se cambió**
+
+Tras la línea 928 había un cierre `});` (del primer `it` de fondos) y otro `});` (del `describe`), pero después colgaba un duplicado parcial del `it` contable (sin la cabecera `it(...)`, con las variables sin declarar) y un `it` extra con el mismo nombre. TS marcaba las líneas 952 y 963 como "Declaration or statement expected" porque `stateJson = ...` no era una sentencia válida a nivel de módulo dentro del `describe` ya cerrado. Eliminado el duplicado parcial, el test queda con dos `it` (contabilidad + fondos) dentro del `describe`, sin código suelto.
+
 ## 2026-06-10 02:48 - Espejar la contabilidad de la app en el reloj sin recalcularla en nativo
 
 **Archivos modificados:** `src/services/watch-bridge.ts`, `android/app/src/main/java/com/mijornada/app/watch/WatchModels.kt`, `android/app/src/main/java/com/mijornada/app/watch/WatchEntities.kt`, `android/app/src/main/java/com/mijornada/app/watch/WatchDatabase.kt`, `android/app/src/main/java/com/mijornada/app/watch/WatchDatabaseProvider.kt`, `android/app/src/main/java/com/mijornada/app/watch/WatchStateJson.kt`, `android/app/src/main/java/com/mijornada/app/watch/WatchRepository.kt`, `android/app/src/main/java/com/mijornada/app/watch/WatchResponseJson.kt`, `android/wear/src/main/java/com/mijornada/app/screens/WatchModels.kt`, `android/wear/src/main/java/com/mijornada/app/WearMainActivity.kt`, `android/wear/src/main/java/com/mijornada/app/screens/TurnosScreen.kt`, `android/wear/src/main/java/com/mijornada/app/screens/TurnoSummaryScreen.kt`, `src/__tests__/android-wear-bridge.test.ts`
