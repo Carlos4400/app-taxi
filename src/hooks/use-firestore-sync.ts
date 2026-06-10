@@ -1,5 +1,5 @@
 import { useEffect, useRef } from "react";
-import { onSnapshot, doc, getDoc } from "firebase/firestore";
+import { onSnapshot, doc, getDoc, waitForPendingWrites } from "firebase/firestore";
 import { useAppStore } from "../services/store";
 import { auth, db } from "../services/firebase";
 import {
@@ -13,6 +13,8 @@ import {
   clearUserPendingSync,
   hasUserPendingSync,
   markUserPendingSync,
+  readUserPendingSync,
+  type PendingSyncArea,
 } from "../services/pending-sync";
 import { readUserLocalJSON, writeUserLocalJSON } from "../services/user-storage";
 import { KEY_CURRENT, KEY_HISTORY, KEY_SETTINGS, KEY_WEEK_OVERRIDES, KEY_RESERVATIONS, KEY_NOTES, KEY_PROCESSED_OPERATIONS } from "../shared/storage-keys";
@@ -391,6 +393,33 @@ export function useFirestoreSync(uid: string) {
     const t = setTimeout(() => setLoadTimedOut(true), LOAD_TIMEOUT_MS);
     return () => clearTimeout(t);
   }, [dataLoaded]);
+
+  // ── Limpieza de marcas "pendiente" huérfanas ──────────────────────────────
+  // Firestore tiene persistencia local activada (persistentLocalCache en
+  // firebase.ts): las escrituras encoladas sobreviven a reinicios y el SDK las
+  // entrega solo al recuperar conexión. Pero las marcas caseras de pending-sync
+  // solo se limpiaban si la promesa de SU escritura resolvía en ESA sesión: si
+  // la app se cerraba antes de la confirmación, el dato llegaba igualmente al
+  // servidor y la marca quedaba huérfana para siempre (punto naranja perpetuo).
+  // waitForPendingWrites (API oficial) resuelve cuando el backend ha confirmado
+  // TODAS las escrituras encoladas: en ese momento, las marcas capturadas al
+  // inicio son huérfanas con certeza y se limpian. Solo se limpian las áreas
+  // capturadas antes de esperar, para no pisar marcas de escrituras nuevas.
+  useEffect(() => {
+    if (!dataLoaded || !uid) return;
+    const areasMarcadas = Object.keys(readUserPendingSync(uid)) as PendingSyncArea[];
+    if (areasMarcadas.length === 0) return;
+    let cancelado = false;
+    waitForPendingWrites(db)
+      .then(() => {
+        if (cancelado) return;
+        areasMarcadas.forEach((area) => clearUserPendingSync(uid, area));
+      })
+      .catch((err) => {
+        console.error("waitForPendingWrites fallido:", err);
+      });
+    return () => { cancelado = true; };
+  }, [dataLoaded, uid]);
 
   useEffect(() => {
     let cancelado = false;

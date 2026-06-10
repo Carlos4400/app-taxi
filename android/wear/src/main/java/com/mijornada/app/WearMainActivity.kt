@@ -234,6 +234,16 @@ class WearMainActivity : ComponentActivity() {
                         currentScreen.value = ScreenState.NO_ACTIVE_TURNO
                     }
                 }
+
+                // El movil publica /turno/state tras sincronizar Room (incluida la
+                // contabilidad precalculada). Si el usuario esta mirando la lista o
+                // un resumen, re-pedir los turnos para que "Pendiente" se sustituya
+                // por los numeros reales sin tener que cerrar y reabrir la app.
+                // Sin riesgo de bucle: GET_TURNOS es de solo lectura y el movil no
+                // publica /turno/state al responderlo.
+                if (currentScreen.value == ScreenState.TURNOS || currentScreen.value == ScreenState.TURNO_SUMMARY) {
+                    sendGetTurnos()
+                }
             } else if ("TURNOS_STATUS" == json.optString("type")) {
                 turnosLoading.value = false
                 isConnected.value = json.optBoolean("connected", false)
@@ -664,6 +674,13 @@ class WearMainActivity : ComponentActivity() {
             )
         }
         turnos.value = list
+        // Refrescar el turno abierto en el resumen con los datos recien llegados
+        // (p. ej. contabilidad ya calculada por la app). Si ya no existe en la
+        // lista, conservar el que se estaba mostrando.
+        val abierto = selectedTurno.value
+        if (abierto != null) {
+            selectedTurno.value = list.firstOrNull { it.id == abierto.id } ?: abierto
+        }
     }
 
     private fun parseTurnoTotals(totals: JSONObject?): WatchTurnoTotals {

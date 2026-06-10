@@ -17,6 +17,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.wear.compose.material.Text
@@ -242,7 +243,21 @@ private fun EntradaHistorial(entry: WatchEntry, onClick: () -> Unit) {
         CategoriaIcon(entry.type, meta.color, 14.dp)
         Spacer(modifier = Modifier.width(7.dp))
         Text(categoriaLabelSingular(entry.type), color = meta.color, fontSize = 12.sp, fontWeight = FontWeight.Bold)
-        Spacer(modifier = Modifier.weight(1f))
+        // Nota de la entrada visible como en la app móvil (antes no se mostraba).
+        if (entry.note.isNotBlank()) {
+            Spacer(modifier = Modifier.width(6.dp))
+            Text(
+                entry.note,
+                color = ColorGrey,
+                fontSize = 10.sp,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f)
+            )
+            Spacer(modifier = Modifier.width(6.dp))
+        } else {
+            Spacer(modifier = Modifier.weight(1f))
+        }
         Text(entry.time, color = ColorGrey, fontSize = 10.sp)
         Spacer(modifier = Modifier.width(8.dp))
         if (entry.type == "nota") {

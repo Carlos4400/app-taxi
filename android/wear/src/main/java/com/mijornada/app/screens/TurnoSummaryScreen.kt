@@ -226,7 +226,8 @@ private fun NoteRow(entry: WatchEntry, general: Boolean) {
         Spacer(modifier = Modifier.width(6.dp))
         Text(if (general) "Nota" else categoriaLabelSingular(entry.type), color = if (general) ColorWhite else meta.color, fontSize = 9.sp, fontWeight = FontWeight.Bold)
         Spacer(modifier = Modifier.width(6.dp))
-        Text(entry.note.take(18), color = ColorWhite, fontSize = 8.sp, modifier = Modifier.weight(1f))
+        // Nota completa, con salto de línea si es larga (antes se truncaba a 18).
+        Text(entry.note, color = ColorWhite, fontSize = 8.sp, modifier = Modifier.weight(1f))
         if (!general) Text(fmtEur(entry.amount), color = meta.color, fontSize = 9.sp, fontWeight = FontWeight.Bold)
     }
 }

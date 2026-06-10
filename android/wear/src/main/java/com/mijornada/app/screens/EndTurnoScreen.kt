@@ -274,7 +274,8 @@ private fun NotaTurnoRow(entry: WatchEntry) {
         Spacer(modifier = Modifier.width(6.dp))
         Text("Nota", color = ColorWhite, fontSize = 10.sp, fontWeight = FontWeight.Bold)
         Spacer(modifier = Modifier.width(6.dp))
-        Text(entry.note.take(24), color = ColorWhite, fontSize = 9.sp)
+        // Nota completa, con salto de línea si es larga (antes se truncaba a 24).
+        Text(entry.note, color = ColorWhite, fontSize = 9.sp, modifier = Modifier.weight(1f))
     }
 }
 
@@ -294,7 +295,8 @@ private fun NotaDetalladaRow(entry: WatchEntry) {
         Spacer(modifier = Modifier.width(6.dp))
         Text(categoriaLabelSingular(entry.type), color = meta.color, fontSize = 10.sp, fontWeight = FontWeight.Bold)
         Spacer(modifier = Modifier.width(6.dp))
-        Text(entry.note.take(16), color = ColorWhite, fontSize = 9.sp, modifier = Modifier.weight(1f))
+        // Nota completa, con salto de línea si es larga (antes se truncaba a 16).
+        Text(entry.note, color = ColorWhite, fontSize = 9.sp, modifier = Modifier.weight(1f))
         Text(fmtEur(entry.amount), color = meta.color, fontSize = 10.sp, fontWeight = FontWeight.Bold)
     }
 }

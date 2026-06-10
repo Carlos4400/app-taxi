@@ -54,6 +54,10 @@ vi.mock("firebase/firestore", () => ({
     set: vi.fn(),
     commit: vi.fn(() => Promise.resolve()),
   })),
+  // Promesa que nunca resuelve: en estos tests no interesa la limpieza de
+  // marcas huérfanas (waitForPendingWrites) y así no interfiere con las
+  // aserciones sobre pendientes locales.
+  waitForPendingWrites: vi.fn(() => new Promise(() => {})),
 }));
 
 function turno(id: number, date: string, startTime: string, endTime: string): Turno {

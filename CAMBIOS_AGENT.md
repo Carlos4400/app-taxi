@@ -121,6 +121,153 @@ stateJson = readFileSync(
 
 Tras la línea 928 había un cierre `});` (del primer `it` de fondos) y otro `});` (del `describe`), pero después colgaba un duplicado parcial del `it` contable (sin la cabecera `it(...)`, con las variables sin declarar) y un `it` extra con el mismo nombre. TS marcaba las líneas 952 y 963 como "Declaration or statement expected" porque `stateJson = ...` no era una sentencia válida a nivel de módulo dentro del `describe` ya cerrado. Eliminado el duplicado parcial, el test queda con dos `it` (contabilidad + fondos) dentro del `describe`, sin código suelto.
 
+## 2026-06-10 16:40 - Mostrar notas completas de las entradas en el reloj
+
+**Archivos modificados:** `android/wear/src/main/java/com/mijornada/app/screens/ActiveTurnoScreen.kt`, `android/wear/src/main/java/com/mijornada/app/screens/TurnoSummaryScreen.kt`, `android/wear/src/main/java/com/mijornada/app/screens/EndTurnoScreen.kt`, `src/__tests__/android-wear-bridge.test.ts`
+
+### Contexto
+
+Confirmado en dispositivo real: la nota de una entrada (p. ej. "Fyhj" en un Extra) no aparecía en ÚLTIMAS ENTRADAS del turno activo del reloj (la app móvil sí la muestra junto a cada entrada), y en las pantallas de resumen/cierre las notas se truncaban a 18, 24 y 16 caracteres sin indicación.
+
+### Cambio 1 - Nota visible en ÚLTIMAS ENTRADAS (ActiveTurnoScreen.kt)
+
+**Código anterior:**
+
+```kotlin
+        Text(categoriaLabelSingular(entry.type), color = meta.color, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+        Spacer(modifier = Modifier.weight(1f))
+        Text(entry.time, color = ColorGrey, fontSize = 10.sp)
+```
+
+**Código nuevo:**
+
+```kotlin
+        Text(categoriaLabelSingular(entry.type), color = meta.color, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+        // Nota de la entrada visible como en la app móvil (antes no se mostraba).
+        if (entry.note.isNotBlank()) {
+            Spacer(modifier = Modifier.width(6.dp))
+            Text(
+                entry.note,
+                color = ColorGrey,
+                fontSize = 10.sp,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f)
+            )
+            Spacer(modifier = Modifier.width(6.dp))
+        } else {
+            Spacer(modifier = Modifier.weight(1f))
+        }
+        Text(entry.time, color = ColorGrey, fontSize = 10.sp)
+```
+
+Más el import nuevo `androidx.compose.ui.text.style.TextOverflow`.
+
+**Por qué se cambió:** espejo con la app móvil, cuya lista de últimas entradas muestra la nota de cada entrada. En el reloj se limita a una línea con elipsis para no romper la fila; la nota completa se ve en el resumen.
+
+### Cambio 2 - Notas sin truncar en resumen y cierre
+
+**Código anterior:**
+
+```kotlin
+        Text(entry.note.take(18), color = ColorWhite, fontSize = 8.sp, modifier = Modifier.weight(1f))   // TurnoSummaryScreen
+        Text(entry.note.take(24), color = ColorWhite, fontSize = 9.sp)                                    // EndTurnoScreen NotaTurnoRow
+        Text(entry.note.take(16), color = ColorWhite, fontSize = 9.sp, modifier = Modifier.weight(1f))   // EndTurnoScreen NotaDetalladaRow
+```
+
+**Código nuevo:** las tres líneas pasan a `Text(entry.note, ...)` (la de NotaTurnoRow además con `modifier = Modifier.weight(1f)`), con comentario explicativo. El texto envuelve en varias líneas si es largo.
+
+**Por qué se cambió:** las notas truncadas a N caracteres perdían información sin avisar; ambas pantallas tienen scroll vertical, así que la nota completa con salto de línea no rompe el layout.
+
+### Cambio 3 - Test de contrato
+
+`No existía el test "muestra las notas completas en el reloj sin truncarlas".` Se añadió a `android-wear-bridge.test.ts`: verifica la nota con elipsis en ActiveTurnoScreen y la ausencia de `entry.note.take(` en las tres pantallas.
+
+### Verificación
+
+`npx tsc --noEmit` limpio; `android-wear-bridge.test.ts` 59/59. Pendiente: gradle wear y prueba física.
+
+## 2026-06-10 16:05 - Corregir marca pendiente huérfana y refresco de turnos en el reloj
+
+**Archivos modificados:** `src/hooks/use-firestore-sync.ts`, `android/wear/src/main/java/com/mijornada/app/WearMainActivity.kt`, `src/__tests__/android-wear-bridge.test.ts`, `src/__tests__/use-firestore-sync-user-isolation.test.tsx`
+
+### Contexto
+
+Dos fallos confirmados en dispositivo real. (1) El indicador de sincronización del móvil quedaba en naranja "Cambios pendientes" para siempre: las marcas de `pending-sync` solo se limpiaban si la promesa de su escritura concreta resolvía en esa misma sesión; con la persistencia de Firestore activada (`persistentLocalCache`), una escritura encolada al cerrar la app se entrega igualmente después, pero la marca quedaba huérfana (verificado vía chrome://inspect: `{"processedOperationIds":true}` atascado). (2) El reloj mostraba "Pendiente" en las cifras contables hasta cerrar y reabrir su app: la lista de turnos era solo pull y la pantalla de resumen no se actualizaba al llegar datos nuevos.
+
+### Cambio 1 - Limpiar marcas pendientes huérfanas con waitForPendingWrites
+
+**Código anterior:**
+
+```ts
+import { onSnapshot, doc, getDoc } from "firebase/firestore";
+```
+
+`No existía el efecto de limpieza de marcas huérfanas en use-firestore-sync.ts.`
+
+**Código nuevo:**
+
+```ts
+import { onSnapshot, doc, getDoc, waitForPendingWrites } from "firebase/firestore";
+```
+
+(más `readUserPendingSync` y `type PendingSyncArea` en el import de pending-sync), y el efecto:
+
+```ts
+  useEffect(() => {
+    if (!dataLoaded || !uid) return;
+    const areasMarcadas = Object.keys(readUserPendingSync(uid)) as PendingSyncArea[];
+    if (areasMarcadas.length === 0) return;
+    let cancelado = false;
+    waitForPendingWrites(db)
+      .then(() => {
+        if (cancelado) return;
+        areasMarcadas.forEach((area) => clearUserPendingSync(uid, area));
+      })
+      .catch((err) => {
+        console.error("waitForPendingWrites fallido:", err);
+      });
+    return () => { cancelado = true; };
+  }, [dataLoaded, uid]);
+```
+
+**Por qué se cambió:** `waitForPendingWrites` (API oficial de Firestore) resuelve cuando el backend ha confirmado todas las escrituras encoladas; en ese momento las marcas capturadas al arrancar son huérfanas con certeza. Solo se limpian las áreas capturadas antes de esperar, para no pisar marcas de escrituras nuevas de la sesión.
+
+### Cambio 2 - El reloj re-pide turnos al recibir STATUS y refresca el resumen abierto
+
+**Código anterior (`WearMainActivity.kt`, manejador STATUS):** terminaba tras decidir la pantalla, sin re-pedir turnos. Y `parseTurnos` terminaba en `turnos.value = list` sin tocar `selectedTurno`.
+
+**Código nuevo (final del manejador STATUS):**
+
+```kotlin
+                if (currentScreen.value == ScreenState.TURNOS || currentScreen.value == ScreenState.TURNO_SUMMARY) {
+                    sendGetTurnos()
+                }
+```
+
+**Código nuevo (final de `parseTurnos`):**
+
+```kotlin
+        val abierto = selectedTurno.value
+        if (abierto != null) {
+            selectedTurno.value = list.firstOrNull { it.id == abierto.id } ?: abierto
+        }
+```
+
+**Por qué se cambió:** el móvil ya publica `/turno/state` (con `updatedAt`, siempre cambia) tras cada `syncState`, incluido el que guarda la contabilidad precalculada; el reloj ahora aprovecha ese aviso para repedir la lista si el usuario la está mirando, y el resumen abierto se actualiza por id. Sin riesgo de bucle: `GET_TURNOS` es de solo lectura y `WearCommandWorker` solo publica `/turno/state` tras comandos de escritura con éxito.
+
+### Cambio 3 - Tests
+
+**Código anterior:** el mock de `firebase/firestore` en `use-firestore-sync-user-isolation.test.tsx` terminaba en `writeBatch`; no existía el test "limpia marcas pendientes huerfanas y refresca turnos del reloj al sincronizar" en `android-wear-bridge.test.ts`.
+
+**Código nuevo:** mock ampliado con `waitForPendingWrites: vi.fn(() => new Promise(() => {}))` (promesa que nunca resuelve, para no interferir con las aserciones de pendientes), y test de contrato nuevo que verifica `waitForPendingWrites(db)`/`readUserPendingSync(uid)` en el hook y el re-pedido + refresco de `selectedTurno` en el reloj.
+
+**Por qué se cambió:** cubrir los dos arreglos contra regresiones.
+
+### Verificación
+
+`npx tsc --noEmit` limpio; `android-wear-bridge.test.ts` 58/58; `use-firestore-sync-user-isolation.test.tsx` + `sync-indicator.test.tsx` 16/16. Pendiente en máquina del desarrollador: gradle y prueba física (reinstalar app móvil y APK del reloj).
+
 ## 2026-06-10 02:48 - Espejar la contabilidad de la app en el reloj sin recalcularla en nativo
 
 **Archivos modificados:** `src/services/watch-bridge.ts`, `android/app/src/main/java/com/mijornada/app/watch/WatchModels.kt`, `android/app/src/main/java/com/mijornada/app/watch/WatchEntities.kt`, `android/app/src/main/java/com/mijornada/app/watch/WatchDatabase.kt`, `android/app/src/main/java/com/mijornada/app/watch/WatchDatabaseProvider.kt`, `android/app/src/main/java/com/mijornada/app/watch/WatchStateJson.kt`, `android/app/src/main/java/com/mijornada/app/watch/WatchRepository.kt`, `android/app/src/main/java/com/mijornada/app/watch/WatchResponseJson.kt`, `android/wear/src/main/java/com/mijornada/app/screens/WatchModels.kt`, `android/wear/src/main/java/com/mijornada/app/WearMainActivity.kt`, `android/wear/src/main/java/com/mijornada/app/screens/TurnosScreen.kt`, `android/wear/src/main/java/com/mijornada/app/screens/TurnoSummaryScreen.kt`, `src/__tests__/android-wear-bridge.test.ts`

@@ -917,6 +917,49 @@ describe("Android Wear bridge", () => {
     expect(summary).toContain("contablePendiente");
   });
 
+  it("limpia marcas pendientes huerfanas y refresca turnos del reloj al sincronizar", () => {
+    const hook = readFileSync(
+      resolve(root, "src/hooks/use-firestore-sync.ts"),
+      "utf8",
+    );
+    const activity = readFileSync(
+      resolve(root, "android/wear/src/main/java/com/mijornada/app/WearMainActivity.kt"),
+      "utf8",
+    );
+
+    // Marcas pendientes huerfanas: la verdad la da el SDK (waitForPendingWrites),
+    // no la contabilidad manual de promesas por sesion.
+    expect(hook).toContain("waitForPendingWrites(db)");
+    expect(hook).toContain("readUserPendingSync(uid)");
+    // El reloj re-pide turnos al recibir STATUS estando en la lista o el resumen
+    // y actualiza el turno abierto con los datos recien llegados.
+    expect(activity).toContain("if (currentScreen.value == ScreenState.TURNOS || currentScreen.value == ScreenState.TURNO_SUMMARY) {");
+    expect(activity).toContain("selectedTurno.value = list.firstOrNull { it.id == abierto.id } ?: abierto");
+  });
+
+  it("muestra las notas completas en el reloj sin truncarlas", () => {
+    const active = readFileSync(
+      resolve(root, "android/wear/src/main/java/com/mijornada/app/screens/ActiveTurnoScreen.kt"),
+      "utf8",
+    );
+    const resumen = readFileSync(
+      resolve(root, "android/wear/src/main/java/com/mijornada/app/screens/TurnoSummaryScreen.kt"),
+      "utf8",
+    );
+    const cierre = readFileSync(
+      resolve(root, "android/wear/src/main/java/com/mijornada/app/screens/EndTurnoScreen.kt"),
+      "utf8",
+    );
+
+    // La nota de cada entrada es visible en ULTIMAS ENTRADAS, como en la app movil.
+    expect(active).toContain("TextOverflow.Ellipsis");
+    expect(active).toContain("if (entry.note.isNotBlank()) {");
+    // Ninguna pantalla trunca notas a N caracteres.
+    expect(active).not.toContain("entry.note.take(");
+    expect(resumen).not.toContain("entry.note.take(");
+    expect(cierre).not.toContain("entry.note.take(");
+  });
+
   it("usa fondos Wear apagados como la app movil", () => {
     const source = readFileSync(
       resolve(root, "android/wear/src/main/java/com/mijornada/app/theme/Color.kt"),
