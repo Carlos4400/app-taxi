@@ -95,6 +95,10 @@ class WatchRepository(private val database: WatchDatabase) {
                 km = turno.km,
                 notes = turno.notes,
                 totalPausedMinutes = turno.totalPausedMinutes,
+                totalTaximetro = turno.totalTaximetro,
+                miGanancia = turno.miGanancia,
+                totalADescontar = turno.totalADescontar,
+                totalADar = turno.totalADar,
             )
         }
 
@@ -146,6 +150,10 @@ class WatchRepository(private val database: WatchDatabase) {
                         km = turno.km,
                         notes = turno.notes,
                         totalPausedMinutes = turno.totalPausedMinutes,
+                        totalTaximetro = turno.totalTaximetro,
+                        miGanancia = turno.miGanancia,
+                        totalADescontar = turno.totalADescontar,
+                        totalADar = turno.totalADar,
                     )
                 },
             )

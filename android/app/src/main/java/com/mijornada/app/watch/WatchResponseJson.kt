@@ -48,10 +48,15 @@ object WatchResponseJson {
     fun turnosStatusToJson(operationId: String, state: WatchProcessorState, userSessionId: String = ""): String {
         val turnos = org.json.JSONArray()
         state.history.asReversed().take(30).forEach { turno ->
-            val totalGasolina = turno.entries.filter { it.type == "gasolina" }.sumOf { it.amount }
+            // La contabilidad (miGanancia, totalADescontar, totalADar) la precalcula
+            // la app movil con la regla de oro de accounting.ts y llega via Room.
+            // Aqui NO se calcula contabilidad: si falta, el turno se marca pendiente
+            // y el reloj lo indica en lugar de mostrar un numero incorrecto.
+            val contablePendiente = turno.miGanancia == null ||
+                turno.totalADescontar == null ||
+                turno.totalADar == null
+            // dineroBase (dinero - nulos) no depende de ajustes: fallback exacto.
             val totalNulo = turno.entries.filter { it.type == "nulo" }.sumOf { it.amount }
-            val totalDescontar = totalGasolina + totalNulo
-            val miGanancia = turno.dinero - totalDescontar
             turnos.put(
                 JSONObject()
                     .put("id", turno.id)
@@ -61,10 +66,11 @@ object WatchResponseJson {
                     .put("endTime", turno.endTime)
                     .put("dinero", turno.dinero)
                     .put("km", turno.km)
-                    .put("totalTaximetro", turno.dinero)
-                    .put("miGanancia", miGanancia)
-                    .put("totalADescontar", totalDescontar)
-                    .put("totalADar", miGanancia)
+                    .put("totalTaximetro", turno.totalTaximetro ?: (turno.dinero - totalNulo))
+                    .put("miGanancia", turno.miGanancia ?: 0.0)
+                    .put("totalADescontar", turno.totalADescontar ?: 0.0)
+                    .put("totalADar", turno.totalADar ?: 0.0)
+                    .put("contablePendiente", contablePendiente)
                     .put("tiempoTrabajado", workedTime(turno.startTime, turno.endTime, turno.totalPausedMinutes))
                     .put("totalPausedMinutes", turno.totalPausedMinutes)
                     .put("totals", totalsJson(turno.entries))

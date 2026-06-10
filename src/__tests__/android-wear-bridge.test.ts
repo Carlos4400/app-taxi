@@ -1,3 +1,4 @@
+// Tests de contrato sobre los fuentes nativos Android/Wear (leen los .kt/.java como texto).
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
@@ -231,8 +232,10 @@ describe("Android Wear bridge", () => {
 
     expect(service).toContain("Build.VERSION.SDK_INT >= Build.VERSION_CODES.S");
     expect(service).toContain("Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU");
-    expect(service.indexOf("Manifest.permission.BLUETOOTH_CONNECT"))
-      .toBeLessThan(service.indexOf("Manifest.permission.POST_NOTIFICATIONS"));
+    // Orden vigente desde el commit "restore permission checks order
+    // (TIRAMISU first, then S)": POST_NOTIFICATIONS antes que BLUETOOTH_CONNECT.
+    expect(service.indexOf("Manifest.permission.POST_NOTIFICATIONS"))
+      .toBeLessThan(service.indexOf("Manifest.permission.BLUETOOTH_CONNECT"));
   });
 
   it("centraliza las claves de respuesta compartidas entre servicio y actividad Wear", () => {
@@ -316,13 +319,15 @@ describe("Android Wear bridge", () => {
     expect(daos).not.toContain("markSynced");
     expect(daos).not.toContain("getPendingSyncOperations");
     expect(repository).not.toContain("synced = false");
-    expect(database).toContain("version = 4");
+    expect(database).toContain("version = 5");
     expect(database).toContain("MIGRATION_1_2");
     expect(database).toContain("MIGRATION_2_3");
     expect(database).toContain("MIGRATION_3_4");
+    expect(database).toContain("MIGRATION_4_5");
     expect(provider).toContain("WatchDatabase.MIGRATION_1_2");
     expect(provider).toContain("WatchDatabase.MIGRATION_2_3");
     expect(provider).toContain("WatchDatabase.MIGRATION_3_4");
+    expect(provider).toContain("WatchDatabase.MIGRATION_4_5");
   });
 
   it("declara CDM y foreground service de turno activo", () => {
@@ -413,7 +418,8 @@ describe("Android Wear bridge", () => {
     expect(activity).toContain('sendTurnoStateCommand("RESUME_TURNO")');
     expect(activity).toContain("onTogglePause = {");
     expect(screen).toContain("onTogglePause: () -> Unit");
-    expect(screen).toContain('if (isPaused) "Reanudar turno" else "Pausar turno"');
+    expect(screen).toContain('isPaused -> "Reanudar turno"');
+    expect(screen).toContain('else -> "Pausar turno"');
   });
 
   it("guarda respuesta y timestamp juntos y protege el historial terminal", () => {
@@ -880,6 +886,69 @@ describe("Android Wear bridge", () => {
     expect(source).toContain("verticalScroll(rememberScrollState())");
     expect(source).not.toContain("align(Alignment.BottomCenter)");
     expect(source).not.toContain("ScalingLazyColumn");
+  });
+
+  it("espeja la contabilidad de la app en el reloj sin recalcularla en nativo", () => {
+    const bridge = readFileSync(
+      resolve(root, "src/services/watch-bridge.ts"),
+      "utf8",
+    );
+    const stateJson = readFileSync(
+      resolve(root, "android/app/src/main/java/com/mijornada/app/watch/WatchStateJson.kt"),
+      "utf8",
+    );
+    const responseJson = readFileSync(
+      resolve(root, "android/app/src/main/java/com/mijornada/app/watch/WatchResponseJson.kt"),
+      "utf8",
+    );
+    const summary = readFileSync(
+      resolve(root, "android/wear/src/main/java/com/mijornada/app/screens/TurnoSummaryScreen.kt"),
+      "utf8",
+    );
+
+    // La app precalcula con la regla de oro y lo envia a Room.
+    expect(bridge).toContain("calcularTurnoContable");
+    expect(bridge).toContain("function turnoContableSnapshot");
+    expect(stateJson).toContain('optJSONObject("contable")');
+    // El nativo no inventa contabilidad: marca pendiente si falta.
+    expect(responseJson).toContain("contablePendiente");
+    expect(responseJson).not.toContain("val miGanancia = turno.dinero - totalDescontar");
+    // El reloj indica pendiente en lugar de mostrar numeros incorrectos.
+    expect(summary).toContain("contablePendiente");
+  });
+
+  it("usa fondos Wear apagados como la app movil", () => {
+    const source = readFileSync(
+      resolve(root, "android/wear/src/main/java/com/mijornada/app/theme/Color.kt"),
+      "utf8",
+    );
+
+    expect(source).toContain("ColorDatafonoBg = Color(0xFF151032)");
+    expect(source).toContain("Color(");
+  });
+});
+stateJson = readFileSync(
+      resolve(root, "android/app/src/main/java/com/mijornada/app/watch/WatchStateJson.kt"),
+      "utf8",
+    );
+    const responseJson = readFileSync(
+      resolve(root, "android/app/src/main/java/com/mijornada/app/watch/WatchResponseJson.kt"),
+      "utf8",
+    );
+    const summary = readFileSync(
+      resolve(root, "android/wear/src/main/java/com/mijornada/app/screens/TurnoSummaryScreen.kt"),
+      "utf8",
+    );
+
+    // La app precalcula con la regla de oro y lo envia a Room.
+    expect(bridge).toContain("calcularTurnoContable");
+    expect(bridge).toContain("function turnoContableSnapshot");
+    expect(stateJson).toContain('optJSONObject("contable")');
+    // El nativo no inventa contabilidad: marca pendiente si falta.
+    expect(responseJson).toContain("contablePendiente");
+    expect(responseJson).not.toContain("val miGanancia = turno.dinero - totalDescontar");
+    // El reloj indica pendiente en lugar de mostrar numeros incorrectos.
+    expect(summary).toContain("contablePendiente");
   });
 
   it("usa fondos Wear apagados como la app movil", () => {

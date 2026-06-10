@@ -1,6 +1,6 @@
 import { registerPlugin, Capacitor, type PluginListenerHandle } from "@capacitor/core";
 import { useAppStore } from "./store";
-import { buildTurnoConfigFromSettings } from "../logic/accounting";
+import { buildTurnoConfigFromSettings, calcularTurnoContable } from "../logic/accounting";
 import { mergeTurnos } from "../logic/turnos";
 import type { CurrentState, Entry, Turno } from "../shared/types";
 
@@ -188,11 +188,30 @@ function pruneProcessedOperationIds(ids: string[]): string[] {
   return ids.slice(ids.length - MAX_PROCESSED_OPERATION_IDS);
 }
 
+/** Resultado contable de un turno precalculado con la regla de oro (accounting.ts),
+ *  igual que buildWatchTurnos. Se persiste en Room para que el reloj muestre
+ *  exactamente los mismos numeros que la app sin duplicar contabilidad en Kotlin. */
+function turnoContableSnapshot(
+  turno: Turno,
+  settings: ReturnType<typeof useAppStore.getState>["settings"],
+) {
+  const calculo = calcularTurnoContable(turno, settings);
+  return {
+    totalTaximetro: calculo.dineroBase,
+    miGanancia: calculo.miGanancia,
+    totalADescontar: calculo.totalDescontar,
+    totalADar: calculo.totalADar,
+  };
+}
+
 function nativeSnapshotCanonical(): string {
   const store = useAppStore.getState();
   return stableHash({
     current: store.current,
-    history: store.history,
+    history: store.history.map((turno) => ({
+      ...turno,
+      contable: turnoContableSnapshot(turno, store.settings),
+    })),
     processedOperationIds: pruneProcessedOperationIds(store.processedOperationIds),
   });
 }
@@ -237,6 +256,16 @@ function startNativeStateSync() {
         });
       },
     ));
+    // Los ajustes contables (porcentajes, descuentos) afectan al contable
+    // precalculado de turnos sin configTurno propia: re-sincronizar al cambiar.
+    storeUnsubscribes.push(useAppStore.subscribe(
+      (state) => state.settings,
+      () => {
+        syncNativeWatchState().catch((err) => {
+          console.error("Error al sincronizar estado movil con Room:", err);
+        });
+      },
+    ));
   }
   return syncNativeWatchState();
 }
@@ -258,6 +287,43 @@ export function setupWatchBridge(uid: string) {
   }
 
   WearOsBridge.setPrepared({ uid })
+    .then(async () => {
+      console.log("WearOsBridge preparado para el usuario:", uid);
+      await queueNativeHydration();
+      await startNativeStateSync();
+    })
+    .catch((err) => {
+      console.error("Error al preparar WearOsBridge:", err);
+    });
+
+  if (listenerAdded) return;
+  listenerAdded = true;
+
+  nativeStateListener = WearOsBridge.addListener("onNativeStateChanged", async () => {
+    try {
+      await queueNativeHydration();
+    } catch (err) {
+      console.error("Error al hidratar estado Wear OS:", err);
+    }
+  });
+}
+
+export async function teardownWatchBridge(uid: string): Promise<void> {
+  if (!uid || preparedUid !== uid) return;
+  storeUnsubscribes.forEach((unsubscribe) => unsubscribe());
+  storeUnsubscribes = [];
+  nativeStateListener?.then((listener) => listener.remove()).catch((err) => {
+    console.error("Error al retirar listener nativo Wear OS:", err);
+  });
+  nativeStateListener = null;
+  listenerAdded = false;
+  preparedUid = "";
+  lastSyncedSnapshot = "";
+  nativeSyncQueue = Promise.resolve();
+  nativeHydrationQueue = null;
+  await WearOsBridge.clearPrepared({ uid });
+}
+d({ uid })
     .then(async () => {
       console.log("WearOsBridge preparado para el usuario:", uid);
       await queueNativeHydration();

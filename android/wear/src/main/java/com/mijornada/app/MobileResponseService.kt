@@ -24,6 +24,9 @@ class MobileResponseService : WearableListenerService() {
     companion object {
         const val WORK_TAG_OUTBOX = "outbox-retry"
         const val EXTRA_OPERATION_ID = "operationId"
+        const val HANDLED_TERMINAL_PREFS = "mobile_response_handled_terminal"
+        const val HANDLED_TERMINAL_KEY = "operations_with_ts"
+        const val HANDLED_TERMINAL_TTL_MS = 24L * 60L * 60L * 1000L
 
         fun cancelOutboxRetry(context: android.content.Context) {
             WorkManager.getInstance(context).cancelAllWorkByTag(WORK_TAG_OUTBOX)
@@ -112,7 +115,46 @@ class MobileResponseService : WearableListenerService() {
             while (handledTerminalOperationIds.size > WearConstants.HANDLED_OPERATION_LIMIT) {
                 handledTerminalOperationIds.remove(handledTerminalOperationIds.first())
             }
+            persistHandledTerminalOperationIds()
             return true
+        }
+    }
+
+    /** Persiste el set de operationIds terminales con TTL de 24h. */
+    private fun persistHandledTerminalOperationIds() {
+        val nowMs = System.currentTimeMillis()
+        val cutoffMs = nowMs - HANDLED_TERMINAL_TTL_MS
+        val prefs = getSharedPreferences(HANDLED_TERMINAL_PREFS, MODE_PRIVATE)
+        val json = org.json.JSONObject()
+        synchronized(handledTerminalOperationIds) {
+            handledTerminalOperationIds.forEach { id ->
+                // Preservamos el timestamp existente si lo hay; si no, usamos now.
+                val existing = prefs.getLong("ts_${'$'}id", 0L)
+                val ts = if (existing in 1..nowMs && existing >= cutoffMs) existing else nowMs
+                json.put(id, ts)
+            }
+        }
+        prefs.edit().putString(HANDLED_TERMINAL_KEY, json.toString()).apply()
+    }
+
+    private fun restoreHandledTerminalOperationIds() {
+        val prefs = getSharedPreferences(HANDLED_TERMINAL_PREFS, MODE_PRIVATE)
+        val raw = prefs.getString(HANDLED_TERMINAL_KEY, null) ?: return
+        try {
+            val json = org.json.JSONObject(raw)
+            val cutoffMs = System.currentTimeMillis() - HANDLED_TERMINAL_TTL_MS
+            synchronized(handledTerminalOperationIds) {
+                handledTerminalOperationIds.clear()
+                val keys = json.keys()
+                while (keys.hasNext()) {
+                    val k = keys.next()
+                    val ts = json.optLong(k, 0L)
+                    if (ts >= cutoffMs) handledTerminalOperationIds.add(k)
+                }
+            }
+        } catch (_: Exception) {
+            // JSON corrupto: limpiar.
+            prefs.edit().remove(HANDLED_TERMINAL_KEY).apply()
         }
     }
 
@@ -127,4 +169,9 @@ class MobileResponseService : WearableListenerService() {
     }
 
     private val handledTerminalOperationIds = java.util.Collections.synchronizedSet(java.util.LinkedHashSet<String>())
+
+    override fun onCreate() {
+        super.onCreate()
+        restoreHandledTerminalOperationIds()
+    }
 }

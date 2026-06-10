@@ -35,6 +35,13 @@ data class WatchTurno(
     val km: Double,
     val notes: String,
     val totalPausedMinutes: Int = 0,
+    // Contabilidad precalculada por la app (regla de oro en TypeScript).
+    // null = la app aun no ha sincronizado este turno (p. ej. cerrado desde el
+    // reloj con la app cerrada); el reloj debe mostrarlo como pendiente.
+    val totalTaximetro: Double? = null,
+    val miGanancia: Double? = null,
+    val totalADescontar: Double? = null,
+    val totalADar: Double? = null,
 )
 
 data class WatchProcessorState(

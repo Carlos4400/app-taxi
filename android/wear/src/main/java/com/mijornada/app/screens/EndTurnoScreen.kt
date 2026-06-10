@@ -29,6 +29,7 @@ fun EndTurnoScreen(
     var activeField by remember { mutableStateOf<String?>(null) }
     var dineroText by remember { mutableStateOf("") }
     var kmText by remember { mutableStateOf("") }
+    var saving by remember { mutableStateOf(false) }
 
     val dinero = parseAmount(dineroText)
     val km = parseAmount(kmText)
@@ -100,8 +101,17 @@ fun EndTurnoScreen(
 
             Spacer(modifier = Modifier.height(12.dp))
 
-            BotonPlano("Terminar Turno", ColorGasolina, ColorGasolinaBg, Modifier.fillMaxWidth(0.86f)) {
-                onConfirm(dinero, km)
+            BotonPlano(
+                label = if (saving) "Enviando..." else "Terminar Turno",
+                textColor = ColorGasolina,
+                bg = ColorGasolinaBg,
+                modifier = Modifier.fillMaxWidth(0.86f),
+                enabled = !saving
+            ) {
+                if (!saving) {
+                    saving = true
+                    onConfirm(dinero, km)
+                }
             }
             Spacer(modifier = Modifier.height(7.dp))
             BotonPlano("Cancelar", ColorGrey, ColorNuloBg, Modifier.fillMaxWidth(0.86f), onClick = onCancel)

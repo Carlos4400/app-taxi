@@ -32,6 +32,7 @@ object WatchDatabaseProvider {
                     WatchDatabase.MIGRATION_1_2,
                     WatchDatabase.MIGRATION_2_3,
                     WatchDatabase.MIGRATION_3_4,
+                    WatchDatabase.MIGRATION_4_5,
                 )
                 .build()
                 .also { database -> instances[databaseName] = database }

@@ -21,6 +21,7 @@ import com.mijornada.app.theme.*
 @Composable
 fun TurnosScreen(
     turnos: List<WatchTurno>,
+    isLoading: Boolean = false,
     onBack: () -> Unit,
     onOpenTurno: (WatchTurno) -> Unit
 ) {
@@ -44,7 +45,9 @@ fun TurnosScreen(
 
         Spacer(modifier = Modifier.height(12.dp))
 
-        if (turnos.isEmpty()) {
+        if (isLoading && turnos.isEmpty()) {
+            Text("Cargando turnos…", color = ColorGrey, fontSize = 12.sp)
+        } else if (turnos.isEmpty()) {
             Text("No hay Turnos Anteriores.", color = ColorGrey, fontSize = 12.sp)
         } else {
             turnos.forEach { turno ->
@@ -75,7 +78,12 @@ private fun TurnoCard(turno: WatchTurno, onClick: () -> Unit) {
 
         Row(horizontalArrangement = Arrangement.spacedBy(7.dp), modifier = Modifier.fillMaxWidth()) {
             MiniMetric("Total Taxímetro", fmtEur(turno.totalTaximetro), ColorAgencia, ColorAgenciaBg, Modifier.weight(1f))
-            MiniMetric("Mi Ganancia", fmtEur(turno.miGanancia), ColorPropina, ColorPropinaBg, Modifier.weight(1f))
+            // Contabilidad pendiente de la app: nunca mostrar un numero incorrecto.
+            MiniMetric(
+                "Mi Ganancia",
+                if (turno.contablePendiente) "Pendiente" else fmtEur(turno.miGanancia),
+                ColorPropina, ColorPropinaBg, Modifier.weight(1f)
+            )
         }
         Spacer(modifier = Modifier.height(7.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(7.dp), modifier = Modifier.fillMaxWidth()) {

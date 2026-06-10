@@ -31,6 +31,9 @@ data class WatchTurno(
     val miGanancia: Double,
     val totalADescontar: Double,
     val totalADar: Double,
+    /** true = la app movil aun no ha calculado la contabilidad de este turno
+     *  (p. ej. cerrado desde el reloj con la app cerrada). Mostrar "Pendiente". */
+    val contablePendiente: Boolean = false,
     val tiempoTrabajado: String,
     val totals: WatchTurnoTotals,
     val entradas: List<WatchEntry>

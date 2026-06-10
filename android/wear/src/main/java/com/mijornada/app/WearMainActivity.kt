@@ -2,8 +2,12 @@ package com.mijornada.app
 
 import android.app.RemoteInput
 import android.content.Intent
+import android.content.SharedPreferences
 import android.os.Build
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
+import android.os.PowerManager
 import android.os.VibrationEffect
 import android.os.Vibrator
 import android.widget.Toast
@@ -16,6 +20,8 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.animation.Crossfade
+import androidx.compose.animation.core.tween
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -33,6 +39,7 @@ import com.mijornada.app.theme.*
 import org.json.JSONArray
 import org.json.JSONObject
 import java.util.UUID
+import java.util.concurrent.atomic.AtomicReference
 
 enum class ScreenState {
     NO_CONNECTED,
@@ -71,18 +78,74 @@ class WearMainActivity : ComponentActivity() {
     private var selectedTurno = mutableStateOf<WatchTurno?>(null)
     private var editingEntry = mutableStateOf<WatchEntry?>(null)
     private var openTurnosAfterOk = false
+    private var turnosLoading = mutableStateOf(false)
+    private var pendingOpsCount = mutableStateOf(0)
+    private val mainHandler = Handler(Looper.getMainLooper())
+    private val resyncRunnable = Runnable { requestStatus() }
+    private fun scheduleResync(delayMs: Long) {
+        mainHandler.removeCallbacks(resyncRunnable)
+        mainHandler.postDelayed(resyncRunnable, delayMs)
+    }
+
+    /** WakeLock parcial breve para que el OutboxWorker pueda completar sus reenvios
+     *  antes de que el reloj entre en Doze al cerrarse la pantalla del usuario. */
+    private var operationWakeLock: PowerManager.WakeLock? = null
+    private fun acquireOperationWakeLock() {
+        if (operationWakeLock?.isHeld == true) return
+        val pm = getSystemService(PowerManager::class.java) ?: return
+        val wl = pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "MiTurno:operation-pending")
+        try {
+            wl.setReferenceCounted(false)
+            wl.acquire(15_000L) // 15s maximo
+            operationWakeLock = wl
+        } catch (_: Exception) {
+            // si el sistema rechaza el wakelock, ignorar; el WorkManager seguira igualmente
+        }
+    }
+    private fun releaseOperationWakeLockIfIdle() {
+        if (WatchOutbox.hasPendingCommands(this).not()) {
+            try { operationWakeLock?.takeIf { it.isHeld }?.release() } catch (_: Exception) {}
+            operationWakeLock = null
+        }
+    }
+
+    private fun refreshPendingOpsCount() {
+        pendingOpsCount.value = WatchOutbox.pendingCommands(this).size
+    }
+
+    /** Pantallas tipo formulario donde un OK/DUPLICATE_IGNORED de un comando debe cerrar el form. */
+    private val formScreens = setOf(
+        ScreenState.ADD_ENTRY,
+        ScreenState.EDIT_ENTRY,
+        ScreenState.CONFIRM_DELETE,
+        ScreenState.END_TURNO,
+    )
     private var isUiActive = false
 
     private val prefs by lazy { getSharedPreferences(WearConstants.Response.PREFS, MODE_PRIVATE) }
-    private var lastKnownResponseTimestamp = 0L
+
+    /** Procesa en vivo las respuestas que MobileResponseService guarda en prefs.
+     *  Sin este listener la Activity solo leia respuestas en onResume, por lo que
+     *  la pantalla no avanzaba hasta bloquear/desbloquear el reloj. Valido porque
+     *  servicio y Activity comparten proceso. */
+    private val responsePrefsListener = SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
+        if (key == WearConstants.Response.RESPONSE_TIMESTAMP) {
+            pollResponseState()
+        }
+    }
+    private val timestampPrefs by lazy { getSharedPreferences("wear_main_activity_state", MODE_PRIVATE) }
+    private var lastKnownResponseTimestamp: Long
+        get() = timestampPrefs.getLong("last_known_response_ts", 0L)
+        set(value) { timestampPrefs.edit().putLong("last_known_response_ts", value).apply() }
 
     // Entrada de texto (nota) vía teclado / voz del sistema (RemoteInput)
     private val NOTE_KEY = "wear_note"
-    private var pendingNoteCallback: ((String) -> Unit)? = null
+    private val pendingNoteCallback = AtomicReference<((String) -> Unit)?>(null)
     private lateinit var noteLauncher: ActivityResultLauncher<Intent>
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        refreshPendingOpsCount()
 
         noteLauncher = registerForActivityResult(
             ActivityResultContracts.StartActivityForResult()
@@ -91,9 +154,10 @@ class WearMainActivity : ComponentActivity() {
             if (data != null) {
                 val results = RemoteInput.getResultsFromIntent(data)
                 val text = results?.getCharSequence(NOTE_KEY)?.toString() ?: ""
-                pendingNoteCallback?.invoke(text)
+                pendingNoteCallback.getAndSet(null)?.invoke(text)
+            } else {
+                pendingNoteCallback.set(null)
             }
-            pendingNoteCallback = null
         }
 
         setContent {
@@ -106,12 +170,20 @@ class WearMainActivity : ComponentActivity() {
     override fun onResume() {
         super.onResume()
         isUiActive = true
+        refreshPendingOpsCount()
+        prefs.registerOnSharedPreferenceChangeListener(responsePrefsListener)
         pollResponseState()
+        // Si quedo una carga de turnos pendiente (respuesta perdida o sobrescrita
+        // mientras la Activity estaba pausada), reintentar la peticion.
+        if (currentScreen.value == ScreenState.TURNOS && turnosLoading.value) {
+            sendGetTurnos()
+        }
         requestStatus()
     }
 
     override fun onPause() {
         isUiActive = false
+        prefs.unregisterOnSharedPreferenceChangeListener(responsePrefsListener)
         super.onPause()
     }
 
@@ -134,6 +206,7 @@ class WearMainActivity : ComponentActivity() {
                 WatchOutbox.remove(this, operationId)
             }
             if (responseType == "STATUS") {
+                refreshPendingOpsCount()
                 val nextUserSessionId = json.optString("userSessionId", "")
                 if (nextUserSessionId.isNotBlank()) {
                     WatchOutbox.removeCommandsFromOtherSessions(this, nextUserSessionId)
@@ -162,30 +235,48 @@ class WearMainActivity : ComponentActivity() {
                     }
                 }
             } else if ("TURNOS_STATUS" == json.optString("type")) {
+                turnosLoading.value = false
                 isConnected.value = json.optBoolean("connected", false)
                 parseTurnos(json.optJSONArray("turnos"))
                 if (isConnected.value) {
-                    currentScreen.value = ScreenState.TURNOS
+                    if (currentScreen.value != ScreenState.TURNO_SUMMARY) {
+                        currentScreen.value = ScreenState.TURNOS
+                    }
                 } else {
                     currentScreen.value = ScreenState.NO_CONNECTED
                 }
             } else if ("OK" == json.optString("type")) {
+                refreshPendingOpsCount()
+                releaseOperationWakeLockIfIdle()
                 performFeedback(json.optString("message", "Hecho"), strong = false)
                 if (openTurnosAfterOk) {
                     openTurnosAfterOk = false
                     sendGetTurnos()
                 } else {
-                    currentScreen.value = ScreenState.ACTIVE_TURNO
+                    // Solo navegar a ACTIVE_TURNO si el usuario sigue en un formulario.
+                    // En TURNOS, TURNO_SUMMARY, NO_CONNECTED: respetar pantalla actual.
+                    if (currentScreen.value in formScreens) {
+                        currentScreen.value = ScreenState.ACTIVE_TURNO
+                    }
                     requestStatus()
                 }
             } else if ("DUPLICATE_IGNORED" == json.optString("type")) {
+                refreshPendingOpsCount()
+                releaseOperationWakeLockIfIdle()
                 performFeedback(json.optString("message", "Ya aplicado"), strong = false)
-                currentScreen.value = if (activeTurno.value) ScreenState.ACTIVE_TURNO else ScreenState.NO_ACTIVE_TURNO
+                if (currentScreen.value in formScreens) {
+                    currentScreen.value = if (activeTurno.value) ScreenState.ACTIVE_TURNO else ScreenState.NO_ACTIVE_TURNO
+                }
                 requestStatus()
                 MobileResponseService.enqueueOutboxRetry(this)
             } else if ("ERROR" == json.optString("type")) {
                 openTurnosAfterOk = false
+                refreshPendingOpsCount()
+                releaseOperationWakeLockIfIdle()
                 performFeedback(json.optString("message", "Error"), strong = true)
+                // Optimismo: si aplicamos un cambio local y el movil rechazo, resync
+                // con el estado real para evitar inconsistencias visuales.
+                requestStatus()
             }
         } catch (e: Exception) {
             performFeedback("Error al leer respuesta", strong = true)
@@ -198,13 +289,27 @@ class WearMainActivity : ComponentActivity() {
             handleBack()
         }
 
-        when (currentScreen.value) {
+        Crossfade(
+            targetState = currentScreen.value,
+            animationSpec = tween(durationMillis = 220),
+            label = "screen-crossfade"
+        ) { screen ->
+        when (screen) {
             ScreenState.NO_CONNECTED -> NoConnectedScreen(onRetry = { requestStatus() })
             ScreenState.NO_ACTIVE_TURNO -> NoActiveTurnoScreen(
+                pendingOpsCount = pendingOpsCount.value,
                 onStartTurno = { sendStartTurno() },
-                onOpenTurnos = { sendGetTurnos() }
+                onOpenTurnos = {
+                    // Navegacion inmediata con estado de carga; la lista llega
+                    // despues con TURNOS_STATUS.
+                    if (sendGetTurnos()) {
+                        turnosLoading.value = true
+                        currentScreen.value = ScreenState.TURNOS
+                    }
+                }
             )
             ScreenState.ACTIVE_TURNO -> ActiveTurnoScreen(
+                pendingOpsCount = pendingOpsCount.value,
                 fechaTurno = formatFechaTurno(startDate.value),
                 startTime = startTime.value,
                 isPaused = isPaused.value,
@@ -237,7 +342,9 @@ class WearMainActivity : ComponentActivity() {
                 categoryLabel = selectedCategoryLabel.value,
                 categoryColor = selectedCategoryColor.value,
                 onSave = { amount, note ->
-                    sendAddEntry(selectedCategory.value, amount, note)
+                    if (sendAddEntry(selectedCategory.value, amount, note)) {
+                        currentScreen.value = ScreenState.ACTIVE_TURNO
+                    }
                 },
                 onCancel = {
                     currentScreen.value = ScreenState.ACTIVE_TURNO
@@ -255,7 +362,11 @@ class WearMainActivity : ComponentActivity() {
                         categoryColor = meta.color,
                         initialAmount = e.amount,
                         initialNote = e.note,
-                        onSave = { amount, note -> sendEditEntry(e.id, amount, note) },
+                        onSave = { amount, note ->
+                            if (sendEditEntry(e.id, amount, note)) {
+                                currentScreen.value = ScreenState.ACTIVE_TURNO
+                            }
+                        },
                         onCancel = { currentScreen.value = ScreenState.ACTIVE_TURNO },
                         onRequestNote = { current, onResult -> requestNote(current, onResult) },
                         onDelete = { currentScreen.value = ScreenState.CONFIRM_DELETE },
@@ -271,7 +382,11 @@ class WearMainActivity : ComponentActivity() {
                     ConfirmDeleteScreen(
                         entry = e,
                         onCancel = { currentScreen.value = ScreenState.EDIT_ENTRY },
-                        onConfirm = { sendDeleteEntry(e.id) }
+                        onConfirm = {
+                            if (sendDeleteEntry(e.id)) {
+                                currentScreen.value = ScreenState.ACTIVE_TURNO
+                            }
+                        }
                     )
                 }
             }
@@ -280,7 +395,9 @@ class WearMainActivity : ComponentActivity() {
                 numPorTipo = numPorTipo.value,
                 entradas = entradas.value,
                 onConfirm = { dinero, km ->
-                    sendEndTurno(dinero, km)
+                    if (sendEndTurno(dinero, km)) {
+                        currentScreen.value = ScreenState.NO_ACTIVE_TURNO
+                    }
                 },
                 onCancel = {
                     currentScreen.value = ScreenState.ACTIVE_TURNO
@@ -288,7 +405,9 @@ class WearMainActivity : ComponentActivity() {
             )
             ScreenState.TURNOS -> TurnosScreen(
                 turnos = turnos.value,
+                isLoading = turnosLoading.value,
                 onBack = {
+                    turnosLoading.value = false
                     currentScreen.value = if (activeTurno.value) ScreenState.ACTIVE_TURNO else ScreenState.NO_ACTIVE_TURNO
                 },
                 onOpenTurno = { turno ->
@@ -308,6 +427,7 @@ class WearMainActivity : ComponentActivity() {
                 }
             }
         }
+        }
     }
 
     private fun handleBack() {
@@ -316,7 +436,10 @@ class WearMainActivity : ComponentActivity() {
             ScreenState.EDIT_ENTRY -> currentScreen.value = ScreenState.ACTIVE_TURNO
             ScreenState.CONFIRM_DELETE -> currentScreen.value = ScreenState.EDIT_ENTRY
             ScreenState.END_TURNO -> currentScreen.value = ScreenState.ACTIVE_TURNO
-            ScreenState.TURNOS -> currentScreen.value = if (activeTurno.value) ScreenState.ACTIVE_TURNO else ScreenState.NO_ACTIVE_TURNO
+            ScreenState.TURNOS -> {
+                turnosLoading.value = false
+                currentScreen.value = if (activeTurno.value) ScreenState.ACTIVE_TURNO else ScreenState.NO_ACTIVE_TURNO
+            }
             ScreenState.TURNO_SUMMARY -> currentScreen.value = ScreenState.TURNOS
             ScreenState.NO_ACTIVE_TURNO -> Unit
             ScreenState.ACTIVE_TURNO -> Unit
@@ -362,37 +485,106 @@ class WearMainActivity : ComponentActivity() {
         sendCommand(command.toString())
     }
 
-    private fun sendStartTurno() {
-        sendTurnoStateCommand("START_TURNO")
-    }
+    private fun sendStartTurno(): Boolean = sendTurnoStateCommand("START_TURNO")
 
-    private fun sendPauseTurno() {
-        sendTurnoStateCommand("PAUSE_TURNO")
-    }
+    private fun sendPauseTurno(): Boolean = sendTurnoStateCommand("PAUSE_TURNO")
 
-    private fun sendResumeTurno() {
-        sendTurnoStateCommand("RESUME_TURNO")
-    }
+    private fun sendResumeTurno(): Boolean = sendTurnoStateCommand("RESUME_TURNO")
 
-    private fun sendTurnoStateCommand(type: String) {
+    private fun sendTurnoStateCommand(type: String): Boolean {
         val command = JSONObject().apply {
             put("operationId", UUID.randomUUID().toString())
             put("type", type)
             put("createdAt", System.currentTimeMillis().toString())
         }
-        sendCommand(command.toString())
+        val sent = sendCommand(command.toString())
+        if (sent) {
+            when (type) {
+                "PAUSE_TURNO" -> {
+                    isPaused.value = true
+                    pauseStartTime.value = java.text.SimpleDateFormat("HH:mm", java.util.Locale.getDefault()).format(java.util.Date())
+                }
+                "RESUME_TURNO" -> {
+                    isPaused.value = false
+                }
+                "START_TURNO" -> {
+                    activeTurno.value = true
+                    startTime.value = java.text.SimpleDateFormat("HH:mm", java.util.Locale.getDefault()).format(java.util.Date())
+                    startDate.value = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.getDefault()).format(java.util.Date())
+                    isPaused.value = false
+                    pauseStartTime.value = ""
+                    totalPausedMinutes.value = 0
+                    totalsPorTipo.value = emptyMap()
+                    numPorTipo.value = emptyMap()
+                    entradas.value = emptyList()
+                    // Navegacion optimista: antes la pantalla no cambiaba hasta
+                    // procesar el STATUS del movil. El STATUS posterior corrige
+                    // el estado si el movil rechaza el comando (ERROR -> resync).
+                    currentScreen.value = ScreenState.ACTIVE_TURNO
+                }
+            }
+        }
+        return sent
     }
 
-    private fun sendGetTurnos() {
+    private fun sendGetTurnos(): Boolean {
         val command = JSONObject().apply {
             put("operationId", UUID.randomUUID().toString())
             put("type", "GET_TURNOS")
             put("createdAt", System.currentTimeMillis().toString())
         }
-        sendCommand(command.toString())
+        return sendCommand(command.toString())
     }
 
-    private fun sendAddEntry(entryType: String, amount: Double, note: String) {
+    /** Aplica un cambio inmediato y local de entradas/totales (optimistic UI).
+     *  Si el movil confirma con OK, el STATUS posterior solo refrescara los mismos datos.
+     *  Si responde ERROR, requestStatus() forzara el resync correcto. */
+    private fun applyOptimisticAddEntry(entryType: String, amount: Double, note: String) {
+        if (entryType.isBlank()) return
+        val newEntry = WatchEntry(
+            id = -System.currentTimeMillis(),
+            type = entryType,
+            amount = amount,
+            note = note,
+            time = java.text.SimpleDateFormat("HH:mm", java.util.Locale.getDefault()).format(java.util.Date())
+        )
+        entradas.value = entradas.value + newEntry
+        if (entryType != "nota") {
+            val nuevosTot = totalsPorTipo.value.toMutableMap()
+            nuevosTot[entryType] = (nuevosTot[entryType] ?: 0.0) + amount
+            totalsPorTipo.value = nuevosTot
+            val nuevosNum = numPorTipo.value.toMutableMap()
+            nuevosNum[entryType] = (nuevosNum[entryType] ?: 0) + 1
+            numPorTipo.value = nuevosNum
+        }
+    }
+
+    private fun applyOptimisticEditEntry(id: Long, amount: Double, note: String) {
+        val before = entradas.value.firstOrNull { it.id == id } ?: return
+        val updated = before.copy(amount = amount, note = note)
+        entradas.value = entradas.value.map { if (it.id == id) updated else it }
+        if (before.type != "nota") {
+            val diff = amount - before.amount
+            val nuevosTot = totalsPorTipo.value.toMutableMap()
+            nuevosTot[before.type] = (nuevosTot[before.type] ?: 0.0) + diff
+            totalsPorTipo.value = nuevosTot
+        }
+    }
+
+    private fun applyOptimisticDeleteEntry(id: Long) {
+        val target = entradas.value.firstOrNull { it.id == id } ?: return
+        entradas.value = entradas.value.filterNot { it.id == id }
+        if (target.type != "nota") {
+            val nuevosTot = totalsPorTipo.value.toMutableMap()
+            nuevosTot[target.type] = ((nuevosTot[target.type] ?: 0.0) - target.amount).coerceAtLeast(0.0)
+            totalsPorTipo.value = nuevosTot
+            val nuevosNum = numPorTipo.value.toMutableMap()
+            nuevosNum[target.type] = ((nuevosNum[target.type] ?: 0) - 1).coerceAtLeast(0)
+            numPorTipo.value = nuevosNum
+        }
+    }
+
+    private fun sendAddEntry(entryType: String, amount: Double, note: String): Boolean {
         val command = JSONObject().apply {
             put("operationId", UUID.randomUUID().toString())
             put("type", "ADD_ENTRY")
@@ -403,7 +595,9 @@ class WearMainActivity : ComponentActivity() {
                 put("note", note)
             })
         }
-        sendCommand(command.toString())
+        val sent = sendCommand(command.toString())
+        if (sent) applyOptimisticAddEntry(entryType, amount, note)
+        return sent
     }
 
     private fun parseTotals(totals: JSONObject?) {
@@ -462,6 +656,7 @@ class WearMainActivity : ComponentActivity() {
                     miGanancia = o.optDouble("miGanancia", 0.0),
                     totalADescontar = o.optDouble("totalADescontar", 0.0),
                     totalADar = o.optDouble("totalADar", 0.0),
+                    contablePendiente = o.optBoolean("contablePendiente", false),
                     tiempoTrabajado = o.optString("tiempoTrabajado", ""),
                     totals = parseTurnoTotals(totals),
                     entradas = parseEntryArray(o.optJSONArray("entradas"))
@@ -500,7 +695,7 @@ class WearMainActivity : ComponentActivity() {
         return list
     }
 
-    private fun sendEditEntry(id: Long, amount: Double, note: String) {
+    private fun sendEditEntry(id: Long, amount: Double, note: String): Boolean {
         val command = JSONObject().apply {
             put("operationId", UUID.randomUUID().toString())
             put("type", "EDIT_ENTRY")
@@ -511,10 +706,12 @@ class WearMainActivity : ComponentActivity() {
                 put("note", note)
             })
         }
-        sendCommand(command.toString())
+        val sent = sendCommand(command.toString())
+        if (sent) applyOptimisticEditEntry(id, amount, note)
+        return sent
     }
 
-    private fun sendDeleteEntry(id: Long) {
+    private fun sendDeleteEntry(id: Long): Boolean {
         val command = JSONObject().apply {
             put("operationId", UUID.randomUUID().toString())
             put("type", "DELETE_ENTRY")
@@ -523,10 +720,12 @@ class WearMainActivity : ComponentActivity() {
                 put("id", id)
             })
         }
-        sendCommand(command.toString())
+        val sent = sendCommand(command.toString())
+        if (sent) applyOptimisticDeleteEntry(id)
+        return sent
     }
 
-    private fun sendAddNote(noteText: String) {
+    private fun sendAddNote(noteText: String): Boolean {
         val command = JSONObject().apply {
             put("operationId", UUID.randomUUID().toString())
             put("type", "ADD_NOTE")
@@ -535,10 +734,10 @@ class WearMainActivity : ComponentActivity() {
                 put("note", noteText)
             })
         }
-        sendCommand(command.toString())
+        return sendCommand(command.toString())
     }
 
-    private fun sendEndTurno(dinero: Double, km: Double) {
+    private fun sendEndTurno(dinero: Double, km: Double): Boolean {
         val command = JSONObject().apply {
             put("operationId", UUID.randomUUID().toString())
             put("type", "END_TURNO")
@@ -550,11 +749,16 @@ class WearMainActivity : ComponentActivity() {
             })
         }
         openTurnosAfterOk = sendCommand(command.toString())
+        return openTurnosAfterOk
     }
 
     /** Lanza el teclado / voz del sistema para introducir una nota de texto libre. */
     private fun requestNote(current: String, onResult: (String) -> Unit) {
-        pendingNoteCallback = onResult
+        if (!pendingNoteCallback.compareAndSet(null, onResult)) {
+            // Ya hay una nota pendiente esperando; no reabrir el RemoteInput.
+            performFeedback("Nota pendiente", strong = false)
+            return
+        }
         val remoteInputs = listOf(
             RemoteInput.Builder(NOTE_KEY)
                 .setLabel(if (current.isBlank()) "Nota" else current.take(24))
@@ -593,6 +797,9 @@ class WearMainActivity : ComponentActivity() {
         if (isRetry && !matchesCurrentSession(commandJson)) {
             return false
         }
+        refreshPendingOpsCount()
+        scheduleResync(2500L)
+        if (pendingOpsCount.value > 0) acquireOperationWakeLock()
         if (!isRetry && shouldPersistOutbox(commandJson)) {
             val operationId = JSONObject(commandJson).optString("operationId", "")
             WatchOutbox.save(this, operationId, commandJson)
@@ -737,12 +944,19 @@ private fun ConfirmDeleteScreen(
                     modifier = Modifier.weight(1f),
                     onClick = onCancel
                 )
+                var deleting by remember { mutableStateOf(false) }
                 ConfirmDeleteButton(
-                    label = "Borrar",
+                    label = if (deleting) "Borrando..." else "Borrar",
                     textColor = ColorWhite,
                     bg = ColorGasolina,
+                    enabled = !deleting,
                     modifier = Modifier.weight(1f),
-                    onClick = onConfirm
+                    onClick = {
+                        if (!deleting) {
+                            deleting = true
+                            onConfirm()
+                        }
+                    }
                 )
             }
         }
@@ -754,6 +968,7 @@ private fun ConfirmDeleteButton(
     label: String,
     textColor: Color,
     bg: Color,
+    enabled: Boolean = true,
     modifier: Modifier = Modifier,
     onClick: () -> Unit
 ) {
@@ -761,7 +976,7 @@ private fun ConfirmDeleteButton(
         modifier = modifier
             .clip(RoundedCornerShape(14.dp))
             .background(bg)
-            .clickable { onClick() }
+            .clickable(enabled = enabled) { onClick() }
             .padding(vertical = 11.dp),
         contentAlignment = Alignment.Center
     ) {

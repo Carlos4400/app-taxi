@@ -50,7 +50,12 @@ fun TurnoSummaryScreen(
 
         Row(horizontalArrangement = Arrangement.spacedBy(7.dp), modifier = Modifier.fillMaxWidth(0.88f)) {
             SummaryMetric("Total Taxímetro", fmtEur(turno.totalTaximetro), ColorAgencia, ColorAgenciaBg, Modifier.weight(1f))
-            SummaryMetric("Mi Ganancia", fmtEur(turno.miGanancia), ColorPropina, ColorPropinaBg, Modifier.weight(1f))
+            // Contabilidad pendiente de calcular por la app: no inventar numeros.
+            SummaryMetric(
+                "Mi Ganancia",
+                if (turno.contablePendiente) "Pendiente" else fmtEur(turno.miGanancia),
+                ColorPropina, ColorPropinaBg, Modifier.weight(1f)
+            )
         }
         Spacer(modifier = Modifier.height(7.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(7.dp), modifier = Modifier.fillMaxWidth(0.88f)) {
@@ -71,8 +76,24 @@ fun TurnoSummaryScreen(
 
         Spacer(modifier = Modifier.height(10.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(7.dp), modifier = Modifier.fillMaxWidth(0.88f)) {
-            SummaryMetric("Total a descontar", fmtEur(turno.totalADescontar), ColorGasolina, ColorGasolinaBg, Modifier.weight(1f))
-            SummaryMetric("Total a dar", fmtEur(turno.totalADar), ColorPropina, ColorPropinaBg, Modifier.weight(1f))
+            SummaryMetric(
+                "Total a descontar",
+                if (turno.contablePendiente) "Pendiente" else fmtEur(turno.totalADescontar),
+                ColorGasolina, ColorGasolinaBg, Modifier.weight(1f)
+            )
+            SummaryMetric(
+                "Total a dar",
+                if (turno.contablePendiente) "Pendiente" else fmtEur(turno.totalADar),
+                ColorPropina, ColorPropinaBg, Modifier.weight(1f)
+            )
+        }
+        if (turno.contablePendiente) {
+            Spacer(modifier = Modifier.height(6.dp))
+            Text(
+                "Abre la app del móvil para calcular la contabilidad",
+                color = ColorGrey,
+                fontSize = 8.sp
+            )
         }
     }
 }

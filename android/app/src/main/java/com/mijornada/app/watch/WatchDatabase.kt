@@ -11,7 +11,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         CurrentTurnoEntity::class,
         TurnoEntity::class,
     ],
-    version = 4,
+    version = 5,
     exportSchema = false,
 )
 abstract class WatchDatabase : RoomDatabase() {
@@ -82,6 +82,20 @@ abstract class WatchDatabase : RoomDatabase() {
                     ADD COLUMN `totalPausedMinutes` INTEGER NOT NULL DEFAULT 0
                     """.trimIndent(),
                 )
+            }
+        }
+
+        @JvmField
+        val MIGRATION_4_5 = object : Migration(4, 5) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                listOf("totalTaximetro", "miGanancia", "totalADescontar", "totalADar").forEach { column ->
+                    db.execSQL(
+                        """
+                        ALTER TABLE `watch_turnos`
+                        ADD COLUMN `$column` REAL DEFAULT NULL
+                        """.trimIndent(),
+                    )
+                }
             }
         }
     }

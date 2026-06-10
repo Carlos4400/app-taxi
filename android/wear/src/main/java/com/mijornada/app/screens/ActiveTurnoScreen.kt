@@ -6,6 +6,11 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -29,6 +34,7 @@ fun ActiveTurnoScreen(
     totalsPorTipo: Map<String, Double>,
     numPorTipo: Map<String, Int>,
     entradas: List<WatchEntry>,
+    pendingOpsCount: Int = 0,
     onSelectCategory: (String) -> Unit,
     onTogglePause: () -> Unit,
     onAddNote: () -> Unit,
@@ -40,6 +46,14 @@ fun ActiveTurnoScreen(
             .fillMaxSize()
             .background(ColorBackground)
     ) {
+        if (pendingOpsCount > 0) {
+            SyncIndicator(
+                count = pendingOpsCount,
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .padding(top = 4.dp)
+            )
+        }
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -67,17 +81,26 @@ fun ActiveTurnoScreen(
 
             Spacer(modifier = Modifier.height(7.dp))
 
+            var togglingPause by remember { mutableStateOf(false) }
+            LaunchedEffect(isPaused) { togglingPause = false }
             Box(
                 modifier = Modifier
                     .fillMaxWidth(WatchSafeButtonWidth)
                     .clip(RoundedCornerShape(14.dp))
                     .background(if (isPaused) ColorPropinaBg else ColorNuloBg)
-                    .clickable { onTogglePause() }
+                    .clickable(enabled = !togglingPause) {
+                        togglingPause = true
+                        onTogglePause()
+                    }
                     .padding(vertical = 8.dp),
                 contentAlignment = Alignment.Center
             ) {
                 Text(
-                    text = if (isPaused) "Reanudar turno" else "Pausar turno",
+                    text = when {
+                        togglingPause -> "Procesando..."
+                        isPaused -> "Reanudar turno"
+                        else -> "Pausar turno"
+                    },
                     color = if (isPaused) ColorPropina else ColorWhite,
                     fontSize = 11.sp,
                     fontWeight = FontWeight.Bold
@@ -116,16 +139,25 @@ fun ActiveTurnoScreen(
 
             Spacer(modifier = Modifier.height(8.dp))
 
+            var requestingNote by remember { mutableStateOf(false) }
             Box(
                 modifier = Modifier
                     .fillMaxWidth(WatchSafeButtonWidth)
                     .clip(RoundedCornerShape(14.dp))
                     .background(ColorNuloBg)
-                    .clickable { onAddNote() }
+                    .clickable(enabled = !requestingNote) {
+                        requestingNote = true
+                        onAddNote()
+                    }
                     .padding(vertical = 9.dp),
                 contentAlignment = Alignment.Center
             ) {
-                Text("✎  Añadir nota al turno", color = ColorWhite, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                Text(
+                    text = if (requestingNote) "Abriendo..." else "✎  Añadir nota al turno",
+                    color = ColorWhite,
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Bold
+                )
             }
 
             if (entradas.isNotEmpty()) {
@@ -218,5 +250,26 @@ private fun EntradaHistorial(entry: WatchEntry, onClick: () -> Unit) {
         } else {
             Text(fmtEurSigned(entry.amount), color = meta.color, fontSize = 12.sp, fontWeight = FontWeight.Bold)
         }
+    }
+}
+
+@Composable
+private fun SyncIndicator(
+    count: Int,
+    modifier: Modifier = Modifier
+) {
+    Box(
+        modifier = modifier
+            .clip(RoundedCornerShape(8.dp))
+            .background(ColorPropinaBg)
+            .padding(horizontal = 6.dp, vertical = 1.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(
+            text = if (count == 1) "↻ Sincronizando..." else "↻ Sincronizando $count",
+            color = ColorPropina,
+            fontSize = 8.sp,
+            fontWeight = FontWeight.Bold
+        )
     }
 }

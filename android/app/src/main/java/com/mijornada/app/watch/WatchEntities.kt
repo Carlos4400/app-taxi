@@ -36,4 +36,9 @@ data class TurnoEntity(
     val km: Double,
     val notes: String,
     val totalPausedMinutes: Int = 0,
+    // Contabilidad precalculada por la app movil (null = pendiente de sincronizar).
+    val totalTaximetro: Double? = null,
+    val miGanancia: Double? = null,
+    val totalADescontar: Double? = null,
+    val totalADar: Double? = null,
 )

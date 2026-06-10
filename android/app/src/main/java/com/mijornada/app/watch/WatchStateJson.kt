@@ -94,6 +94,8 @@ object WatchStateJson {
         val historyJson = root.optJSONArray("history") ?: JSONArray()
         val history = (0 until historyJson.length()).mapNotNull { index ->
             val turno = historyJson.optJSONObject(index) ?: return@mapNotNull null
+            // Contabilidad precalculada por la app (regla de oro TypeScript).
+            val contable = turno.optJSONObject("contable")
             WatchTurno(
                 id = turno.optLong("id", 0L),
                 date = turno.optString("date", ""),
@@ -105,6 +107,10 @@ object WatchStateJson {
                 km = turno.optDouble("km", 0.0),
                 notes = turno.optString("notes", ""),
                 totalPausedMinutes = turno.optInt("totalPausedMinutes", 0),
+                totalTaximetro = nullableDouble(contable, "totalTaximetro"),
+                miGanancia = nullableDouble(contable, "miGanancia"),
+                totalADescontar = nullableDouble(contable, "totalADescontar"),
+                totalADar = nullableDouble(contable, "totalADar"),
             )
         }
         val processedOperationIdsJson = root.optJSONArray("processedOperationIds") ?: JSONArray()
@@ -121,5 +127,11 @@ object WatchStateJson {
     private fun nullableString(json: JSONObject, key: String): String? {
         if (!json.has(key) || json.isNull(key)) return null
         return json.optString(key, "").ifBlank { null }
+    }
+
+    private fun nullableDouble(json: JSONObject?, key: String): Double? {
+        if (json == null || !json.has(key) || json.isNull(key)) return null
+        val value = json.optDouble(key, Double.NaN)
+        return if (value.isNaN()) null else value
     }
 }

@@ -31,8 +31,7 @@
 
         <service
             android:name="com.mijornada.app.MobileResponseService"
-            android:exported="true"
-            android:permission="com.google.android.gms.permission.BIND_DATA_LAYER">
+            android:exported="true">
             <intent-filter>
                 <action android:name="com.google.android.gms.wearable.DATA_CHANGED" />
                 <data

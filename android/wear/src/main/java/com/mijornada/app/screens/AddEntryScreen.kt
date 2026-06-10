@@ -31,6 +31,7 @@ fun AddEntryScreen(
 ) {
     var amountText by remember { mutableStateOf(amountToText(initialAmount)) }
     var note by remember { mutableStateOf(initialNote) }
+    var saving by remember { mutableStateOf(false) }
 
     val amount = parseAmount(amountText)
 
@@ -38,7 +39,12 @@ fun AddEntryScreen(
         NotaEditor(
             note = note,
             onEditarTexto = { onRequestNote(note) { result -> note = result } },
-            onSave = { if (note.isNotBlank()) onSave(0.0, note) },
+            onSave = {
+                if (note.isNotBlank() && !saving) {
+                    saving = true
+                    onSave(0.0, note)
+                }
+            },
             onCancel = onCancel,
             onDelete = onDelete
         )
@@ -85,9 +91,14 @@ fun AddEntryScreen(
                 )
                 Spacer(modifier = Modifier.width(9.dp))
                 GuardarImporteButton(
-                    enabled = amount > 0.0,
+                    enabled = amount > 0.0 && !saving,
                     color = categoryColor,
-                    onClick = { onSave(amount, note) }
+                    onClick = {
+                        if (!saving) {
+                            saving = true
+                            onSave(amount, note)
+                        }
+                    }
                 )
             }
 
