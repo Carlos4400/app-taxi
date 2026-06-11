@@ -470,6 +470,63 @@ export function processWatchCommand(
     };
   }
 
+  if (command.type === "EDIT_TURNO") {
+    const target = state.history.find((t) => t.id === command.payload.id);
+    if (!target) {
+      return {
+        ...state,
+        response: errorResponse(command, "TURNO_NOT_FOUND", "Turno no encontrado"),
+      };
+    }
+    if (!(command.payload.dinero > 0) || !(command.payload.km > 0)) {
+      return {
+        ...state,
+        response: errorResponse(command, "INVALID_EDIT_VALUES", "Taximetro y kilometros obligatorios"),
+      };
+    }
+
+    const entradas = command.payload.entradas.map((e) => ({
+      id: e.id,
+      type: e.type as string,
+      amount: e.amount,
+      note: e.note,
+      time: e.time,
+    }));
+    if (entradas.some((e) => e.type !== "nota" && !(e.amount > 0))) {
+      return {
+        ...state,
+        response: errorResponse(command, "INVALID_EDIT_VALUES", "Importes de entradas invalidos"),
+      };
+    }
+
+    return {
+      ...state,
+      history: state.history.map((t) =>
+        t.id === command.payload.id
+          ? {
+              ...t,
+              dinero: command.payload.dinero,
+              km: command.payload.km,
+              entries: entradas,
+              // Totales recomputados igual que saveEdit en edit-turno-screen.
+              totalP: entradas.filter((e) => e.type === "propina").reduce((s2, e) => s2 + e.amount, 0),
+              totalD: entradas.filter((e) => e.type === "datafono").reduce((s2, e) => s2 + e.amount, 0),
+              totalA: entradas.filter((e) => e.type === "agencia_bono").reduce((s2, e) => s2 + e.amount, 0),
+              totalE: entradas.filter((e) => e.type === "extra").reduce((s2, e) => s2 + e.amount, 0),
+              totalF: entradas.filter((e) => e.type === "gasolina").reduce((s2, e) => s2 + e.amount, 0),
+              totalN: entradas.filter((e) => e.type === "nulo").reduce((s2, e) => s2 + e.amount, 0),
+            }
+          : t,
+      ),
+      processedOperationIds: withProcessedOperationId(state, command.operationId),
+      response: {
+        type: "OK",
+        operationId: command.operationId,
+        message: "Turno actualizado",
+      },
+    };
+  }
+
   if (command.type === "END_TURNO") {
     if (!state.current.startTime) {
       return {

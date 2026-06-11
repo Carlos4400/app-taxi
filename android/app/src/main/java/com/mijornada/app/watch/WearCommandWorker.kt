@@ -61,6 +61,7 @@ class WearCommandWorker(
                 || "ADD_ENTRY" == type
                 || "ADD_NOTE" == type
                 || "EDIT_ENTRY" == type
+                || "EDIT_TURNO" == type
                 || "DELETE_ENTRY" == type
                 || "END_TURNO" == type
         } catch (e: Exception) {

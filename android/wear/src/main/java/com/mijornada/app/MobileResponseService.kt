@@ -84,6 +84,11 @@ class MobileResponseService : WearableListenerService() {
             val operationId = json.optString("operationId", "")
             val isTerminal = isTerminalResponse(responseType, json.optString("code", ""))
 
+            if (responseType == "STATUS") {
+                // Alimenta la Tile y la complicación de esfera con el estado confirmado.
+                TurnoStatusStore.save(this, responseJson)
+            }
+
             if (operationId.isNotBlank() && isTerminal) {
                 if (!rememberTerminalOperation(operationId)) return
                 WatchOutbox.remove(this, operationId)

@@ -41,12 +41,16 @@ import org.json.JSONObject
 import java.util.UUID
 import java.util.concurrent.atomic.AtomicReference
 
+/** Extra con la acción solicitada desde la tile ("iniciar_turno", "continuar", "turnos", "abrir"). */
+const val EXTRA_ACCION_TILE = "com.mijornada.app.ACCION_TILE"
+
 enum class ScreenState {
     NO_CONNECTED,
     NO_ACTIVE_TURNO,
     ACTIVE_TURNO,
     TURNOS,
     TURNO_SUMMARY,
+    EDIT_TURNO_DATOS,
     ADD_ENTRY,
     EDIT_ENTRY,
     CONFIRM_DELETE,
@@ -79,6 +83,7 @@ class WearMainActivity : ComponentActivity() {
     private var editingEntry = mutableStateOf<WatchEntry?>(null)
     private var openTurnosAfterOk = false
     private var turnosLoading = mutableStateOf(false)
+    private var pendingTileAction: String? = null
     private var pendingOpsCount = mutableStateOf(0)
     private val mainHandler = Handler(Looper.getMainLooper())
     private val resyncRunnable = Runnable { requestStatus() }
@@ -146,6 +151,7 @@ class WearMainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         refreshPendingOpsCount()
+        pendingTileAction = intent?.getStringExtra(EXTRA_ACCION_TILE)
 
         noteLauncher = registerForActivityResult(
             ActivityResultContracts.StartActivityForResult()
@@ -167,12 +173,49 @@ class WearMainActivity : ComponentActivity() {
         }
     }
 
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        pendingTileAction = intent.getStringExtra(EXTRA_ACCION_TILE)
+        consumeTileAction()
+    }
+
+    /** Ejecuta la acción pedida desde la tile por el circuito normal de la app.
+     *  Si aún no hay sesión confirmada, se reintenta al procesar el STATUS. */
+    private fun consumeTileAction() {
+        val accion = pendingTileAction ?: return
+        when (accion) {
+            "iniciar_turno" -> {
+                if (activeTurno.value) {
+                    pendingTileAction = null
+                    currentScreen.value = ScreenState.ACTIVE_TURNO
+                } else if (userSessionId.value.isNotBlank()) {
+                    pendingTileAction = null
+                    sendStartTurno()
+                }
+                // Sin sesión todavía: conservar la acción y esperar al STATUS.
+            }
+            "continuar" -> {
+                pendingTileAction = null
+                if (activeTurno.value) currentScreen.value = ScreenState.ACTIVE_TURNO
+            }
+            "turnos" -> {
+                pendingTileAction = null
+                if (sendGetTurnos()) {
+                    turnosLoading.value = true
+                    currentScreen.value = ScreenState.TURNOS
+                }
+            }
+            else -> pendingTileAction = null
+        }
+    }
+
     override fun onResume() {
         super.onResume()
         isUiActive = true
         refreshPendingOpsCount()
         prefs.registerOnSharedPreferenceChangeListener(responsePrefsListener)
         pollResponseState()
+        consumeTileAction()
         // Si quedo una carga de turnos pendiente (respuesta perdida o sobrescrita
         // mientras la Activity estaba pausada), reintentar la peticion.
         if (currentScreen.value == ScreenState.TURNOS && turnosLoading.value) {
@@ -244,6 +287,9 @@ class WearMainActivity : ComponentActivity() {
                 if (currentScreen.value == ScreenState.TURNOS || currentScreen.value == ScreenState.TURNO_SUMMARY) {
                     sendGetTurnos()
                 }
+
+                // Acción pendiente de la tile que esperaba sesión/estado confirmado.
+                consumeTileAction()
             } else if ("TURNOS_STATUS" == json.optString("type")) {
                 turnosLoading.value = false
                 isConnected.value = json.optBoolean("connected", false)
@@ -265,7 +311,12 @@ class WearMainActivity : ComponentActivity() {
                 } else {
                     // Solo navegar a ACTIVE_TURNO si el usuario sigue en un formulario.
                     // En TURNOS, TURNO_SUMMARY, NO_CONNECTED: respetar pantalla actual.
-                    if (currentScreen.value in formScreens) {
+                    if (currentScreen.value == ScreenState.EDIT_TURNO_DATOS) {
+                        // Edicion de turno cerrado confirmada: volver al resumen
+                        // y re-pedir la lista para mostrar los datos del movil.
+                        currentScreen.value = ScreenState.TURNO_SUMMARY
+                        sendGetTurnos()
+                    } else if (currentScreen.value in formScreens) {
                         currentScreen.value = ScreenState.ACTIVE_TURNO
                     }
                     requestStatus()
@@ -274,7 +325,10 @@ class WearMainActivity : ComponentActivity() {
                 refreshPendingOpsCount()
                 releaseOperationWakeLockIfIdle()
                 performFeedback(json.optString("message", "Ya aplicado"), strong = false)
-                if (currentScreen.value in formScreens) {
+                if (currentScreen.value == ScreenState.EDIT_TURNO_DATOS) {
+                    currentScreen.value = ScreenState.TURNO_SUMMARY
+                    sendGetTurnos()
+                } else if (currentScreen.value in formScreens) {
                     currentScreen.value = if (activeTurno.value) ScreenState.ACTIVE_TURNO else ScreenState.NO_ACTIVE_TURNO
                 }
                 requestStatus()
@@ -432,7 +486,25 @@ class WearMainActivity : ComponentActivity() {
                 } else {
                     TurnoSummaryScreen(
                         turno = turno,
-                        onBack = { currentScreen.value = ScreenState.TURNOS }
+                        onBack = { currentScreen.value = ScreenState.TURNOS },
+                        onEdit = { currentScreen.value = ScreenState.EDIT_TURNO_DATOS }
+                    )
+                }
+            }
+            ScreenState.EDIT_TURNO_DATOS -> {
+                val turno = selectedTurno.value
+                if (turno == null) {
+                    LaunchedEffect(Unit) { currentScreen.value = ScreenState.TURNOS }
+                } else {
+                    EditTurnoDatosScreen(
+                        turno = turno,
+                        onRequestNote = { current, onResult -> requestNote(current, onResult) },
+                        onConfirm = { dinero, km, entradas ->
+                            if (!sendEditTurno(turno.id, dinero, km, entradas)) {
+                                currentScreen.value = ScreenState.TURNO_SUMMARY
+                            }
+                        },
+                        onCancel = { currentScreen.value = ScreenState.TURNO_SUMMARY }
                     )
                 }
             }
@@ -451,6 +523,7 @@ class WearMainActivity : ComponentActivity() {
                 currentScreen.value = if (activeTurno.value) ScreenState.ACTIVE_TURNO else ScreenState.NO_ACTIVE_TURNO
             }
             ScreenState.TURNO_SUMMARY -> currentScreen.value = ScreenState.TURNOS
+            ScreenState.EDIT_TURNO_DATOS -> currentScreen.value = ScreenState.TURNO_SUMMARY
             ScreenState.NO_ACTIVE_TURNO -> Unit
             ScreenState.ACTIVE_TURNO -> Unit
             ScreenState.NO_CONNECTED -> Unit
@@ -769,6 +842,65 @@ class WearMainActivity : ComponentActivity() {
         return openTurnosAfterOk
     }
 
+    private fun sendEditTurno(id: Long, dinero: Double, km: Double, entradas: List<WatchEntry>): Boolean {
+        val command = JSONObject().apply {
+            put("operationId", UUID.randomUUID().toString())
+            put("type", "EDIT_TURNO")
+            put("createdAt", System.currentTimeMillis().toString())
+            put("payload", JSONObject().apply {
+                put("id", id)
+                put("dinero", dinero)
+                put("km", km)
+                put("entradas", JSONArray().also { array ->
+                    entradas.forEach { entry ->
+                        array.put(JSONObject().apply {
+                            put("id", entry.id)
+                            put("type", entry.type)
+                            put("amount", entry.amount)
+                            put("note", entry.note)
+                            put("time", entry.time)
+                        })
+                    }
+                })
+            })
+        }
+        val sent = sendCommand(command.toString())
+        if (sent) applyOptimisticEditTurno(id, dinero, km, entradas)
+        return sent
+    }
+
+    /** Optimista: el turno editado muestra los datos nuevos al instante y su
+     *  contabilidad pasa a Pendiente hasta que la app la recalcule (regla de
+     *  oro: nunca mostrar numeros contables no confirmados). dineroBase no
+     *  depende de ajustes, por eso si puede actualizarse en local. */
+    private fun applyOptimisticEditTurno(id: Long, dinero: Double, km: Double, entradas: List<WatchEntry>) {
+        val tipos = listOf("propina", "datafono", "agencia_bono", "extra", "gasolina", "nulo")
+        val porTipo = tipos.associateWith { tipo -> entradas.filter { it.type == tipo }.sumOf { it.amount } }
+        val numPorTipo = tipos.associateWith { tipo -> entradas.count { it.type == tipo } }
+        turnos.value = turnos.value.map { turno ->
+            if (turno.id == id) {
+                val nulos = porTipo["nulo"] ?: 0.0
+                turno.copy(
+                    dinero = dinero,
+                    km = km,
+                    entradas = entradas,
+                    totals = WatchTurnoTotals(porTipo, numPorTipo, entradas.size),
+                    totalTaximetro = dinero - nulos,
+                    miGanancia = 0.0,
+                    totalADescontar = 0.0,
+                    totalADar = 0.0,
+                    contablePendiente = true,
+                )
+            } else {
+                turno
+            }
+        }
+        val abierto = selectedTurno.value
+        if (abierto != null && abierto.id == id) {
+            selectedTurno.value = turnos.value.firstOrNull { it.id == id } ?: abierto
+        }
+    }
+
     /** Lanza el teclado / voz del sistema para introducir una nota de texto libre. */
     private fun requestNote(current: String, onResult: (String) -> Unit) {
         if (!pendingNoteCallback.compareAndSet(null, onResult)) {
@@ -915,6 +1047,7 @@ class WearMainActivity : ComponentActivity() {
                 || type == "ADD_ENTRY"
                 || type == "ADD_NOTE"
                 || type == "EDIT_ENTRY"
+                || type == "EDIT_TURNO"
                 || type == "DELETE_ENTRY"
                 || type == "END_TURNO"
         } catch (e: Exception) {

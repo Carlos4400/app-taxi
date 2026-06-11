@@ -84,6 +84,17 @@ export type WatchCommand =
     }
   | {
       operationId: string;
+      type: "EDIT_TURNO";
+      createdAt: string;
+      payload: {
+        id: number;
+        dinero: number;
+        km: number;
+        entradas: WatchEntry[];
+      };
+    }
+  | {
+      operationId: string;
       type: "END_TURNO";
       createdAt: string;
       payload: {

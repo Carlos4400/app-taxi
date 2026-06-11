@@ -121,6 +121,298 @@ stateJson = readFileSync(
 
 Tras la línea 928 había un cierre `});` (del primer `it` de fondos) y otro `});` (del `describe`), pero después colgaba un duplicado parcial del `it` contable (sin la cabecera `it(...)`, con las variables sin declarar) y un `it` extra con el mismo nombre. TS marcaba las líneas 952 y 963 como "Declaration or statement expected" porque `stateJson = ...` no era una sentencia válida a nivel de módulo dentro del `describe` ya cerrado. Eliminado el duplicado parcial, el test queda con dos `it` (contabilidad + fondos) dentro del `describe`, sin código suelto.
 
+## 2026-06-11 04:15 - Ampliar EDIT_TURNO a edición completa (paridad con edit-turno-screen del móvil)
+
+**Archivos modificados:** `src/shared/watch-commands.ts`, `src/logic/watch-command-processor.ts`, `android/app/src/main/java/com/mijornada/app/watch/WatchModels.kt`, `android/app/src/main/java/com/mijornada/app/watch/WatchCommandJson.kt`, `android/app/src/main/java/com/mijornada/app/watch/WatchCommandProcessor.kt`, `android/wear/src/main/java/com/mijornada/app/screens/EditTurnoDatosScreen.kt`, `android/wear/src/main/java/com/mijornada/app/WearMainActivity.kt`, `ARQUITECTURA_RELOJ_WEAR_OS.md`, `src/__tests__/android-wear-bridge.test.ts`
+
+### Contexto
+
+El usuario pidió que la edición desde el lápiz del reloj fuera "la misma edición que en el móvil". `edit-turno-screen.tsx` permite: dinero/km, editar/borrar/añadir entradas, editar/borrar/añadir notas, y guardado atómico. Se amplió el payload de `EDIT_TURNO` con `entradas` y la pantalla del reloj a edición completa con cambios locales hasta Guardar. **"Eliminar Turno" del móvil queda fuera deliberadamente:** la hidratación fusiona con `mergeTurnos` (los turnos del store que no estén en Room se conservan), así que un borrado nativo resucitaría desde la app; soportarlo exige mecanismo de tombstones aparte.
+
+### Cambio 1 - Payload de EDIT_TURNO con entradas (paridad TS/Kotlin)
+
+`watch-commands.ts`: payload pasa a `{id, dinero, km, entradas: WatchEntry[]}`. Procesador TS: valida importes de entradas no-nota > 0 (`INVALID_EDIT_VALUES`), reemplaza `entries` y **recomputa totalP..totalN exactamente como `saveEdit` del móvil**. Kotlin (`WatchCommandJson.parseEntradas` nuevo, `WatchCommand.EditTurno.entradas`, `processEditTurno`): misma validación, reemplaza `entries` y mantiene la anulación de contabilidad (`totalTaximetro/miGanancia/totalADescontar/totalADar = null`).
+
+### Cambio 2 - Pantalla de edición completa en el reloj
+
+`EditTurnoDatosScreen.kt` reescrita: campos Taxímetro/KM con teclado plegable; sección ENTRADAS con filas pulsables que abren `AddEntryScreen` reutilizada en modo local (editar importe/nota, eliminar); selector de 6 categorías para añadir entrada nueva; sección NOTAS DEL TURNO con editar (RemoteInput), borrar (✕) y añadir nota; "Guardar cambios" envía un único `EDIT_TURNO` con todo y "Cancelar" descarta. Los ids de elementos nuevos usan `System.currentTimeMillis()` y hora actual, como el móvil.
+
+### Cambio 3 - Activity: envío y optimista completos
+
+`sendEditTurno(id, dinero, km, entradas)` serializa el array al payload; `applyOptimisticEditTurno` actualiza también `entradas` y recomputa `totals` (porTipo/numPorTipo/numEntradas) en local, manteniendo `contablePendiente = true`. La pantalla recibe `onRequestNote` para la entrada de texto del sistema.
+
+### Cambio 4 - Docs y tests
+
+`ARQUITECTURA_RELOJ_WEAR_OS.md`: descripción de `EDIT_TURNO` ampliada a edición completa. Test de contrato ampliado: `entradas: WatchEntry[]` en el contrato TS, `command.payload.entradas` en el procesador TS, `entries = command.entradas` en Kotlin, `parseEntradas` en el parser, y la pantalla con firma `(Double, Double, List<WatchEntry>)` y reutilización de `AddEntryScreen`.
+
+### Verificación
+
+`npx tsc --noEmit` limpio; `android-wear-bridge.test.ts` 62/62 y `watch-command-processor.test.ts` en verde. Pendiente: gradle de app y wear (**reinstalar ambas**) y ciclo físico completo: lápiz → editar entradas/notas/datos → Guardar → Pendiente → abrir app móvil → recalculado.
+
+## 2026-06-11 03:30 - Añadir comando EDIT_TURNO, lápiz funcional y cabeceras dentro del círculo
+
+**Archivos modificados:** `src/shared/watch-commands.ts`, `src/logic/watch-command-processor.ts`, `android/app/src/main/java/com/mijornada/app/watch/WatchModels.kt`, `android/app/src/main/java/com/mijornada/app/watch/WatchCommandJson.kt`, `android/app/src/main/java/com/mijornada/app/watch/WatchCommandProcessor.kt`, `android/app/src/main/java/com/mijornada/app/watch/WearCommandWorker.kt`, `android/app/src/main/java/com/mijornada/app/watch/WatchRepository.kt`, `android/wear/src/main/java/com/mijornada/app/WearMainActivity.kt`, `android/wear/src/main/java/com/mijornada/app/screens/EditTurnoDatosScreen.kt` (nuevo), `android/wear/src/main/java/com/mijornada/app/screens/TurnoSummaryScreen.kt`, `android/wear/src/main/java/com/mijornada/app/screens/TurnosScreen.kt`, `ARQUITECTURA_RELOJ_WEAR_OS.md`, `src/__tests__/android-wear-bridge.test.ts`
+
+### Contexto
+
+Dos peticiones del usuario tras ver el resumen en el reloj: (1) la flecha ‹ y el lápiz ✎ de las cabeceras quedaban recortados por la curva superior (fila al 88% en lo alto del círculo, donde el ancho útil es menor); (2) el lápiz debía mantenerse y ser funcional. Como no existía forma de editar un turno cerrado desde el reloj, se creó el comando crítico `EDIT_TURNO` (dinero y km) de punta a punta.
+
+### Cambio 1 - Comando EDIT_TURNO en el contrato (paridad TS/Kotlin)
+
+`No existía EDIT_TURNO.` En `watch-commands.ts` nueva variante con payload `{id, dinero, km}`. En `watch-command-processor.ts` (TS) y `WatchCommandProcessor.kt` (Kotlin) la misma lógica: turno no encontrado → `TURNO_NOT_FOUND`; dinero o km ≤ 0 → `INVALID_EDIT_VALUES`; si es válido se actualizan dinero/km del turno en `history` y responde OK "Turno actualizado". Parseo añadido en `WatchCommandJson.kt`, tipo en `WatchModels.kt` (`WatchCommand.EditTurno`), `typeName()` en `WatchRepository.kt` y clasificado como comando de **escritura** en `WearCommandWorker.isWriteCommand` (publica `/turno/state` tras aplicarse).
+
+### Cambio 2 - Regla de oro: editar anula la contabilidad guardada
+
+**Código nuevo (núcleo de `processEditTurno`, Kotlin):**
+
+```kotlin
+        val nextHistory = state.history.map { turno ->
+            if (turno.id == command.id) {
+                turno.copy(
+                    dinero = command.dinero,
+                    km = command.km,
+                    totalTaximetro = null,
+                    miGanancia = null,
+                    totalADescontar = null,
+                    totalADar = null,
+                )
+            } else { turno }
+        }
+```
+
+**Por qué:** al cambiar dinero/km, la contabilidad precalculada deja de ser válida; con los campos a null el reloj muestra "Pendiente" hasta que la app móvil recalcula con `accounting.ts` y sincroniza (el ciclo existente espejo contable → refresco automático cierra el circuito).
+
+### Cambio 3 - Reloj: pantalla de edición y envío por outbox
+
+`No existía EditTurnoDatosScreen.kt`: campos Taxímetro y KM (estilo de la app, campo activo resaltado), `NumericKeypad` reutilizado, Guardar/Cancelar. En `WearMainActivity`: estado `EDIT_TURNO_DATOS`, `sendEditTurno()` (outbox: `type == "EDIT_TURNO"` añadido a `shouldPersistOutbox`), optimista que actualiza dinero/km/dineroBase en local y marca `contablePendiente`, vuelta al resumen en OK/DUPLICATE con re-pedido de turnos, y `handleBack`.
+
+### Cambio 4 - Cabeceras dentro del círculo y lápiz funcional
+
+**Código anterior (resumen):** fila al `0.88f` con título "Resumen del Turno" y `✎` decorativo sin clickable; padding `top = 20.dp, bottom = 22.dp`.
+
+**Código nuevo:** fila al `0.68f` (en lo alto del círculo el ancho útil es menor), título corto "Resumen", `✎` con `clickable { onEdit() }`; padding `top = 26.dp, bottom = 36.dp`. Misma corrección de cabecera y paddings en `TurnosScreen`. El aviso inferior "Abre la app del móvil…" pasa a `fillMaxWidth(0.72f)` con `TextAlign.Center` (antes lo recortaba la curva inferior por ambos lados).
+
+### Cambio 5 - Documentación y tests
+
+`EDIT_TURNO` añadido a la lista de comandos críticos de `ARQUITECTURA_RELOJ_WEAR_OS.md`. Test de contrato nuevo "permite editar dinero y km de un turno cerrado desde el reloj" (paridad TS/Kotlin, anulación de contabilidad, outbox, pantalla y lápiz). Aserción del título actualizada a "Resumen".
+
+### Verificación
+
+`npx tsc --noEmit` limpio; `android-wear-bridge.test.ts` + `watch-command-processor.test.ts` 77/77. Pendiente: gradle (app y wear — **hay que reinstalar las dos apps**: el procesador del comando vive en el móvil) y prueba física del ciclo completo: lápiz → editar → Pendiente → abrir app móvil → números recalculados en el reloj.
+
+## 2026-06-10 19:40 - Rediseñar la tile con logo, estado en color y botones de acción
+
+**Archivos modificados:** `android/wear/src/main/java/com/mijornada/app/TurnoTileService.kt`, `android/wear/src/main/java/com/mijornada/app/WearMainActivity.kt`, `src/__tests__/android-wear-bridge.test.ts`
+
+### Contexto
+
+La primera tile era texto plano. Diseño acordado con el usuario: logo de la app arriba, línea de estado en color y dos botones al estilo de la home — "Iniciar Turno"/"Continuar" (verde, o azul en pausa) y "Turnos" (morado). Los botones no envían comandos por su cuenta (violaría el outbox/operationId): abren la app con la acción solicitada como extra y la app la ejecuta por su circuito normal.
+
+### Cambio 1 - TurnoTileService rediseñada
+
+**Código anterior:** layout de tres líneas de texto con un único clickable global.
+
+**Código nuevo:** columna con `Image` del logo (`brand_taxi_logo` vía `addIdToImageMapping`, RESOURCES_VERSION "2"), texto de estado coloreado (verde activo / azul pausa / gris libre) y fila de dos botones `Box` con fondo redondeado translúcido y `LaunchAction` con extra:
+
+```kotlin
+                            .addKeyToExtraMapping(EXTRA_ACCION_TILE, ActionBuilders.stringExtra(accion))
+```
+
+Acciones: `iniciar_turno` / `continuar` (según estado) y `turnos`; el fondo de la tile completa lleva `abrir`. Ancho de botón calculado desde `deviceConfiguration.screenWidthDp` para la pantalla redonda.
+
+### Cambio 2 - WearMainActivity ejecuta la acción de la tile
+
+**Código anterior:** `No existía manejo de extras de la tile en WearMainActivity.kt.`
+
+**Código nuevo:** constante top-level `EXTRA_ACCION_TILE`, campo `pendingTileAction` (leído en `onCreate` y en `onNewIntent`), y `consumeTileAction()` que ejecuta por el circuito normal: `iniciar_turno` → `sendStartTurno()` (espera a tener sesión confirmada si aún no la hay; si ya hay turno, abre la pantalla activa), `continuar` → pantalla de turno activo, `turnos` → `sendGetTurnos()` + pantalla TURNOS con carga. Se consume en `onResume` y, si quedó pendiente de sesión, al procesar el siguiente `STATUS`.
+
+**Por qué se cambió:** acciones de un toque desde la tile sin saltarse outbox, operationId ni validación de sesión.
+
+### Cambio 3 - Test de contrato ampliado
+
+El test "expone tile y complicacion..." verifica además `addKeyToExtraMapping(EXTRA_ACCION_TILE` en la tile y `EXTRA_ACCION_TILE` + `consumeTileAction()` en la Activity.
+
+### Verificación
+
+`android-wear-bridge.test.ts` 61/61. Pendiente: gradle wear y prueba física (la tile se actualiza sola al reinstalar; si no, quitarla y volver a añadirla).
+
+## 2026-06-10 19:05 - Complicación de esfera como logo con anillo de color por estado
+
+**Archivos modificados:** `android/wear/src/main/java/com/mijornada/app/TurnoComplicationService.kt`, `android/wear/src/main/AndroidManifest.xml`
+
+### Contexto
+
+Probada en el Xiaomi Watch 5, la complicación SHORT_TEXT ("Libre/Turno" en texto plano) resultaba pobre. El usuario pidió solo el logo de la app con un anillo de color según estado. El color de las complicaciones normales lo decide la esfera, así que se usa el tipo SMALL_IMAGE con `SmallImageType.PHOTO` (la esfera lo muestra sin tintar) y el bitmap se dibuja en runtime.
+
+### Cambio 1 - SMALL_IMAGE con logo y anillo
+
+**Código anterior:** `TurnoComplicationService` solo soportaba `SHORT_TEXT` (texto "Libre"/"Pausa"/hora con título "Turno").
+
+**Código nuevo:** tipo preferido `SMALL_IMAGE`: bitmap 128px generado en runtime — círculo de fondo `#15151C` (color de tarjeta de la app), anillo de grosor 7,5% del color del estado y `brand_taxi_logo` centrado al 62%. Paleta coherente con el lenguaje de color de la app (acordada con el usuario tras proponerle invertir la suya):
+
+```kotlin
+        private const val COLOR_ACTIVO = 0xFF3CFF64.toInt()  // verde = turno en marcha
+        private const val COLOR_PAUSA = 0xFF3B82F6.toInt()   // azul = pausa (igual que el móvil)
+        private const val COLOR_LIBRE = 0xFF7C5CFF.toInt()   // morado del botón Turnos
+```
+
+`SHORT_TEXT` se mantiene como segundo tipo para huecos solo-texto. En el manifest, `SUPPORTED_TYPES` pasa de `"SHORT_TEXT"` a `"SMALL_IMAGE,SHORT_TEXT"`.
+
+**Por qué se cambió:** identidad visual de la app en la esfera con control total del color, que el tipo texto no permite (la esfera impone su estilo).
+
+### Verificación
+
+`android-wear-bridge.test.ts` 61/61. Pendiente: gradle wear y prueba física — al cambiar el tipo preferido, puede hacer falta volver a seleccionar "Mi Turno" en el hueco de la esfera.
+
+## 2026-06-10 18:10 - Añadir tile (cuadrícula) y complicación de esfera con el estado del turno
+
+**Archivos modificados:** `android/wear/build.gradle`, `android/wear/src/main/AndroidManifest.xml`, `android/wear/src/main/res/values/strings.xml`, `android/wear/src/main/java/com/mijornada/app/TurnoStatusStore.kt` (nuevo), `android/wear/src/main/java/com/mijornada/app/TurnoTileService.kt` (nuevo), `android/wear/src/main/java/com/mijornada/app/TurnoComplicationService.kt` (nuevo), `android/wear/src/main/java/com/mijornada/app/MobileResponseService.kt`, `ARQUITECTURA_RELOJ_WEAR_OS.md`, `src/__tests__/android-wear-bridge.test.ts`
+
+### Contexto
+
+Feature nueva pedida por el usuario: que Mi Turno aparezca como cuadrícula (Tile de Wear OS, junto a Tiempo/Sueño/etc.) y como complicación en la esfera del reloj, igual que las apps del sistema. Implementado siguiendo la documentación oficial de Tiles (TileService + ProtoLayout) y de complicaciones (ComplicationDataSourceService). Ambas superficies son de **solo lectura**: muestran el último STATUS confirmado por el móvil y al tocarlas abren la app; no escriben datos de negocio (respeta las invariantes de la arquitectura Wear).
+
+### Cambio 1 - Dependencias (build.gradle del wear)
+
+**Código anterior:** terminaba el bloque Wear en `implementation 'androidx.wear:wear-input:1.1.0'`.
+
+**Código nuevo:**
+
+```groovy
+    implementation 'androidx.wear.tiles:tiles:1.3.0'
+    implementation 'androidx.wear.protolayout:protolayout:1.1.0'
+    implementation 'androidx.wear.protolayout:protolayout-expression:1.1.0'
+    implementation 'androidx.wear.watchface:watchface-complications-data-source-ktx:1.2.1'
+    implementation 'androidx.concurrent:concurrent-futures:1.1.0'
+```
+
+**Por qué se cambió:** la guía oficial actual recomienda tiles 1.6 + protolayout 1.4, pero exigen compileSdk 35+; el proyecto usa compileSdk 34, así que se fijaron las últimas versiones estables compatibles. `concurrent-futures` aporta `CallbackToFutureAdapter` para implementar la API basada en ListenableFuture sin arrastrar Guava completo.
+
+### Cambio 2 - TurnoStatusStore.kt (nuevo)
+
+`No existía TurnoStatusStore en el módulo wear.` Objeto que persiste el último STATUS confirmado (`activeTurno`, `isPaused`, `startTime`, nº de entradas) en SharedPreferences propias y, tras cada guardado, pide refresco de las dos superficies con las APIs oficiales push: `TileService.getUpdater(context).requestUpdate(...)` y `ComplicationDataSourceUpdateRequester.requestUpdateAll()`.
+
+### Cambio 3 - TurnoTileService.kt (nuevo)
+
+`No existía TurnoTileService.` `TileService` con `onTileRequest`/`onTileResourcesRequest` (vía `CallbackToFutureAdapter`), layout ProtoLayout en columna: título "Mi Turno", estado ("🚀 Turno activo" / "⏸ Turno en pausa" / "Sin turno activo" / "Abre la app para sincronizar") y detalle ("desde HH:MM · N entradas"). Toda la tile es clicable con `LaunchAction` que abre `WearMainActivity`. `freshnessIntervalMillis` de 5 minutos como respaldo del refresco push.
+
+### Cambio 4 - TurnoComplicationService.kt (nuevo)
+
+`No existía TurnoComplicationService.` `SuspendingComplicationDataSourceService` (artefacto ktx oficial) tipo `SHORT_TEXT`: texto según estado (hora de inicio si activo, "Pausa", "Libre", "Abrir"), título "Turno", `tapAction` con PendingIntent a `WearMainActivity`, y `getPreviewData` para el editor de esferas.
+
+### Cambio 5 - MobileResponseService alimenta las superficies
+
+**Código anterior:** tras parsear la respuesta no había integración con tile/complicación.
+
+**Código nuevo (dentro del try de `handleResponseJson`):**
+
+```kotlin
+            if (responseType == "STATUS") {
+                // Alimenta la Tile y la complicación de esfera con el estado confirmado.
+                TurnoStatusStore.save(this, responseJson)
+            }
+```
+
+**Por qué se cambió:** patrón push oficial — cada STATUS del móvil actualiza las superficies al instante, sin polling.
+
+### Cambio 6 - Manifest y strings
+
+Dos `<service>` nuevos en el manifest del wear con los permisos oficiales (`BIND_TILE_PROVIDER` con su intent-filter y metadata `androidx.wear.tiles.PREVIEW` apuntando a `@drawable/brand_taxi_logo`; `BIND_COMPLICATION_PROVIDER` con `SUPPORTED_TYPES=SHORT_TEXT` y `UPDATE_PERIOD_SECONDS=0` = solo push). Strings nuevas: `tile_label`, `tile_description`, `complication_label`.
+
+### Cambio 7 - Test de contrato y arquitectura
+
+Test nuevo "expone tile y complicacion de esfera con el estado del turno" (permisos en manifest, dependencias, clases, refresco push y ausencia de Firestore en las superficies). `ARQUITECTURA_RELOJ_WEAR_OS.md` ampliado con los tres archivos nuevos en la lista del reloj.
+
+### Verificación
+
+`npx tsc --noEmit` limpio; `android-wear-bridge.test.ts` 61/61. Pendiente en máquina del desarrollador: `./gradlew :wear:assembleDebug` (primera compilación con las dependencias nuevas — descargará artefactos) y prueba física: añadir la cuadrícula desde "Gestiona cuadrículas" del móvil o manteniendo pulsada la esfera → Tiles, y la complicación desde el editor de esferas en un hueco SHORT_TEXT.
+
+## 2026-06-10 17:20 - Añadir iconos a las métricas del reloj y notas vacías estilo móvil
+
+**Archivos modificados:** `android/wear/src/main/java/com/mijornada/app/screens/CategoriaIcons.kt`, `android/wear/src/main/java/com/mijornada/app/screens/TurnoSummaryScreen.kt`, `android/wear/src/main/java/com/mijornada/app/screens/TurnosScreen.kt`, `android/wear/src/main/java/com/mijornada/app/screens/EndTurnoScreen.kt`, `src/__tests__/android-wear-bridge.test.ts`
+
+### Contexto
+
+Las tarjetas de métricas del reloj (Total Taxímetro, Mi Ganancia, Total KM, Tiempo, Total a descontar, Total a dar) iban sin icono mientras la app móvil muestra uno por tarjeta (summary-icons.tsx). Y cuando un turno no tiene notas, el reloj mostraba bloque con cabecera "Notas del turno" + "Sin notas del turno", mientras el móvil muestra solo una línea en cursiva.
+
+### Cambio 1 - Composable MetricIcon (CategoriaIcons.kt)
+
+**Código anterior:** `No existía MetricIcon en CategoriaIcons.kt.`
+
+**Código nuevo:** composable `fun MetricIcon(type: String, color: Color, size: Dp)` con seis iconos calcados **trazo a trazo de los SVG reales del móvil** (paths con `cubicTo`/`quadraticBezierTo` sobre viewBox 24x24, mismo sistema que `CategoriaIcon`): `taximetro` = `IconTaxiBadgeNeon` (placa de techo con asa, alas y texto "TAXI" superpuesto, escala 1.4), `ganancia` = `IconMoneyBag` (saco con lazo, símbolo S y destellos laterales), `km` = `IconRoad`, `tiempo` = `IconTimer` (esfera abierta con corona y aguja), `descontar` = `IconReceipt` (recibo con borde dentado), `dar` = `IconGive` (maletín con € superpuesto). Tamaño en tarjetas: 13.dp (una primera versión a 9.dp con dibujos aproximados se descartó tras verla en el dispositivo: iconos no fieles y demasiado pequeños).
+
+**Por qué se cambió:** réplica fiel de los mismos iconos que ve el usuario en la app móvil, con el patrón técnico ya establecido en el archivo (Text superpuesto como en propinas).
+
+### Cambio 2 - Icono en las tarjetas de métricas
+
+**Código anterior (firma y cabecera de `SummaryMetric` en TurnoSummaryScreen.kt; análogo `MiniMetric` en TurnosScreen.kt):**
+
+```kotlin
+private fun SummaryMetric(
+    label: String,
+    ...
+        Text(label, color = ColorGrey, fontSize = 7.sp, fontWeight = FontWeight.Bold)
+```
+
+**Código nuevo:**
+
+```kotlin
+private fun SummaryMetric(
+    iconType: String,
+    label: String,
+    ...
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            MetricIcon(iconType, color, 9.dp)
+            Spacer(modifier = Modifier.width(3.dp))
+            Text(label, color = ColorGrey, fontSize = 7.sp, fontWeight = FontWeight.Bold)
+        }
+```
+
+Las 6 llamadas de `SummaryMetric` y las 4 de `MiniMetric` pasan el tipo de icono como primer argumento ("taximetro", "ganancia", "km", "tiempo", "descontar", "dar").
+
+**Por qué se cambió:** espejo visual con las tarjetas de la app móvil (icono + etiqueta encima del valor).
+
+### Cambio 3 - Notas vacías como en el móvil
+
+**Código anterior (TurnoSummaryScreen.kt):**
+
+```kotlin
+        Spacer(modifier = Modifier.height(10.dp))
+        NotesBlock("Notas del turno", notasTurno, general = true)
+
+        if (notasDetalladas.isNotEmpty()) {
+```
+
+**Código nuevo:**
+
+```kotlin
+        if (notasTurno.isEmpty() && notasDetalladas.isEmpty()) {
+            Spacer(modifier = Modifier.height(10.dp))
+            Text("Sin notas del turno", color = ColorGrey, fontSize = 10.sp, fontStyle = FontStyle.Italic)
+        } else {
+            if (notasTurno.isNotEmpty()) {
+                Spacer(modifier = Modifier.height(10.dp))
+                NotesBlock("Notas del turno", notasTurno, general = true)
+            }
+            if (notasDetalladas.isNotEmpty()) {
+                Spacer(modifier = Modifier.height(10.dp))
+                NotesBlock("Notas detalladas", notasDetalladas, general = false)
+            }
+        }
+```
+
+Y en `EndTurnoScreen.kt`, la sección "Notas del turno" muestra la cabecera solo cuando hay notas; sin notas, solo la línea en cursiva. Import `FontStyle` añadido en ambos.
+
+**Por qué se cambió:** mismo comportamiento que la app móvil: una sola línea "Sin notas del turno" en cursiva, sin bloque vacío con cabecera.
+
+### Cambio 4 - Test de contrato
+
+`No existía el test "anade iconos de metrica y notas vacias estilo movil en el reloj".` Verifica `MetricIcon` en CategoriaIcons, su uso en SummaryMetric/MiniMetric, y la línea en cursiva para notas vacías en resumen y cierre.
+
+### Verificación
+
+`npx tsc --noEmit` limpio; `android-wear-bridge.test.ts` 60/60. Pendiente: gradle wear y validación visual en el Xiaomi Watch 5 (los iconos son dibujo a mano alzada — si alguno no convence visualmente, se ajusta el trazo).
+
 ## 2026-06-10 16:40 - Mostrar notas completas de las entradas en el reloj
 
 **Archivos modificados:** `android/wear/src/main/java/com/mijornada/app/screens/ActiveTurnoScreen.kt`, `android/wear/src/main/java/com/mijornada/app/screens/TurnoSummaryScreen.kt`, `android/wear/src/main/java/com/mijornada/app/screens/EndTurnoScreen.kt`, `src/__tests__/android-wear-bridge.test.ts`

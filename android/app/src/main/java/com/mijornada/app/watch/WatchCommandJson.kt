@@ -62,6 +62,14 @@ object WatchCommandJson {
                 createdAt = createdAt,
                 id = payload.optLong("id", 0L),
             )
+            "EDIT_TURNO" -> WatchCommand.EditTurno(
+                operationId = operationId,
+                createdAt = createdAt,
+                id = payload.optLong("id", 0L),
+                dinero = payload.optDouble("dinero", 0.0),
+                km = payload.optDouble("km", 0.0),
+                entradas = parseEntradas(payload),
+            )
             "END_TURNO" -> WatchCommand.EndTurno(
                 operationId = operationId,
                 createdAt = createdAt,
@@ -72,6 +80,24 @@ object WatchCommandJson {
             else -> throw InvalidCommandException("Comando Wear no reconocido: $type")
         }
     }
+}
+
+private fun parseEntradas(payload: JSONObject): List<WatchEntry> {
+    val array = payload.optJSONArray("entradas") ?: return emptyList()
+    val entradas = mutableListOf<WatchEntry>()
+    for (i in 0 until array.length()) {
+        val item = array.optJSONObject(i) ?: continue
+        entradas.add(
+            WatchEntry(
+                id = item.optLong("id", 0L),
+                type = item.optString("type", ""),
+                amount = item.optDouble("amount", 0.0),
+                note = item.optString("note", ""),
+                time = item.optString("time", ""),
+            )
+        )
+    }
+    return entradas
 }
 
 class MalformedJsonException(message: String) : Exception(message)

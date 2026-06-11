@@ -145,4 +145,13 @@ sealed class WatchCommand {
         val km: Double,
         val note: String,
     ) : WatchCommand()
+
+    data class EditTurno(
+        override val operationId: String,
+        override val createdAt: String,
+        val id: Long,
+        val dinero: Double,
+        val km: Double,
+        val entradas: List<WatchEntry>,
+    ) : WatchCommand()
 }

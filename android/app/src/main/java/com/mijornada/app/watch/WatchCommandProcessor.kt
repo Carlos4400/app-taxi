@@ -23,6 +23,7 @@ object WatchCommandProcessor {
             is WatchCommand.EditEntry -> processEditEntry(command, state)
             is WatchCommand.DeleteEntry -> processDeleteEntry(command, state)
             is WatchCommand.EndTurno -> processEndTurno(command, state)
+            is WatchCommand.EditTurno -> processEditTurno(command, state)
         }
     }
 
@@ -210,6 +211,46 @@ object WatchCommandProcessor {
                 processedOperationIds = state.withOperationId(command.operationId),
             ),
             response = WatchResponse.Ok(command.operationId, "Turno terminado"),
+        )
+    }
+
+    private fun processEditTurno(command: WatchCommand.EditTurno, state: WatchProcessorState): WatchProcessorResult {
+        if (state.history.none { it.id == command.id }) {
+            return state.error(command.operationId, "TURNO_NOT_FOUND", "Turno no encontrado")
+        }
+        if (command.dinero <= 0.0 || command.km <= 0.0) {
+            return state.error(command.operationId, "INVALID_EDIT_VALUES", "Taximetro y kilometros obligatorios")
+        }
+
+        if (command.entradas.any { it.type != "nota" && it.amount <= 0.0 }) {
+            return state.error(command.operationId, "INVALID_EDIT_VALUES", "Importes de entradas invalidos")
+        }
+
+        // Regla de oro: al cambiar datos del turno la contabilidad guardada deja
+        // de ser valida; se anula para que el reloj muestre "Pendiente" hasta que
+        // la app movil la recalcule con accounting.ts. Nunca numeros incorrectos.
+        val nextHistory = state.history.map { turno ->
+            if (turno.id == command.id) {
+                turno.copy(
+                    dinero = command.dinero,
+                    km = command.km,
+                    entries = command.entradas,
+                    totalTaximetro = null,
+                    miGanancia = null,
+                    totalADescontar = null,
+                    totalADar = null,
+                )
+            } else {
+                turno
+            }
+        }
+
+        return WatchProcessorResult(
+            state = state.copy(
+                history = nextHistory,
+                processedOperationIds = state.withOperationId(command.operationId),
+            ),
+            response = WatchResponse.Ok(command.operationId, "Turno actualizado"),
         )
     }
 

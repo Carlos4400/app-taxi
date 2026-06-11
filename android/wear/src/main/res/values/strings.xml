@@ -1,4 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Mi Turno Watch</string>
+    <string name="tile_label">Mi Turno</string>
+    <string name="tile_description">Estado del turno y entradas del día de un vistazo</string>
+    <string name="complication_label">Mi Turno</string>
 </resources>

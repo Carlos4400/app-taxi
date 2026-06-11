@@ -30,11 +30,12 @@ fun TurnosScreen(
             .fillMaxSize()
             .background(ColorBackground)
             .verticalScroll(rememberScrollState())
-            .padding(start = 18.dp, end = 18.dp, top = 20.dp, bottom = 22.dp),
+            .padding(start = 18.dp, end = 18.dp, top = 26.dp, bottom = 36.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
+        // Cabecera estrecha para que la flecha quede dentro del circulo.
         Row(
-            modifier = Modifier.fillMaxWidth(0.88f),
+            modifier = Modifier.fillMaxWidth(0.68f),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
@@ -77,9 +78,10 @@ private fun TurnoCard(turno: WatchTurno, onClick: () -> Unit) {
         Spacer(modifier = Modifier.height(8.dp))
 
         Row(horizontalArrangement = Arrangement.spacedBy(7.dp), modifier = Modifier.fillMaxWidth()) {
-            MiniMetric("Total Taxímetro", fmtEur(turno.totalTaximetro), ColorAgencia, ColorAgenciaBg, Modifier.weight(1f))
+            MiniMetric("taximetro", "Total Taxímetro", fmtEur(turno.totalTaximetro), ColorAgencia, ColorAgenciaBg, Modifier.weight(1f))
             // Contabilidad pendiente de la app: nunca mostrar un numero incorrecto.
             MiniMetric(
+                "ganancia",
                 "Mi Ganancia",
                 if (turno.contablePendiente) "Pendiente" else fmtEur(turno.miGanancia),
                 ColorPropina, ColorPropinaBg, Modifier.weight(1f)
@@ -87,14 +89,15 @@ private fun TurnoCard(turno: WatchTurno, onClick: () -> Unit) {
         }
         Spacer(modifier = Modifier.height(7.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(7.dp), modifier = Modifier.fillMaxWidth()) {
-            MiniMetric("Total KM", "${fmtKmNumber(turno.km)} km", ColorExtra, ColorExtraBg, Modifier.weight(1f))
-            MiniMetric("Tiempo", turno.tiempoTrabajado, ColorNulo, ColorNuloBg, Modifier.weight(1f))
+            MiniMetric("km", "Total KM", "${fmtKmNumber(turno.km)} km", ColorExtra, ColorExtraBg, Modifier.weight(1f))
+            MiniMetric("tiempo", "Tiempo", turno.tiempoTrabajado, ColorNulo, ColorNuloBg, Modifier.weight(1f))
         }
     }
 }
 
 @Composable
 private fun MiniMetric(
+    iconType: String,
     label: String,
     value: String,
     color: androidx.compose.ui.graphics.Color,
@@ -109,7 +112,12 @@ private fun MiniMetric(
             .padding(horizontal = 7.dp, vertical = 7.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Text(label, color = ColorGrey, fontSize = 7.sp, fontWeight = FontWeight.Bold)
+        // Icono + etiqueta, como las tarjetas de métricas de la app móvil.
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            MetricIcon(iconType, color, 13.dp)
+            Spacer(modifier = Modifier.width(4.dp))
+            Text(label, color = ColorGrey, fontSize = 7.sp, fontWeight = FontWeight.Bold)
+        }
         Spacer(modifier = Modifier.height(3.dp))
         Text(value, color = color, fontSize = 11.sp, fontWeight = FontWeight.Bold)
     }

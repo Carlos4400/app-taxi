@@ -170,5 +170,6 @@ class WatchRepository(private val database: WatchDatabase) {
             is WatchCommand.EditEntry -> "EDIT_ENTRY"
             is WatchCommand.DeleteEntry -> "DELETE_ENTRY"
             is WatchCommand.EndTurno -> "END_TURNO"
+            is WatchCommand.EditTurno -> "EDIT_TURNO"
         }
 }

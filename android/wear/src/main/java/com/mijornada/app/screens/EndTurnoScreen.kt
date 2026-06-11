@@ -12,6 +12,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -209,11 +210,12 @@ private fun ResumenHoyCard(
                 .background(Color(0xFF252631))
         )
         Spacer(modifier = Modifier.height(8.dp))
-        SectionTitle("Notas del turno", ColorDatafono)
-        Spacer(modifier = Modifier.height(6.dp))
+        // Notas como en la app móvil: sin cabecera cuando no hay ninguna.
         if (notasTurno.isEmpty()) {
-            Text("Sin notas del turno", color = ColorGrey, fontSize = 10.sp)
+            Text("Sin notas del turno", color = ColorGrey, fontSize = 10.sp, fontStyle = FontStyle.Italic)
         } else {
+            SectionTitle("Notas del turno", ColorDatafono)
+            Spacer(modifier = Modifier.height(6.dp))
             notasTurno.forEach { entry ->
                 NotaTurnoRow(entry)
                 Spacer(modifier = Modifier.height(5.dp))

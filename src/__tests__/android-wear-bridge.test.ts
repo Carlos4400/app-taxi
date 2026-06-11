@@ -712,7 +712,7 @@ describe("Android Wear bridge", () => {
     expect(turnos).toContain("Total Taxímetro");
     expect(turnos).toContain("Mi Ganancia");
     expect(turnos).toContain("Tiempo");
-    expect(resumen).toContain("Resumen del Turno");
+    expect(resumen).toContain("Resumen"); // titulo corto: cabecera estrecha para la curva
     expect(resumen).toContain("Total Taxímetro");
     expect(resumen).toContain("Mi Ganancia");
     expect(resumen).toContain("Total KM");
@@ -958,6 +958,150 @@ describe("Android Wear bridge", () => {
     expect(active).not.toContain("entry.note.take(");
     expect(resumen).not.toContain("entry.note.take(");
     expect(cierre).not.toContain("entry.note.take(");
+  });
+
+  it("anade iconos de metrica y notas vacias estilo movil en el reloj", () => {
+    const iconos = readFileSync(
+      resolve(root, "android/wear/src/main/java/com/mijornada/app/screens/CategoriaIcons.kt"),
+      "utf8",
+    );
+    const resumen = readFileSync(
+      resolve(root, "android/wear/src/main/java/com/mijornada/app/screens/TurnoSummaryScreen.kt"),
+      "utf8",
+    );
+    const turnos = readFileSync(
+      resolve(root, "android/wear/src/main/java/com/mijornada/app/screens/TurnosScreen.kt"),
+      "utf8",
+    );
+    const cierre = readFileSync(
+      resolve(root, "android/wear/src/main/java/com/mijornada/app/screens/EndTurnoScreen.kt"),
+      "utf8",
+    );
+
+    // Iconos de metricas como en la app movil (summary-icons.tsx).
+    expect(iconos).toContain("fun MetricIcon(");
+    expect(resumen).toContain('SummaryMetric("taximetro"');
+    expect(resumen).toContain('"descontar"');
+    expect(resumen).toContain('"dar"');
+    expect(turnos).toContain('MiniMetric("taximetro"');
+    // Sin notas: una sola linea en cursiva, sin bloque con cabecera.
+    expect(resumen).toContain("notasTurno.isEmpty() && notasDetalladas.isEmpty()");
+    expect(resumen).toContain("FontStyle.Italic");
+    expect(cierre).toContain("FontStyle.Italic");
+  });
+
+  it("expone tile y complicacion de esfera con el estado del turno", () => {
+    const manifest = readFileSync(
+      resolve(root, "android/wear/src/main/AndroidManifest.xml"),
+      "utf8",
+    );
+    const gradle = readFileSync(
+      resolve(root, "android/wear/build.gradle"),
+      "utf8",
+    );
+    const tile = readFileSync(
+      resolve(root, "android/wear/src/main/java/com/mijornada/app/TurnoTileService.kt"),
+      "utf8",
+    );
+    const complicacion = readFileSync(
+      resolve(root, "android/wear/src/main/java/com/mijornada/app/TurnoComplicationService.kt"),
+      "utf8",
+    );
+    const store = readFileSync(
+      resolve(root, "android/wear/src/main/java/com/mijornada/app/TurnoStatusStore.kt"),
+      "utf8",
+    );
+    const responseService = readFileSync(
+      resolve(root, "android/wear/src/main/java/com/mijornada/app/MobileResponseService.kt"),
+      "utf8",
+    );
+
+    // Servicios registrados con los permisos oficiales de Wear OS.
+    expect(manifest).toContain("com.google.android.wearable.permission.BIND_TILE_PROVIDER");
+    expect(manifest).toContain("com.google.android.wearable.permission.BIND_COMPLICATION_PROVIDER");
+    expect(manifest).toContain("androidx.wear.tiles.PREVIEW");
+    expect(gradle).toContain("androidx.wear.tiles:tiles");
+    expect(gradle).toContain("watchface-complications-data-source-ktx");
+    // Implementaciones y refresco push al llegar STATUS del movil.
+    expect(tile).toContain("class TurnoTileService : TileService()");
+    expect(complicacion).toContain("SuspendingComplicationDataSourceService");
+    expect(store).toContain("requestUpdate(TurnoTileService::class.java)");
+    expect(store).toContain("requestUpdateAll()");
+    expect(responseService).toContain("TurnoStatusStore.save(this, responseJson)");
+    // Botones de la tile: abren la app con la acción por el circuito seguro.
+    expect(tile).toContain("addKeyToExtraMapping(EXTRA_ACCION_TILE");
+    const activityWear = readFileSync(
+      resolve(root, "android/wear/src/main/java/com/mijornada/app/WearMainActivity.kt"),
+      "utf8",
+    );
+    expect(activityWear).toContain("EXTRA_ACCION_TILE");
+    expect(activityWear).toContain("private fun consumeTileAction()");
+    // Solo lectura de estado confirmado: sin escrituras de negocio.
+    expect(tile).not.toContain("Firestore");
+    expect(complicacion).not.toContain("Firestore");
+  });
+
+  it("permite editar dinero y km de un turno cerrado desde el reloj (EDIT_TURNO)", () => {
+    const contratoTs = readFileSync(
+      resolve(root, "src/shared/watch-commands.ts"),
+      "utf8",
+    );
+    const procesadorTs = readFileSync(
+      resolve(root, "src/logic/watch-command-processor.ts"),
+      "utf8",
+    );
+    const procesadorKt = readFileSync(
+      resolve(root, "android/app/src/main/java/com/mijornada/app/watch/WatchCommandProcessor.kt"),
+      "utf8",
+    );
+    const parserKt = readFileSync(
+      resolve(root, "android/app/src/main/java/com/mijornada/app/watch/WatchCommandJson.kt"),
+      "utf8",
+    );
+    const worker = readFileSync(
+      resolve(root, "android/app/src/main/java/com/mijornada/app/watch/WearCommandWorker.kt"),
+      "utf8",
+    );
+    const activity = readFileSync(
+      resolve(root, "android/wear/src/main/java/com/mijornada/app/WearMainActivity.kt"),
+      "utf8",
+    );
+    const pantalla = readFileSync(
+      resolve(root, "android/wear/src/main/java/com/mijornada/app/screens/EditTurnoDatosScreen.kt"),
+      "utf8",
+    );
+    const resumen = readFileSync(
+      resolve(root, "android/wear/src/main/java/com/mijornada/app/screens/TurnoSummaryScreen.kt"),
+      "utf8",
+    );
+    const arquitectura = readFileSync(
+      resolve(root, "ARQUITECTURA_RELOJ_WEAR_OS.md"),
+      "utf8",
+    );
+
+    // Contrato en paridad TS/Kotlin, con edicion completa (entradas incluidas).
+    expect(contratoTs).toContain('type: "EDIT_TURNO"');
+    expect(contratoTs).toContain("entradas: WatchEntry[]");
+    expect(procesadorTs).toContain("command.payload.entradas");
+    expect(procesadorKt).toContain("entries = command.entradas");
+    expect(parserKt).toContain("entradas = parseEntradas(payload)");
+    expect(pantalla).toContain("onConfirm: (Double, Double, List<WatchEntry>) -> Unit");
+    expect(pantalla).toContain("AddEntryScreen(");
+    expect(procesadorTs).toContain('command.type === "EDIT_TURNO"');
+    expect(parserKt).toContain('"EDIT_TURNO" -> WatchCommand.EditTurno(');
+    expect(procesadorKt).toContain("processEditTurno");
+    // Regla de oro: editar anula la contabilidad guardada (Pendiente).
+    expect(procesadorKt).toContain("totalTaximetro = null");
+    expect(procesadorKt).toContain("miGanancia = null");
+    // Es comando critico (outbox + worker de escritura).
+    expect(worker).toContain('"EDIT_TURNO" == type');
+    expect(activity).toContain('type == "EDIT_TURNO"');
+    expect(activity).toContain("private fun sendEditTurno(");
+    // Lapiz funcional y pantalla de edicion.
+    expect(resumen).toContain("onEdit: () -> Unit");
+    expect(pantalla).toContain("fun EditTurnoDatosScreen(");
+    // Documentado en el contrato de arquitectura.
+    expect(arquitectura).toContain("EDIT_TURNO");
   });
 
   it("usa fondos Wear apagados como la app movil", () => {

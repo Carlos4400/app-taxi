@@ -184,6 +184,7 @@ Los siguientes comandos se guardan en el outbox y requieren confirmacion:
 - `EDIT_ENTRY`
 - `DELETE_ENTRY`
 - `END_TURNO`
+- `EDIT_TURNO` (edicion completa de un turno cerrado: dinero, km y entradas/notas; anula su contabilidad guardada hasta que la app movil la recalcula)
 
 Solo puede existir una operacion critica pendiente a la vez desde la interfaz
 actual del reloj. Esto evita encadenar acciones basadas en un estado aun no
@@ -407,6 +408,9 @@ segundo plano.
 ### Reloj
 
 - `android/wear/src/main/java/com/mijornada/app/WearMainActivity.kt`
+- `android/wear/src/main/java/com/mijornada/app/TurnoTileService.kt` (tile de solo lectura)
+- `android/wear/src/main/java/com/mijornada/app/TurnoComplicationService.kt` (complicacion de solo lectura)
+- `android/wear/src/main/java/com/mijornada/app/TurnoStatusStore.kt` (ultimo STATUS para tile/complicacion)
 - `android/wear/src/main/java/com/mijornada/app/WatchOutbox.kt`
 - `android/wear/src/main/java/com/mijornada/app/OutboxWorker.kt`
 - `android/wear/src/main/java/com/mijornada/app/MobileResponseService.kt`
