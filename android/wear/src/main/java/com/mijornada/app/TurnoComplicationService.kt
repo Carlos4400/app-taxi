@@ -11,6 +11,8 @@ import android.graphics.RectF
 import android.graphics.drawable.Icon
 import androidx.wear.watchface.complications.data.ComplicationData
 import androidx.wear.watchface.complications.data.ComplicationType
+import androidx.wear.watchface.complications.data.MonochromaticImage
+import androidx.wear.watchface.complications.data.MonochromaticImageComplicationData
 import androidx.wear.watchface.complications.data.PlainComplicationText
 import androidx.wear.watchface.complications.data.ShortTextComplicationData
 import androidx.wear.watchface.complications.data.SmallImage
@@ -22,44 +24,33 @@ import androidx.wear.watchface.complications.datasource.SuspendingComplicationDa
 /**
  * Complicación de esfera de Mi Turno.
  *
- * Tipo preferido SMALL_IMAGE: el logo del taxi dentro de un anillo cuyo color
- * indica el estado, coherente con el lenguaje de color de la app:
- *   verde  #3CFF64 = turno activo (verde = acción/ganancia en toda la app)
- *   azul   #3B82F6 = turno en pausa (mismo azul de pausa del móvil)
- *   morado #7C5CFF = libre (morado del botón Turnos, neutro)
- * Se usa SmallImageType.PHOTO para que la esfera no lo tinte y respete los
- * colores. Tocar abre la app. SHORT_TEXT se mantiene para huecos solo-texto.
+ * Decisión del usuario: en la esfera debe verse el logo de la app con
+ * "Mi Turno" debajo, sin texto de estado ni hora.
+ *
+ * - SMALL_IMAGE: el logo neón a color sobre fondo oscuro (PHOTO para que la
+ *   esfera no lo tinte). Para huecos que acepten imagen.
+ * - SHORT_TEXT: respaldo para huecos solo-texto (como el de la esfera Xiaomi
+ *   del usuario, que no acepta SMALL_IMAGE): nombre "Mi Turno" e icono
+ *   monocromo del taxi.
+ *
+ * Tocar abre la app.
  */
 class TurnoComplicationService : SuspendingComplicationDataSourceService() {
 
     override fun getPreviewData(type: ComplicationType): ComplicationData? = when (type) {
-        ComplicationType.SMALL_IMAGE -> smallImage(COLOR_ACTIVO)
-        ComplicationType.SHORT_TEXT -> shortText("13:34", "Turno")
+        ComplicationType.SMALL_IMAGE -> smallImage()
+        ComplicationType.MONOCHROMATIC_IMAGE -> soloIconoCentrado()
+        ComplicationType.SHORT_TEXT -> shortTextMiTurno()
         else -> null
     }
 
-    override suspend fun onComplicationRequest(request: ComplicationRequest): ComplicationData? {
-        val status = TurnoStatusStore.read(this)
-        return when (request.complicationType) {
-            ComplicationType.SMALL_IMAGE -> smallImage(colorEstado(status))
-            ComplicationType.SHORT_TEXT -> shortText(textoEstado(status), "Turno")
+    override suspend fun onComplicationRequest(request: ComplicationRequest): ComplicationData? =
+        when (request.complicationType) {
+            ComplicationType.SMALL_IMAGE -> smallImage()
+            ComplicationType.MONOCHROMATIC_IMAGE -> soloIconoCentrado()
+            ComplicationType.SHORT_TEXT -> shortTextMiTurno()
             else -> null
         }
-    }
-
-    private fun colorEstado(status: TurnoStatusStore.Status): Int = when {
-        status.activo && status.pausado -> COLOR_PAUSA
-        status.activo -> COLOR_ACTIVO
-        else -> COLOR_LIBRE
-    }
-
-    private fun textoEstado(status: TurnoStatusStore.Status): String = when {
-        !status.conocido -> "Abrir"
-        status.activo && status.pausado -> "Pausa"
-        status.activo && status.startTime.isNotBlank() -> status.startTime
-        status.activo -> "Activo"
-        else -> "Libre"
-    }
 
     private fun abrirApp(): PendingIntent = PendingIntent.getActivity(
         this,
@@ -68,53 +59,76 @@ class TurnoComplicationService : SuspendingComplicationDataSourceService() {
         PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
     )
 
-    private fun smallImage(colorAnillo: Int): ComplicationData {
+    private fun smallImage(): ComplicationData {
         val imagen = SmallImage.Builder(
-            Icon.createWithBitmap(logoConAnillo(colorAnillo)),
+            Icon.createWithBitmap(logoSolo()),
             SmallImageType.PHOTO,
-        ).build()
+        )
+            // Imagen segura para modo ambiente/burn-in (trazos finos blancos):
+            // sin ella, la doc oficial avisa de que la esfera puede no mostrar
+            // ninguna imagen con burn-in protection o low-bit ambient activos.
+            .setAmbientImage(Icon.createWithBitmap(logoAmbiente()))
+            .build()
         return SmallImageComplicationData.Builder(
             imagen,
-            PlainComplicationText.Builder("Estado del turno de Mi Turno").build(),
+            PlainComplicationText.Builder("Logo de Mi Turno").build(),
         )
             .setTapAction(abrirApp())
             .build()
     }
 
-    private fun shortText(textoEstado: String, titulo: String): ComplicationData {
-        return ShortTextComplicationData.Builder(
-            PlainComplicationText.Builder(textoEstado).build(),
-            PlainComplicationText.Builder("Estado del turno de Mi Turno").build(),
+    /**
+     * Tipo "solo icono" (MONOCHROMATIC_IMAGE): si el hueco de la esfera lo
+     * acepta, pinta el icono del logo centrado, sin reservar línea de texto.
+     */
+    private fun soloIconoCentrado(): ComplicationData =
+        MonochromaticImageComplicationData.Builder(
+            MonochromaticImage.Builder(
+                Icon.createWithResource(this, R.drawable.complication_icon)
+            ).build(),
+            PlainComplicationText.Builder("Logo de Mi Turno").build(),
         )
-            .setTitle(PlainComplicationText.Builder(titulo).build())
             .setTapAction(abrirApp())
             .build()
-    }
 
-    /** Fondo oscuro de tarjeta + anillo del color del estado + logo centrado. */
-    private fun logoConAnillo(colorAnillo: Int): Bitmap {
-        val size = 128
+    /**
+     * Respaldo para huecos solo-texto: nombre "Mi Turno" e icono monocromo
+     * del logo. Sin título ni estado.
+     */
+    private fun shortTextMiTurno(): ComplicationData =
+        ShortTextComplicationData.Builder(
+            PlainComplicationText.Builder("Mi Turno").build(),
+            PlainComplicationText.Builder("Logo de Mi Turno").build(),
+        )
+            .setMonochromaticImage(
+                MonochromaticImage.Builder(
+                    Icon.createWithResource(this, R.drawable.complication_icon)
+                ).build()
+            )
+            .setTapAction(abrirApp())
+            .build()
+
+    /** Fondo negro + logo neón centrado, sin anillo ni texto. */
+    private fun logoSolo(): Bitmap {
+        // 384px: la esfera propia lo pinta a ~190px de pantalla; a 128px se
+        // veía pixelado al estirarlo.
+        val size = 384
         val bmp = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
         val canvas = Canvas(bmp)
         val centro = size / 2f
 
+        // Círculo negro sobre lienzo transparente: las esquinas quedan
+        // transparentes para no tapar las rayitas de batería que la esfera
+        // propia pinta alrededor del hueco del logo.
         val fondo = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = Color.parseColor("#15151C")
+            color = Color.BLACK
             style = Paint.Style.FILL
         }
         canvas.drawCircle(centro, centro, centro, fondo)
 
-        val grosor = size * 0.075f
-        val anillo = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = colorAnillo
-            style = Paint.Style.STROKE
-            strokeWidth = grosor
-        }
-        canvas.drawCircle(centro, centro, centro - grosor / 2f, anillo)
-
         val logo = BitmapFactory.decodeResource(resources, R.drawable.brand_taxi_logo)
         if (logo != null) {
-            val interior = size * 0.62f
+            val interior = size * 0.94f
             val ratio = logo.width.toFloat() / logo.height.toFloat()
             val ancho: Float
             val alto: Float
@@ -126,9 +140,29 @@ class TurnoComplicationService : SuspendingComplicationDataSourceService() {
         return bmp
     }
 
-    companion object {
-        private const val COLOR_ACTIVO = 0xFF3CFF64.toInt()
-        private const val COLOR_PAUSA = 0xFF3B82F6.toInt()
-        private const val COLOR_LIBRE = 0xFF7C5CFF.toInt()
+    /** Version ambiente: trazos finos blancos sobre negro (seguro para burn-in). */
+    private fun logoAmbiente(): Bitmap {
+        val size = 128
+        val bmp = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
+        val canvas = Canvas(bmp)
+        val centro = size / 2f
+
+        val anillo = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.WHITE
+            style = Paint.Style.STROKE
+            strokeWidth = size * 0.03f
+        }
+        canvas.drawCircle(centro, centro, centro - size * 0.04f, anillo)
+
+        val letra = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.WHITE
+            textAlign = Paint.Align.CENTER
+            textSize = size * 0.4f
+            typeface = android.graphics.Typeface.DEFAULT_BOLD
+            style = Paint.Style.STROKE
+            strokeWidth = size * 0.02f
+        }
+        canvas.drawText("T", centro, centro + size * 0.14f, letra)
+        return bmp
     }
 }

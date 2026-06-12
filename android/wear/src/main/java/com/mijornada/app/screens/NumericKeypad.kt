@@ -50,7 +50,60 @@ fun NumericKeypad(
             ) {
                 row.forEach { key ->
                     val keyColor = if (key == "DEL") color else ColorWhite
-                    KeyButton(key, keyColor, keyHeight, keyFontSize, Modifier.weight(1f)) { onKey(key) }
+                    KeyButton(
+                        label = key,
+                        color = keyColor,
+                        keyHeight = keyHeight,
+                        keyFontSize = keyFontSize,
+                        modifier = Modifier.weight(1f)
+                    ) { onKey(key) }
+                }
+            }
+        }
+    }
+}
+
+/**
+ * Teclado para pantallas de cierre a círculo completo: cada fila se estrecha
+ * según la cuerda del círculo a su altura (las filas centrales aprovechan más
+ * ancho que la primera y la última). Las teclas son píldoras altas, pensadas
+ * para tamaños proporcionales al diámetro (keyHeight ≈ 10.5% del diámetro).
+ */
+@Composable
+fun NumericKeypadRedondo(
+    onKey: (String) -> Unit,
+    color: Color,
+    keyHeight: Dp,
+    keyFontSize: TextUnit,
+    rowSpacing: Dp,
+    anchosFilas: List<Float> = listOf(0.78f, 0.84f, 0.84f, 0.78f),
+    modifier: Modifier = Modifier
+) {
+    val rows = listOf(
+        listOf("1", "2", "3"),
+        listOf("4", "5", "6"),
+        listOf("7", "8", "9"),
+        listOf("DEL", "0", ",")
+    )
+    Column(
+        modifier = modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(rowSpacing),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        rows.forEachIndexed { i, row ->
+            Row(
+                modifier = Modifier.fillMaxWidth(anchosFilas.getOrElse(i) { 0.8f }),
+                horizontalArrangement = Arrangement.spacedBy(rowSpacing)
+            ) {
+                row.forEach { key ->
+                    KeyButton(
+                        label = key,
+                        color = color,
+                        keyHeight = keyHeight,
+                        keyFontSize = keyFontSize,
+                        cornerRadius = keyHeight / 2,
+                        modifier = Modifier.weight(1f)
+                    ) { onKey(key) }
                 }
             }
         }
@@ -63,13 +116,14 @@ private fun KeyButton(
     color: Color,
     keyHeight: Dp,
     keyFontSize: TextUnit,
+    cornerRadius: Dp = 9.dp,
     modifier: Modifier = Modifier,
     onClick: () -> Unit
 ) {
     Box(
         modifier = modifier
             .height(keyHeight)
-            .clip(RoundedCornerShape(9.dp))
+            .clip(RoundedCornerShape(cornerRadius))
             .background(Color(0xFF1C1C24))
             .clickable { onClick() },
         contentAlignment = Alignment.Center

@@ -1,5 +1,6 @@
 package com.mijornada.app.screens
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -49,6 +50,16 @@ fun EditTurnoDatosScreen(
     val dinero = parseAmount(dineroText)
     val km = parseAmount(kmText)
     val valido = dinero > 0.0 && km > 0.0
+
+    // Gesto atras dentro de la edicion: cierra solo la subpantalla abierta
+    // (editor de entrada) en vez de expulsar de toda la edicion. Compose
+    // invoca el BackHandler habilitado mas interno (orden LIFO oficial del
+    // OnBackPressedDispatcher), asi que este tiene prioridad sobre el global
+    // de la Activity mientras haya una subpantalla abierta.
+    BackHandler(enabled = editandoEntrada != null || nuevaCategoria != null) {
+        editandoEntrada = null
+        nuevaCategoria = null
+    }
 
     fun horaActual(): String =
         java.text.SimpleDateFormat("HH:mm", java.util.Locale.getDefault()).format(java.util.Date())
@@ -157,11 +168,10 @@ fun EditTurnoDatosScreen(
                 FilaEntrada(entry) { editandoEntrada = entry }
             }
         }
-        Spacer(modifier = Modifier.height(6.dp))
-        BotonAncho("＋ Añadir entrada", ColorWhite, ColorNuloBg) { nuevaCategoria = "datafono" }
-
-        // Selector rapido de categoria para la entrada nueva.
-        Spacer(modifier = Modifier.height(5.dp))
+        // Anadir entrada: directamente la cuadricula de categorias (el boton
+        // ancho era redundante; tocar una categoria ya abre el editor).
+        Spacer(modifier = Modifier.height(10.dp))
+        SeccionTitulo("AÑADIR ENTRADA")
         Row(horizontalArrangement = Arrangement.spacedBy(5.dp), modifier = Modifier.fillMaxWidth(0.84f)) {
             listOf("datafono", "propina", "agencia_bono").forEach { tipo ->
                 BotonCategoria(tipo, Modifier.weight(1f)) { nuevaCategoria = tipo }

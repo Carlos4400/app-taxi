@@ -82,7 +82,7 @@ class MobileResponseService : WearableListenerService() {
             val json = org.json.JSONObject(responseJson)
             val responseType = json.optString("type")
             val operationId = json.optString("operationId", "")
-            val isTerminal = isTerminalResponse(responseType, json.optString("code", ""))
+            val isTerminal = WearConstants.isTerminalResponse(responseType, json.optString("code", ""))
 
             if (responseType == "STATUS") {
                 // Alimenta la Tile y la complicación de esfera con el estado confirmado.
@@ -107,11 +107,6 @@ class MobileResponseService : WearableListenerService() {
         } catch (e: Exception) {
             Log.e(TAG, "Error al procesar mensaje", e)
         }
-    }
-
-    private fun isTerminalResponse(responseType: String, code: String): Boolean {
-        if (responseType == "OK" || responseType == "DUPLICATE_IGNORED") return true
-        return responseType == "ERROR" && code != "USER_NOT_PREPARED" && code != "APP_NOT_READY"
     }
 
     private fun rememberTerminalOperation(operationId: String): Boolean {

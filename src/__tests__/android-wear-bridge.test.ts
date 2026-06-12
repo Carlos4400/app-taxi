@@ -1,4 +1,4 @@
-// Tests de contrato sobre los fuentes nativos Android/Wear (leen los .kt/.java como texto).
+// Tests de contrato sobre los fuentes nativos Android/Wear (leen los .kt y .java como texto).
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
@@ -284,8 +284,22 @@ describe("Android Wear bridge", () => {
     expect(source).toContain('getDataItemUri("/watch-command/$operationId")');
     expect(source).toContain('getDataItemUri("/watch-ack/$operationId")');
     expect(source).toContain("deleteDataItems");
-    expect(source).toContain("isTerminalResponse(responseType, json.optString(\"code\", \"\"))");
-    expect(source).toContain('"USER_NOT_PREPARED"');
+    // Fuente unica de la regla "respuesta terminal" (auditoria 2026-06-12, M3):
+    // vive en WearConstants y nadie la duplica en privado.
+    const constantes = readFileSync(
+      resolve(root, "android/wear/src/main/java/com/mijornada/app/WearConstants.kt"),
+      "utf8",
+    );
+    const activityWear = readFileSync(
+      resolve(root, "android/wear/src/main/java/com/mijornada/app/WearMainActivity.kt"),
+      "utf8",
+    );
+    expect(constantes).toContain("fun isTerminalResponse(responseType: String, code: String)");
+    expect(constantes).toContain('"USER_NOT_PREPARED"');
+    expect(source).toContain("WearConstants.isTerminalResponse(responseType, json.optString(\"code\", \"\"))");
+    expect(activityWear).toContain("WearConstants.isTerminalResponse(responseType, json.optString(\"code\", \"\"))");
+    expect(source).not.toContain("private fun isTerminalResponse");
+    expect(activityWear).not.toContain("private fun isTerminalResponse");
   });
 
   it("usa un unico flujo Room hacia la sincronizacion habitual de la app", () => {
@@ -417,9 +431,67 @@ describe("Android Wear bridge", () => {
     expect(activity).toContain('sendTurnoStateCommand("PAUSE_TURNO")');
     expect(activity).toContain('sendTurnoStateCommand("RESUME_TURNO")');
     expect(activity).toContain("onTogglePause = {");
-    expect(screen).toContain("onTogglePause: () -> Unit");
-    expect(screen).toContain('isPaused -> "Reanudar turno"');
-    expect(screen).toContain('else -> "Pausar turno"');
+    expect(screen).toContain("onTogglePause: () -> Boolean");
+    expect(screen).toContain("if (isPaused) {");
+    expect(screen).toContain("PausedTurnoContent(");
+    expect(screen).toContain('Text("Turno Pausado"');
+    expect(screen).toContain('"Continuar Turno"');
+    expect(screen).toContain("PauseIcon(");
+    expect(screen).toContain("PlayIcon(");
+    expect(screen).toContain("onResume = onTogglePause");
+    expect(screen).not.toContain("⏸");
+    expect(screen).not.toContain('isPaused -> "Reanudar turno"');
+  });
+
+  it("pide la verificacion del movil antes de pausar el turno desde Wear", () => {
+    const activity = readFileSync(
+      resolve(root, "android/wear/src/main/java/com/mijornada/app/WearMainActivity.kt"),
+      "utf8",
+    );
+
+    expect(activity).toContain("CONFIRM_PAUSE_TURNO");
+    expect(activity).toContain(
+      '"¿Seguro que quieres pausar el Turno actual?"',
+    );
+    expect(activity).toContain('label = "Pausar"');
+    expect(activity).toContain("if (isPaused.value) {");
+    expect(activity).toContain("sendResumeTurno()");
+    expect(activity).toContain("currentScreen.value = ScreenState.CONFIRM_PAUSE_TURNO");
+    expect(activity).toContain(
+      "ScreenState.CONFIRM_PAUSE_TURNO -> currentScreen.value = ScreenState.ACTIVE_TURNO",
+    );
+  });
+
+  it("personaliza pausa y reanudacion Wear con la paleta azul del movil", () => {
+    const screen = readFileSync(
+      resolve(root, "android/wear/src/main/java/com/mijornada/app/screens/ActiveTurnoScreen.kt"),
+      "utf8",
+    );
+    const colors = readFileSync(
+      resolve(root, "android/wear/src/main/java/com/mijornada/app/theme/Color.kt"),
+      "utf8",
+    );
+
+    expect(colors).toContain("val ColorPause = Color(0xFF7EB6FF)");
+    expect(colors).toContain("val ColorPauseBorder = Color(0xFF3B82F6)");
+    expect(colors).toContain("val ColorPauseBg = Color(0xFF101827)");
+    expect(screen).toContain(".border(2.dp, ColorPauseBorder");
+    expect(screen).toContain(".background(ColorPauseBg)");
+    expect(screen).toContain('"Pausar turno"');
+  });
+
+  it("mantiene la pantalla pausada dentro del area segura circular", () => {
+    const screen = readFileSync(
+      resolve(root, "android/wear/src/main/java/com/mijornada/app/screens/ActiveTurnoScreen.kt"),
+      "utf8",
+    );
+
+    expect(screen).toContain("PausedSafeWidth = 0.70f");
+    expect(screen).toContain(".fillMaxWidth(PausedSafeWidth)");
+    expect(screen).toContain("offset(y = (-8).dp)");
+    expect(screen).toContain(".size(82.dp)");
+    expect(screen).toContain(".padding(vertical = 10.dp)");
+    expect(screen).not.toContain("Modifier.fillMaxWidth(0.82f)");
   });
 
   it("guarda respuesta y timestamp juntos y protege el historial terminal", () => {
@@ -734,6 +806,26 @@ describe("Android Wear bridge", () => {
     expect(source).toContain("sendDeleteEntry(e.id)");
   });
 
+  it("pide confirmacion antes de iniciar un turno desde el reloj o la tile", () => {
+    const source = readFileSync(
+      resolve(root, "android/wear/src/main/java/com/mijornada/app/WearMainActivity.kt"),
+      "utf8",
+    );
+
+    expect(source).toContain("CONFIRM_START_TURNO");
+    expect(source).toContain(
+      "onStartTurno = { currentScreen.value = ScreenState.CONFIRM_START_TURNO }",
+    );
+    expect(source).toContain("currentScreen.value = ScreenState.CONFIRM_START_TURNO");
+    expect(source).toContain('Text("Pulsa para comenzar tu Turno."');
+    expect(source).toContain('label = "Cancelar"');
+    expect(source).toContain('label = if (starting) "Iniciando..." else "Iniciar"');
+    expect(source).toContain("sendStartTurno()");
+    expect(source).toContain(
+      "ScreenState.CONFIRM_START_TURNO -> currentScreen.value = ScreenState.NO_ACTIVE_TURNO",
+    );
+  });
+
   it("gestiona el boton atras nativo sin cerrar la app durante flujos de trabajo", () => {
     const source = readFileSync(
       resolve(root, "android/wear/src/main/java/com/mijornada/app/WearMainActivity.kt"),
@@ -852,7 +944,13 @@ describe("Android Wear bridge", () => {
     expect(source).toContain("Notas del turno");
     expect(source).toContain("Notas detalladas");
     expect(source).toContain("TecladoCierreOverlay");
-    expect(source).toContain("keyHeight = 20.dp");
+    // Teclado de cierre adaptado al circulo (2026-06-12): pantalla completa
+    // sin tarjeta flotante, medidas proporcionales al diametro y filas
+    // estrechadas segun la cuerda; nada queda cortado por el marco redondo.
+    expect(source).toContain("BoxWithConstraints");
+    expect(source).toContain("NumericKeypadRedondo(");
+    expect(source).toContain("keyHeight = d * 0.105f");
+    expect(source).not.toContain("0xDD000000");
     expect(source).toContain("verticalScroll(rememberScrollState())");
     expect(source).not.toContain("var confirming");
     expect(source).not.toContain("ConfirmarCierre(");
@@ -1007,6 +1105,10 @@ describe("Android Wear bridge", () => {
       resolve(root, "android/wear/src/main/java/com/mijornada/app/TurnoComplicationService.kt"),
       "utf8",
     );
+    const complicationIcon = readFileSync(
+      resolve(root, "android/wear/src/main/res/drawable/complication_icon.xml"),
+      "utf8",
+    );
     const store = readFileSync(
       resolve(root, "android/wear/src/main/java/com/mijornada/app/TurnoStatusStore.kt"),
       "utf8",
@@ -1036,9 +1138,86 @@ describe("Android Wear bridge", () => {
     );
     expect(activityWear).toContain("EXTRA_ACCION_TILE");
     expect(activityWear).toContain("private fun consumeTileAction()");
+    // Cumplimiento de la doc oficial de complicaciones: icono blanco del
+    // selector, imagen ambiente anti burn-in y throttle de requestUpdate.
+    expect(manifest).toContain('android:icon="@drawable/complication_icon"');
+    expect(complicacion).toContain("setAmbientImage");
+    expect(store).toContain("MIN_COMPLICATION_UPDATE_MS");
+    // Decision del usuario (2026-06-12): el hueco SHORT_TEXT de la esfera
+    // Xiaomi muestra el icono monocromo y el nombre "Mi Turno" debajo.
+    expect(manifest).toContain('android:value="MONOCHROMATIC_IMAGE,SMALL_IMAGE,SHORT_TEXT"');
+    expect(complicacion).toContain("MonochromaticImageComplicationData");
+    expect(complicacion).toContain("soloIconoCentrado");
+    expect(complicacion).toContain("shortTextMiTurno");
+    expect(complicacion).toContain('PlainComplicationText.Builder("Mi Turno")');
+    expect(complicacion).not.toContain('PlainComplicationText.Builder(" ")');
+    expect(complicacion).toContain("setMonochromaticImage");
+    expect(complicacion).not.toContain("textoEstado");
+    expect(complicacion).not.toContain("setTitle");
+    // Opcion A elegida por el usuario: frontal clasico redondeado, legible a
+    // tamaño de complicación y sin detalles finos que formen una mancha.
+    expect(complicationIcon).toContain("Opcion A: frontal clasico redondeado");
+    expect(complicationIcon).toContain("Letrero de taxi");
+    expect(complicationIcon).toContain("Parabrisas amplio");
+    expect(complicationIcon).toContain("Faros redondos");
+    expect(complicationIcon).toContain("Parrilla ancha");
+    expect(complicationIcon).not.toContain("lateral");
+    // Invariante de navegacion del reloj: STATUS de fondo solo mueve entre
+    // pantallas de reposo (sin listas de excepciones ad hoc).
+    const activityNav = readFileSync(
+      resolve(root, "android/wear/src/main/java/com/mijornada/app/WearMainActivity.kt"),
+      "utf8",
+    );
+    expect(activityNav).toContain("pantallasDeReposo");
+    expect(activityNav).toContain("pantallasFlujoTurnos");
+    expect(activityNav).toContain("if (currentScreen.value in pantallasDeReposo)");
     // Solo lectura de estado confirmado: sin escrituras de negocio.
     expect(tile).not.toContain("Firestore");
     expect(complicacion).not.toContain("Firestore");
+  });
+
+  it("expone esfera propia en Watch Face Format con logo neon y 3 huecos", () => {
+    // Wear OS 6 (el del Xiaomi Watch 5 del usuario) solo acepta esferas en
+    // Watch Face Format: APK aparte, solo recursos, sin codigo.
+    const manifest = readFileSync(
+      resolve(root, "android/watchface/src/main/AndroidManifest.xml"),
+      "utf8",
+    );
+    const gradle = readFileSync(
+      resolve(root, "android/watchface/build.gradle"),
+      "utf8",
+    );
+    const esfera = readFileSync(
+      resolve(root, "android/watchface/src/main/res/raw/watchface.xml"),
+      "utf8",
+    );
+    const settings = readFileSync(resolve(root, "android/settings.gradle"), "utf8");
+    expect(settings).toContain("':watchface'");
+    expect(manifest).toContain('android:hasCode="false"');
+    expect(manifest).toContain("com.google.wear.watchface.format.version");
+    expect(gradle).toContain('applicationId "com.mijornada.app.esfera"');
+    // Analogica, dial y logo neon de la marca.
+    expect(esfera).toContain('<Metadata key="CLOCK_TYPE" value="ANALOG" />');
+    expect(esfera).toContain('<Image resource="dial" />');
+    expect(esfera).toContain('<Image resource="taxi_logo" />');
+    // Hueco del logo: por defecto la complicacion de Mi Turno (logo a color,
+    // tocar abre la app) y 3 huecos redondos configurables.
+    expect(esfera).toContain(
+      'primaryProvider="com.mijornada.app/com.mijornada.app.TurnoComplicationService"',
+    );
+    expect((esfera.match(/<ComplicationSlot /g) ?? []).length).toBe(4);
+    expect(esfera).toContain('defaultSystemProvider="WATCH_BATTERY"');
+    // Recursos presentes (preview e imagenes de agujas).
+    for (const recurso of ["preview", "dial", "hour", "minute", "second", "taxi_logo"]) {
+      expect(
+        existsSync(resolve(root, `android/watchface/src/main/res/drawable/${recurso}.png`)),
+      ).toBe(true);
+    }
+    expect(existsSync(resolve(root, "android/watchface/src/main/res/xml/watch_face_info.xml"))).toBe(true);
+    // La esfera legacy (API clasica) se retiro: Wear OS 6 no la lista.
+    expect(
+      existsSync(resolve(root, "android/wear/src/main/java/com/mijornada/app/MiTurnoWatchFaceService.kt")),
+    ).toBe(false);
   });
 
   it("permite editar dinero y km de un turno cerrado desde el reloj (EDIT_TURNO)", () => {
@@ -1085,6 +1264,15 @@ describe("Android Wear bridge", () => {
     expect(procesadorTs).toContain("command.payload.entradas");
     expect(procesadorKt).toContain("entries = command.entradas");
     expect(parserKt).toContain("entradas = parseEntradas(payload)");
+    // Lista blanca de tipos de entrada en la frontera (auditoria 2026-06-12, M4):
+    // un tipo desconocido no cae en ningun cubo contable, asi que se rechaza
+    // con INVALID_PAYLOAD en vez de guardarse en silencio.
+    expect(parserKt).toContain(
+      'private val TIPOS_ENTRADA = setOf("propina", "datafono", "agencia_bono", "extra", "gasolina", "nulo")',
+    );
+    expect(parserKt).toContain('private val TIPOS_ENTRADA_TURNO = TIPOS_ENTRADA + "nota"');
+    expect(parserKt).toContain("if (it !in TIPOS_ENTRADA)");
+    expect(parserKt).toContain("if (tipo !in TIPOS_ENTRADA_TURNO)");
     expect(pantalla).toContain("onConfirm: (Double, Double, List<WatchEntry>) -> Unit");
     expect(pantalla).toContain("AddEntryScreen(");
     expect(procesadorTs).toContain('command.type === "EDIT_TURNO"');
@@ -1100,6 +1288,13 @@ describe("Android Wear bridge", () => {
     // Lapiz funcional y pantalla de edicion.
     expect(resumen).toContain("onEdit: () -> Unit");
     expect(pantalla).toContain("fun EditTurnoDatosScreen(");
+    // Gesto atras dentro de la edicion: cierra solo la subpantalla abierta
+    // (BackHandler interno con prioridad LIFO), no expulsa de la edicion.
+    expect(pantalla).toContain(
+      "BackHandler(enabled = editandoEntrada != null || nuevaCategoria != null)",
+    );
+    // Sin boton redundante: la cuadricula de categorias añade directamente.
+    expect(pantalla).not.toContain("＋ Añadir entrada");
     // Documentado en el contrato de arquitectura.
     expect(arquitectura).toContain("EDIT_TURNO");
   });

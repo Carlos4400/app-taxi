@@ -21,6 +21,7 @@
         <activity
             android:name="com.mijornada.app.WearMainActivity"
             android:exported="true"
+            android:launchMode="singleTop"
             android:taskAffinity="com.mijornada.app.watch"
             android:theme="@android:style/Theme.DeviceDefault.NoActionBar">
             <intent-filter>
@@ -71,7 +72,7 @@
         <service
             android:name="com.mijornada.app.TurnoComplicationService"
             android:exported="true"
-            android:icon="@mipmap/ic_launcher"
+            android:icon="@drawable/complication_icon"
             android:label="@string/complication_label"
             android:permission="com.google.android.wearable.permission.BIND_COMPLICATION_PROVIDER">
             <intent-filter>
@@ -79,7 +80,7 @@
             </intent-filter>
             <meta-data
                 android:name="android.support.wearable.complications.SUPPORTED_TYPES"
-                android:value="SMALL_IMAGE,SHORT_TEXT" />
+                android:value="MONOCHROMATIC_IMAGE,SMALL_IMAGE,SHORT_TEXT" />
             <meta-data
                 android:name="android.support.wearable.complications.UPDATE_PERIOD_SECONDS"
                 android:value="0" />

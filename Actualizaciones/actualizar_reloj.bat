@@ -63,10 +63,12 @@ if not defined WATCH (
     pause
     exit /b 1
   )
-  "%ADB%" connect !WATCH!
+  "%ADB%" connect !WATCH! | findstr /i "connected" >nul
   if errorlevel 1 (
     echo.
     echo [ERROR] No se pudo conectar con !WATCH!
+    echo Comprueba el puerto actual en el reloj: Depuracion inalambrica
+    echo cambia de puerto al reiniciarse o al apagarse la pantalla un rato.
     pause
     exit /b 1
   )

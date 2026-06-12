@@ -1,0 +1,651 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Esfera de Mi Turno (Watch Face Format v2).
+    Replica de la disposicion de la esfera Xiaomi original del usuario:
+    numeros grandes en el borde con rayitas de minutos en el filo; bateria en
+    rayitas verdes con degradado dentro de los numeros (de 10 a 2) con su %;
+    logo neon del taxi arriba al centro (hueco con la complicacion de Mi
+    Turno: a color y al tocarlo abre la app); huecos configurables izquierda,
+    derecha y abajo-centro; arcos de pasos (azul, 7-8h) y pulso (naranja-rojo,
+    4-5h) junto al borde con su valor rotado.
+-->
+<WatchFace width="450" height="450">
+    <Metadata key="CLOCK_TYPE" value="ANALOG" />
+    <Metadata key="PREVIEW_TIME" value="10:08:30" />
+    <Scene backgroundColor="#000000">
+
+        <PartImage x="0" y="0" width="450" height="450">
+            <Image resource="dial" />
+        </PartImage>
+
+        <!-- Bateria (rayitas, 10 a 2) -->
+        <Condition>
+            <Expressions><Expression name="bat0"><![CDATA[([BATTERY_PERCENT]) >= 3.3]]></Expression></Expressions>
+            <Compare expression="bat0"><PartDraw x="0" y="0" width="450" height="450" pivotX="0.5" pivotY="0.5" angle="-50.0"><Rectangle x="222" y="61" width="6" height="18"><Fill color="#00E0A0" /></Rectangle></PartDraw></Compare>
+            <Default><PartDraw x="0" y="0" width="450" height="450" pivotX="0.5" pivotY="0.5" angle="-50.0"><Rectangle x="222" y="61" width="6" height="18"><Fill color="#13261B" /></Rectangle></PartDraw></Default>
+        </Condition>
+        <Condition>
+            <Expressions><Expression name="bat1"><![CDATA[([BATTERY_PERCENT]) >= 6.7]]></Expression></Expressions>
+            <Compare expression="bat1"><PartDraw x="0" y="0" width="450" height="450" pivotX="0.5" pivotY="0.5" angle="-46.6"><Rectangle x="222" y="61" width="6" height="18"><Fill color="#02E19D" /></Rectangle></PartDraw></Compare>
+            <Default><PartDraw x="0" y="0" width="450" height="450" pivotX="0.5" pivotY="0.5" angle="-46.6"><Rectangle x="222" y="61" width="6" height="18"><Fill color="#13261B" /></Rectangle></PartDraw></Default>
+        </Condition>
+        <Condition>
+            <Expressions><Expression name="bat2"><![CDATA[([BATTERY_PERCENT]) >= 10.0]]></Expression></Expressions>
+            <Compare expression="bat2"><PartDraw x="0" y="0" width="450" height="450" pivotX="0.5" pivotY="0.5" angle="-43.1"><Rectangle x="222" y="61" width="6" height="18"><Fill color="#04E29B" /></Rectangle></PartDraw></Compare>
+            <Default><PartDraw x="0" y="0" width="450" height="450" pivotX="0.5" pivotY="0.5" angle="-43.1"><Rectangle x="222" y="61" width="6" height="18"><Fill color="#13261B" /></Rectangle></PartDraw></Default>
+        </Condition>
+        <Condition>
+            <Expressions><Expression name="bat3"><![CDATA[([BATTERY_PERCENT]) >= 13.3]]></Expression></Expressions>
+            <Compare expression="bat3"><PartDraw x="0" y="0" width="450" height="450" pivotX="0.5" pivotY="0.5" angle="-39.7"><Rectangle x="222" y="61" width="6" height="18"><Fill color="#06E399" /></Rectangle></PartDraw></Compare>
+            <Default><PartDraw x="0" y="0" width="450" height="450" pivotX="0.5" pivotY="0.5" angle="-39.7"><Rectangle x="222" y="61" width="6" height="18"><Fill color="#13261B" /></Rectangle></PartDraw></Default>
+        </Condition>
+        <Condition>
+            <Expressions><Expression name="bat4"><![CDATA[([BATTERY_PERCENT]) >= 16.7]]></Expression></Expressions>
+            <Compare expression="bat4"><PartDraw x="0" y="0" width="450" height="450" pivotX="0.5" pivotY="0.5" angle="-36.2"><Rectangle x="222" y="61" width="6" height="18"><Fill color="#08E497" /></Rectangle></PartDraw></Compare>
+            <Default><PartDraw x="0" y="0" width="450" height="450" pivotX="0.5" pivotY="0.5" angle="-36.2"><Rectangle x="222" y="61" width="6" height="18"><Fill color="#13261B" /></Rectangle></PartDraw></Default>
+        </Condition>
+        <Condition>
+            <Expressions><Expression name="bat5"><![CDATA[([BATTERY_PERCENT]) >= 20.0]]></Expression></Expressions>
+            <Compare expression="bat5"><PartDraw x="0" y="0" width="450" height="450" pivotX="0.5" pivotY="0.5" angle="-32.8"><Rectangle x="222" y="61" width="6" height="18"><Fill color="#0AE595" /></Rectangle></PartDraw></Compare>
+            <Default><PartDraw x="0" y="0" width="450" height="450" pivotX="0.5" pivotY="0.5" angle="-32.8"><Rectangle x="222" y="61" width="6" height="18"><Fill color="#13261B" /></Rectangle></PartDraw></Default>
+        </Condition>
+        <Condition>
+            <Expressions><Expression name="bat6"><![CDATA[([BATTERY_PERCENT]) >= 23.3]]></Expression></Expressions>
+            <Compare expression="bat6"><PartDraw x="0" y="0" width="450" height="450" pivotX="0.5" pivotY="0.5" angle="-29.3"><Rectangle x="222" y="61" width="6" height="18"><Fill color="#0CE693" /></Rectangle></PartDraw></Compare>
+            <Default><PartDraw x="0" y="0" width="450" height="450" pivotX="0.5" pivotY="0.5" angle="-29.3"><Rectangle x="222" y="61" width="6" height="18"><Fill color="#13261B" /></Rectangle></PartDraw></Default>
+        </Condition>
+        <Condition>
+            <Expressions><Expression name="bat7"><![CDATA[([BATTERY_PERCENT]) >= 26.7]]></Expression></Expressions>
+            <Compare expression="bat7"><PartDraw x="0" y="0" width="450" height="450" pivotX="0.5" pivotY="0.5" angle="-25.9"><Rectangle x="222" y="61" width="6" height="18"><Fill color="#0EE791" /></Rectangle></PartDraw></Compare>
+            <Default><PartDraw x="0" y="0" width="450" height="450" pivotX="0.5" pivotY="0.5" angle="-25.9"><Rectangle x="222" y="61" width="6" height="18"><Fill color="#13261B" /></Rectangle></PartDraw></Default>
+        </Condition>
+        <Condition>
+            <Expressions><Expression name="bat8"><![CDATA[([BATTERY_PERCENT]) >= 30.0]]></Expression></Expressions>
+            <Compare expression="bat8"><PartDraw x="0" y="0" width="450" height="450" pivotX="0.5" pivotY="0.5" angle="-22.4"><Rectangle x="222" y="61" width="6" height="18"><Fill color="#10E88F" /></Rectangle></PartDraw></Compare>
+            <Default><PartDraw x="0" y="0" width="450" height="450" pivotX="0.5" pivotY="0.5" angle="-22.4"><Rectangle x="222" y="61" width="6" height="18"><Fill color="#13261B" /></Rectangle></PartDraw></Default>
+        </Condition>
+        <Condition>
+            <Expressions><Expression name="bat9"><![CDATA[([BATTERY_PERCENT]) >= 33.3]]></Expression></Expressions>
+            <Compare expression="bat9"><PartDraw x="0" y="0" width="450" height="450" pivotX="0.5" pivotY="0.5" angle="-19.0"><Rectangle x="222" y="61" width="6" height="18"><Fill color="#12E98D" /></Rectangle></PartDraw></Compare>
+            <Default><PartDraw x="0" y="0" width="450" height="450" pivotX="0.5" pivotY="0.5" angle="-19.0"><Rectangle x="222" y="61" width="6" height="18"><Fill color="#13261B" /></Rectangle></PartDraw></Default>
+        </Condition>
+        <Condition>
+            <Expressions><Expression name="bat10"><![CDATA[([BATTERY_PERCENT]) >= 36.7]]></Expression></Expressions>
+            <Compare expression="bat10"><PartDraw x="0" y="0" width="450" height="450" pivotX="0.5" pivotY="0.5" angle="-15.5"><Rectangle x="222" y="61" width="6" height="18"><Fill color="#14EA8B" /></Rectangle></PartDraw></Compare>
+            <Default><PartDraw x="0" y="0" width="450" height="450" pivotX="0.5" pivotY="0.5" angle="-15.5"><Rectangle x="222" y="61" width="6" height="18"><Fill color="#13261B" /></Rectangle></PartDraw></Default>
+        </Condition>
+        <Condition>
+            <Expressions><Expression name="bat11"><![CDATA[([BATTERY_PERCENT]) >= 40.0]]></Expression></Expressions>
+            <Compare expression="bat11"><PartDraw x="0" y="0" width="450" height="450" pivotX="0.5" pivotY="0.5" angle="-12.1"><Rectangle x="222" y="61" width="6" height="18"><Fill color="#16EB89" /></Rectangle></PartDraw></Compare>
+            <Default><PartDraw x="0" y="0" width="450" height="450" pivotX="0.5" pivotY="0.5" angle="-12.1"><Rectangle x="222" y="61" width="6" height="18"><Fill color="#13261B" /></Rectangle></PartDraw></Default>
+        </Condition>
+        <Condition>
+            <Expressions><Expression name="bat12"><![CDATA[([BATTERY_PERCENT]) >= 43.3]]></Expression></Expressions>
+            <Compare expression="bat12"><PartDraw x="0" y="0" width="450" height="450" pivotX="0.5" pivotY="0.5" angle="-8.6"><Rectangle x="222" y="61" width="6" height="18"><Fill color="#18EC87" /></Rectangle></PartDraw></Compare>
+            <Default><PartDraw x="0" y="0" width="450" height="450" pivotX="0.5" pivotY="0.5" angle="-8.6"><Rectangle x="222" y="61" width="6" height="18"><Fill color="#13261B" /></Rectangle></PartDraw></Default>
+        </Condition>
+        <Condition>
+            <Expressions><Expression name="bat13"><![CDATA[([BATTERY_PERCENT]) >= 46.7]]></Expression></Expressions>
+            <Compare expression="bat13"><PartDraw x="0" y="0" width="450" height="450" pivotX="0.5" pivotY="0.5" angle="-5.2"><Rectangle x="222" y="61" width="6" height="18"><Fill color="#1AED85" /></Rectangle></PartDraw></Compare>
+            <Default><PartDraw x="0" y="0" width="450" height="450" pivotX="0.5" pivotY="0.5" angle="-5.2"><Rectangle x="222" y="61" width="6" height="18"><Fill color="#13261B" /></Rectangle></PartDraw></Default>
+        </Condition>
+        <Condition>
+            <Expressions><Expression name="bat14"><![CDATA[([BATTERY_PERCENT]) >= 50.0]]></Expression></Expressions>
+            <Compare expression="bat14"><PartDraw x="0" y="0" width="450" height="450" pivotX="0.5" pivotY="0.5" angle="-1.7"><Rectangle x="222" y="61" width="6" height="18"><Fill color="#1CEE83" /></Rectangle></PartDraw></Compare>
+            <Default><PartDraw x="0" y="0" width="450" height="450" pivotX="0.5" pivotY="0.5" angle="-1.7"><Rectangle x="222" y="61" width="6" height="18"><Fill color="#13261B" /></Rectangle></PartDraw></Default>
+        </Condition>
+        <Condition>
+            <Expressions><Expression name="bat15"><![CDATA[([BATTERY_PERCENT]) >= 53.3]]></Expression></Expressions>
+            <Compare expression="bat15"><PartDraw x="0" y="0" width="450" height="450" pivotX="0.5" pivotY="0.5" angle="1.7"><Rectangle x="222" y="61" width="6" height="18"><Fill color="#1FF080" /></Rectangle></PartDraw></Compare>
+            <Default><PartDraw x="0" y="0" width="450" height="450" pivotX="0.5" pivotY="0.5" angle="1.7"><Rectangle x="222" y="61" width="6" height="18"><Fill color="#13261B" /></Rectangle></PartDraw></Default>
+        </Condition>
+        <Condition>
+            <Expressions><Expression name="bat16"><![CDATA[([BATTERY_PERCENT]) >= 56.7]]></Expression></Expressions>
+            <Compare expression="bat16"><PartDraw x="0" y="0" width="450" height="450" pivotX="0.5" pivotY="0.5" angle="5.2"><Rectangle x="222" y="61" width="6" height="18"><Fill color="#21F17E" /></Rectangle></PartDraw></Compare>
+            <Default><PartDraw x="0" y="0" width="450" height="450" pivotX="0.5" pivotY="0.5" angle="5.2"><Rectangle x="222" y="61" width="6" height="18"><Fill color="#13261B" /></Rectangle></PartDraw></Default>
+        </Condition>
+        <Condition>
+            <Expressions><Expression name="bat17"><![CDATA[([BATTERY_PERCENT]) >= 60.0]]></Expression></Expressions>
+            <Compare expression="bat17"><PartDraw x="0" y="0" width="450" height="450" pivotX="0.5" pivotY="0.5" angle="8.6"><Rectangle x="222" y="61" width="6" height="18"><Fill color="#23F27C" /></Rectangle></PartDraw></Compare>
+            <Default><PartDraw x="0" y="0" width="450" height="450" pivotX="0.5" pivotY="0.5" angle="8.6"><Rectangle x="222" y="61" width="6" height="18"><Fill color="#13261B" /></Rectangle></PartDraw></Default>
+        </Condition>
+        <Condition>
+            <Expressions><Expression name="bat18"><![CDATA[([BATTERY_PERCENT]) >= 63.3]]></Expression></Expressions>
+            <Compare expression="bat18"><PartDraw x="0" y="0" width="450" height="450" pivotX="0.5" pivotY="0.5" angle="12.1"><Rectangle x="222" y="61" width="6" height="18"><Fill color="#25F37A" /></Rectangle></PartDraw></Compare>
+            <Default><PartDraw x="0" y="0" width="450" height="450" pivotX="0.5" pivotY="0.5" angle="12.1"><Rectangle x="222" y="61" width="6" height="18"><Fill color="#13261B" /></Rectangle></PartDraw></Default>
+        </Condition>
+        <Condition>
+            <Expressions><Expression name="bat19"><![CDATA[([BATTERY_PERCENT]) >= 66.7]]></Expression></Expressions>
+            <Compare expression="bat19"><PartDraw x="0" y="0" width="450" height="450" pivotX="0.5" pivotY="0.5" angle="15.5"><Rectangle x="222" y="61" width="6" height="18"><Fill color="#27F478" /></Rectangle></PartDraw></Compare>
+            <Default><PartDraw x="0" y="0" width="450" height="450" pivotX="0.5" pivotY="0.5" angle="15.5"><Rectangle x="222" y="61" width="6" height="18"><Fill color="#13261B" /></Rectangle></PartDraw></Default>
+        </Condition>
+        <Condition>
+            <Expressions><Expression name="bat20"><![CDATA[([BATTERY_PERCENT]) >= 70.0]]></Expression></Expressions>
+            <Compare expression="bat20"><PartDraw x="0" y="0" width="450" height="450" pivotX="0.5" pivotY="0.5" angle="19.0"><Rectangle x="222" y="61" width="6" height="18"><Fill color="#29F576" /></Rectangle></PartDraw></Compare>
+            <Default><PartDraw x="0" y="0" width="450" height="450" pivotX="0.5" pivotY="0.5" angle="19.0"><Rectangle x="222" y="61" width="6" height="18"><Fill color="#13261B" /></Rectangle></PartDraw></Default>
+        </Condition>
+        <Condition>
+            <Expressions><Expression name="bat21"><![CDATA[([BATTERY_PERCENT]) >= 73.3]]></Expression></Expressions>
+            <Compare expression="bat21"><PartDraw x="0" y="0" width="450" height="450" pivotX="0.5" pivotY="0.5" angle="22.4"><Rectangle x="222" y="61" width="6" height="18"><Fill color="#2BF674" /></Rectangle></PartDraw></Compare>
+            <Default><PartDraw x="0" y="0" width="450" height="450" pivotX="0.5" pivotY="0.5" angle="22.4"><Rectangle x="222" y="61" width="6" height="18"><Fill color="#13261B" /></Rectangle></PartDraw></Default>
+        </Condition>
+        <Condition>
+            <Expressions><Expression name="bat22"><![CDATA[([BATTERY_PERCENT]) >= 76.7]]></Expression></Expressions>
+            <Compare expression="bat22"><PartDraw x="0" y="0" width="450" height="450" pivotX="0.5" pivotY="0.5" angle="25.9"><Rectangle x="222" y="61" width="6" height="18"><Fill color="#2DF772" /></Rectangle></PartDraw></Compare>
+            <Default><PartDraw x="0" y="0" width="450" height="450" pivotX="0.5" pivotY="0.5" angle="25.9"><Rectangle x="222" y="61" width="6" height="18"><Fill color="#13261B" /></Rectangle></PartDraw></Default>
+        </Condition>
+        <Condition>
+            <Expressions><Expression name="bat23"><![CDATA[([BATTERY_PERCENT]) >= 80.0]]></Expression></Expressions>
+            <Compare expression="bat23"><PartDraw x="0" y="0" width="450" height="450" pivotX="0.5" pivotY="0.5" angle="29.3"><Rectangle x="222" y="61" width="6" height="18"><Fill color="#2FF870" /></Rectangle></PartDraw></Compare>
+            <Default><PartDraw x="0" y="0" width="450" height="450" pivotX="0.5" pivotY="0.5" angle="29.3"><Rectangle x="222" y="61" width="6" height="18"><Fill color="#13261B" /></Rectangle></PartDraw></Default>
+        </Condition>
+        <Condition>
+            <Expressions><Expression name="bat24"><![CDATA[([BATTERY_PERCENT]) >= 83.3]]></Expression></Expressions>
+            <Compare expression="bat24"><PartDraw x="0" y="0" width="450" height="450" pivotX="0.5" pivotY="0.5" angle="32.8"><Rectangle x="222" y="61" width="6" height="18"><Fill color="#31F96E" /></Rectangle></PartDraw></Compare>
+            <Default><PartDraw x="0" y="0" width="450" height="450" pivotX="0.5" pivotY="0.5" angle="32.8"><Rectangle x="222" y="61" width="6" height="18"><Fill color="#13261B" /></Rectangle></PartDraw></Default>
+        </Condition>
+        <Condition>
+            <Expressions><Expression name="bat25"><![CDATA[([BATTERY_PERCENT]) >= 86.7]]></Expression></Expressions>
+            <Compare expression="bat25"><PartDraw x="0" y="0" width="450" height="450" pivotX="0.5" pivotY="0.5" angle="36.2"><Rectangle x="222" y="61" width="6" height="18"><Fill color="#33FA6C" /></Rectangle></PartDraw></Compare>
+            <Default><PartDraw x="0" y="0" width="450" height="450" pivotX="0.5" pivotY="0.5" angle="36.2"><Rectangle x="222" y="61" width="6" height="18"><Fill color="#13261B" /></Rectangle></PartDraw></Default>
+        </Condition>
+        <Condition>
+            <Expressions><Expression name="bat26"><![CDATA[([BATTERY_PERCENT]) >= 90.0]]></Expression></Expressions>
+            <Compare expression="bat26"><PartDraw x="0" y="0" width="450" height="450" pivotX="0.5" pivotY="0.5" angle="39.7"><Rectangle x="222" y="61" width="6" height="18"><Fill color="#35FB6A" /></Rectangle></PartDraw></Compare>
+            <Default><PartDraw x="0" y="0" width="450" height="450" pivotX="0.5" pivotY="0.5" angle="39.7"><Rectangle x="222" y="61" width="6" height="18"><Fill color="#13261B" /></Rectangle></PartDraw></Default>
+        </Condition>
+        <Condition>
+            <Expressions><Expression name="bat27"><![CDATA[([BATTERY_PERCENT]) >= 93.3]]></Expression></Expressions>
+            <Compare expression="bat27"><PartDraw x="0" y="0" width="450" height="450" pivotX="0.5" pivotY="0.5" angle="43.1"><Rectangle x="222" y="61" width="6" height="18"><Fill color="#37FC68" /></Rectangle></PartDraw></Compare>
+            <Default><PartDraw x="0" y="0" width="450" height="450" pivotX="0.5" pivotY="0.5" angle="43.1"><Rectangle x="222" y="61" width="6" height="18"><Fill color="#13261B" /></Rectangle></PartDraw></Default>
+        </Condition>
+        <Condition>
+            <Expressions><Expression name="bat28"><![CDATA[([BATTERY_PERCENT]) >= 96.7]]></Expression></Expressions>
+            <Compare expression="bat28"><PartDraw x="0" y="0" width="450" height="450" pivotX="0.5" pivotY="0.5" angle="46.6"><Rectangle x="222" y="61" width="6" height="18"><Fill color="#39FD66" /></Rectangle></PartDraw></Compare>
+            <Default><PartDraw x="0" y="0" width="450" height="450" pivotX="0.5" pivotY="0.5" angle="46.6"><Rectangle x="222" y="61" width="6" height="18"><Fill color="#13261B" /></Rectangle></PartDraw></Default>
+        </Condition>
+        <Condition>
+            <Expressions><Expression name="bat29"><![CDATA[([BATTERY_PERCENT]) >= 100.0]]></Expression></Expressions>
+            <Compare expression="bat29"><PartDraw x="0" y="0" width="450" height="450" pivotX="0.5" pivotY="0.5" angle="50.0"><Rectangle x="222" y="61" width="6" height="18"><Fill color="#3CFF64" /></Rectangle></PartDraw></Compare>
+            <Default><PartDraw x="0" y="0" width="450" height="450" pivotX="0.5" pivotY="0.5" angle="50.0"><Rectangle x="222" y="61" width="6" height="18"><Fill color="#13261B" /></Rectangle></PartDraw></Default>
+        </Condition>
+        <PartText x="306" y="137" width="84" height="28" pivotX="0.5" pivotY="0.5" angle="59" tintColor="#3CFF64">
+            <Text align="CENTER"><Font family="SYNC_TO_DEVICE" size="22.0" weight="BOLD">
+                <Template><![CDATA[%s%%]]><Parameter expression="[BATTERY_PERCENT]" /></Template>
+            </Font></Text>
+        </PartText>
+        <!-- Pasos (rayitas, 7 a 8) -->
+        <Condition>
+            <Expressions><Expression name="pas0"><![CDATA[([STEP_PERCENT]) >= 8.3]]></Expression></Expressions>
+            <Compare expression="pas0"><PartDraw x="0" y="0" width="450" height="450" pivotX="0.5" pivotY="0.5" angle="197.0"><Rectangle x="222" y="61" width="6" height="18"><Fill color="#33C2FF" /></Rectangle></PartDraw></Compare>
+            <Default><PartDraw x="0" y="0" width="450" height="450" pivotX="0.5" pivotY="0.5" angle="197.0"><Rectangle x="222" y="61" width="6" height="18"><Fill color="#121B26" /></Rectangle></PartDraw></Default>
+        </Condition>
+        <Condition>
+            <Expressions><Expression name="pas1"><![CDATA[([STEP_PERCENT]) >= 16.7]]></Expression></Expressions>
+            <Compare expression="pas1"><PartDraw x="0" y="0" width="450" height="450" pivotX="0.5" pivotY="0.5" angle="201.5"><Rectangle x="222" y="61" width="6" height="18"><Fill color="#35BFFF" /></Rectangle></PartDraw></Compare>
+            <Default><PartDraw x="0" y="0" width="450" height="450" pivotX="0.5" pivotY="0.5" angle="201.5"><Rectangle x="222" y="61" width="6" height="18"><Fill color="#121B26" /></Rectangle></PartDraw></Default>
+        </Condition>
+        <Condition>
+            <Expressions><Expression name="pas2"><![CDATA[([STEP_PERCENT]) >= 25.0]]></Expression></Expressions>
+            <Compare expression="pas2"><PartDraw x="0" y="0" width="450" height="450" pivotX="0.5" pivotY="0.5" angle="206.1"><Rectangle x="222" y="61" width="6" height="18"><Fill color="#37BCFF" /></Rectangle></PartDraw></Compare>
+            <Default><PartDraw x="0" y="0" width="450" height="450" pivotX="0.5" pivotY="0.5" angle="206.1"><Rectangle x="222" y="61" width="6" height="18"><Fill color="#121B26" /></Rectangle></PartDraw></Default>
+        </Condition>
+        <Condition>
+            <Expressions><Expression name="pas3"><![CDATA[([STEP_PERCENT]) >= 33.3]]></Expression></Expressions>
+            <Compare expression="pas3"><PartDraw x="0" y="0" width="450" height="450" pivotX="0.5" pivotY="0.5" angle="210.6"><Rectangle x="222" y="61" width="6" height="18"><Fill color="#3ABAFF" /></Rectangle></PartDraw></Compare>
+            <Default><PartDraw x="0" y="0" width="450" height="450" pivotX="0.5" pivotY="0.5" angle="210.6"><Rectangle x="222" y="61" width="6" height="18"><Fill color="#121B26" /></Rectangle></PartDraw></Default>
+        </Condition>
+        <Condition>
+            <Expressions><Expression name="pas4"><![CDATA[([STEP_PERCENT]) >= 41.7]]></Expression></Expressions>
+            <Compare expression="pas4"><PartDraw x="0" y="0" width="450" height="450" pivotX="0.5" pivotY="0.5" angle="215.2"><Rectangle x="222" y="61" width="6" height="18"><Fill color="#3CB7FF" /></Rectangle></PartDraw></Compare>
+            <Default><PartDraw x="0" y="0" width="450" height="450" pivotX="0.5" pivotY="0.5" angle="215.2"><Rectangle x="222" y="61" width="6" height="18"><Fill color="#121B26" /></Rectangle></PartDraw></Default>
+        </Condition>
+        <Condition>
+            <Expressions><Expression name="pas5"><![CDATA[([STEP_PERCENT]) >= 50.0]]></Expression></Expressions>
+            <Compare expression="pas5"><PartDraw x="0" y="0" width="450" height="450" pivotX="0.5" pivotY="0.5" angle="219.7"><Rectangle x="222" y="61" width="6" height="18"><Fill color="#3EB5FF" /></Rectangle></PartDraw></Compare>
+            <Default><PartDraw x="0" y="0" width="450" height="450" pivotX="0.5" pivotY="0.5" angle="219.7"><Rectangle x="222" y="61" width="6" height="18"><Fill color="#121B26" /></Rectangle></PartDraw></Default>
+        </Condition>
+        <Condition>
+            <Expressions><Expression name="pas6"><![CDATA[([STEP_PERCENT]) >= 58.3]]></Expression></Expressions>
+            <Compare expression="pas6"><PartDraw x="0" y="0" width="450" height="450" pivotX="0.5" pivotY="0.5" angle="224.3"><Rectangle x="222" y="61" width="6" height="18"><Fill color="#41B2FF" /></Rectangle></PartDraw></Compare>
+            <Default><PartDraw x="0" y="0" width="450" height="450" pivotX="0.5" pivotY="0.5" angle="224.3"><Rectangle x="222" y="61" width="6" height="18"><Fill color="#121B26" /></Rectangle></PartDraw></Default>
+        </Condition>
+        <Condition>
+            <Expressions><Expression name="pas7"><![CDATA[([STEP_PERCENT]) >= 66.7]]></Expression></Expressions>
+            <Compare expression="pas7"><PartDraw x="0" y="0" width="450" height="450" pivotX="0.5" pivotY="0.5" angle="228.8"><Rectangle x="222" y="61" width="6" height="18"><Fill color="#43B0FF" /></Rectangle></PartDraw></Compare>
+            <Default><PartDraw x="0" y="0" width="450" height="450" pivotX="0.5" pivotY="0.5" angle="228.8"><Rectangle x="222" y="61" width="6" height="18"><Fill color="#121B26" /></Rectangle></PartDraw></Default>
+        </Condition>
+        <Condition>
+            <Expressions><Expression name="pas8"><![CDATA[([STEP_PERCENT]) >= 75.0]]></Expression></Expressions>
+            <Compare expression="pas8"><PartDraw x="0" y="0" width="450" height="450" pivotX="0.5" pivotY="0.5" angle="233.4"><Rectangle x="222" y="61" width="6" height="18"><Fill color="#45ADFF" /></Rectangle></PartDraw></Compare>
+            <Default><PartDraw x="0" y="0" width="450" height="450" pivotX="0.5" pivotY="0.5" angle="233.4"><Rectangle x="222" y="61" width="6" height="18"><Fill color="#121B26" /></Rectangle></PartDraw></Default>
+        </Condition>
+        <Condition>
+            <Expressions><Expression name="pas9"><![CDATA[([STEP_PERCENT]) >= 83.3]]></Expression></Expressions>
+            <Compare expression="pas9"><PartDraw x="0" y="0" width="450" height="450" pivotX="0.5" pivotY="0.5" angle="237.9"><Rectangle x="222" y="61" width="6" height="18"><Fill color="#48ABFF" /></Rectangle></PartDraw></Compare>
+            <Default><PartDraw x="0" y="0" width="450" height="450" pivotX="0.5" pivotY="0.5" angle="237.9"><Rectangle x="222" y="61" width="6" height="18"><Fill color="#121B26" /></Rectangle></PartDraw></Default>
+        </Condition>
+        <Condition>
+            <Expressions><Expression name="pas10"><![CDATA[([STEP_PERCENT]) >= 91.7]]></Expression></Expressions>
+            <Compare expression="pas10"><PartDraw x="0" y="0" width="450" height="450" pivotX="0.5" pivotY="0.5" angle="242.5"><Rectangle x="222" y="61" width="6" height="18"><Fill color="#4AA8FF" /></Rectangle></PartDraw></Compare>
+            <Default><PartDraw x="0" y="0" width="450" height="450" pivotX="0.5" pivotY="0.5" angle="242.5"><Rectangle x="222" y="61" width="6" height="18"><Fill color="#121B26" /></Rectangle></PartDraw></Default>
+        </Condition>
+        <Condition>
+            <Expressions><Expression name="pas11"><![CDATA[([STEP_PERCENT]) >= 100.0]]></Expression></Expressions>
+            <Compare expression="pas11"><PartDraw x="0" y="0" width="450" height="450" pivotX="0.5" pivotY="0.5" angle="247.0"><Rectangle x="222" y="61" width="6" height="18"><Fill color="#4DA6FF" /></Rectangle></PartDraw></Compare>
+            <Default><PartDraw x="0" y="0" width="450" height="450" pivotX="0.5" pivotY="0.5" angle="247.0"><Rectangle x="222" y="61" width="6" height="18"><Fill color="#121B26" /></Rectangle></PartDraw></Default>
+        </Condition>
+        <PartText x="35" y="259" width="84" height="28" pivotX="0.5" pivotY="0.5" angle="72" tintColor="#4DA6FF">
+            <Text align="CENTER"><Font family="SYNC_TO_DEVICE" size="22.0" weight="BOLD">
+                <Template><![CDATA[%d]]><Parameter expression="[STEP_COUNT]" /></Template>
+            </Font></Text>
+        </PartText>
+        <!-- Pulso (rayitas, 4 a 5; calorias no existe como fuente WFF) -->
+        <Condition>
+            <Expressions><Expression name="pul0"><![CDATA[((round([HEART_RATE]) / 220) * 100) >= 8.3]]></Expression></Expressions>
+            <Compare expression="pul0"><PartDraw x="0" y="0" width="450" height="450" pivotX="0.5" pivotY="0.5" angle="113.0"><Rectangle x="222" y="61" width="6" height="18"><Fill color="#FF9500" /></Rectangle></PartDraw></Compare>
+            <Default><PartDraw x="0" y="0" width="450" height="450" pivotX="0.5" pivotY="0.5" angle="113.0"><Rectangle x="222" y="61" width="6" height="18"><Fill color="#261410" /></Rectangle></PartDraw></Default>
+        </Condition>
+        <Condition>
+            <Expressions><Expression name="pul1"><![CDATA[((round([HEART_RATE]) / 220) * 100) >= 16.7]]></Expression></Expressions>
+            <Compare expression="pul1"><PartDraw x="0" y="0" width="450" height="450" pivotX="0.5" pivotY="0.5" angle="117.5"><Rectangle x="222" y="61" width="6" height="18"><Fill color="#FF8E04" /></Rectangle></PartDraw></Compare>
+            <Default><PartDraw x="0" y="0" width="450" height="450" pivotX="0.5" pivotY="0.5" angle="117.5"><Rectangle x="222" y="61" width="6" height="18"><Fill color="#261410" /></Rectangle></PartDraw></Default>
+        </Condition>
+        <Condition>
+            <Expressions><Expression name="pul2"><![CDATA[((round([HEART_RATE]) / 220) * 100) >= 25.0]]></Expression></Expressions>
+            <Compare expression="pul2"><PartDraw x="0" y="0" width="450" height="450" pivotX="0.5" pivotY="0.5" angle="122.1"><Rectangle x="222" y="61" width="6" height="18"><Fill color="#FF8708" /></Rectangle></PartDraw></Compare>
+            <Default><PartDraw x="0" y="0" width="450" height="450" pivotX="0.5" pivotY="0.5" angle="122.1"><Rectangle x="222" y="61" width="6" height="18"><Fill color="#261410" /></Rectangle></PartDraw></Default>
+        </Condition>
+        <Condition>
+            <Expressions><Expression name="pul3"><![CDATA[((round([HEART_RATE]) / 220) * 100) >= 33.3]]></Expression></Expressions>
+            <Compare expression="pul3"><PartDraw x="0" y="0" width="450" height="450" pivotX="0.5" pivotY="0.5" angle="126.6"><Rectangle x="222" y="61" width="6" height="18"><Fill color="#FF810D" /></Rectangle></PartDraw></Compare>
+            <Default><PartDraw x="0" y="0" width="450" height="450" pivotX="0.5" pivotY="0.5" angle="126.6"><Rectangle x="222" y="61" width="6" height="18"><Fill color="#261410" /></Rectangle></PartDraw></Default>
+        </Condition>
+        <Condition>
+            <Expressions><Expression name="pul4"><![CDATA[((round([HEART_RATE]) / 220) * 100) >= 41.7]]></Expression></Expressions>
+            <Compare expression="pul4"><PartDraw x="0" y="0" width="450" height="450" pivotX="0.5" pivotY="0.5" angle="131.2"><Rectangle x="222" y="61" width="6" height="18"><Fill color="#FF7A11" /></Rectangle></PartDraw></Compare>
+            <Default><PartDraw x="0" y="0" width="450" height="450" pivotX="0.5" pivotY="0.5" angle="131.2"><Rectangle x="222" y="61" width="6" height="18"><Fill color="#261410" /></Rectangle></PartDraw></Default>
+        </Condition>
+        <Condition>
+            <Expressions><Expression name="pul5"><![CDATA[((round([HEART_RATE]) / 220) * 100) >= 50.0]]></Expression></Expressions>
+            <Compare expression="pul5"><PartDraw x="0" y="0" width="450" height="450" pivotX="0.5" pivotY="0.5" angle="135.7"><Rectangle x="222" y="61" width="6" height="18"><Fill color="#FF7415" /></Rectangle></PartDraw></Compare>
+            <Default><PartDraw x="0" y="0" width="450" height="450" pivotX="0.5" pivotY="0.5" angle="135.7"><Rectangle x="222" y="61" width="6" height="18"><Fill color="#261410" /></Rectangle></PartDraw></Default>
+        </Condition>
+        <Condition>
+            <Expressions><Expression name="pul6"><![CDATA[((round([HEART_RATE]) / 220) * 100) >= 58.3]]></Expression></Expressions>
+            <Compare expression="pul6"><PartDraw x="0" y="0" width="450" height="450" pivotX="0.5" pivotY="0.5" angle="140.3"><Rectangle x="222" y="61" width="6" height="18"><Fill color="#FF6D1A" /></Rectangle></PartDraw></Compare>
+            <Default><PartDraw x="0" y="0" width="450" height="450" pivotX="0.5" pivotY="0.5" angle="140.3"><Rectangle x="222" y="61" width="6" height="18"><Fill color="#261410" /></Rectangle></PartDraw></Default>
+        </Condition>
+        <Condition>
+            <Expressions><Expression name="pul7"><![CDATA[((round([HEART_RATE]) / 220) * 100) >= 66.7]]></Expression></Expressions>
+            <Compare expression="pul7"><PartDraw x="0" y="0" width="450" height="450" pivotX="0.5" pivotY="0.5" angle="144.8"><Rectangle x="222" y="61" width="6" height="18"><Fill color="#FF671E" /></Rectangle></PartDraw></Compare>
+            <Default><PartDraw x="0" y="0" width="450" height="450" pivotX="0.5" pivotY="0.5" angle="144.8"><Rectangle x="222" y="61" width="6" height="18"><Fill color="#261410" /></Rectangle></PartDraw></Default>
+        </Condition>
+        <Condition>
+            <Expressions><Expression name="pul8"><![CDATA[((round([HEART_RATE]) / 220) * 100) >= 75.0]]></Expression></Expressions>
+            <Compare expression="pul8"><PartDraw x="0" y="0" width="450" height="450" pivotX="0.5" pivotY="0.5" angle="149.4"><Rectangle x="222" y="61" width="6" height="18"><Fill color="#FF6022" /></Rectangle></PartDraw></Compare>
+            <Default><PartDraw x="0" y="0" width="450" height="450" pivotX="0.5" pivotY="0.5" angle="149.4"><Rectangle x="222" y="61" width="6" height="18"><Fill color="#261410" /></Rectangle></PartDraw></Default>
+        </Condition>
+        <Condition>
+            <Expressions><Expression name="pul9"><![CDATA[((round([HEART_RATE]) / 220) * 100) >= 83.3]]></Expression></Expressions>
+            <Compare expression="pul9"><PartDraw x="0" y="0" width="450" height="450" pivotX="0.5" pivotY="0.5" angle="153.9"><Rectangle x="222" y="61" width="6" height="18"><Fill color="#FF5A27" /></Rectangle></PartDraw></Compare>
+            <Default><PartDraw x="0" y="0" width="450" height="450" pivotX="0.5" pivotY="0.5" angle="153.9"><Rectangle x="222" y="61" width="6" height="18"><Fill color="#261410" /></Rectangle></PartDraw></Default>
+        </Condition>
+        <Condition>
+            <Expressions><Expression name="pul10"><![CDATA[((round([HEART_RATE]) / 220) * 100) >= 91.7]]></Expression></Expressions>
+            <Compare expression="pul10"><PartDraw x="0" y="0" width="450" height="450" pivotX="0.5" pivotY="0.5" angle="158.5"><Rectangle x="222" y="61" width="6" height="18"><Fill color="#FF532B" /></Rectangle></PartDraw></Compare>
+            <Default><PartDraw x="0" y="0" width="450" height="450" pivotX="0.5" pivotY="0.5" angle="158.5"><Rectangle x="222" y="61" width="6" height="18"><Fill color="#261410" /></Rectangle></PartDraw></Default>
+        </Condition>
+        <Condition>
+            <Expressions><Expression name="pul11"><![CDATA[((round([HEART_RATE]) / 220) * 100) >= 100.0]]></Expression></Expressions>
+            <Compare expression="pul11"><PartDraw x="0" y="0" width="450" height="450" pivotX="0.5" pivotY="0.5" angle="163.0"><Rectangle x="222" y="61" width="6" height="18"><Fill color="#FF4D30" /></Rectangle></PartDraw></Compare>
+            <Default><PartDraw x="0" y="0" width="450" height="450" pivotX="0.5" pivotY="0.5" angle="163.0"><Rectangle x="222" y="61" width="6" height="18"><Fill color="#261410" /></Rectangle></PartDraw></Default>
+        </Condition>
+        <PartText x="339" y="256" width="84" height="28" pivotX="0.5" pivotY="0.5" angle="-74" tintColor="#FF7040">
+            <Text align="CENTER"><Font family="SYNC_TO_DEVICE" size="22.0" weight="BOLD">
+                <Template><![CDATA[%d]]><Parameter expression="round([HEART_RATE])" /></Template>
+            </Font></Text>
+        </PartText>
+
+        <!-- Logo estatico de respaldo -->
+        <PartImage x="150" y="107" width="150" height="99">
+            <Image resource="taxi_logo" />
+        </PartImage>
+
+        <!-- Hueco del logo (Mi Turno por defecto: logo a color, abre la app) -->
+        <ComplicationSlot x="145" y="76" width="160" height="160" slotId="1" displayName="@string/slot_logo"
+            supportedTypes="SMALL_IMAGE EMPTY">
+            <BoundingOval x="0" y="0" width="160" height="160" outlinePadding="2.0" />
+            <DefaultProviderPolicy primaryProvider="com.mijornada.app/com.mijornada.app.TurnoComplicationService" primaryProviderType="SMALL_IMAGE" defaultSystemProvider="EMPTY" defaultSystemProviderType="EMPTY" />
+            <Complication type="SMALL_IMAGE">
+                <PartImage x="0" y="0" width="160" height="160">
+                    <Image resource="[COMPLICATION.SMALL_IMAGE]" />
+                </PartImage>
+            </Complication>
+        </ComplicationSlot>
+
+        <ComplicationSlot x="70" y="197" width="100" height="100" slotId="2" displayName="@string/slot_izquierda"
+            supportedTypes="RANGED_VALUE SHORT_TEXT SMALL_IMAGE MONOCHROMATIC_IMAGE EMPTY">
+            <BoundingOval x="0" y="0" width="100" height="100" outlinePadding="2.0" />
+            <DefaultProviderPolicy defaultSystemProvider="WATCH_BATTERY" defaultSystemProviderType="RANGED_VALUE" />
+            <Complication type="SHORT_TEXT">
+                <PartDraw x="0" y="0" width="100" height="100">
+                    <Ellipse x="0" y="0" width="100" height="100"><Fill color="#101016" /></Ellipse>
+                    <Ellipse x="2" y="2" width="96" height="96"><Stroke thickness="3" color="#4A4A52" /></Ellipse>
+                </PartDraw>
+                <Condition>
+                    <Expressions>
+                        <Expression name="st_iconoYTexto"><![CDATA[[COMPLICATION.MONOCHROMATIC_IMAGE] != null && [COMPLICATION.TEXT] != null]]></Expression>
+                        <Expression name="st_icono"><![CDATA[[COMPLICATION.MONOCHROMATIC_IMAGE] != null]]></Expression>
+                    </Expressions>
+                    <Compare expression="st_iconoYTexto">
+                        <PartImage x="39" y="14" width="23" height="23" tintColor="#FFB300">
+                            <Image resource="[COMPLICATION.MONOCHROMATIC_IMAGE]" />
+                        </PartImage>
+                        <PartText x="8" y="42" width="84" height="36" tintColor="#FFFFFF">
+                            <Text align="CENTER" ellipsis="TRUE"><Font family="SYNC_TO_DEVICE" size="26.0" weight="BOLD">
+                                <Template><![CDATA[%s]]><Parameter expression="[COMPLICATION.TEXT]" /></Template>
+                            </Font></Text>
+                        </PartText>
+                    </Compare>
+                    <Compare expression="st_icono">
+                        <PartImage x="32" y="32" width="36" height="36" tintColor="#FFB300">
+                            <Image resource="[COMPLICATION.MONOCHROMATIC_IMAGE]" />
+                        </PartImage>
+                    </Compare>
+                    <Default>
+                        <PartText x="8" y="32" width="84" height="36" tintColor="#FFFFFF">
+                            <Text align="CENTER" ellipsis="TRUE"><Font family="SYNC_TO_DEVICE" size="26.0" weight="BOLD">
+                                <Template><![CDATA[%s]]><Parameter expression="[COMPLICATION.TEXT]" /></Template>
+                            </Font></Text>
+                        </PartText>
+                    </Default>
+                </Condition>
+            </Complication>
+            <Complication type="RANGED_VALUE">
+                <PartDraw x="0" y="0" width="100" height="100">
+                    <Ellipse x="0" y="0" width="100" height="100"><Fill color="#101016" /></Ellipse>
+                </PartDraw>
+                <PartDraw x="6" y="6" width="88" height="88">
+                    <Arc centerX="44" centerY="44" width="88" height="88" startAngle="-150" endAngle="150">
+                        <Stroke thickness="6" color="#23232A" cap="ROUND" />
+                    </Arc>
+                    <Arc centerX="44" centerY="44" width="88" height="88" startAngle="-150" endAngle="-150">
+                        <Stroke thickness="8" color="#FFB300" cap="ROUND" />
+                        <Transform target="endAngle" value="-150 + (((clamp(([COMPLICATION.RANGED_VALUE_VALUE]), ([COMPLICATION.RANGED_VALUE_MIN]), ([COMPLICATION.RANGED_VALUE_MAX])) - ([COMPLICATION.RANGED_VALUE_MIN])) / (([COMPLICATION.RANGED_VALUE_MAX]) - ([COMPLICATION.RANGED_VALUE_MIN]))) * (300))" />
+                    </Arc>
+                </PartDraw>
+                <PartDraw x="6" y="6" width="88" height="88" pivotX="0.5" pivotY="0.5" angle="-150">
+                    <Ellipse x="39" y="-5" width="10" height="10"><Fill color="#FFFFFF" /></Ellipse>
+                    <Transform target="angle" value="-150 + (((clamp(([COMPLICATION.RANGED_VALUE_VALUE]), ([COMPLICATION.RANGED_VALUE_MIN]), ([COMPLICATION.RANGED_VALUE_MAX])) - ([COMPLICATION.RANGED_VALUE_MIN])) / (([COMPLICATION.RANGED_VALUE_MAX]) - ([COMPLICATION.RANGED_VALUE_MIN]))) * (300))" />
+                </PartDraw>
+                <Condition>
+                    <Expressions>
+                        <Expression name="rv_iconoYTexto"><![CDATA[[COMPLICATION.MONOCHROMATIC_IMAGE] != null && [COMPLICATION.TEXT] != null]]></Expression>
+                        <Expression name="rv_texto"><![CDATA[[COMPLICATION.TEXT] != null]]></Expression>
+                    </Expressions>
+                    <Compare expression="rv_iconoYTexto">
+                        <PartText x="8" y="26" width="84" height="34" tintColor="#FFFFFF">
+                            <Text align="CENTER" ellipsis="TRUE"><Font family="SYNC_TO_DEVICE" size="26.0" weight="BOLD">
+                                <Template><![CDATA[%s]]><Parameter expression="[COMPLICATION.TEXT]" /></Template>
+                            </Font></Text>
+                        </PartText>
+                        <PartImage x="39" y="63" width="22" height="22" tintColor="#FFB300">
+                            <Image resource="[COMPLICATION.MONOCHROMATIC_IMAGE]" />
+                        </PartImage>
+                    </Compare>
+                    <Compare expression="rv_texto">
+                        <PartText x="8" y="32" width="84" height="36" tintColor="#FFFFFF">
+                            <Text align="CENTER" ellipsis="TRUE"><Font family="SYNC_TO_DEVICE" size="26.0" weight="BOLD">
+                                <Template><![CDATA[%s]]><Parameter expression="[COMPLICATION.TEXT]" /></Template>
+                            </Font></Text>
+                        </PartText>
+                    </Compare>
+                    <Default>
+                        <PartImage x="36" y="36" width="28" height="28" tintColor="#FFB300">
+                            <Image resource="[COMPLICATION.MONOCHROMATIC_IMAGE]" />
+                        </PartImage>
+                    </Default>
+                </Condition>
+            </Complication>
+            <Complication type="SMALL_IMAGE">
+                <PartDraw x="0" y="0" width="100" height="100">
+                    <Ellipse x="0" y="0" width="100" height="100"><Fill color="#101016" /></Ellipse>
+                    <Ellipse x="2" y="2" width="96" height="96"><Stroke thickness="3" color="#FFB300" /></Ellipse>
+                </PartDraw>
+                <PartImage x="15" y="15" width="70" height="70">
+                    <Image resource="[COMPLICATION.SMALL_IMAGE]" />
+                </PartImage>
+            </Complication>
+            <Complication type="MONOCHROMATIC_IMAGE">
+                <PartDraw x="0" y="0" width="100" height="100">
+                    <Ellipse x="2" y="2" width="96" height="96"><Stroke thickness="3" color="#FFB300" /></Ellipse>
+                </PartDraw>
+                <PartImage x="30" y="30" width="40" height="40" tintColor="#FFB300">
+                    <Image resource="[COMPLICATION.MONOCHROMATIC_IMAGE]" />
+                </PartImage>
+            </Complication>
+        </ComplicationSlot>
+
+        <ComplicationSlot x="280" y="197" width="100" height="100" slotId="3" displayName="@string/slot_derecha"
+            supportedTypes="RANGED_VALUE SHORT_TEXT SMALL_IMAGE MONOCHROMATIC_IMAGE EMPTY">
+            <BoundingOval x="0" y="0" width="100" height="100" outlinePadding="2.0" />
+            <DefaultProviderPolicy defaultSystemProvider="DATE" defaultSystemProviderType="SHORT_TEXT" />
+            <Complication type="SHORT_TEXT">
+                <PartDraw x="0" y="0" width="100" height="100">
+                    <Ellipse x="0" y="0" width="100" height="100"><Fill color="#101016" /></Ellipse>
+                    <Ellipse x="2" y="2" width="96" height="96"><Stroke thickness="3" color="#4A4A52" /></Ellipse>
+                </PartDraw>
+                <Condition>
+                    <Expressions>
+                        <Expression name="st_iconoYTexto"><![CDATA[[COMPLICATION.MONOCHROMATIC_IMAGE] != null && [COMPLICATION.TEXT] != null]]></Expression>
+                        <Expression name="st_icono"><![CDATA[[COMPLICATION.MONOCHROMATIC_IMAGE] != null]]></Expression>
+                    </Expressions>
+                    <Compare expression="st_iconoYTexto">
+                        <PartImage x="39" y="14" width="23" height="23" tintColor="#4DA6FF">
+                            <Image resource="[COMPLICATION.MONOCHROMATIC_IMAGE]" />
+                        </PartImage>
+                        <PartText x="8" y="42" width="84" height="36" tintColor="#FFFFFF">
+                            <Text align="CENTER" ellipsis="TRUE"><Font family="SYNC_TO_DEVICE" size="26.0" weight="BOLD">
+                                <Template><![CDATA[%s]]><Parameter expression="[COMPLICATION.TEXT]" /></Template>
+                            </Font></Text>
+                        </PartText>
+                    </Compare>
+                    <Compare expression="st_icono">
+                        <PartImage x="32" y="32" width="36" height="36" tintColor="#4DA6FF">
+                            <Image resource="[COMPLICATION.MONOCHROMATIC_IMAGE]" />
+                        </PartImage>
+                    </Compare>
+                    <Default>
+                        <PartText x="8" y="32" width="84" height="36" tintColor="#FFFFFF">
+                            <Text align="CENTER" ellipsis="TRUE"><Font family="SYNC_TO_DEVICE" size="26.0" weight="BOLD">
+                                <Template><![CDATA[%s]]><Parameter expression="[COMPLICATION.TEXT]" /></Template>
+                            </Font></Text>
+                        </PartText>
+                    </Default>
+                </Condition>
+            </Complication>
+            <Complication type="RANGED_VALUE">
+                <PartDraw x="0" y="0" width="100" height="100">
+                    <Ellipse x="0" y="0" width="100" height="100"><Fill color="#101016" /></Ellipse>
+                </PartDraw>
+                <PartDraw x="6" y="6" width="88" height="88">
+                    <Arc centerX="44" centerY="44" width="88" height="88" startAngle="-150" endAngle="150">
+                        <Stroke thickness="6" color="#23232A" cap="ROUND" />
+                    </Arc>
+                    <Arc centerX="44" centerY="44" width="88" height="88" startAngle="-150" endAngle="-150">
+                        <Stroke thickness="8" color="#4DA6FF" cap="ROUND" />
+                        <Transform target="endAngle" value="-150 + (((clamp(([COMPLICATION.RANGED_VALUE_VALUE]), ([COMPLICATION.RANGED_VALUE_MIN]), ([COMPLICATION.RANGED_VALUE_MAX])) - ([COMPLICATION.RANGED_VALUE_MIN])) / (([COMPLICATION.RANGED_VALUE_MAX]) - ([COMPLICATION.RANGED_VALUE_MIN]))) * (300))" />
+                    </Arc>
+                </PartDraw>
+                <PartDraw x="6" y="6" width="88" height="88" pivotX="0.5" pivotY="0.5" angle="-150">
+                    <Ellipse x="39" y="-5" width="10" height="10"><Fill color="#FFFFFF" /></Ellipse>
+                    <Transform target="angle" value="-150 + (((clamp(([COMPLICATION.RANGED_VALUE_VALUE]), ([COMPLICATION.RANGED_VALUE_MIN]), ([COMPLICATION.RANGED_VALUE_MAX])) - ([COMPLICATION.RANGED_VALUE_MIN])) / (([COMPLICATION.RANGED_VALUE_MAX]) - ([COMPLICATION.RANGED_VALUE_MIN]))) * (300))" />
+                </PartDraw>
+                <Condition>
+                    <Expressions>
+                        <Expression name="rv_iconoYTexto"><![CDATA[[COMPLICATION.MONOCHROMATIC_IMAGE] != null && [COMPLICATION.TEXT] != null]]></Expression>
+                        <Expression name="rv_texto"><![CDATA[[COMPLICATION.TEXT] != null]]></Expression>
+                    </Expressions>
+                    <Compare expression="rv_iconoYTexto">
+                        <PartText x="8" y="26" width="84" height="34" tintColor="#FFFFFF">
+                            <Text align="CENTER" ellipsis="TRUE"><Font family="SYNC_TO_DEVICE" size="26.0" weight="BOLD">
+                                <Template><![CDATA[%s]]><Parameter expression="[COMPLICATION.TEXT]" /></Template>
+                            </Font></Text>
+                        </PartText>
+                        <PartImage x="39" y="63" width="22" height="22" tintColor="#4DA6FF">
+                            <Image resource="[COMPLICATION.MONOCHROMATIC_IMAGE]" />
+                        </PartImage>
+                    </Compare>
+                    <Compare expression="rv_texto">
+                        <PartText x="8" y="32" width="84" height="36" tintColor="#FFFFFF">
+                            <Text align="CENTER" ellipsis="TRUE"><Font family="SYNC_TO_DEVICE" size="26.0" weight="BOLD">
+                                <Template><![CDATA[%s]]><Parameter expression="[COMPLICATION.TEXT]" /></Template>
+                            </Font></Text>
+                        </PartText>
+                    </Compare>
+                    <Default>
+                        <PartImage x="36" y="36" width="28" height="28" tintColor="#4DA6FF">
+                            <Image resource="[COMPLICATION.MONOCHROMATIC_IMAGE]" />
+                        </PartImage>
+                    </Default>
+                </Condition>
+            </Complication>
+            <Complication type="SMALL_IMAGE">
+                <PartDraw x="0" y="0" width="100" height="100">
+                    <Ellipse x="0" y="0" width="100" height="100"><Fill color="#101016" /></Ellipse>
+                    <Ellipse x="2" y="2" width="96" height="96"><Stroke thickness="3" color="#4DA6FF" /></Ellipse>
+                </PartDraw>
+                <PartImage x="15" y="15" width="70" height="70">
+                    <Image resource="[COMPLICATION.SMALL_IMAGE]" />
+                </PartImage>
+            </Complication>
+            <Complication type="MONOCHROMATIC_IMAGE">
+                <PartDraw x="0" y="0" width="100" height="100">
+                    <Ellipse x="2" y="2" width="96" height="96"><Stroke thickness="3" color="#4DA6FF" /></Ellipse>
+                </PartDraw>
+                <PartImage x="30" y="30" width="40" height="40" tintColor="#4DA6FF">
+                    <Image resource="[COMPLICATION.MONOCHROMATIC_IMAGE]" />
+                </PartImage>
+            </Complication>
+        </ComplicationSlot>
+
+        <ComplicationSlot x="175" y="272" width="100" height="100" slotId="4" displayName="@string/slot_centro"
+            supportedTypes="RANGED_VALUE SHORT_TEXT SMALL_IMAGE MONOCHROMATIC_IMAGE EMPTY">
+            <BoundingOval x="0" y="0" width="100" height="100" outlinePadding="2.0" />
+            <DefaultProviderPolicy defaultSystemProvider="HEART_RATE" defaultSystemProviderType="RANGED_VALUE" />
+            <Complication type="SHORT_TEXT">
+                <PartDraw x="0" y="0" width="100" height="100">
+                    <Ellipse x="0" y="0" width="100" height="100"><Fill color="#101016" /></Ellipse>
+                    <Ellipse x="2" y="2" width="96" height="96"><Stroke thickness="3" color="#4A4A52" /></Ellipse>
+                </PartDraw>
+                <Condition>
+                    <Expressions>
+                        <Expression name="st_iconoYTexto"><![CDATA[[COMPLICATION.MONOCHROMATIC_IMAGE] != null && [COMPLICATION.TEXT] != null]]></Expression>
+                        <Expression name="st_icono"><![CDATA[[COMPLICATION.MONOCHROMATIC_IMAGE] != null]]></Expression>
+                    </Expressions>
+                    <Compare expression="st_iconoYTexto">
+                        <PartImage x="39" y="14" width="23" height="23" tintColor="#FF5252">
+                            <Image resource="[COMPLICATION.MONOCHROMATIC_IMAGE]" />
+                        </PartImage>
+                        <PartText x="8" y="42" width="84" height="36" tintColor="#FFFFFF">
+                            <Text align="CENTER" ellipsis="TRUE"><Font family="SYNC_TO_DEVICE" size="26.0" weight="BOLD">
+                                <Template><![CDATA[%s]]><Parameter expression="[COMPLICATION.TEXT]" /></Template>
+                            </Font></Text>
+                        </PartText>
+                    </Compare>
+                    <Compare expression="st_icono">
+                        <PartImage x="32" y="32" width="36" height="36" tintColor="#FF5252">
+                            <Image resource="[COMPLICATION.MONOCHROMATIC_IMAGE]" />
+                        </PartImage>
+                    </Compare>
+                    <Default>
+                        <PartText x="8" y="32" width="84" height="36" tintColor="#FFFFFF">
+                            <Text align="CENTER" ellipsis="TRUE"><Font family="SYNC_TO_DEVICE" size="26.0" weight="BOLD">
+                                <Template><![CDATA[%s]]><Parameter expression="[COMPLICATION.TEXT]" /></Template>
+                            </Font></Text>
+                        </PartText>
+                    </Default>
+                </Condition>
+            </Complication>
+            <Complication type="RANGED_VALUE">
+                <PartDraw x="0" y="0" width="100" height="100">
+                    <Ellipse x="0" y="0" width="100" height="100"><Fill color="#101016" /></Ellipse>
+                </PartDraw>
+                <PartDraw x="6" y="6" width="88" height="88">
+                    <Arc centerX="44" centerY="44" width="88" height="88" startAngle="-150" endAngle="150">
+                        <Stroke thickness="6" color="#23232A" cap="ROUND" />
+                    </Arc>
+                    <Arc centerX="44" centerY="44" width="88" height="88" startAngle="-150" endAngle="-150">
+                        <Stroke thickness="8" color="#FF5252" cap="ROUND" />
+                        <Transform target="endAngle" value="-150 + (((clamp(([COMPLICATION.RANGED_VALUE_VALUE]), ([COMPLICATION.RANGED_VALUE_MIN]), ([COMPLICATION.RANGED_VALUE_MAX])) - ([COMPLICATION.RANGED_VALUE_MIN])) / (([COMPLICATION.RANGED_VALUE_MAX]) - ([COMPLICATION.RANGED_VALUE_MIN]))) * (300))" />
+                    </Arc>
+                </PartDraw>
+                <PartDraw x="6" y="6" width="88" height="88" pivotX="0.5" pivotY="0.5" angle="-150">
+                    <Ellipse x="39" y="-5" width="10" height="10"><Fill color="#FFFFFF" /></Ellipse>
+                    <Transform target="angle" value="-150 + (((clamp(([COMPLICATION.RANGED_VALUE_VALUE]), ([COMPLICATION.RANGED_VALUE_MIN]), ([COMPLICATION.RANGED_VALUE_MAX])) - ([COMPLICATION.RANGED_VALUE_MIN])) / (([COMPLICATION.RANGED_VALUE_MAX]) - ([COMPLICATION.RANGED_VALUE_MIN]))) * (300))" />
+                </PartDraw>
+                <Condition>
+                    <Expressions>
+                        <Expression name="rv_iconoYTexto"><![CDATA[[COMPLICATION.MONOCHROMATIC_IMAGE] != null && [COMPLICATION.TEXT] != null]]></Expression>
+                        <Expression name="rv_texto"><![CDATA[[COMPLICATION.TEXT] != null]]></Expression>
+                    </Expressions>
+                    <Compare expression="rv_iconoYTexto">
+                        <PartText x="8" y="26" width="84" height="34" tintColor="#FFFFFF">
+                            <Text align="CENTER" ellipsis="TRUE"><Font family="SYNC_TO_DEVICE" size="26.0" weight="BOLD">
+                                <Template><![CDATA[%s]]><Parameter expression="[COMPLICATION.TEXT]" /></Template>
+                            </Font></Text>
+                        </PartText>
+                        <PartImage x="39" y="63" width="22" height="22" tintColor="#FF5252">
+                            <Image resource="[COMPLICATION.MONOCHROMATIC_IMAGE]" />
+                        </PartImage>
+                    </Compare>
+                    <Compare expression="rv_texto">
+                        <PartText x="8" y="32" width="84" height="36" tintColor="#FFFFFF">
+                            <Text align="CENTER" ellipsis="TRUE"><Font family="SYNC_TO_DEVICE" size="26.0" weight="BOLD">
+                                <Template><![CDATA[%s]]><Parameter expression="[COMPLICATION.TEXT]" /></Template>
+                            </Font></Text>
+                        </PartText>
+                    </Compare>
+                    <Default>
+                        <PartImage x="36" y="36" width="28" height="28" tintColor="#FF5252">
+                            <Image resource="[COMPLICATION.MONOCHROMATIC_IMAGE]" />
+                        </PartImage>
+                    </Default>
+                </Condition>
+            </Complication>
+            <Complication type="SMALL_IMAGE">
+                <PartDraw x="0" y="0" width="100" height="100">
+                    <Ellipse x="0" y="0" width="100" height="100"><Fill color="#101016" /></Ellipse>
+                    <Ellipse x="2" y="2" width="96" height="96"><Stroke thickness="3" color="#FF5252" /></Ellipse>
+                </PartDraw>
+                <PartImage x="15" y="15" width="70" height="70">
+                    <Image resource="[COMPLICATION.SMALL_IMAGE]" />
+                </PartImage>
+            </Complication>
+            <Complication type="MONOCHROMATIC_IMAGE">
+                <PartDraw x="0" y="0" width="100" height="100">
+                    <Ellipse x="2" y="2" width="96" height="96"><Stroke thickness="3" color="#FF5252" /></Ellipse>
+                </PartDraw>
+                <PartImage x="30" y="30" width="40" height="40" tintColor="#FF5252">
+                    <Image resource="[COMPLICATION.MONOCHROMATIC_IMAGE]" />
+                </PartImage>
+            </Complication>
+        </ComplicationSlot>
+
+        <AnalogClock x="0" y="0" width="450" height="450">
+            <Variant mode="AMBIENT" target="alpha" value="192" />
+            <HourHand resource="hour" x="215" y="50" width="20" height="190" pivotX="0.5" pivotY="0.92105263" />
+            <MinuteHand resource="minute" x="217" y="25" width="16" height="220" pivotX="0.5" pivotY="0.9" />
+            <SecondHand resource="second" x="221" y="15" width="8" height="245" pivotX="0.5" pivotY="0.85714285">
+                <Variant mode="AMBIENT" target="alpha" value="0" />
+            </SecondHand>
+        </AnalogClock>
+
+        <PartDraw x="217" y="217" width="16" height="16">
+            <Ellipse x="0" y="0" width="16" height="16">
+                <Fill color="#FFFFFF" />
+            </Ellipse>
+        </PartDraw>
+    </Scene>
+</WatchFace>

@@ -22,6 +22,10 @@ val ColorGasolinaBg = Color(0xFF3A0A0A)
 val ColorNulo = Color(0xFF9AA8C7)
 val ColorNuloBg = Color(0xFF151922)
 
+val ColorPause = Color(0xFF7EB6FF)
+val ColorPauseBorder = Color(0xFF3B82F6)
+val ColorPauseBg = Color(0xFF101827)
+
 val ColorWhite = Color(0xFFFFFFFF)
 val ColorGrey = Color(0xFF8E8E93)
 val ColorDisabledBg = Color(0xFF20232C)

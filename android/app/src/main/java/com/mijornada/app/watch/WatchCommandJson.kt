@@ -2,6 +2,17 @@ package com.mijornada.app.watch
 
 import org.json.JSONObject
 
+/**
+ * Tipos de entrada admitidos. Lista cerrada, espejo de WatchEntryType en
+ * src/shared/watch-commands.ts: un tipo desconocido no caería en ningún cubo
+ * contable y descuadraría las cuentas en silencio, así que se rechaza aquí,
+ * en la frontera, con error visible para el reloj (INVALID_PAYLOAD).
+ */
+private val TIPOS_ENTRADA = setOf("propina", "datafono", "agencia_bono", "extra", "gasolina", "nulo")
+
+/** En las entradas de un turno (EDIT_TURNO) también viajan las notas. */
+private val TIPOS_ENTRADA_TURNO = TIPOS_ENTRADA + "nota"
+
 object WatchCommandJson {
     @JvmStatic
     fun parse(commandJson: String): WatchCommand {
@@ -41,7 +52,11 @@ object WatchCommandJson {
             "ADD_ENTRY" -> WatchCommand.AddEntry(
                 operationId = operationId,
                 createdAt = createdAt,
-                entryType = payload.optString("entryType", ""),
+                entryType = payload.optString("entryType", "").also {
+                    if (it !in TIPOS_ENTRADA) {
+                        throw InvalidPayloadException("entryType desconocido: \"$it\"")
+                    }
+                },
                 amount = payload.optDouble("amount", 0.0),
                 note = payload.optString("note", ""),
             )
@@ -87,10 +102,14 @@ private fun parseEntradas(payload: JSONObject): List<WatchEntry> {
     val entradas = mutableListOf<WatchEntry>()
     for (i in 0 until array.length()) {
         val item = array.optJSONObject(i) ?: continue
+        val tipo = item.optString("type", "")
+        if (tipo !in TIPOS_ENTRADA_TURNO) {
+            throw InvalidPayloadException("Tipo de entrada desconocido en entradas[$i]: \"$tipo\"")
+        }
         entradas.add(
             WatchEntry(
                 id = item.optLong("id", 0L),
-                type = item.optString("type", ""),
+                type = tipo,
                 amount = item.optDouble("amount", 0.0),
                 note = item.optString("note", ""),
                 time = item.optString("time", ""),

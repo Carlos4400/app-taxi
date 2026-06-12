@@ -1,0 +1,40 @@
+// Esfera de Mi Turno en Watch Face Format (WFF).
+// APK aparte y solo-recursos (hasCode=false): es el unico formato de esfera
+// que aceptan los relojes con Wear OS recientes (el Xiaomi Watch 5 incluido).
+apply plugin: 'com.android.application'
+
+def packageJson = new groovy.json.JsonSlurper().parse(file('../../package.json'))
+def packageVersionName = packageJson.version ?: "1.0.0"
+def packageVersionCode = packageVersionName.tokenize('.').last().isInteger() ? packageVersionName.tokenize('.').last().toInteger() : 1
+
+android {
+    namespace 'com.mijornada.app.esfera'
+    compileSdk rootProject.ext.compileSdkVersion
+
+    defaultConfig {
+        applicationId "com.mijornada.app.esfera"
+        // WFF version 2 requiere Wear OS 5 (API 34) o superior.
+        minSdk 34
+        targetSdk rootProject.ext.targetSdkVersion
+        versionCode packageVersionCode
+        versionName packageVersionName
+    }
+
+    signingConfigs {
+        debug {
+            storeFile file('../app/debug.keystore')
+            storePassword 'android'
+            keyAlias 'androiddebugkey'
+            keyPassword 'android'
+        }
+    }
+
+    buildTypes {
+        debug {
+            signingConfig signingConfigs.debug
+        }
+        release {
+            signingConfig signingConfigs.debug
+        }
+    }
+}

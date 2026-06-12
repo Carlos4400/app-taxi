@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="watchface_name">Mi Turno</string>
+    <string name="slot_logo">Logo</string>
+    <string name="slot_izquierda">Hueco izquierdo</string>
+    <string name="slot_centro">Hueco central</string>
+    <string name="slot_derecha">Hueco derecho</string>
+</resources>
