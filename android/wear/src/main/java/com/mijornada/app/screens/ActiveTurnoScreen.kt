@@ -13,6 +13,8 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import kotlinx.coroutines.delay
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -39,6 +41,8 @@ fun ActiveTurnoScreen(
     numPorTipo: Map<String, Int>,
     entradas: List<WatchEntry>,
     pendingOpsCount: Int = 0,
+    pauseStartTime: String = "",
+    totalPausedMinutes: Int = 0,
     onSelectCategory: (String) -> Unit,
     onTogglePause: () -> Boolean,
     onAddNote: () -> Boolean,
@@ -51,6 +55,8 @@ fun ActiveTurnoScreen(
             fechaTurno = fechaTurno,
             startTime = startTime,
             pendingOpsCount = pendingOpsCount,
+            pauseStartTime = pauseStartTime,
+            totalPausedMinutes = totalPausedMinutes,
             onResume = onTogglePause
         )
         return
@@ -73,7 +79,9 @@ fun ActiveTurnoScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .verticalScroll(rememberScrollState())
-                .padding(start = 18.dp, end = 18.dp, top = 26.dp, bottom = 22.dp),
+                // bottom 44: con 22 el último botón ("Terminar turno") quedaba
+                // recortado por la curva inferior del círculo al final del scroll.
+                .padding(start = 18.dp, end = 18.dp, top = 26.dp, bottom = 44.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -200,6 +208,8 @@ private fun PausedTurnoContent(
     fechaTurno: String,
     startTime: String,
     pendingOpsCount: Int,
+    pauseStartTime: String,
+    totalPausedMinutes: Int,
     onResume: () -> Boolean
 ) {
     var resuming by remember { mutableStateOf(false) }
@@ -208,6 +218,15 @@ private fun PausedTurnoContent(
             resuming = onResume()
         }
     }
+    // Tic de 30s para que el tiempo pausado avance en pantalla.
+    var ahoraMs by remember { mutableStateOf(System.currentTimeMillis()) }
+    LaunchedEffect(Unit) {
+        while (true) {
+            delay(30_000L)
+            ahoraMs = System.currentTimeMillis()
+        }
+    }
+    val minutosPausado = minutosPausadoTotal(pauseStartTime, totalPausedMinutes, ahoraMs)
 
     Box(
         modifier = Modifier
@@ -242,19 +261,28 @@ private fun PausedTurnoContent(
             )
             Spacer(modifier = Modifier.height(8.dp))
             Box(
+                // Icono compacto: al añadir la línea del contador la columna
+                // (fija, sin scroll) se salía del círculo; se recupera la
+                // altura aquí y en el título, el resto queda igual.
                 modifier = Modifier
-                    .size(82.dp)
-                    .clip(RoundedCornerShape(24.dp))
+                    .size(62.dp)
+                    .clip(RoundedCornerShape(18.dp))
                     .background(ColorPauseBg)
-                    .border(3.dp, ColorPauseBorder, RoundedCornerShape(24.dp))
+                    .border(3.dp, ColorPauseBorder, RoundedCornerShape(18.dp))
                     .clickable(enabled = !resuming) { resume() },
                 contentAlignment = Alignment.Center
             ) {
-                PauseIcon(size = 46.dp, color = ColorPause)
+                PauseIcon(size = 34.dp, color = ColorPause)
             }
             Spacer(modifier = Modifier.height(10.dp))
-            Text("Turno Pausado", color = ColorWhite, fontSize = 18.sp, fontWeight = FontWeight.Bold)
-            Spacer(modifier = Modifier.height(12.dp))
+            Text("Tiempo Pausado", color = ColorWhite, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+            Text(
+                fmtMinutosPausa(minutosPausado),
+                color = ColorPause,
+                fontSize = 18.sp,
+                fontWeight = FontWeight.Bold
+            )
+            Spacer(modifier = Modifier.height(10.dp))
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -419,3 +447,33 @@ private fun SyncIndicator(
         )
     }
 }
+
+/**
+ * Minutos de pausa acumulados del turno: las pausas ya cerradas
+ * (totalPausedMinutes, el dato que luego descuenta el tiempo trabajado) más
+ * la pausa en curso desde pauseStartTime ("HH:mm"). Mismo criterio de cruce
+ * de medianoche (+24h) que elapsedMinutes en el procesador del móvil.
+ * ahoraMs entra como parámetro para que Compose recomponga con cada tic.
+ */
+private fun minutosPausadoTotal(pauseStartTime: String, totalPausedMinutes: Int, ahoraMs: Long): Int {
+    val partes = pauseStartTime.split(":")
+    val inicio = if (partes.size >= 2) {
+        val h = partes[0].toIntOrNull()
+        val m = partes[1].toIntOrNull()
+        if (h != null && m != null) h * 60 + m else null
+    } else {
+        null
+    }
+    val enCurso = if (inicio != null) {
+        val cal = java.util.Calendar.getInstance().apply { timeInMillis = ahoraMs }
+        val ahora = cal.get(java.util.Calendar.HOUR_OF_DAY) * 60 + cal.get(java.util.Calendar.MINUTE)
+        val dif = ahora - inicio
+        if (dif >= 0) dif else dif + 24 * 60
+    } else {
+        0
+    }
+    return totalPausedMinutes + enCurso
+}
+
+private fun fmtMinutosPausa(minutos: Int): String =
+    if (minutos < 60) "$minutos min" else "${minutos / 60} h ${minutos % 60} min"

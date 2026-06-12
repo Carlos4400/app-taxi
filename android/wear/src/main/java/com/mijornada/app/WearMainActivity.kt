@@ -411,6 +411,8 @@ class WearMainActivity : ComponentActivity() {
                 fechaTurno = formatFechaTurno(startDate.value),
                 startTime = startTime.value,
                 isPaused = isPaused.value,
+                pauseStartTime = pauseStartTime.value,
+                totalPausedMinutes = totalPausedMinutes.value,
                 totalsPorTipo = totalsPorTipo.value,
                 numPorTipo = numPorTipo.value,
                 entradas = entradas.value,

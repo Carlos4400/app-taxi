@@ -434,7 +434,11 @@ describe("Android Wear bridge", () => {
     expect(screen).toContain("onTogglePause: () -> Boolean");
     expect(screen).toContain("if (isPaused) {");
     expect(screen).toContain("PausedTurnoContent(");
-    expect(screen).toContain('Text("Turno Pausado"');
+    // Pausa con tiempo en vivo (2026-06-12): "Tiempo Pausado" + minutos
+    // acumulados (totalPausedMinutes + pausa en curso), igual que el móvil.
+    expect(screen).toContain('Text("Tiempo Pausado"');
+    expect(screen).toContain("minutosPausadoTotal(");
+    expect(screen).toContain("fmtMinutosPausa(");
     expect(screen).toContain('"Continuar Turno"');
     expect(screen).toContain("PauseIcon(");
     expect(screen).toContain("PlayIcon(");
@@ -489,7 +493,9 @@ describe("Android Wear bridge", () => {
     expect(screen).toContain("PausedSafeWidth = 0.70f");
     expect(screen).toContain(".fillMaxWidth(PausedSafeWidth)");
     expect(screen).toContain("offset(y = (-8).dp)");
-    expect(screen).toContain(".size(82.dp)");
+    // Icono compacto (2026-06-12): con la línea del contador de pausa la
+    // columna fija se salía del círculo; 82dp→62dp y título a 13sp.
+    expect(screen).toContain(".size(62.dp)");
     expect(screen).toContain(".padding(vertical = 10.dp)");
     expect(screen).not.toContain("Modifier.fillMaxWidth(0.82f)");
   });
@@ -762,6 +768,11 @@ describe("Android Wear bridge", () => {
     expect(noActive).toContain("Iniciar Turno");
     expect(noActive).toContain("Turnos");
     expect(noActive).toContain("Móvil conectado");
+    // Botones de la home con los iconos del móvil (2026-06-12): vector
+    // tintado en vez del emoji de cohete, y portapapeles en Turnos.
+    expect(noActive).toContain("R.drawable.ic_cohete");
+    expect(noActive).toContain("R.drawable.ic_clipboard");
+    expect(noActive).not.toContain("\u{1F680}");
     expect(main).toContain("ScreenState.TURNOS");
     expect(main).toContain("sendGetTurnos()");
     expect(main).toContain(`put("type", "GET_TURNOS")`);
@@ -1004,7 +1015,9 @@ describe("Android Wear bridge", () => {
     expect(source).toContain("fillMaxWidth(WatchSafeRowWidth)");
     expect(source).toContain("top = 26.dp");
     expect(source).toContain("WatchSafeButtonWidth = 0.86f");
-    expect(source).toContain("bottom = 22.dp");
+    // bottom 44 (2026-06-12): con 22 el último botón quedaba recortado por
+    // la curva inferior del círculo al final del scroll.
+    expect(source).toContain("bottom = 44.dp");
     expect(source).toContain(`Text("Terminar turno"`);
     expect(source).toContain("verticalScroll(rememberScrollState())");
     expect(source).not.toContain("align(Alignment.BottomCenter)");
@@ -1158,6 +1171,20 @@ describe("Android Wear bridge", () => {
     expect(responseService).toContain("TurnoStatusStore.save(this, responseJson)");
     // Botones de la tile: abren la app con la acción por el circuito seguro.
     expect(tile).toContain("addKeyToExtraMapping(EXTRA_ACCION_TILE");
+    // Tile calcada a la home del móvil (2026-06-12): botones apilados con
+    // borde del color, icono pre-tintado + texto, y azul en pausa.
+    expect(tile).toContain('"Continuar Turno"');
+    expect(tile).toContain('"Iniciar Turno"');
+    expect(tile).toContain("setBorder(");
+    // Sin línea de estado (el usuario la quitó: el botón ya comunica el
+    // estado, azul "Turno Pausado" con icono de pausa cuando corresponde).
+    expect(tile).toContain('"Turno Pausado"');
+    expect(tile).toContain("ID_ICONO_PAUSA_AZUL");
+    expect(tile).not.toContain("Activo desde");
+    expect(tile).not.toContain("En pausa");
+    expect(existsSync(resolve(root, "android/wear/src/main/res/drawable/tile_cohete_verde.png"))).toBe(true);
+    expect(existsSync(resolve(root, "android/wear/src/main/res/drawable/tile_pausa_azul.png"))).toBe(true);
+    expect(existsSync(resolve(root, "android/wear/src/main/res/drawable/tile_clipboard_morado.png"))).toBe(true);
     const activityWear = readFileSync(
       resolve(root, "android/wear/src/main/java/com/mijornada/app/WearMainActivity.kt"),
       "utf8",

@@ -1913,6 +1913,182 @@ El test fija que la complicación no vuelva a ocultar el texto mediante un espac
 #### Por qué se cambió
 El hueco `SHORT_TEXT` de la esfera Xiaomi obliga a mostrar un icono monocromo. La silueta lateral anterior no era fiel al icono principal de la app. La nueva versión reproduce su vista frontal y conserva sus rasgos identificativos dentro de la restricción monocroma.
 
+## 2026-06-12 22:23 - Encajar pausa y "Terminar turno" en el círculo del reloj
+
+**Archivos modificados:** `android/wear/src/main/java/com/mijornada/app/screens/ActiveTurnoScreen.kt`, `android/wear/src/main/java/com/mijornada/app/screens/EndTurnoScreen.kt`, `src/__tests__/android-wear-bridge.test.ts`
+
+### Contexto
+
+Fotos del usuario tras instalar el contador de pausa: (1) en la pantalla de pausa (columna fija sin scroll) la línea nueva del contador hizo crecer la columna y la fecha y el botón rozaban el borde curvo; (2) en el turno activo, "Terminar turno" quedaba recortado por la curva inferior al final del scroll (esto ya pasaba antes, el relleno inferior de 22dp era insuficiente); (3) mismo recorte en la pantalla de cierre con el botón "Cancelar" (relleno inferior 18dp). Decisión del usuario: en pausa, compactar solo el icono grande y un poco el título, dejando el resto igual.
+
+### Cambio 1 - Pantalla de pausa: icono y título compactos
+
+**Código anterior:** caja del icono `.size(82.dp)` con esquinas `24.dp`, `PauseIcon(size = 46.dp)`, `Text("Tiempo Pausado", fontSize = 16.sp)`.
+
+**Código nuevo:** caja `.size(62.dp)` con esquinas `18.dp`, `PauseIcon(size = 34.dp)`, título a `13.sp`. Contador, espaciados, fecha, offset y botón sin cambios.
+
+**Por qué se cambió:** recuperar los ~20dp que añadió la línea del contador para que la columna fija vuelva a caber en el círculo.
+
+### Cambio 2 - Turno activo: relleno inferior del scroll 22→44dp
+
+**Código anterior:** `.padding(start = 18.dp, end = 18.dp, top = 26.dp, bottom = 22.dp)`.
+
+**Código nuevo:** `bottom = 44.dp` (con comentario del porqué).
+
+**Por qué se cambió:** con 22dp el último botón no podía subir hasta la zona ancha del círculo y la curva lo recortaba.
+
+### Cambio 2b - Pantalla de cierre: relleno inferior del scroll 18→44dp
+
+**Código anterior (en `EndTurnoScreen.kt`):** `.padding(start = 18.dp, end = 18.dp, top = 20.dp, bottom = 18.dp)`.
+
+**Código nuevo:** `bottom = 44.dp` (con comentario del porqué).
+
+**Por qué se cambió:** mismo recorte que en el turno activo, señalado por el usuario sobre el botón "Cancelar".
+
+### Cambio 3 - Tests de caracterización actualizados
+
+**Código anterior:** aserciones `.size(82.dp)` y `bottom = 22.dp`.
+
+**Código nuevo:** `.size(62.dp)` y `bottom = 44.dp`, con comentarios del motivo.
+
+**Por qué se cambió:** los tests fijaban las medidas antiguas.
+
+Verificación: `npx tsc --noEmit` sin errores; `android-wear-bridge.test.ts` en verde (72 tests). Instalar con `actualizar_reloj.bat`.
+
+## 2026-06-12 22:08 - Tiempo pausado en vivo y tile sin línea de estado
+
+**Archivos modificados:** `android/wear/src/main/java/com/mijornada/app/TurnoTileService.kt`, `android/wear/src/main/res/drawable/tile_pausa_azul.png` (nuevo), `android/wear/src/main/res/drawable/tile_cohete_azul.png` (eliminado, huérfano), `android/wear/src/main/java/com/mijornada/app/screens/ActiveTurnoScreen.kt`, `android/wear/src/main/java/com/mijornada/app/WearMainActivity.kt`, `src/main.tsx`, `src/__tests__/android-wear-bridge.test.ts`
+
+### Contexto
+
+Peticiones del usuario sobre la pausa: (1) quitar la línea de estado de la tile ("⏸ En pausa" — el emoji se renderiza como una caja fea y la información es redundante); (2) en la tile, con turno pausado el botón azul debe decir "Turno Pausado" en vez de "Continuar Turno"; (3) en el cartel de pausa del móvil y en la pantalla de pausa del reloj, sustituir "Turno Pausado" por "Tiempo Pausado" mostrando el tiempo pausado en vivo. El dato ya existía: `totalPausedMinutes` (pausas cerradas, el que descuenta el tiempo trabajado) + `pauseStartTime` (pausa en curso), ambos en el STATUS que recibe el reloj.
+
+### Cambio 1 - Tile: sin línea de estado y botón "Turno Pausado"
+
+**Código anterior:** elemento `estado` (when con "Abre para sincronizar"/"⏸ En pausa"/"🚀 Activo desde…"/"🚀 Turno activo"/"Sin turno activo") insertado en la columna; botón pausado `boton("Continuar Turno", COLOR_AZUL, …, ID_ICONO_COHETE_AZUL, …)`; constante `COLOR_GRIS`; recurso `tile_cohete_azul.png` mapeado como `ID_ICONO_COHETE_AZUL`; `RESOURCES_VERSION = "3"`.
+
+**Código nuevo:** columna sin línea de estado (espaciador 0.04·ancho entre logo y botones); botón pausado `boton("Turno Pausado", COLOR_AZUL, …, ID_ICONO_PAUSA_AZUL, …)` con `tile_pausa_azul.png` nuevo (rasterizado del `IconPause` del móvil en #3B82F6); `COLOR_GRIS` y `tile_cohete_azul.png` eliminados (quedaban huérfanos); `RESOURCES_VERSION = "4"`.
+
+**Por qué se cambió:** el estado ya lo comunica el propio botón; el emoji ⏸ no renderizaba como icono correcto.
+
+### Cambio 2 - Reloj: "Tiempo Pausado" con minutos en vivo
+
+**Código anterior:** `PausedTurnoContent(fechaTurno, startTime, pendingOpsCount, onResume)` con `Text("Turno Pausado", …, 18.sp)`; `ActiveTurnoScreen` sin parámetros de pausa; la llamada de `WearMainActivity` no pasaba `pauseStartTime`/`totalPausedMinutes` (ya los tenía en estado, líneas 79-80).
+
+**Código nuevo:** `ActiveTurnoScreen` y `PausedTurnoContent` ganan `pauseStartTime: String` y `totalPausedMinutes: Int`; el texto pasa a `Text("Tiempo Pausado", 16.sp)` + valor azul `fmtMinutosPausa(minutosPausado)` (18.sp); tic de 30 s con `LaunchedEffect`+`delay` recalculando. Helpers nuevos a nivel de archivo: `minutosPausadoTotal(pauseStartTime, totalPausedMinutes, ahoraMs)` (pausas cerradas + pausa en curso, con +24h si cruza medianoche, mismo criterio que `elapsedMinutes` del procesador nativo) y `fmtMinutosPausa` ("X min" / "X h Y min"). Imports nuevos `LaunchedEffect` y `kotlinx.coroutines.delay`.
+
+**Por qué se cambió:** mostrar el dato real que luego descuenta el tiempo trabajado, contándose en pantalla.
+
+### Cambio 3 - Móvil: cartel "Tiempo Pausado" con valor en vivo
+
+**Código anterior (en el overlay de pausa de `src/main.tsx`):**
+
+```tsx
+            <div style={{ fontSize: 24, fontWeight: 800, color: "white", marginBottom: 40, letterSpacing: "-0.5px" }}>
+              Turno Pausado
+            </div>
+```
+
+**Código nuevo:** el div pasa a "Tiempo Pausado" (sin `marginBottom`, lo aporta el valor) seguido de `<TiempoPausadoValor pauseStartTime={current.pauseStartTime ?? null} totalPausedMinutes={current.totalPausedMinutes || 0} />`. Componente nuevo `TiempoPausadoValor` al final de `main.tsx`: mismo cálculo que el reloj (en curso + acumulado, +24h medianoche), tic de 30 s con `setInterval` limpiado en el efecto, valor en azul #7eb6ff a 30px.
+
+**Por qué se cambió:** petición del usuario; paridad móvil-reloj.
+
+### Cambio 4 - Tests
+
+**Código anterior:** aserciones `Text("Turno Pausado"` en la pantalla del reloj, `ID_ICONO_COHETE_AZUL` y existencia de `tile_cohete_azul.png` en la tile.
+
+**Código nuevo:** `Text("Tiempo Pausado"`, `minutosPausadoTotal(`, `fmtMinutosPausa(` en la pantalla; en la tile `"Turno Pausado"`, `ID_ICONO_PAUSA_AZUL`, `tile_pausa_azul.png` y ausencia de "Activo desde"/"En pausa".
+
+**Por qué se cambió:** fijar el comportamiento nuevo.
+
+Verificación: `npx tsc --noEmit` sin errores; suite completa con solo los fallos conocidos del flag `--no-isolate` (los 3 archivos afectados pasan aislados: 7/7); `vite build` compila. Reloj: `actualizar_reloj.bat`; móvil: desplegar con el proceso habitual.
+
+## 2026-06-12 21:53 - Iconos del móvil en la home del reloj y líneas en el portapapeles
+
+**Archivos modificados:** `android/wear/src/main/res/drawable/ic_cohete.xml` (nuevo), `android/wear/src/main/res/drawable/ic_clipboard.xml` (nuevo), `android/wear/src/main/res/drawable/tile_clipboard_morado.png` (regenerado), `android/wear/src/main/java/com/mijornada/app/screens/NoActiveTurnoScreen.kt`, `src/__tests__/android-wear-bridge.test.ts`
+
+### Contexto
+
+Peticiones del usuario tras ver la tile: (1) el portapapeles debe llevar líneas interiores ("lo de dentro" — nota: el `IconClipboard` del móvil tampoco las tiene; se añaden por decisión del usuario porque se lee mejor como lista); (2) la home de la app del reloj debe usar estos mismos iconos: "Iniciar Turno" llevaba un emoji 🚀 que no se parece al cohete del móvil y "Turnos" iba sin icono.
+
+### Cambio 1 - Vectores tintables ic_cohete.xml e ic_clipboard.xml
+
+**Código anterior:** `No existían ic_cohete.xml ni ic_clipboard.xml en android/wear/res/drawable.`
+
+**Código nuevo:** VectorDrawables convertidos del SVG literal de `home-icons.tsx` (trazo 1.8, cohete en `<group rotation=45>`, círculo de la ventana como arco; portapapeles con 3 líneas interiores añadidas). Trazos blancos para tintarlos en Compose con el color del botón.
+
+**Por qué se cambió:** en la app (Compose) lo correcto es un vector único tintable, no PNG por color como exige la tile.
+
+### Cambio 2 - Home del reloj con icono + texto
+
+**Código anterior:**
+
+```kotlin
+            HomeActionButton(
+                label = "🚀  Iniciar Turno",
+                ...
+            HomeActionButton(
+                label = "Turnos",
+```
+
+y en `HomeActionButton` el contenido era solo `Text(label, ...)`.
+
+**Código nuevo:** `HomeActionButton` gana el parámetro `iconRes: Int` y pinta `Row(Image(painterResource(iconRes), colorFilter = tint(textColor), 15.dp) + Spacer + Text)`. Llamadas: "Iniciar Turno" con `R.drawable.ic_cohete` (sin emoji) y "Turnos" con `R.drawable.ic_clipboard`.
+
+**Por qué se cambió:** paridad visual con los botones de la home del móvil (icono + texto en su color).
+
+### Cambio 3 - tile_clipboard_morado.png con líneas interiores
+
+**Código anterior:** PNG del portapapeles solo con contorno y pinza (fiel al SVG del móvil).
+
+**Código nuevo:** mismo trazo con 3 líneas interiores (y=10.5, 14 y 17.5 corta), regenerado con cairosvg.
+
+**Por qué se cambió:** decisión del usuario; coherente con `ic_clipboard.xml`.
+
+### Cambio 4 - Test
+
+**Código anterior:** el test de la home del reloj no fijaba iconos.
+
+**Código nuevo:** aserciones `R.drawable.ic_cohete`, `R.drawable.ic_clipboard` y ausencia del emoji 🚀 en `NoActiveTurnoScreen.kt`.
+
+**Por qué se cambió:** fijar que la home no vuelva al emoji.
+
+Verificación: `xmllint` de los dos vectores sin errores, `npx tsc --noEmit` limpio, `android-wear-bridge` y `brand-assets` en verde (76 tests), PNG verificado en disco. Compilar e instalar con `actualizar_reloj.bat`.
+
+## 2026-06-12 21:42 - Calcar la tile del reloj a la home de la app móvil
+
+**Archivos modificados:** `android/wear/src/main/java/com/mijornada/app/TurnoTileService.kt`, `android/wear/src/main/res/drawable/tile_cohete_verde.png` (nuevo), `android/wear/src/main/res/drawable/tile_cohete_azul.png` (nuevo), `android/wear/src/main/res/drawable/tile_clipboard_morado.png` (nuevo), `src/__tests__/android-wear-bridge.test.ts`
+
+### Contexto
+
+El usuario pidió que la tarjeta de la cuadrícula (Tile) fuera más fiel a la home del móvil. Diferencias detectadas: el móvil usa botones apilados a lo ancho con borde de 2px en su color, fondo translúcido e icono + texto en negrita, con el botón principal en azul cuando el turno está pausado; la tile tenía dos pastillas pequeñas planas lado a lado, sin borde ni icono y con el texto "Continuar" en vez de "Continuar Turno". Solo presentación: las acciones siguen viajando por el circuito seguro (outbox, operationId, sesión).
+
+### Cambio 1 - Iconos pre-tintados para la tile
+
+**Código anterior:** `No existían tile_cohete_verde.png, tile_cohete_azul.png ni tile_clipboard_morado.png en android/wear/res/drawable.`
+
+**Código nuevo:** tres PNG de 96×96 (cohete verde #3CFF64, cohete azul #3B82F6, portapapeles morado #7C5CFF). Pre-tintados porque las tiles no tintan imágenes en runtime. (Misma sesión: la primera versión eran formas rellenas dibujadas a mano y el usuario señaló que el cohete no era igual; se regeneraron rasterizando con cairosvg el SVG literal de `IconRocket`/`IconClipboard` de `src/components/home-icons.tsx` — trazo 1.8, cohete rotado 45° — que es el estado final.)
+
+**Por qué se cambió:** los botones del móvil llevan icono; la tile no tenía ninguno.
+
+### Cambio 2 - TurnoTileService: botones estilo móvil apilados
+
+**Código anterior (resumen):** fila horizontal con dos `Box` de `(0.84·ancho − 8)/2` × 42dp, solo fondo translúcido (`setBackground`), texto "Continuar"/"Iniciar Turno"/"Turnos"; `RESOURCES_VERSION = "2"` y mapeo único del logo.
+
+**Código nuevo:** columna con dos botones apilados de `0.64·ancho` × `0.175·ancho` (fracciones del diámetro: el ancho 0.64 cabe en la cuerda del círculo a la altura del botón inferior), cada uno con `setBorder` de 2dp del color, fondo translúcido, esquina `0.0875·ancho` e icono (`Image` de `0.085·ancho`) + texto en `Row`; etiquetas fieles "Iniciar Turno"/"Continuar Turno" (azul + cohete azul en pausa) y "Turnos" con portapapeles; espaciadores proporcionales (`0.02/0.03·ancho`); `RESOURCES_VERSION = "3"` con los tres iconos añadidos al mapeo mediante el helper nuevo `imagen(resId)`.
+
+**Por qué se cambió:** misma identidad visual que la home del móvil, con medidas proporcionales para no salirse del círculo.
+
+### Cambio 3 - Test de caracterización de la tile
+
+**Código anterior:** el test "expone tile y complicacion de esfera con el estado del turno" no fijaba el estilo de los botones.
+
+**Código nuevo:** aserciones de `"Continuar Turno"`, `"Iniciar Turno"`, `setBorder(`, `ID_ICONO_COHETE_AZUL` y existencia de los tres PNG.
+
+**Por qué se cambió:** fijar la paridad visual con el móvil y que los iconos no desaparezcan sin aviso.
+
+Verificación: `npx tsc --noEmit` sin errores; `android-wear-bridge.test.ts` en verde (72 tests); los tres PNG verificados en disco. Compilar e instalar con `actualizar_reloj.bat`.
+
 ## 2026-06-12 21:06 - Precargar las imágenes de marca en el service worker
 
 **Archivos modificados:** `public/sw.js`, `src/__tests__/brand-assets.test.ts`

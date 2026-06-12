@@ -13,16 +13,22 @@ import androidx.wear.tiles.TileBuilders
 import androidx.wear.tiles.TileService
 import com.google.common.util.concurrent.ListenableFuture
 
-private const val RESOURCES_VERSION = "2"
+private const val RESOURCES_VERSION = "4"
 private const val ID_LOGO = "logo_taxi"
+private const val ID_ICONO_COHETE_VERDE = "icono_cohete_verde"
+private const val ID_ICONO_PAUSA_AZUL = "icono_pausa_azul"
+private const val ID_ICONO_CLIPBOARD = "icono_clipboard"
 
 /**
- * Tile (cuadrícula) de Mi Turno con la identidad de la app: logo del taxi,
- * estado en color (verde activo / azul pausa / gris libre) y dos botones de
- * acción al estilo de la home — "Iniciar Turno"/"Continuar" (verde/azul) y
- * "Turnos" (morado). Los botones abren la app con la acción ya disparada:
- * el comando viaja por el circuito seguro de siempre (outbox, operationId,
- * sesión) — la tile nunca escribe datos por su cuenta.
+ * Tile (cuadrícula) de Mi Turno calcada a la home de la app móvil: logo del
+ * taxi, estado en color (verde activo / azul pausa / gris libre) y los botones
+ * como en el móvil — apilados a lo ancho, con borde de 2dp en su color, fondo
+ * translúcido e icono + texto en negrita ("Iniciar Turno"/"Continuar Turno"
+ * verde, azul si el turno está en pausa, y "Turnos" morado). Los botones abren
+ * la app con la acción ya disparada: el comando viaja por el circuito seguro
+ * de siempre (outbox, operationId, sesión) — la tile nunca escribe datos por
+ * su cuenta. Las medidas son fracciones del ancho de pantalla para que el
+ * conjunto quepa dentro del círculo en cualquier reloj.
  */
 class TurnoTileService : TileService() {
 
@@ -48,20 +54,25 @@ class TurnoTileService : TileService() {
             completer.set(
                 ResourceBuilders.Resources.Builder()
                     .setVersion(RESOURCES_VERSION)
-                    .addIdToImageMapping(
-                        ID_LOGO,
-                        ResourceBuilders.ImageResource.Builder()
-                            .setAndroidResourceByResId(
-                                ResourceBuilders.AndroidImageResourceByResId.Builder()
-                                    .setResourceId(R.drawable.brand_taxi_logo)
-                                    .build()
-                            )
-                            .build()
-                    )
+                    .addIdToImageMapping(ID_LOGO, imagen(R.drawable.brand_taxi_logo))
+                    // Iconos pre-tintados (las tiles no tintan en runtime),
+                    // espejo de los iconos de la home del móvil.
+                    .addIdToImageMapping(ID_ICONO_COHETE_VERDE, imagen(R.drawable.tile_cohete_verde))
+                    .addIdToImageMapping(ID_ICONO_PAUSA_AZUL, imagen(R.drawable.tile_pausa_azul))
+                    .addIdToImageMapping(ID_ICONO_CLIPBOARD, imagen(R.drawable.tile_clipboard_morado))
                     .build()
             )
             "TurnoTileResources"
         }
+
+    private fun imagen(resId: Int): ResourceBuilders.ImageResource =
+        ResourceBuilders.ImageResource.Builder()
+            .setAndroidResourceByResId(
+                ResourceBuilders.AndroidImageResourceByResId.Builder()
+                    .setResourceId(resId)
+                    .build()
+            )
+            .build()
 
     private fun tileLayout(status: TurnoStatusStore.Status, anchoPantallaDp: Int): LayoutElementBuilders.LayoutElement {
         // Logo de la app, centrado (proporción ~2.4:1 del PNG de marca).
@@ -71,38 +82,27 @@ class TurnoTileService : TileService() {
             .setHeight(DimensionBuilders.dp(anchoPantallaDp * 0.18f))
             .build()
 
-        val estado = when {
-            !status.conocido -> texto("Abre para sincronizar", 12f, COLOR_GRIS)
-            status.activo && status.pausado -> texto("⏸ En pausa", 13f, COLOR_AZUL)
-            status.activo && status.startTime.isNotBlank() -> texto("🚀 Activo desde ${status.startTime}", 13f, COLOR_VERDE)
-            status.activo -> texto("🚀 Turno activo", 13f, COLOR_VERDE)
-            else -> texto("Sin turno activo", 12f, COLOR_GRIS)
+        // Sin línea de estado (decisión del usuario: redundante). El estado lo
+        // comunica el botón principal: verde "Iniciar/Continuar Turno" o azul
+        // "Turno Pausado" con icono de pausa (tocarlo abre la app igualmente).
+        val botonPrincipal = when {
+            status.activo && status.pausado -> boton("Turno Pausado", COLOR_AZUL, COLOR_AZUL_BG, ID_ICONO_PAUSA_AZUL, "continuar", anchoPantallaDp)
+            status.activo -> boton("Continuar Turno", COLOR_VERDE, COLOR_VERDE_BG, ID_ICONO_COHETE_VERDE, "continuar", anchoPantallaDp)
+            else -> boton("Iniciar Turno", COLOR_VERDE, COLOR_VERDE_BG, ID_ICONO_COHETE_VERDE, "iniciar_turno", anchoPantallaDp)
         }
-
-        // Botón izquierdo según estado, como la home de la app.
-        val botonIzquierda = when {
-            status.activo && status.pausado -> boton("Continuar", COLOR_AZUL, COLOR_AZUL_BG, "continuar", anchoPantallaDp)
-            status.activo -> boton("Continuar", COLOR_VERDE, COLOR_VERDE_BG, "continuar", anchoPantallaDp)
-            else -> boton("Iniciar Turno", COLOR_VERDE, COLOR_VERDE_BG, "iniciar_turno", anchoPantallaDp)
-        }
-        val botonTurnos = boton("Turnos", COLOR_MORADO, COLOR_MORADO_BG, "turnos", anchoPantallaDp)
-
-        val fila = LayoutElementBuilders.Row.Builder()
-            .setVerticalAlignment(LayoutElementBuilders.VERTICAL_ALIGN_CENTER)
-            .addContent(botonIzquierda)
-            .addContent(LayoutElementBuilders.Spacer.Builder().setWidth(DimensionBuilders.dp(8f)).build())
-            .addContent(botonTurnos)
-            .build()
+        val botonTurnos = boton("Turnos", COLOR_MORADO, COLOR_MORADO_BG, ID_ICONO_CLIPBOARD, "turnos", anchoPantallaDp)
 
         val columna = LayoutElementBuilders.Column.Builder()
             .setWidth(DimensionBuilders.expand())
             .setHeight(DimensionBuilders.wrap())
             .setHorizontalAlignment(LayoutElementBuilders.HORIZONTAL_ALIGN_CENTER)
             .addContent(logo)
-            .addContent(LayoutElementBuilders.Spacer.Builder().setHeight(DimensionBuilders.dp(6f)).build())
-            .addContent(estado)
-            .addContent(LayoutElementBuilders.Spacer.Builder().setHeight(DimensionBuilders.dp(10f)).build())
-            .addContent(fila)
+            .addContent(LayoutElementBuilders.Spacer.Builder().setHeight(DimensionBuilders.dp(anchoPantallaDp * 0.04f)).build())
+            // Apilados a lo ancho como en el móvil; el ancho 0.64 cabe dentro
+            // de la cuerda del círculo a la altura del botón inferior.
+            .addContent(botonPrincipal)
+            .addContent(LayoutElementBuilders.Spacer.Builder().setHeight(DimensionBuilders.dp(anchoPantallaDp * 0.03f)).build())
+            .addContent(botonTurnos)
             .build()
 
         // Toda la tile abre la app (los botones tienen su propia acción).
@@ -124,13 +124,28 @@ class TurnoTileService : TileService() {
         etiqueta: String,
         colorTexto: Int,
         colorFondo: Int,
+        iconoId: String,
         accion: String,
         anchoPantallaDp: Int,
     ): LayoutElementBuilders.LayoutElement {
-        val anchoBoton = (anchoPantallaDp * 0.84f - 8f) / 2f
+        // Estilo de la home del móvil: borde 2dp del color, fondo translúcido
+        // e icono + texto. Ancho 0.64 del diámetro (cabe en el arco inferior).
+        val ladoIcono = DimensionBuilders.dp(anchoPantallaDp * 0.085f)
+        val contenido = LayoutElementBuilders.Row.Builder()
+            .setVerticalAlignment(LayoutElementBuilders.VERTICAL_ALIGN_CENTER)
+            .addContent(
+                LayoutElementBuilders.Image.Builder()
+                    .setResourceId(iconoId)
+                    .setWidth(ladoIcono)
+                    .setHeight(ladoIcono)
+                    .build()
+            )
+            .addContent(LayoutElementBuilders.Spacer.Builder().setWidth(DimensionBuilders.dp(6f)).build())
+            .addContent(texto(etiqueta, 13f, colorTexto))
+            .build()
         return LayoutElementBuilders.Box.Builder()
-            .setWidth(DimensionBuilders.dp(anchoBoton))
-            .setHeight(DimensionBuilders.dp(42f))
+            .setWidth(DimensionBuilders.dp(anchoPantallaDp * 0.64f))
+            .setHeight(DimensionBuilders.dp(anchoPantallaDp * 0.175f))
             .setVerticalAlignment(LayoutElementBuilders.VERTICAL_ALIGN_CENTER)
             .setHorizontalAlignment(LayoutElementBuilders.HORIZONTAL_ALIGN_CENTER)
             .setModifiers(
@@ -141,14 +156,20 @@ class TurnoTileService : TileService() {
                             .setColor(argb(colorFondo))
                             .setCorner(
                                 ModifiersBuilders.Corner.Builder()
-                                    .setRadius(DimensionBuilders.dp(18f))
+                                    .setRadius(DimensionBuilders.dp(anchoPantallaDp * 0.0875f))
                                     .build()
                             )
                             .build()
                     )
+                    .setBorder(
+                        ModifiersBuilders.Border.Builder()
+                            .setWidth(DimensionBuilders.dp(2f))
+                            .setColor(argb(colorTexto))
+                            .build()
+                    )
                     .build()
             )
-            .addContent(texto(etiqueta, 13f, colorTexto))
+            .addContent(contenido)
             .build()
     }
 
@@ -188,6 +209,5 @@ class TurnoTileService : TileService() {
         private val COLOR_AZUL_BG = 0x2E3B82F6.toInt()
         private const val COLOR_MORADO = 0xFF7C5CFF.toInt()
         private val COLOR_MORADO_BG = 0x2E7C5CFF.toInt()
-        private const val COLOR_GRIS = 0xFF9CA3AF.toInt()
     }
 }

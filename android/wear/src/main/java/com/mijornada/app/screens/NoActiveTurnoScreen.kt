@@ -80,7 +80,8 @@ fun NoActiveTurnoScreen(
             Spacer(modifier = Modifier.height(10.dp))
 
             HomeActionButton(
-                label = "🚀  Iniciar Turno",
+                label = "Iniciar Turno",
+                iconRes = R.drawable.ic_cohete,
                 textColor = ColorPropina,
                 bg = ColorPropinaBg,
                 borderColor = ColorPropina,
@@ -89,6 +90,7 @@ fun NoActiveTurnoScreen(
             Spacer(modifier = Modifier.height(7.dp))
             HomeActionButton(
                 label = "Turnos",
+                iconRes = R.drawable.ic_clipboard,
                 textColor = ColorDatafono,
                 bg = ColorDatafonoBg,
                 borderColor = ColorDatafono,
@@ -115,6 +117,7 @@ private fun BrandTaxiLogo() {
 @Composable
 private fun HomeActionButton(
     label: String,
+    iconRes: Int,
     textColor: androidx.compose.ui.graphics.Color,
     bg: androidx.compose.ui.graphics.Color,
     borderColor: androidx.compose.ui.graphics.Color,
@@ -140,6 +143,17 @@ private fun HomeActionButton(
             .padding(vertical = 10.dp),
         contentAlignment = Alignment.Center
     ) {
-        Text(label, color = textColor, fontSize = 13.sp, fontWeight = androidx.compose.ui.text.font.FontWeight.Bold)
+        // Icono + texto como los botones de la home del móvil; el vector es
+        // blanco y se tinta con el color del botón.
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Image(
+                painter = painterResource(id = iconRes),
+                contentDescription = null,
+                colorFilter = androidx.compose.ui.graphics.ColorFilter.tint(textColor),
+                modifier = Modifier.size(15.dp)
+            )
+            Spacer(modifier = Modifier.width(6.dp))
+            Text(label, color = textColor, fontSize = 13.sp, fontWeight = androidx.compose.ui.text.font.FontWeight.Bold)
+        }
     }
 }

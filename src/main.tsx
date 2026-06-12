@@ -1852,9 +1852,13 @@ function App({ uid }: { uid: string }) {
             >
               <IconPause s={84} c="#7eb6ff" />
             </div>
-            <div style={{ fontSize: 24, fontWeight: 800, color: "white", marginBottom: 40, letterSpacing: "-0.5px" }}>
-              Turno Pausado
+            <div style={{ fontSize: 24, fontWeight: 800, color: "white", letterSpacing: "-0.5px" }}>
+              Tiempo Pausado
             </div>
+            <TiempoPausadoValor
+              pauseStartTime={current.pauseStartTime ?? null}
+              totalPausedMinutes={current.totalPausedMinutes || 0}
+            />
             <button
               onClick={togglePause}
               style={{
@@ -1900,6 +1904,46 @@ function App({ uid }: { uid: string }) {
         />
       )}
     </Shell>
+  );
+}
+
+/**
+ * Tiempo pausado del turno en vivo: pausas ya cerradas (totalPausedMinutes,
+ * el mismo dato que luego descuenta el tiempo trabajado) más la pausa en
+ * curso desde pauseStartTime ("HH:MM", con +24h si cruza la medianoche,
+ * igual que el procesador nativo). Se refresca cada 30 s.
+ */
+function TiempoPausadoValor({
+  pauseStartTime,
+  totalPausedMinutes,
+}: {
+  pauseStartTime: string | null;
+  totalPausedMinutes: number;
+}) {
+  const [ahora, setAhora] = useState(() => Date.now());
+  useEffect(() => {
+    const id = setInterval(() => setAhora(Date.now()), 30_000);
+    return () => clearInterval(id);
+  }, []);
+
+  let enCurso = 0;
+  const partes = (pauseStartTime ?? "").split(":");
+  if (partes.length >= 2) {
+    const h = Number(partes[0]);
+    const m = Number(partes[1]);
+    if (Number.isFinite(h) && Number.isFinite(m)) {
+      const fecha = new Date(ahora);
+      const dif = fecha.getHours() * 60 + fecha.getMinutes() - (h * 60 + m);
+      enCurso = dif >= 0 ? dif : dif + 24 * 60;
+    }
+  }
+  const minutos = totalPausedMinutes + enCurso;
+  const etiqueta = minutos < 60 ? `${minutos} min` : `${Math.floor(minutos / 60)} h ${minutos % 60} min`;
+
+  return (
+    <div style={{ fontSize: 30, fontWeight: 800, color: "#7eb6ff", marginTop: 6, marginBottom: 34, letterSpacing: "-0.5px" }}>
+      {etiqueta}
+    </div>
   );
 }
 

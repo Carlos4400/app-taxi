@@ -46,7 +46,9 @@ fun EndTurnoScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .verticalScroll(rememberScrollState())
-                .padding(start = 18.dp, end = 18.dp, top = 20.dp, bottom = 18.dp),
+                // bottom 44: con 18 el último botón ("Cancelar") quedaba
+                // recortado por la curva inferior del círculo al final del scroll.
+                .padding(start = 18.dp, end = 18.dp, top = 20.dp, bottom = 44.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Row(
