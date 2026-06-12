@@ -107,7 +107,8 @@ fun EndTurnoScreen(
                 textColor = ColorGasolina,
                 bg = ColorGasolinaBg,
                 modifier = Modifier.fillMaxWidth(0.86f),
-                enabled = !saving
+                enabled = !saving,
+                borderColor = ColorGasolina
             ) {
                 if (!saving) {
                     saving = true
@@ -311,44 +312,45 @@ private fun TecladoCierreOverlay(
     onDone: () -> Unit
 ) {
     val color = if (field == "dinero") ColorAgencia else ColorExtra
-    Box(
+    // Pantalla completa diseñada para el círculo: sin tarjeta flotante ni
+    // bordes que el marco redondo pueda cortar. Las medidas verticales son
+    // fracciones del diámetro y cada fila del teclado se estrecha según la
+    // cuerda del círculo a su altura, así cabe entero en cualquier reloj
+    // redondo y aprovecha todo el ancho disponible.
+    BoxWithConstraints(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color(0xDD000000)),
-        contentAlignment = Alignment.Center
+            .background(ColorBackground)
     ) {
+        val d = maxHeight
         Column(
             modifier = Modifier
-                .fillMaxWidth(0.78f)
-                .clip(RoundedCornerShape(18.dp))
-                .background(ColorBackground)
-                .border(1.dp, color.copy(alpha = 0.35f), RoundedCornerShape(18.dp))
-                .padding(horizontal = 12.dp, vertical = 12.dp),
+                .fillMaxSize()
+                .padding(top = d * 0.07f),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Text(
                 if (field == "dinero") "Total Taxímetro" else "Total KM",
                 color = color,
-                fontSize = 10.sp,
+                fontSize = 11.sp,
                 fontWeight = FontWeight.Bold
             )
-            Spacer(modifier = Modifier.height(4.dp))
             Text(
                 "${value.ifBlank { "0" }} ${if (field == "dinero") "€" else "KM"}",
                 color = color,
-                fontSize = 22.sp,
+                fontSize = 26.sp,
                 fontWeight = FontWeight.Bold
             )
-            Spacer(modifier = Modifier.height(8.dp))
-            NumericKeypad(
+            Spacer(modifier = Modifier.height(d * 0.02f))
+            NumericKeypadRedondo(
                 onKey = onKey,
                 color = color,
-                widthFraction = 1f,
-                keyHeight = 20.dp,
-                keyFontSize = 12.sp
+                keyHeight = d * 0.105f,
+                keyFontSize = 15.sp,
+                rowSpacing = d * 0.016f
             )
-            Spacer(modifier = Modifier.height(8.dp))
-            BotonPlano("Guardar", ColorBackground, color, Modifier.fillMaxWidth(), onClick = onDone)
+            Spacer(modifier = Modifier.height(d * 0.018f))
+            BotonPlano("Guardar", ColorBackground, color, Modifier.fillMaxWidth(0.55f), onClick = onDone)
         }
     }
 }
@@ -360,12 +362,16 @@ private fun BotonPlano(
     bg: Color,
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
+    borderColor: Color? = null,
     onClick: () -> Unit
 ) {
+    val shape = RoundedCornerShape(14.dp)
+    val borderMod = if (borderColor != null) Modifier.border(2.dp, borderColor, shape) else Modifier
     Box(
         modifier = modifier
-            .clip(RoundedCornerShape(14.dp))
+            .clip(shape)
             .background(bg)
+            .then(borderMod)
             .clickable(enabled = enabled) { onClick() }
             .padding(vertical = 10.dp),
         contentAlignment = Alignment.Center

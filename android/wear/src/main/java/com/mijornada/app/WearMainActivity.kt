@@ -17,6 +17,7 @@ import androidx.activity.compose.setContent
 import androidx.activity.result.ActivityResultLauncher
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -53,6 +54,8 @@ enum class ScreenState {
     EDIT_TURNO_DATOS,
     ADD_ENTRY,
     EDIT_ENTRY,
+    CONFIRM_START_TURNO,
+    CONFIRM_PAUSE_TURNO,
     CONFIRM_DELETE,
     END_TURNO
 }
@@ -85,6 +88,7 @@ class WearMainActivity : ComponentActivity() {
     private var turnosLoading = mutableStateOf(false)
     private var pendingTileAction: String? = null
     private var pendingOpsCount = mutableStateOf(0)
+    private var requestingNote = mutableStateOf(false)
     private val mainHandler = Handler(Looper.getMainLooper())
     private val resyncRunnable = Runnable { requestStatus() }
     private fun scheduleResync(delayMs: Long) {
@@ -117,6 +121,24 @@ class WearMainActivity : ComponentActivity() {
     private fun refreshPendingOpsCount() {
         pendingOpsCount.value = WatchOutbox.pendingCommands(this).size
     }
+
+    /** Invariante de navegacion: una sincronizacion de fondo (STATUS) solo puede
+     *  redirigir entre estas pantallas de reposo. Cualquier otra pantalla
+     *  (consultas, formularios, edicion) pertenece a una accion del usuario y
+     *  solo se abandona por decision suya o por la respuesta de su comando. */
+    private val pantallasDeReposo = setOf(
+        ScreenState.NO_CONNECTED,
+        ScreenState.NO_ACTIVE_TURNO,
+        ScreenState.ACTIVE_TURNO,
+    )
+
+    /** Flujo de consulta/edicion de turnos cerrados: un TURNOS_STATUS de fondo
+     *  actualiza sus datos pero nunca les roba la pantalla. */
+    private val pantallasFlujoTurnos = setOf(
+        ScreenState.TURNOS,
+        ScreenState.TURNO_SUMMARY,
+        ScreenState.EDIT_TURNO_DATOS,
+    )
 
     /** Pantallas tipo formulario donde un OK/DUPLICATE_IGNORED de un comando debe cerrar el form. */
     private val formScreens = setOf(
@@ -164,6 +186,7 @@ class WearMainActivity : ComponentActivity() {
             } else {
                 pendingNoteCallback.set(null)
             }
+            requestingNote.value = false
         }
 
         setContent {
@@ -190,7 +213,7 @@ class WearMainActivity : ComponentActivity() {
                     currentScreen.value = ScreenState.ACTIVE_TURNO
                 } else if (userSessionId.value.isNotBlank()) {
                     pendingTileAction = null
-                    sendStartTurno()
+                    currentScreen.value = ScreenState.CONFIRM_START_TURNO
                 }
                 // Sin sesión todavía: conservar la acción y esperar al STATUS.
             }
@@ -244,7 +267,7 @@ class WearMainActivity : ComponentActivity() {
             val json = JSONObject(responseJson)
             val responseType = json.optString("type")
             val operationId = json.optString("operationId", "")
-            val isTerminal = isTerminalResponse(responseType, json.optString("code", ""))
+            val isTerminal = WearConstants.isTerminalResponse(responseType, json.optString("code", ""))
             if (operationId.isNotBlank() && isTerminal) {
                 WatchOutbox.remove(this, operationId)
             }
@@ -266,15 +289,13 @@ class WearMainActivity : ComponentActivity() {
                 parseEntradas(json.optJSONArray("entradas"))
                 MobileResponseService.enqueueOutboxRetry(this)
 
-                if (!isConnected.value) {
-                    currentScreen.value = ScreenState.NO_CONNECTED
-                } else if (activeTurno.value) {
-                    if (currentScreen.value == ScreenState.NO_CONNECTED || currentScreen.value == ScreenState.NO_ACTIVE_TURNO) {
-                        currentScreen.value = ScreenState.ACTIVE_TURNO
-                    }
-                } else {
-                    if (currentScreen.value != ScreenState.TURNOS && currentScreen.value != ScreenState.TURNO_SUMMARY) {
-                        currentScreen.value = ScreenState.NO_ACTIVE_TURNO
+                // Invariante: un STATUS de fondo solo navega entre pantallas de
+                // reposo. Nunca expulsa de consultas, formularios o ediciones.
+                if (currentScreen.value in pantallasDeReposo) {
+                    currentScreen.value = when {
+                        !isConnected.value -> ScreenState.NO_CONNECTED
+                        activeTurno.value -> ScreenState.ACTIVE_TURNO
+                        else -> ScreenState.NO_ACTIVE_TURNO
                     }
                 }
 
@@ -295,10 +316,13 @@ class WearMainActivity : ComponentActivity() {
                 isConnected.value = json.optBoolean("connected", false)
                 parseTurnos(json.optJSONArray("turnos"))
                 if (isConnected.value) {
-                    if (currentScreen.value != ScreenState.TURNO_SUMMARY) {
+                    // Navegar a la lista solo si el usuario no esta ya dentro del
+                    // flujo de turnos: los refrescos de fondo actualizan datos
+                    // sin robar la pantalla.
+                    if (currentScreen.value !in pantallasFlujoTurnos) {
                         currentScreen.value = ScreenState.TURNOS
                     }
-                } else {
+                } else if (currentScreen.value in pantallasDeReposo) {
                     currentScreen.value = ScreenState.NO_CONNECTED
                 }
             } else if ("OK" == json.optString("type")) {
@@ -362,7 +386,7 @@ class WearMainActivity : ComponentActivity() {
             ScreenState.NO_CONNECTED -> NoConnectedScreen(onRetry = { requestStatus() })
             ScreenState.NO_ACTIVE_TURNO -> NoActiveTurnoScreen(
                 pendingOpsCount = pendingOpsCount.value,
-                onStartTurno = { sendStartTurno() },
+                onStartTurno = { currentScreen.value = ScreenState.CONFIRM_START_TURNO },
                 onOpenTurnos = {
                     // Navegacion inmediata con estado de carga; la lista llega
                     // despues con TURNOS_STATUS.
@@ -372,17 +396,31 @@ class WearMainActivity : ComponentActivity() {
                     }
                 }
             )
+            ScreenState.CONFIRM_START_TURNO -> ConfirmStartTurnoScreen(
+                onCancel = { currentScreen.value = ScreenState.NO_ACTIVE_TURNO },
+                onConfirm = {
+                    val sent = sendStartTurno()
+                    if (sent) {
+                        currentScreen.value = ScreenState.NO_ACTIVE_TURNO
+                    }
+                    sent
+                }
+            )
             ScreenState.ACTIVE_TURNO -> ActiveTurnoScreen(
                 pendingOpsCount = pendingOpsCount.value,
                 fechaTurno = formatFechaTurno(startDate.value),
                 startTime = startTime.value,
                 isPaused = isPaused.value,
-                totalPausedMinutes = totalPausedMinutes.value,
                 totalsPorTipo = totalsPorTipo.value,
                 numPorTipo = numPorTipo.value,
                 entradas = entradas.value,
                 onTogglePause = {
-                    if (isPaused.value) sendResumeTurno() else sendPauseTurno()
+                    if (isPaused.value) {
+                        sendResumeTurno()
+                    } else {
+                        currentScreen.value = ScreenState.CONFIRM_PAUSE_TURNO
+                        true
+                    }
                 },
                 onSelectCategory = { category ->
                     selectedCategory.value = category
@@ -390,16 +428,32 @@ class WearMainActivity : ComponentActivity() {
                     currentScreen.value = ScreenState.ADD_ENTRY
                 },
                 onAddNote = {
-                    requestNote("") { text ->
+                    if (requestNote("") { text ->
                         if (text.isNotBlank()) sendAddNote(text)
+                    }) {
+                        requestingNote.value = true
+                        true
+                    } else {
+                        false
                     }
                 },
+                requestingNote = requestingNote.value,
                 onEditEntry = { entry ->
                     editingEntry.value = entry
                     currentScreen.value = ScreenState.EDIT_ENTRY
                 },
                 onEndTurno = {
                     currentScreen.value = ScreenState.END_TURNO
+                }
+            )
+            ScreenState.CONFIRM_PAUSE_TURNO -> ConfirmPauseTurnoScreen(
+                onCancel = { currentScreen.value = ScreenState.ACTIVE_TURNO },
+                onConfirm = {
+                    val sent = sendPauseTurno()
+                    if (sent) {
+                        currentScreen.value = ScreenState.ACTIVE_TURNO
+                    }
+                    sent
                 }
             )
             ScreenState.ADD_ENTRY -> AddEntryScreen(
@@ -516,6 +570,8 @@ class WearMainActivity : ComponentActivity() {
         when (currentScreen.value) {
             ScreenState.ADD_ENTRY -> currentScreen.value = ScreenState.ACTIVE_TURNO
             ScreenState.EDIT_ENTRY -> currentScreen.value = ScreenState.ACTIVE_TURNO
+            ScreenState.CONFIRM_START_TURNO -> currentScreen.value = ScreenState.NO_ACTIVE_TURNO
+            ScreenState.CONFIRM_PAUSE_TURNO -> currentScreen.value = ScreenState.ACTIVE_TURNO
             ScreenState.CONFIRM_DELETE -> currentScreen.value = ScreenState.EDIT_ENTRY
             ScreenState.END_TURNO -> currentScreen.value = ScreenState.ACTIVE_TURNO
             ScreenState.TURNOS -> {
@@ -902,11 +958,11 @@ class WearMainActivity : ComponentActivity() {
     }
 
     /** Lanza el teclado / voz del sistema para introducir una nota de texto libre. */
-    private fun requestNote(current: String, onResult: (String) -> Unit) {
+    private fun requestNote(current: String, onResult: (String) -> Unit): Boolean {
         if (!pendingNoteCallback.compareAndSet(null, onResult)) {
             // Ya hay una nota pendiente esperando; no reabrir el RemoteInput.
             performFeedback("Nota pendiente", strong = false)
-            return
+            return false
         }
         val remoteInputs = listOf(
             RemoteInput.Builder(NOTE_KEY)
@@ -916,6 +972,7 @@ class WearMainActivity : ComponentActivity() {
         val intent: Intent = RemoteInputIntentHelper.createActionRemoteInputIntent()
         RemoteInputIntentHelper.putRemoteInputsExtra(intent, remoteInputs)
         noteLauncher.launch(intent)
+        return true
     }
 
     private fun performFeedback(message: String, strong: Boolean) {
@@ -1033,11 +1090,6 @@ class WearMainActivity : ComponentActivity() {
         }
     }
 
-    private fun isTerminalResponse(responseType: String, code: String): Boolean {
-        if (responseType == "OK" || responseType == "DUPLICATE_IGNORED") return true
-        return responseType == "ERROR" && code != "USER_NOT_PREPARED" && code != "APP_NOT_READY"
-    }
-
     private fun shouldPersistOutbox(commandJson: String): Boolean {
         return try {
             val type = JSONObject(commandJson).optString("type", "")
@@ -1052,6 +1104,107 @@ class WearMainActivity : ComponentActivity() {
                 || type == "END_TURNO"
         } catch (e: Exception) {
             false
+        }
+    }
+}
+
+@Composable
+private fun ConfirmPauseTurnoScreen(
+    onCancel: () -> Unit,
+    onConfirm: () -> Boolean
+) {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(ColorBackground),
+        contentAlignment = Alignment.Center
+    ) {
+        Column(
+            modifier = Modifier.fillMaxWidth(0.88f),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Text("Pausar Turno", color = ColorPause, fontSize = 17.sp, fontWeight = FontWeight.Bold)
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                "¿Seguro que quieres pausar el Turno actual?",
+                color = ColorGrey,
+                fontSize = 12.sp
+            )
+            Spacer(modifier = Modifier.height(16.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                ConfirmDeleteButton(
+                    label = "Cancelar",
+                    textColor = ColorGrey,
+                    bg = ColorNuloBg,
+                    modifier = Modifier.weight(1f),
+                    onClick = onCancel
+                )
+                var pausing by remember { mutableStateOf(false) }
+                ConfirmDeleteButton(
+                    label = "Pausar",
+                    textColor = ColorPause,
+                    bg = ColorPauseBg,
+                    borderColor = ColorPauseBorder,
+                    enabled = !pausing,
+                    modifier = Modifier.weight(1f),
+                    onClick = {
+                        if (!pausing) {
+                            pausing = onConfirm()
+                        }
+                    }
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun ConfirmStartTurnoScreen(
+    onCancel: () -> Unit,
+    onConfirm: () -> Boolean
+) {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(ColorBackground),
+        contentAlignment = Alignment.Center
+    ) {
+        Column(
+            modifier = Modifier.fillMaxWidth(0.88f),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Text("Iniciar Turno", color = ColorPropina, fontSize = 17.sp, fontWeight = FontWeight.Bold)
+            Spacer(modifier = Modifier.height(8.dp))
+            Text("Pulsa para comenzar tu Turno.", color = ColorGrey, fontSize = 12.sp)
+            Spacer(modifier = Modifier.height(16.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                ConfirmDeleteButton(
+                    label = "Cancelar",
+                    textColor = ColorGrey,
+                    bg = ColorNuloBg,
+                    modifier = Modifier.weight(1f),
+                    onClick = onCancel
+                )
+                var starting by remember { mutableStateOf(false) }
+                ConfirmDeleteButton(
+                    label = if (starting) "Iniciando..." else "Iniciar",
+                    textColor = ColorPropina,
+                    bg = ColorPropinaBg,
+                    enabled = !starting,
+                    modifier = Modifier.weight(1f),
+                    onClick = {
+                        if (!starting) {
+                            starting = onConfirm()
+                        }
+                    }
+                )
+            }
         }
     }
 }
@@ -1118,6 +1271,7 @@ private fun ConfirmDeleteButton(
     label: String,
     textColor: Color,
     bg: Color,
+    borderColor: Color? = null,
     enabled: Boolean = true,
     modifier: Modifier = Modifier,
     onClick: () -> Unit
@@ -1126,6 +1280,10 @@ private fun ConfirmDeleteButton(
         modifier = modifier
             .clip(RoundedCornerShape(14.dp))
             .background(bg)
+            .then(
+                if (borderColor != null) Modifier.border(1.5.dp, borderColor, RoundedCornerShape(14.dp))
+                else Modifier
+            )
             .clickable(enabled = enabled) { onClick() }
             .padding(vertical = 11.dp),
         contentAlignment = Alignment.Center

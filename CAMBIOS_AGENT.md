@@ -1,3 +1,1869 @@
+## 2026-06-12 16:48 - Borde en Terminar Turno de la pantalla de cierre
+
+**Archivos modificados:** `android/wear/src/main/java/com/mijornada/app/screens/EndTurnoScreen.kt`
+
+### Cambio 1 - BotonPlano acepta borde opcional
+
+#### Código anterior
+```kotlin
+@Composable
+private fun BotonPlano(
+    label: String,
+    textColor: Color,
+    bg: Color,
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true,
+    onClick: () -> Unit
+) {
+    Box(
+        modifier = modifier
+            .clip(RoundedCornerShape(14.dp))
+            .background(bg)
+            .clickable(enabled = enabled) { onClick() }
+            .padding(vertical = 10.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(label, color = if (enabled) textColor else ColorDisabledText, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+    }
+}
+```
+
+#### Código nuevo
+```kotlin
+@Composable
+private fun BotonPlano(
+    label: String,
+    textColor: Color,
+    bg: Color,
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true,
+    borderColor: Color? = null,
+    onClick: () -> Unit
+) {
+    val shape = RoundedCornerShape(14.dp)
+    val borderMod = if (borderColor != null) Modifier.border(2.dp, borderColor, shape) else Modifier
+    Box(
+        modifier = modifier
+            .clip(shape)
+            .background(bg)
+            .then(borderMod)
+            .clickable(enabled = enabled) { onClick() }
+            .padding(vertical = 10.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(label, color = if (enabled) textColor else ColorDisabledText, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+    }
+}
+```
+
+#### Por qué se cambió
+`BotonPlano` es un helper privado de `EndTurnoScreen.kt` que ya usaban 3 sitios (botón "Terminar Turno", "Cancelar" y "Guardar" del overlay). Antes ninguno podía llevar borde porque el `Modifier` no estaba extendido para ello. Se añade un parámetro opcional `borderColor: Color?` (default `null`) para no romper a los otros dos callers: si no se pasa, el botón queda como estaba.
+
+### Cambio 2 - Botón Terminar Turno de la pantalla de cierre lleva borde 2dp ColorGasolina
+
+#### Código anterior
+```kotlin
+BotonPlano(
+    label = if (saving) "Enviando..." else "Terminar Turno",
+    textColor = ColorGasolina,
+    bg = ColorGasolinaBg,
+    modifier = Modifier.fillMaxWidth(0.86f),
+    enabled = !saving
+) { ... }
+```
+
+#### Código nuevo
+```kotlin
+BotonPlano(
+    label = if (saving) "Enviando..." else "Terminar Turno",
+    textColor = ColorGasolina,
+    bg = ColorGasolinaBg,
+    modifier = Modifier.fillMaxWidth(0.86f),
+    enabled = !saving,
+    borderColor = ColorGasolina
+) { ... }
+```
+
+#### Por qué se cambió
+Mismo criterio que el botón "Terminar turno" de `ActiveTurnoScreen.kt`: borde 2dp del mismo color que el texto (`ColorGasolina`), respetando la paleta del proyecto. Los otros dos botones del archivo (Cancelar y Guardar) se quedan sin borde, porque su cambio en esta sesión no estaba previsto.
+
+## 2026-06-12 16:35 - Mover borde del botón Pausar a Terminar turno
+
+**Archivos modificados:** `android/wear/src/main/java/com/mijornada/app/screens/ActiveTurnoScreen.kt`
+
+### Cambio 1 - Quitar borde al botón Pausar turno
+
+#### Código anterior
+```kotlin
+var togglingPause by remember { mutableStateOf(false) }
+Box(
+    modifier = Modifier
+        .fillMaxWidth(WatchSafeButtonWidth)
+        .clip(RoundedCornerShape(14.dp))
+        .background(ColorPauseBg)
+        .border(2.dp, ColorPauseBorder, RoundedCornerShape(14.dp))
+        .clickable(enabled = !togglingPause) {
+            togglingPause = onTogglePause()
+        }
+        .padding(vertical = 8.dp),
+    contentAlignment = Alignment.Center
+) {
+```
+
+#### Código nuevo
+```kotlin
+var togglingPause by remember { mutableStateOf(false) }
+Box(
+    modifier = Modifier
+        .fillMaxWidth(WatchSafeButtonWidth)
+        .clip(RoundedCornerShape(14.dp))
+        .background(ColorPauseBg)
+        .clickable(enabled = !togglingPause) {
+            togglingPause = onTogglePause()
+        }
+        .padding(vertical = 8.dp),
+    contentAlignment = Alignment.Center
+) {
+```
+
+#### Por qué se cambió
+El usuario pidió quitar el borde al botón "Pausar turno" de la rama activa del turno. Era el único botón grande de acción en la pantalla activa que llevaba un stroke 2dp de `ColorPauseBorder`. Ahora se queda solo con el fondo `ColorPauseBg` y el clip redondeado, igual que los otros botones de la pantalla (Añadir nota, Terminar turno).
+
+### Cambio 2 - Añadir borde al botón Terminar turno
+
+#### Código anterior
+```kotlin
+Box(
+    modifier = Modifier
+        .fillMaxWidth(WatchSafeButtonWidth)
+        .clip(RoundedCornerShape(16.dp))
+        .background(ColorGasolinaBg)
+        .clickable { onEndTurno() }
+        .padding(vertical = 11.dp),
+    contentAlignment = Alignment.Center
+) {
+    Text("Terminar turno", color = ColorGasolina, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+}
+```
+
+#### Código nuevo
+```kotlin
+Box(
+    modifier = Modifier
+        .fillMaxWidth(WatchSafeButtonWidth)
+        .clip(RoundedCornerShape(16.dp))
+        .background(ColorGasolinaBg)
+        .border(2.dp, ColorGasolina, RoundedCornerShape(16.dp))
+        .clickable { onEndTurno() }
+        .padding(vertical = 11.dp),
+    contentAlignment = Alignment.Center
+) {
+    Text("Terminar turno", color = ColorGasolina, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+}
+```
+
+#### Por qué se cambió
+El usuario pidió mover el borde al botón "Terminar turno", usando el color de su propio texto (`ColorGasolina`) en lugar de inventar un `ColorGasolinaBorder` nuevo. Grosor 2dp (mismo que tenia el botón Pausar) y radio 16dp (igual que el clip del propio botón). Los dos bordes de la rama pausada (`PausedTurnoContent`) se dejan intactos, como pidió el usuario: solo se toca la pantalla activa.
+
+## 2026-06-12 16:18 - Resetear estado del botón Añadir nota al cerrar el RemoteInput
+
+**Archivos modificados:** `android/wear/src/main/java/com/mijornada/app/screens/ActiveTurnoScreen.kt`, `android/wear/src/main/java/com/mijornada/app/WearMainActivity.kt`
+
+### Cambio 1 - Firma de onAddNote devuelve Boolean
+
+#### Código anterior
+```kotlin
+onAddNote: () -> Unit,
+```
+
+#### Código nuevo
+```kotlin
+onAddNote: () -> Boolean,
+```
+
+#### Por qué se cambió
+El botón "Añadir nota al turno" quedaba con el texto "Abriendo..." para siempre después de pulsarlo porque el composable ponia su estado interno a `true` sin posibilidad de resetearlo (el callback no devolvia nada y el RemoteInput se completa de forma asíncrona fuera del composable). Devolver `Boolean` desde el callback alinea la firma con la del botón "Pausar turno" (`onTogglePause: () -> Boolean`) ya existente en la misma pantalla, y permite que el caller indique si la acción se ha lanzado o no.
+
+### Cambio 2 - Clickable del botón nota asigna el resultado del callback
+
+#### Código anterior
+```kotlin
+.clickable(enabled = !requestingNote) {
+    requestingNote = true
+    onAddNote()
+}
+```
+
+#### Código nuevo
+```kotlin
+.clickable(enabled = !requestingNote) {
+    requestingNote = onAddNote()
+}
+```
+
+#### Por qué se cambió
+Mismo patrón que el botón "Pausar turno" (`togglingPause = onTogglePause()`): el composable delega en el caller la decisión de si el estado de "procesando" debe activarse. Si el caller no consigue lanzar la acción (por ejemplo, ya hay una nota pendiente), devuelve `false` y el botón no se queda bloqueado.
+
+### Cambio 3 - WearMainActivity gestiona requestingNote como state y lo resetea al cerrarse el RemoteInput
+
+#### Código anterior
+```kotlin
+private var pendingTileAction: String? = null
+private var pendingOpsCount = mutableStateOf(0)
+```
+
+#### Código nuevo
+```kotlin
+private var pendingTileAction: String? = null
+private var pendingOpsCount = mutableStateOf(0)
+private var requestingNote = mutableStateOf(false)
+```
+
+#### Por qué se cambió
+El estado `requestingNote` antes vivia dentro del composable (`var requestingNote by remember { mutableStateOf(false) }`), lo que hacia imposible resetearlo desde el callback asíncrono de `noteLauncher`. Subirlo a `WearMainActivity` como `mutableStateOf` permite que el `LaunchedEffect`/`SideEffect` de Compose lo observe y que el caller lo resetee cuando el RemoteInput termina (por resultado, por cancelación o por cualquier vía).
+
+### Cambio 4 - noteLauncher resetea requestingNote al cerrarse
+
+#### Código anterior
+```kotlin
+noteLauncher = registerForActivityResult(
+    ActivityResultContracts.StartActivityForResult()
+) { result ->
+    val data: Intent? = result.data
+    if (data != null) {
+        val results = RemoteInput.getResultsFromIntent(data)
+        val text = results?.getCharSequence(NOTE_KEY)?.toString() ?: ""
+        pendingNoteCallback.getAndSet(null)?.invoke(text)
+    } else {
+        pendingNoteCallback.set(null)
+    }
+}
+```
+
+#### Código nuevo
+```kotlin
+noteLauncher = registerForActivityResult(
+    ActivityResultContracts.StartActivityForResult()
+) { result ->
+    val data: Intent? = result.data
+    if (data != null) {
+        val results = RemoteInput.getResultsFromIntent(data)
+        val text = results?.getCharSequence(NOTE_KEY)?.toString() ?: ""
+        pendingNoteCallback.getAndSet(null)?.invoke(text)
+    } else {
+        pendingNoteCallback.set(null)
+    }
+    requestingNote.value = false
+}
+```
+
+#### Por qué se cambió
+Esta es la clave del fix. El RemoteInput (teclado/voz del sistema) se completa de forma asíncrona y vuelve al `noteLauncher` con un resultado o con `data == null` (cancelado). Antes el composable nunca se enteraba y el texto "Abriendo..." quedaba clavado. Ahora, sin importar el camino por el que termine la nota, se resetea `requestingNote` para que el botón vuelva a mostrar "✎  Añadir nota al turno" y se reactive el click.
+
+### Cambio 5 - onAddNote en WearMainActivity devuelve true solo si el RemoteInput se lanzó
+
+#### Código anterior
+```kotlin
+onAddNote = {
+    requestNote("") { text ->
+        if (text.isNotBlank()) sendAddNote(text)
+    }
+},
+```
+
+#### Código nuevo
+```kotlin
+onAddNote = {
+    if (requestNote("") { text ->
+        if (text.isNotBlank()) sendAddNote(text)
+    }) {
+        requestingNote.value = true
+        true
+    } else {
+        false
+    }
+},
+```
+
+#### Por qué se cambió
+`requestNote()` ya devolvia `Boolean` (true si se lanzó el RemoteInput, false si ya habia una nota pendiente). Antes se ignoraba ese valor. Ahora se aprovecha: si se lanzó, marcamos `requestingNote` y devolvemos `true` para que el botón entre en estado "Abriendo..."; si no se pudo lanzar, devolvemos `false` para que el botón no se bloquee y el usuario pueda reintentar.
+
+### Cambio 6 - requestNote devuelve Boolean para indicar si lanzó el RemoteInput
+
+#### Código anterior
+```kotlin
+private fun requestNote(current: String, onResult: (String) -> Unit) {
+    if (!pendingNoteCallback.compareAndSet(null, onResult)) {
+        // Ya hay una nota pendiente esperando; no reabrir el RemoteInput.
+        performFeedback("Nota pendiente", strong = false)
+        return
+    }
+    ...
+    noteLauncher.launch(intent)
+}
+```
+
+#### Código nuevo
+```kotlin
+private fun requestNote(current: String, onResult: (String) -> Unit): Boolean {
+    if (!pendingNoteCallback.compareAndSet(null, onResult)) {
+        // Ya hay una nota pendiente esperando; no reabrir el RemoteInput.
+        performFeedback("Nota pendiente", strong = false)
+        return false
+    }
+    ...
+    noteLauncher.launch(intent)
+    return true
+}
+```
+
+#### Por qué se cambió
+Para que el caller del botón "Añadir nota al turno" (línea 430) pueda saber si el RemoteInput se llegó a lanzar o si se rechazó por haber otro pendiente, la firma de `requestNote` pasa a devolver `Boolean`. Los otros callers existentes (`AddEntryScreen`, `EditEntryScreen`, `EditTurnoDatosScreen`) ya invocan `requestNote` y el compilador valida la nueva firma.
+
+### Cambio 7 - requestingNote se lee como prop en lugar de remember local
+
+#### Código anterior
+```kotlin
+// en ActiveTurnoScreen.kt
+var requestingNote by remember { mutableStateOf(false) }
+Box(
+    modifier = Modifier
+        ...
+        .clickable(enabled = !requestingNote) {
+            requestingNote = onAddNote()
+        }
+        ...
+)
+```
+
+#### Código nuevo
+```kotlin
+// en ActiveTurnoScreen.kt
+Box(
+    modifier = Modifier
+        ...
+        .clickable(enabled = !requestingNote) {
+            onAddNote()
+        }
+        ...
+)
+
+// y en WearMainActivity.kt
+ActiveTurnoScreen(
+    ...
+    onAddNote = { ... },
+    requestingNote = requestingNote.value,
+    ...
+)
+```
+
+#### Por qué se cambió
+El composable seguia declarando su propio `var requestingNote by remember { mutableStateOf(false) }` local, independiente del `requestingNote` que `WearMainActivity` gestiona y resetea en `noteLauncher`. Habia dos estados duplicados: el reset nunca llegaba a la UI y el texto "Abriendo..." seguia clavado. Ahora `requestingNote` se recibe como prop, igual que `isPaused`, `pendingOpsCount` y el resto de estado de la app que ya seguia este patrón.
+
+## 2026-06-12 15:34 - Mover botón Pausar entre Añadir nota y Terminar
+
+**Archivos modificados:** `android/wear/src/main/java/com/mijornada/app/screens/ActiveTurnoScreen.kt`
+
+### Cambio 1 - Reordenar botones en la pantalla activa del reloj
+
+#### Código anterior
+```kotlin
+            }
+
+            Spacer(modifier = Modifier.height(7.dp))
+
+            var togglingPause by remember { mutableStateOf(false) }
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth(WatchSafeButtonWidth)
+                    .clip(RoundedCornerShape(14.dp))
+                    .background(ColorPauseBg)
+                    .border(2.dp, ColorPauseBorder, RoundedCornerShape(14.dp))
+                    .clickable(enabled = !togglingPause) {
+                        togglingPause = onTogglePause()
+                    }
+                    .padding(vertical = 8.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    PauseIcon(size = 18.dp, color = ColorPause)
+                    Spacer(modifier = Modifier.width(7.dp))
+                    Text(
+                        text = if (togglingPause) "Procesando..." else "Pausar turno",
+                        color = ColorPause,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            }
+
+            Row(
+                modifier = Modifier.fillMaxWidth(WatchSafeRowWidth),
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                TarjetaCategoria("datafono", totalsPorTipo, numPorTipo, grande = true, modifier = Modifier.weight(1f)) { onSelectCategory("datafono") }
+```
+
+#### Código nuevo
+```kotlin
+            }
+
+            Row(
+                modifier = Modifier.fillMaxWidth(WatchSafeRowWidth),
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                TarjetaCategoria("datafono", totalsPorTipo, numPorTipo, grande = true, modifier = Modifier.weight(1f)) { onSelectCategory("datafono") }
+```
+
+#### Por qué se cambió
+El usuario pidió que el botón "Pausar turno" deje de estar entre la cabecera y las tarjetas de categorías, y se situe entre "Añadir nota al turno" y "Terminar turno". Se ha movido el bloque íntegro (estado `togglingPause`, `Box` con sus modificadores, icono, texto y `Spacer(7.dp)`) sin alterar colores, tamaños, lógica ni la firma del composable; el resto del layout y `PausedTurnoContent` quedan intactos.
+
+## 2026-06-12 15:23 - Ajustar pausa al área circular del reloj
+
+**Archivos modificados:** `android/wear/src/main/java/com/mijornada/app/screens/ActiveTurnoScreen.kt`, `src/__tests__/android-wear-bridge.test.ts`
+
+### Cambio 1 - Área segura de la pantalla pausada
+
+#### Código anterior
+```kotlin
+        Column(
+            modifier = Modifier.fillMaxWidth(0.82f),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+```
+
+#### Código nuevo
+```kotlin
+private const val PausedSafeWidth = 0.70f
+```
+
+```kotlin
+        Column(
+            modifier = Modifier
+                .fillMaxWidth(PausedSafeWidth)
+                .offset(y = (-8).dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+```
+
+#### Por qué se cambió
+La fotografía del reloj mostró que el botón `Continuar Turno` invadía la curva inferior. El contenido pausado ahora utiliza un ancho específico para la zona circular inferior y se desplaza ligeramente hacia arriba.
+
+### Cambio 2 - Compactar elementos de pausa
+
+#### Código anterior
+```kotlin
+                    .size(94.dp)
+                    .clip(RoundedCornerShape(27.dp))
+                    .background(ColorPauseBg)
+                    .border(3.dp, ColorPauseBorder, RoundedCornerShape(27.dp))
+```
+
+```kotlin
+                PauseIcon(size = 52.dp, color = ColorPause)
+```
+
+```kotlin
+                    .padding(vertical = 13.dp),
+```
+
+#### Código nuevo
+```kotlin
+                    .size(82.dp)
+                    .clip(RoundedCornerShape(24.dp))
+                    .background(ColorPauseBg)
+                    .border(3.dp, ColorPauseBorder, RoundedCornerShape(24.dp))
+```
+
+```kotlin
+                PauseIcon(size = 46.dp, color = ColorPause)
+```
+
+```kotlin
+                    .padding(vertical = 10.dp),
+```
+
+#### Por qué se cambió
+Reduce la altura ocupada y deja margen visible alrededor del icono, el título y el botón sin eliminar ninguna forma de reanudar.
+
+### Cambio 3 - Contrato de área segura circular
+
+#### Código anterior
+`No existía el test mantiene la pantalla pausada dentro del area segura circular en src/__tests__/android-wear-bridge.test.ts.`
+
+#### Código nuevo
+```ts
+  it("mantiene la pantalla pausada dentro del area segura circular", () => {
+    expect(screen).toContain("PausedSafeWidth = 0.70f");
+    expect(screen).toContain(".fillMaxWidth(PausedSafeWidth)");
+    expect(screen).toContain("offset(y = (-8).dp)");
+    expect(screen).toContain(".size(82.dp)");
+    expect(screen).toContain(".padding(vertical = 10.dp)");
+    expect(screen).not.toContain("Modifier.fillMaxWidth(0.82f)");
+  });
+```
+
+#### Por qué se cambió
+El test impide recuperar dimensiones que vuelvan a recortar el botón inferior en la pantalla circular.
+
+## 2026-06-12 14:45 - Igualar pausa Wear con la experiencia móvil
+
+**Archivos modificados:** `android/wear/src/main/java/com/mijornada/app/WearMainActivity.kt`, `android/wear/src/main/java/com/mijornada/app/screens/ActiveTurnoScreen.kt`, `android/wear/src/main/java/com/mijornada/app/theme/Color.kt`, `src/__tests__/android-wear-bridge.test.ts`
+
+### Cambio 1 - Verificación antes de pausar
+
+#### Código anterior
+```kotlin
+                onTogglePause = {
+                    if (isPaused.value) sendResumeTurno() else sendPauseTurno()
+                },
+```
+
+#### Código nuevo
+```kotlin
+                onTogglePause = {
+                    if (isPaused.value) {
+                        sendResumeTurno()
+                    } else {
+                        currentScreen.value = ScreenState.CONFIRM_PAUSE_TURNO
+                        true
+                    }
+                },
+```
+
+```kotlin
+@Composable
+private fun ConfirmPauseTurnoScreen(
+    onCancel: () -> Unit,
+    onConfirm: () -> Boolean
+) {
+```
+
+```kotlin
+            Text(
+                "¿Seguro que quieres pausar el Turno actual?",
+                color = ColorGrey,
+                fontSize = 12.sp
+            )
+```
+
+```kotlin
+                ConfirmDeleteButton(
+                    label = "Pausar",
+                    textColor = ColorPause,
+                    bg = ColorPauseBg,
+                    borderColor = ColorPauseBorder,
+                    enabled = !pausing,
+```
+
+#### Por qué se cambió
+El reloj pausaba directamente con el primer toque. La app móvil solicita confirmación con el texto literal `¿Seguro que quieres pausar el Turno actual?`; Wear ahora reproduce esa verificación y el botón azul `Pausar`.
+
+### Cambio 2 - Pantalla dedicada para turno pausado
+
+#### Código anterior
+```kotlin
+                if (isPaused) {
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = "⏸ Pausado ${totalPausedMinutes}m",
+                        color = ColorGrey, fontSize = 11.sp, fontWeight = FontWeight.Bold
+                    )
+                }
+```
+
+```kotlin
+                        isPaused -> "Reanudar turno"
+```
+
+#### Código nuevo
+```kotlin
+    if (isPaused) {
+        PausedTurnoContent(
+            fechaTurno = fechaTurno,
+            startTime = startTime,
+            pendingOpsCount = pendingOpsCount,
+            onResume = onTogglePause
+        )
+        return
+    }
+```
+
+```kotlin
+@Composable
+private fun PausedTurnoContent(
+    fechaTurno: String,
+    startTime: String,
+    pendingOpsCount: Int,
+    onResume: () -> Boolean
+) {
+```
+
+```kotlin
+            Text("Turno Pausado", color = ColorWhite, fontSize = 19.sp, fontWeight = FontWeight.Bold)
+```
+
+```kotlin
+                PlayIcon(size = 19.dp, color = ColorPause)
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    if (resuming) "Reanudando..." else "Continuar Turno",
+```
+
+#### Por qué se cambió
+El estado pausado mantenía visibles las tarjetas y mostraba un carácter amarillo. Ahora sustituye el contenido por la pantalla dedicada del móvil, conserva fecha y hora de inicio y permite reanudar tocando el icono grande o `Continuar Turno`.
+
+### Cambio 3 - Iconos y botón de pausa azules
+
+#### Código anterior
+```kotlin
+                    .background(if (isPaused) ColorPropinaBg else ColorNuloBg)
+```
+
+```kotlin
+                        else -> "Pausar turno"
+```
+
+#### Código nuevo
+```kotlin
+                    .background(ColorPauseBg)
+                    .border(2.dp, ColorPauseBorder, RoundedCornerShape(14.dp))
+```
+
+```kotlin
+                    PauseIcon(size = 18.dp, color = ColorPause)
+```
+
+```kotlin
+@Composable
+private fun PauseIcon(size: androidx.compose.ui.unit.Dp, color: Color) {
+```
+
+```kotlin
+@Composable
+private fun PlayIcon(size: androidx.compose.ui.unit.Dp, color: Color) {
+```
+
+#### Por qué se cambió
+El botón anterior era gris y el estado pausado dependía del carácter amarillo `⏸`. Los iconos nuevos reproducen las formas de pausa y reproducción del móvil mediante Compose y usan su identidad azul.
+
+### Cambio 4 - Paleta azul de control del turno
+
+#### Código anterior
+`No existían ColorPause, ColorPauseBorder ni ColorPauseBg en android/wear/src/main/java/com/mijornada/app/theme/Color.kt.`
+
+#### Código nuevo
+```kotlin
+val ColorPause = Color(0xFF7EB6FF)
+val ColorPauseBorder = Color(0xFF3B82F6)
+val ColorPauseBg = Color(0xFF101827)
+```
+
+#### Por qué se cambió
+Fija en Wear los mismos colores utilizados por los controles de pausa del móvil.
+
+### Cambio 5 - Contratos de paridad de pausa
+
+#### Código anterior
+```ts
+    expect(screen).toContain('isPaused -> "Reanudar turno"');
+    expect(screen).toContain('else -> "Pausar turno"');
+```
+
+#### Código nuevo
+```ts
+    expect(screen).toContain("PausedTurnoContent(");
+    expect(screen).toContain('Text("Turno Pausado"');
+    expect(screen).toContain('"Continuar Turno"');
+    expect(screen).toContain("PauseIcon(");
+    expect(screen).toContain("PlayIcon(");
+    expect(screen).not.toContain("⏸");
+```
+
+```ts
+  it("pide la verificacion del movil antes de pausar el turno desde Wear", () => {
+```
+
+```ts
+  it("personaliza pausa y reanudacion Wear con la paleta azul del movil", () => {
+```
+
+#### Por qué se cambió
+Los tests fijan la verificación previa, la pantalla pausada dedicada, las dos formas de reanudar, los iconos sin carácter amarillo y la paleta azul del móvil.
+
+## 2026-06-12 14:33 - Añadir confirmación para iniciar turno en Wear
+
+**Archivos modificados:** `android/wear/src/main/java/com/mijornada/app/WearMainActivity.kt`, `src/__tests__/android-wear-bridge.test.ts`
+
+### Cambio 1 - Navegación a la confirmación de inicio
+
+#### Código anterior
+```kotlin
+    ADD_ENTRY,
+    EDIT_ENTRY,
+    CONFIRM_DELETE,
+```
+
+```kotlin
+                onStartTurno = { sendStartTurno() },
+```
+
+#### Código nuevo
+```kotlin
+    ADD_ENTRY,
+    EDIT_ENTRY,
+    CONFIRM_START_TURNO,
+    CONFIRM_DELETE,
+```
+
+```kotlin
+                onStartTurno = { currentScreen.value = ScreenState.CONFIRM_START_TURNO },
+```
+
+```kotlin
+            ScreenState.CONFIRM_START_TURNO -> ConfirmStartTurnoScreen(
+                onCancel = { currentScreen.value = ScreenState.NO_ACTIVE_TURNO },
+                onConfirm = {
+                    val sent = sendStartTurno()
+                    if (sent) {
+                        currentScreen.value = ScreenState.NO_ACTIVE_TURNO
+                    }
+                    sent
+                }
+            )
+```
+
+#### Por qué se cambió
+El reloj enviaba `START_TURNO` con el primer toque. Ahora el primer toque abre una confirmación y el comando solo se envía al pulsar `Iniciar`.
+
+### Cambio 2 - Pantalla de confirmación de inicio
+
+#### Código anterior
+`No existía ConfirmStartTurnoScreen en android/wear/src/main/java/com/mijornada/app/WearMainActivity.kt.`
+
+#### Código nuevo
+```kotlin
+@Composable
+private fun ConfirmStartTurnoScreen(
+    onCancel: () -> Unit,
+    onConfirm: () -> Boolean
+) {
+```
+
+```kotlin
+            Text("Iniciar Turno", color = ColorPropina, fontSize = 17.sp, fontWeight = FontWeight.Bold)
+            Spacer(modifier = Modifier.height(8.dp))
+            Text("Pulsa para comenzar tu Turno.", color = ColorGrey, fontSize = 12.sp)
+```
+
+```kotlin
+                ConfirmDeleteButton(
+                    label = if (starting) "Iniciando..." else "Iniciar",
+                    textColor = ColorPropina,
+                    bg = ColorPropinaBg,
+                    enabled = !starting,
+                    modifier = Modifier.weight(1f),
+                    onClick = {
+                        if (!starting) {
+                            starting = onConfirm()
+                        }
+                    }
+                )
+```
+
+#### Por qué se cambió
+Reproduce en Wear el segundo paso de la app móvil con el texto literal `Pulsa para comenzar tu Turno.`, permite cancelar y evita pulsaciones repetidas mientras se acepta el envío.
+
+### Cambio 3 - Confirmación al iniciar desde la Tile
+
+#### Código anterior
+```kotlin
+                } else if (userSessionId.value.isNotBlank()) {
+                    pendingTileAction = null
+                    sendStartTurno()
+                }
+```
+
+#### Código nuevo
+```kotlin
+                } else if (userSessionId.value.isNotBlank()) {
+                    pendingTileAction = null
+                    currentScreen.value = ScreenState.CONFIRM_START_TURNO
+                }
+```
+
+#### Por qué se cambió
+El botón `Iniciar Turno` de la Tile también enviaba el inicio directamente. Ahora abre la misma confirmación que la pantalla principal.
+
+### Cambio 4 - Contrato de confirmación de inicio
+
+#### Código anterior
+`No existía el test pide confirmacion antes de iniciar un turno desde el reloj o la tile en src/__tests__/android-wear-bridge.test.ts.`
+
+#### Código nuevo
+```ts
+  it("pide confirmacion antes de iniciar un turno desde el reloj o la tile", () => {
+    const source = readFileSync(
+      resolve(root, "android/wear/src/main/java/com/mijornada/app/WearMainActivity.kt"),
+      "utf8",
+    );
+
+    expect(source).toContain("CONFIRM_START_TURNO");
+    expect(source).toContain(
+      "onStartTurno = { currentScreen.value = ScreenState.CONFIRM_START_TURNO }",
+    );
+    expect(source).toContain("currentScreen.value = ScreenState.CONFIRM_START_TURNO");
+    expect(source).toContain('Text("Pulsa para comenzar tu Turno."');
+    expect(source).toContain('label = "Cancelar"');
+    expect(source).toContain('label = if (starting) "Iniciando..." else "Iniciar"');
+    expect(source).toContain("sendStartTurno()");
+    expect(source).toContain(
+      "ScreenState.CONFIRM_START_TURNO -> currentScreen.value = ScreenState.NO_ACTIVE_TURNO",
+    );
+  });
+```
+
+#### Por qué se cambió
+El test fija que ningún inicio desde la pantalla principal o la Tile omita la confirmación y que el botón Atrás vuelva a la pantalla sin turno activo.
+
+## 2026-06-12 05:57 - Implementar opción A de taxi clásico
+
+**Archivos modificados:** `android/wear/src/main/res/drawable/complication_icon.xml`, `src/__tests__/android-wear-bridge.test.ts`
+
+### Cambio 1 - Frontal clásico redondeado
+
+#### Código anterior
+```xml
+<!-- Silueta lateral simplificada de un taxi clasico para complicaciones Wear OS.
+     El perfil de sedan antiguo usa capó y maletero marcados, techo redondeado,
+     letrero y ruedas grandes para seguir siendo legible como icono monocromo. -->
+```
+
+#### Código nuevo
+```xml
+<!-- Opcion A: frontal clasico redondeado para complicaciones Wear OS.
+     Conserva letrero, parabrisas, faros dobles y parrilla horizontal mediante
+     formas gruesas legibles cuando la esfera lo reduce y tinta. -->
+```
+
+```xml
+    <!-- Parrilla ancha y parachoques -->
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M6.1,15.4 h11.8 v1.2 h-11.8 z M2,18 h20 v1.5 h-20 z M5.1,17 h1.4 v3.8 h-1.4 z M17.5,17 h1.4 v3.8 h-1.4 z" />
+```
+
+#### Por qué se cambió
+El usuario eligió la opción A de la comparación visual: frontal clásico redondeado con letrero, parabrisas amplio, faros dobles, parrilla horizontal y parachoques grueso.
+
+### Cambio 2 - Contrato de la opción A
+
+#### Código anterior
+```ts
+    expect(complicationIcon).toContain("Silueta lateral simplificada de un taxi clasico");
+    expect(complicationIcon).toContain("Letrero de taxi");
+    expect(complicationIcon).toContain("sedan antiguo");
+    expect(complicationIcon).toContain("Ruedas grandes");
+    expect(complicationIcon).not.toContain("frontal");
+```
+
+#### Código nuevo
+```ts
+    expect(complicationIcon).toContain("Opcion A: frontal clasico redondeado");
+    expect(complicationIcon).toContain("Letrero de taxi");
+    expect(complicationIcon).toContain("Parabrisas amplio");
+    expect(complicationIcon).toContain("Faros redondos");
+    expect(complicationIcon).toContain("Parrilla ancha");
+    expect(complicationIcon).not.toContain("lateral");
+```
+
+#### Por qué se cambió
+El test fija literalmente los rasgos elegidos de la opción A e impide volver a una silueta lateral.
+
+## 2026-06-12 05:25 - Dibujar silueta lateral de taxi clásico
+
+**Archivos modificados:** `android/wear/src/main/res/drawable/complication_icon.xml`, `src/__tests__/android-wear-bridge.test.ts`
+
+### Cambio 1 - Sustituir frontal por perfil clásico
+
+#### Código anterior
+```xml
+<!-- Silueta frontal simplificada de un taxi para complicaciones Wear OS.
+     Usa formas gruesas y pocos huecos para seguir pareciendo un coche cuando
+     la esfera lo reduce y lo tinta como icono monocromo. -->
+```
+
+#### Código nuevo
+```xml
+<!-- Silueta lateral simplificada de un taxi clasico para complicaciones Wear OS.
+     El perfil de sedan antiguo usa capó y maletero marcados, techo redondeado,
+     letrero y ruedas grandes para seguir siendo legible como icono monocromo. -->
+```
+
+```xml
+    <!-- Perfil de sedan antiguo con ventanas recortadas -->
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:fillType="evenOdd"
+        android:pathData="M7.3,6 h8.1 q1.2,0 2,0.9 l2.2,3.1 h2 q1.3,0 1.6,1.3 l0.5,3.8 q0.2,1.5 -1.4,1.7 h-20.6 q-1.6,-0.2 -1.4,-1.7 l0.5,-3.2 q0.2,-1.3 1.5,-1.5 l2.4,-0.4 l1.4,-3 q0.4,-1 1.2,-1 z M7.5,7.3 q-0.4,0 -0.6,0.5 l-1,2.2 h5 v-2.7 z M12.2,7.3 v2.7 h5.8 l-1.6,-2.2 q-0.4,-0.5 -1,-0.5 z" />
+```
+
+#### Por qué se cambió
+El usuario pidió que el icono pareciera un taxi más clásico. El perfil lateral de sedán antiguo se aproxima al coche principal de la marca mediante capó, maletero, techo redondeado, letrero y ruedas grandes.
+
+### Cambio 2 - Contrato de taxi clásico
+
+#### Código anterior
+```ts
+    expect(complicationIcon).toContain("Silueta frontal simplificada");
+    expect(complicationIcon).toContain("Letrero de taxi con hueco central");
+    expect(complicationIcon).toContain("Faros recortados");
+    expect(complicationIcon).not.toContain("Retrovisores");
+    expect(complicationIcon).not.toContain("parrilla");
+```
+
+#### Código nuevo
+```ts
+    expect(complicationIcon).toContain("Silueta lateral simplificada de un taxi clasico");
+    expect(complicationIcon).toContain("Letrero de taxi");
+    expect(complicationIcon).toContain("sedan antiguo");
+    expect(complicationIcon).toContain("Ruedas grandes");
+    expect(complicationIcon).not.toContain("frontal");
+```
+
+#### Por qué se cambió
+El test fija que el icono permanezca como una silueta lateral de taxi clásico y no vuelva al frontal moderno.
+
+## 2026-06-12 05:20 - Simplificar silueta frontal del taxi
+
+**Archivos modificados:** `android/wear/src/main/res/drawable/complication_icon.xml`, `src/__tests__/android-wear-bridge.test.ts`
+
+### Cambio 1 - Icono de coche frontal legible
+
+#### Código anterior
+```xml
+    <!-- Frontal del taxi con parabrisas, faros y parrilla recortados -->
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:fillType="evenOdd"
+        android:pathData="M8.2,5.4 h7.6 q1.8,0 2.5,1.7 l1,2.5 q1.6,0.6 1.9,2.3 l0.9,5.5 q0.3,2 -1.7,2.4 h-16.8 q-2,-0.4 -1.7,-2.4 l0.9,-5.5 q0.3,-1.7 1.9,-2.3 l1,-2.5 q0.7,-1.7 2.5,-1.7 z M8.3,6.8 q-0.9,0 -1.3,1 l-0.8,2.1 h11.6 l-0.8,-2.1 q-0.4,-1 -1.3,-1 z M5.3,12.1 a1.8,1.6 0,1 0,3.6,0 a1.8,1.6 0,1 0,-3.6,0 z M15.1,12.1 a1.8,1.6 0,1 0,3.6,0 a1.8,1.6 0,1 0,-3.6,0 z M8,14.8 h8 q0.7,0 0.7,0.7 v1.7 q0,0.7 -0.7,0.7 h-8 q-0.7,0 -0.7,-0.7 v-1.7 q0,-0.7 0.7,-0.7 z" />
+    <!-- Retrovisores -->
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M3.1,8.2 a1.4,1.4 0,1 0,0.01,0 z M20.9,8.2 a1.4,1.4 0,1 0,-0.01,0 z" />
+```
+
+#### Código nuevo
+```xml
+    <!-- Carroceria y cabina con parabrisas y Faros recortados -->
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:fillType="evenOdd"
+        android:pathData="M7.2,5.5 h9.6 q1.7,0 2.3,1.6 l1.2,3.4 q1.2,0.7 1.4,2.2 l0.6,4.4 q0.2,1.9 -1.7,2.2 h-17.2 q-1.9,-0.3 -1.7,-2.2 l0.6,-4.4 q0.2,-1.5 1.4,-2.2 l1.2,-3.4 q0.6,-1.6 2.3,-1.6 z M7.5,7.2 q-0.8,0 -1.1,0.9 l-0.8,2.4 h12.8 l-0.8,-2.4 q-0.3,-0.9 -1.1,-0.9 z M4.4,13.2 a2,1.8 0,1 0,4,0 a2,1.8 0,1 0,-4,0 z M15.6,13.2 a2,1.8 0,1 0,4,0 a2,1.8 0,1 0,-4,0 z" />
+    <!-- Ruedas visibles bajo la carroceria -->
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M4.1,18.2 h3.4 v2.4 q0,1.2 -1.2,1.2 h-1 q-1.2,0 -1.2,-1.2 z M16.5,18.2 h3.4 v2.4 q0,1.2 -1.2,1.2 h-1 q-1.2,0 -1.2,-1.2 z" />
+```
+
+#### Por qué se cambió
+El icono anterior incluía detalles finos que perdían legibilidad. El nuevo conserva claramente un coche frontal mediante letrero, parabrisas grande, dos faros y dos ruedas.
+
+### Cambio 2 - Contrato de silueta simplificada
+
+#### Código anterior
+`No existían aserciones sobre la silueta simplificada de complication_icon.xml en src/__tests__/android-wear-bridge.test.ts.`
+
+#### Código nuevo
+```ts
+    expect(complicationIcon).toContain("Silueta frontal simplificada");
+    expect(complicationIcon).toContain("Letrero de taxi con hueco central");
+    expect(complicationIcon).toContain("Faros recortados");
+    expect(complicationIcon).not.toContain("Retrovisores");
+    expect(complicationIcon).not.toContain("parrilla");
+```
+
+#### Por qué se cambió
+El test impide recuperar detalles finos que conviertan el coche en una mancha al reducirse.
+
+## 2026-06-12 05:12 - Probar medidor de estado en la complicación
+
+**Archivos modificados:** `android/wear/src/main/AndroidManifest.xml`, `android/wear/src/main/java/com/mijornada/app/TurnoComplicationService.kt`, `src/__tests__/android-wear-bridge.test.ts`
+
+### Cambio 1 - Ofrecer RANGED_VALUE
+
+#### Código anterior
+```xml
+                android:value="MONOCHROMATIC_IMAGE,SMALL_IMAGE,SHORT_TEXT" />
+```
+
+#### Código nuevo
+```xml
+                android:value="RANGED_VALUE,MONOCHROMATIC_IMAGE,SMALL_IMAGE,SHORT_TEXT" />
+```
+
+#### Por qué se cambió
+Permite comprobar si la esfera Xiaomi representa Mi Turno como sus medidores.
+
+### Cambio 2 - Valores por estado
+
+#### Código anterior
+`No existía rangedValueEstado en android/wear/src/main/java/com/mijornada/app/TurnoComplicationService.kt.`
+
+#### Código nuevo
+```kotlin
+        val valor = when {
+            status.activo && status.pausado -> 50f
+            status.activo -> 100f
+            else -> 0f
+        }
+```
+
+#### Por qué se cambió
+Envía `0` sin turno, `50` en pausa y `100` activo para la prueba del medidor.
+
+## 2026-06-12 05:03 - Mostrar Mi Turno bajo la complicación
+
+**Archivos modificados:** `android/wear/src/main/java/com/mijornada/app/TurnoComplicationService.kt`, `src/__tests__/android-wear-bridge.test.ts`
+
+### Cambio 1 - Texto visible de la complicación Xiaomi
+
+#### Código anterior
+```kotlin
+        ComplicationType.SHORT_TEXT -> shortTextSoloIcono()
+
+    private fun shortTextSoloIcono(): ComplicationData =
+        ShortTextComplicationData.Builder(
+            PlainComplicationText.Builder(" ").build(),
+            PlainComplicationText.Builder("Logo de Mi Turno").build(),
+        )
+```
+
+#### Código nuevo
+```kotlin
+        ComplicationType.SHORT_TEXT -> shortTextMiTurno()
+
+    private fun shortTextMiTurno(): ComplicationData =
+        ShortTextComplicationData.Builder(
+            PlainComplicationText.Builder("Mi Turno").build(),
+            PlainComplicationText.Builder("Logo de Mi Turno").build(),
+        )
+```
+
+#### Por qué se cambió
+El usuario pidió que el hueco `SHORT_TEXT` de la esfera Xiaomi muestre literalmente `Mi Turno` debajo del icono del taxi. El círculo exterior y su color los dibuja la esfera Xiaomi y no son controlables desde los datos `SHORT_TEXT` de la complicación.
+
+### Cambio 2 - Contrato del texto Mi Turno
+
+#### Código anterior
+```ts
+    expect(complicacion).toContain("shortTextSoloIcono");
+    expect(complicacion).toContain('PlainComplicationText.Builder(" ")');
+```
+
+#### Código nuevo
+```ts
+    expect(complicacion).toContain("shortTextMiTurno");
+    expect(complicacion).toContain('PlainComplicationText.Builder("Mi Turno")');
+    expect(complicacion).not.toContain('PlainComplicationText.Builder(" ")');
+```
+
+#### Por qué se cambió
+El test fija que la complicación no vuelva a ocultar el texto mediante un espacio en blanco y que conserve el nombre visible `Mi Turno`.
+
+## 2026-06-12 04:55 - Redibujar icono frontal de la complicación
+
+**Archivos modificados:** `android/wear/src/main/res/drawable/complication_icon.xml`
+
+### Cambio 1 - Silueta monocroma basada en el icono principal
+
+#### Código anterior
+```xml
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Icono monocromo blanco para el selector de complicaciones y los huecos
+     SHORT_TEXT, segun la guia oficial: "a single-color white icon". Silueta
+     simplificada del logo de la app (taxi clasico con letrero en el techo). -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <!-- Letrero TAXI del techo -->
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M9.6,3.6 h4.8 a1,1 0 0 1 1,1 v1.2 a0.6,0.6 0 0 1 -0.6,0.6 h-5.6 a0.6,0.6 0 0 1 -0.6,-0.6 v-1.2 a1,1 0 0 1 1,-1 z" />
+    <!-- Cabina con ventanas recortadas -->
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:fillType="evenOdd"
+        android:pathData="M8.8,7 h6.4 q1,0 1.4,0.9 l1.7,4.1 h-12.6 l1.7,-4.1 q0.4,-0.9 1.4,-0.9 z M9.1,8.3 h2.4 v2.4 h-3.4 z M12.7,8.3 h2.3 q0.5,0 0.7,0.45 l0.8,1.95 h-3.8 z" />
+    <!-- Carroceria -->
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M2.8,12 h18.4 q1.6,0 1.6,1.6 v2 q0,1.3 -1.3,1.3 h-19 q-1.3,0 -1.3,-1.3 v-2 q0,-1.6 1.6,-1.6 z" />
+    <!-- Ruedas -->
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:fillType="evenOdd"
+        android:pathData="M7,15.4 a2.5,2.5 0 1 1 -0.01,0 z M7,16.9 a1,1 0 1 0 0.01,0 z" />
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:fillType="evenOdd"
+        android:pathData="M17,15.4 a2.5,2.5 0 1 1 -0.01,0 z M17,16.9 a1,1 0 1 0 0.01,0 z" />
+</vector>
+```
+
+#### Código nuevo
+```xml
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Version monocroma frontal del icono principal para complicaciones Wear OS.
+     Los huecos SHORT_TEXT fuerzan un solo color, por eso conserva la silueta
+     del taxi, el letrero, el parabrisas, los faros y la parrilla. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <!-- Letrero del techo -->
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:fillType="evenOdd"
+        android:pathData="M8.2,2.2 h7.6 q0.8,0 1,0.8 l0.5,2.7 h-10.6 l0.5,-2.7 q0.2,-0.8 1,-0.8 z M9.1,3.2 l-0.3,1.4 h6.4 l-0.3,-1.4 z" />
+    <!-- Frontal del taxi con parabrisas, faros y parrilla recortados -->
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:fillType="evenOdd"
+        android:pathData="M8.2,5.4 h7.6 q1.8,0 2.5,1.7 l1,2.5 q1.6,0.6 1.9,2.3 l0.9,5.5 q0.3,2 -1.7,2.4 h-16.8 q-2,-0.4 -1.7,-2.4 l0.9,-5.5 q0.3,-1.7 1.9,-2.3 l1,-2.5 q0.7,-1.7 2.5,-1.7 z M8.3,6.8 q-0.9,0 -1.3,1 l-0.8,2.1 h11.6 l-0.8,-2.1 q-0.4,-1 -1.3,-1 z M5.3,12.1 a1.8,1.6 0,1 0,3.6,0 a1.8,1.6 0,1 0,-3.6,0 z M15.1,12.1 a1.8,1.6 0,1 0,3.6,0 a1.8,1.6 0,1 0,-3.6,0 z M8,14.8 h8 q0.7,0 0.7,0.7 v1.7 q0,0.7 -0.7,0.7 h-8 q-0.7,0 -0.7,-0.7 v-1.7 q0,-0.7 0.7,-0.7 z" />
+    <!-- Retrovisores -->
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M3.1,8.2 a1.4,1.4 0,1 0,0.01,0 z M20.9,8.2 a1.4,1.4 0,1 0,-0.01,0 z" />
+    <!-- Parachoques y barras verticales caracteristicas del icono principal -->
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M2.2,18.3 h19.6 v1.2 h-19.6 z M6.1,16.6 h1.3 v4.1 h-1.3 z M16.6,16.6 h1.3 v4.1 h-1.3 z" />
+</vector>
+```
+
+#### Por qué se cambió
+El hueco `SHORT_TEXT` de la esfera Xiaomi obliga a mostrar un icono monocromo. La silueta lateral anterior no era fiel al icono principal de la app. La nueva versión reproduce su vista frontal y conserva sus rasgos identificativos dentro de la restricción monocroma.
+
+## 2026-06-12 14:48 - Adaptar el teclado de cierre de turno a la pantalla redonda
+
+**Archivos modificados:** `android/wear/src/main/java/com/mijornada/app/screens/EndTurnoScreen.kt`, `android/wear/src/main/java/com/mijornada/app/screens/NumericKeypad.kt`, `src/__tests__/android-wear-bridge.test.ts`
+
+### Contexto
+
+Al introducir Total Taxímetro / Total KM en el cierre de turno, el teclado era una tarjeta flotante rectangular (78% de ancho, con borde) más alta que el círculo visible: el marco redondo del Xiaomi Watch 5 cortaba las líneas laterales y el botón Guardar, y sobraba espacio sin usar (fotos del usuario). Se rediseña como pantalla completa para círculo: medidas verticales proporcionales al diámetro y filas del teclado estrechadas según la cuerda del círculo a su altura.
+
+### Cambio 1 - Nuevo NumericKeypadRedondo en NumericKeypad.kt
+
+**Código anterior:** `No existía NumericKeypadRedondo en NumericKeypad.kt.`
+
+**Código nuevo:** composable público con anchos por fila `anchosFilas = [0.78, 0.84, 0.84, 0.78]` (cuerdas del círculo), teclas píldora (`cornerRadius = keyHeight / 2`) y espaciado parametrizado. Reutiliza `KeyButton`, que gana el parámetro opcional `cornerRadius: Dp = 9.dp` (las llamadas existentes no cambian de aspecto); la llamada interna de `NumericKeypad` pasa a argumentos con nombre para no romperse con el parámetro nuevo.
+
+**Por qué se cambió:** un teclado rectangular uniforme no puede aprovechar un círculo; con anchos por cuerda las filas centrales usan más pantalla y ninguna se sale.
+
+### Cambio 2 - TecladoCierreOverlay a pantalla completa circular
+
+**Código anterior (resumen):** `Box` con velo `0xDD000000` y `Column fillMaxWidth(0.78f)` con `clip`/`border` de tarjeta, título 10sp, valor 22sp, `NumericKeypad` con `keyHeight = 20.dp` y `Guardar` a ancho completo de la tarjeta.
+
+**Código nuevo:** `BoxWithConstraints` opaco a pantalla completa (sin tarjeta ni borde); `d = maxHeight` (diámetro) y a partir de él: padding superior `0.07·d`, título 11sp, valor 26sp, `NumericKeypadRedondo` con `keyHeight = 0.105·d` y `rowSpacing = 0.016·d`, y `Guardar` como píldora `fillMaxWidth(0.55f)` que cabe en el arco inferior. Presupuesto vertical verificado para 466px/~233dp: ≈219dp ≤ 233dp, con todas las filas dentro de su cuerda.
+
+**Por qué se cambió:** eliminar los cortes del marco redondo y aprovechar el espacio; al ser fracciones del diámetro queda bien en cualquier reloj redondo, no solo en el del usuario.
+
+### Cambio 3 - Test de caracterización actualizado
+
+**Código anterior:** aserción `keyHeight = 20.dp` (fijaba la tarjeta compacta antigua).
+
+**Código nuevo:** aserciones `BoxWithConstraints`, `NumericKeypadRedondo(`, `keyHeight = d * 0.105f` y ausencia del velo `0xDD000000`.
+
+**Por qué se cambió:** el test documentaba el layout anterior; ahora fija el nuevo.
+
+Verificación: `npx tsc --noEmit` sin errores; `android-wear-bridge.test.ts` en verde (67 tests). Compilar e instalar con `actualizar_reloj.bat`.
+
+## 2026-06-12 14:33 - Unificar isTerminalResponse en WearConstants
+
+**Archivos modificados:** `android/wear/src/main/java/com/mijornada/app/WearConstants.kt`, `android/wear/src/main/java/com/mijornada/app/MobileResponseService.kt`, `android/wear/src/main/java/com/mijornada/app/WearMainActivity.kt`, `src/__tests__/android-wear-bridge.test.ts`
+
+### Contexto
+
+Hallazgo M3 de la auditoría: la regla que decide si una respuesta del móvil es terminal (zanja el comando) o provisional (reintentar) estaba duplicada, idéntica, como función privada en `MobileResponseService` y `WearMainActivity`. Riesgo de divergencia silenciosa al añadir códigos nuevos. Sin cambio de comportamiento: misma lógica, una sola fuente.
+
+### Cambio 1 - Función compartida en WearConstants
+
+**Código anterior:** `No existía isTerminalResponse en WearConstants.kt.`
+
+**Código nuevo:**
+
+```kotlin
+    fun isTerminalResponse(responseType: String, code: String): Boolean {
+        if (responseType == "OK" || responseType == "DUPLICATE_IGNORED") return true
+        return responseType == "ERROR" && code != "USER_NOT_PREPARED" && code != "APP_NOT_READY"
+    }
+```
+
+(con KDoc explicando que es fuente única y quiénes la usan).
+
+**Por qué se cambió:** lugar neutral ya compartido por ambas clases (ahí viven `HANDLED_OPERATION_LIMIT` y las claves de prefs).
+
+### Cambio 2 - Eliminar las dos copias privadas y llamar a la compartida
+
+**Código anterior (idéntico en `MobileResponseService.kt:112-115` y `WearMainActivity.kt:1093-1096`):**
+
+```kotlin
+    private fun isTerminalResponse(responseType: String, code: String): Boolean {
+        if (responseType == "OK" || responseType == "DUPLICATE_IGNORED") return true
+        return responseType == "ERROR" && code != "USER_NOT_PREPARED" && code != "APP_NOT_READY"
+    }
+```
+
+**Código nuevo:** ambas copias eliminadas; los dos puntos de llamada pasan a `WearConstants.isTerminalResponse(responseType, json.optString("code", ""))`.
+
+**Por qué se cambió:** eliminar la duplicación que permitía que outbox y pantalla divergieran si solo se actualizaba una copia.
+
+### Cambio 3 - Test fija la fuente única
+
+**Código anterior (en el test "elimina DataItems de comando y ACK tras una respuesta terminal"):**
+
+```ts
+    expect(source).toContain("isTerminalResponse(responseType, json.optString(\"code\", \"\"))");
+    expect(source).toContain('"USER_NOT_PREPARED"');
+```
+
+**Código nuevo:** comprueba que la función vive en `WearConstants.kt` (con `"USER_NOT_PREPARED"` allí), que servicio y activity llaman a `WearConstants.isTerminalResponse(...)` y que **ninguno** de los dos vuelve a declarar `private fun isTerminalResponse`.
+
+**Por qué se cambió:** que la duplicación no pueda reaparecer sin que salte un test.
+
+Verificación: `npx tsc --noEmit` sin errores; `android-wear-bridge.test.ts` en verde (67 tests). El módulo wear se compila en el PC del usuario (`actualizar_reloj.bat`).
+
+## 2026-06-12 14:28 - Validar tipos de entrada en la frontera del puente Wear
+
+**Archivos modificados:** `android/app/src/main/java/com/mijornada/app/watch/WatchCommandJson.kt`, `src/__tests__/android-wear-bridge.test.ts`
+
+### Contexto
+
+Hallazgo M4 de la auditoría: el parser de comandos del reloj aceptaba cualquier `entryType` (incluido vacío o desconocido). Una entrada con tipo fuera de la lista no cae en ningún cubo contable (`totalP..totalN`/`porTipo`) y descuadraría las cuentas en silencio. Se valida ahora en la frontera, reutilizando el mecanismo existente (`InvalidPayloadException` → ack `INVALID_PAYLOAD` al reloj, verificado en `WatchNativeCommandHandler.kt:141-144`, sin reintentos envenenados).
+
+### Cambio 1 - Listas blancas TIPOS_ENTRADA y TIPOS_ENTRADA_TURNO
+
+**Código anterior:** `No existían TIPOS_ENTRADA ni TIPOS_ENTRADA_TURNO en WatchCommandJson.kt.`
+
+**Código nuevo:**
+
+```kotlin
+private val TIPOS_ENTRADA = setOf("propina", "datafono", "agencia_bono", "extra", "gasolina", "nulo")
+private val TIPOS_ENTRADA_TURNO = TIPOS_ENTRADA + "nota"
+```
+
+**Por qué se cambió:** espejo de la unión cerrada `WatchEntryType` de `src/shared/watch-commands.ts` (en las entradas de un turno también viajan notas).
+
+### Cambio 2 - ADD_ENTRY valida entryType
+
+**Código anterior:**
+
+```kotlin
+                entryType = payload.optString("entryType", ""),
+```
+
+**Código nuevo:**
+
+```kotlin
+                entryType = payload.optString("entryType", "").also {
+                    if (it !in TIPOS_ENTRADA) {
+                        throw InvalidPayloadException("entryType desconocido: \"$it\"")
+                    }
+                },
+```
+
+**Por qué se cambió:** rechazar en la puerta, con error visible para el reloj, lo que antes se guardaba en silencio.
+
+### Cambio 3 - parseEntradas valida el tipo de cada entrada
+
+**Código anterior:**
+
+```kotlin
+        entradas.add(
+            WatchEntry(
+                id = item.optLong("id", 0L),
+                type = item.optString("type", ""),
+```
+
+**Código nuevo:**
+
+```kotlin
+        val tipo = item.optString("type", "")
+        if (tipo !in TIPOS_ENTRADA_TURNO) {
+            throw InvalidPayloadException("Tipo de entrada desconocido en entradas[$i]: \"$tipo\"")
+        }
+        entradas.add(
+            WatchEntry(
+                id = item.optLong("id", 0L),
+                type = tipo,
+```
+
+**Por qué se cambió:** misma defensa para las entradas que viajan dentro de EDIT_TURNO.
+
+### Cambio 4 - Test de caracterización fija la lista blanca
+
+**Código anterior:** el test "permite editar dinero y km..." de `android-wear-bridge.test.ts` no comprobaba validación de tipos en el parser.
+
+**Código nuevo:** aserciones de que `parserKt` contiene `TIPOS_ENTRADA`, `TIPOS_ENTRADA_TURNO` y las dos comprobaciones `!in`.
+
+**Por qué se cambió:** que la defensa no pueda retirarse sin que salte un test.
+
+Verificación: `npx tsc --noEmit` sin errores; tests `android-wear-bridge` y `watch-command-processor` en verde (82 tests). Nota sobre M1 de la auditoría: verificado en profundidad y **retirado como falso positivo** — el espejo TS no cachea la contabilidad, la recalcula en vivo con `calcularTurnoContable` en cada envío (`watch-command-processor.ts:127`), por lo que cumple la regla de oro por construcción y no se modificó nada. El módulo `android/app` (Kotlin) debe compilarse en el PC del usuario.
+
+## 2026-06-12 14:12 - Eliminar módulo huérfano watch-totals.ts
+
+**Archivos modificados:** `src/logic/watch-totals.ts` (eliminado)
+
+### Contexto
+
+Hallazgo M2 de la auditoría de hoy: módulo sin ningún importador en el proyecto (ni código ni tests). Sus dos funciones (`computeWatchTotals` y `buildWatchEntradas`) existen también, con el mismo nombre y uso real, dentro de `src/logic/watch-command-processor.ts` (líneas 37 y 64): el archivo era un duplicado que nunca llegó a conectarse.
+
+### Cambio - Borrar src/logic/watch-totals.ts
+
+**Código anterior:** archivo de 39 líneas con `computeWatchTotals(current)` (totales y conteos por tipo de entrada para el reloj) y `buildWatchEntradas(current)`.
+
+**Código nuevo:** `No existe el archivo.`
+
+**Por qué se cambió:** código muerto verificado (cero referencias a `watch-totals`, `computeWatchTotals` o `buildWatchEntradas` apuntando a este módulo en `src/`, `scripts/`, configs ni Android); las versiones vivas están en `watch-command-processor.ts`.
+
+Verificación: `npx tsc --noEmit` sin errores y suite de tests en verde (los archivos `logic`, `user-storage-extraction` y `watch-command-processor` pasan; los fallos intermitentes con `--no-isolate` son artefactos del flag, no del código).
+
+## 2026-06-12 02:45 - Añadir tipo solo-icono a la complicación para centrarla
+
+**Archivos modificados:** `android/wear/src/main/java/com/mijornada/app/TurnoComplicationService.kt`, `android/wear/src/main/AndroidManifest.xml`, `src/__tests__/android-wear-bridge.test.ts`
+
+### Contexto
+
+En el hueco SHORT_TEXT de la esfera Xiaomi el icono sale alto porque la esfera reserva la línea de texto (en blanco) debajo. Si el hueco acepta el tipo MONOCHROMATIC_IMAGE (solo icono), la esfera lo pinta centrado. Se ofrece ese tipo además de los existentes; si el hueco no lo acepta, todo sigue como estaba.
+
+### Cambio 1 - Nueva función soloIconoCentrado() y rama MONOCHROMATIC_IMAGE
+
+**Código anterior:** `No existía soloIconoCentrado() en TurnoComplicationService.kt; getPreviewData/onComplicationRequest solo trataban SMALL_IMAGE y SHORT_TEXT.`
+
+**Código nuevo:** rama `ComplicationType.MONOCHROMATIC_IMAGE -> soloIconoCentrado()` en preview y request; la función construye `MonochromaticImageComplicationData` con el icono `complication_icon`, descripción "Logo de Mi Turno" y `setTapAction(abrirApp())`. Import nuevo `MonochromaticImageComplicationData`.
+
+**Por qué se cambió:** es el único tipo que las esferas pintan como icono solo y centrado, sin línea de texto.
+
+### Cambio 2 - Manifest: SUPPORTED_TYPES con MONOCHROMATIC_IMAGE
+
+**Código anterior:**
+
+```xml
+                android:value="SMALL_IMAGE,SHORT_TEXT" />
+```
+
+**Código nuevo:**
+
+```xml
+                android:value="MONOCHROMATIC_IMAGE,SMALL_IMAGE,SHORT_TEXT" />
+```
+
+**Por qué se cambió:** declarar el tipo nuevo; el tipo efectivo lo elige el hueco de la esfera.
+
+### Cambio 3 - Test actualizado
+
+**Código anterior:** aserciones `android:value="SMALL_IMAGE,SHORT_TEXT"` y `shortTextSoloIcono`.
+
+**Código nuevo:** añade `MONOCHROMATIC_IMAGE,SMALL_IMAGE,SHORT_TEXT`, `MonochromaticImageComplicationData` y `soloIconoCentrado` a las aserciones.
+
+**Por qué se cambió:** fijar el invariante nuevo.
+
+Verificación: tests del bridge en verde (63). Compilar e instalar con `actualizar_reloj.bat` y volver a seleccionar la complicación en el hueco.
+
+## 2026-06-12 02:10 - Sustituir icono monocromo de la complicación por el logo del usuario
+
+**Archivos modificados:** `android/wear/src/main/res/drawable/complication_icon.xml` (eliminado), `android/wear/src/main/res/drawable/complication_icon.png` (nuevo)
+
+### Contexto
+
+El usuario decidió volver a su esfera Xiaomi de siempre con la complicación de Mi Turno en un hueco (los huecos de esa esfera son solo-texto: icono monocromo obligatorio), pero con su propio logo como silueta en lugar del dibujo simplificado.
+
+### Cambio - complication_icon pasa de vector genérico a PNG derivado del logo del usuario
+
+**Código anterior:** `complication_icon.xml`, vector de 24dp con la silueta simplificada (letrero, cabina con ventanas, carrocería y ruedas) documentado en la entrada de las 12:35 del 2026-06-11.
+
+**Código nuevo:** `complication_icon.png` (256×256, blanco sobre transparente), generado desde el `Taxi1.svg` aportado por el usuario (la versión en líneas de su logo neón): se rasterizó a 1024px, se extrajo el trazado (las líneas talladas en el SVG), se recortó al contenido y se centró con margen en lienzo cuadrado. El nombre del recurso se mantiene, por lo que el manifest (`android:icon`) y `TurnoComplicationService` (`Icon.createWithResource`) no cambian.
+
+**Por qué se cambió:** en los huecos solo-texto el icono monocromo es el único elemento visible; el usuario quiere que sea su logo. A los tamaños reales de hueco (48–96px) el trazado se reconoce bien; el límite de 24px que desaconsejaba este arte aplicaba al icono pequeño junto a texto, que ya no se usa.
+
+**Reversión en la misma sesión:** probado en el reloj, la esfera Xiaomi pinta el icono más pequeño de lo previsto y el trazado detallado se veía como una mancha. Se eliminó `complication_icon.png` y se restauró `complication_icon.xml` con exactamente el vector anterior (la silueta simplificada de la entrada de las 12:35 del 2026-06-11), a elección del usuario entre las variantes ofrecidas. Estado final: el vector simplificado.
+
+Verificación: tests del bridge y brand-assets en verde. Compilar e instalar con `actualizar_reloj.bat`.
+
+## 2026-06-12 01:24 - Migrar esfera propia a Watch Face Format (Wear OS 6)
+
+**Archivos modificados:**
+
+- `android/watchface/build.gradle` (nuevo)
+- `android/watchface/src/main/AndroidManifest.xml` (nuevo)
+- `android/watchface/src/main/res/raw/watchface.xml` (nuevo)
+- `android/watchface/src/main/res/xml/watch_face_info.xml` (nuevo)
+- `android/watchface/src/main/res/values/strings.xml` (nuevo)
+- `android/watchface/src/main/res/drawable/` (nuevos: `dial.png`, `hour.png`, `minute.png`, `second.png`, `taxi_logo.png`, `preview.png`)
+- `android/settings.gradle`
+- `android/wear/src/main/java/com/mijornada/app/MiTurnoWatchFaceService.kt` (eliminado)
+- `android/wear/src/main/AndroidManifest.xml`
+- `android/wear/build.gradle`
+- `android/wear/src/main/res/xml/watch_face.xml` (eliminado)
+- `android/wear/src/main/res/drawable/watch_face_preview.png` (eliminado)
+- `android/wear/src/main/res/values/strings.xml`
+- `src/__tests__/android-wear-bridge.test.ts`
+- `instalar_esfera.bat` (nuevo), `diagnostico_esfera.bat` (nuevo), `activar_esfera.bat` (nuevo)
+
+### Contexto
+
+La esfera creada en la entrada de las 00:39 (API clásica `androidx.wear.watchface`) se instalaba y registraba pero el Xiaomi Watch 5 del usuario (Wear OS 6, Android 16/API 36) no la listaba: el gestor de esferas devolvía `set-watchface failed ... Watch face package is not installed`, porque desde enero de 2026 Wear OS solo acepta esferas en Watch Face Format (WFF). Se migró la esfera a WFF (mismo diseño: dial analógico, logo neón a color arriba, 3 huecos configurables abajo) y se retiró la esfera legacy.
+
+### Cambio 1 - Crear módulo `:watchface` (esfera WFF)
+
+**Código anterior:** `No existía el módulo android/watchface.`
+
+**Código nuevo:** módulo `com.android.application` con `applicationId "com.mijornada.app.esfera"` (APK aparte: WFF exige paquetes solo-recursos), `minSdk 34`, sin dependencias y firmado con el mismo debug keystore. Manifest con `android:hasCode="false"`, `<property com.google.wear.watchface.format.version value="2"/>` y label "Mi Turno". `watch_face_info.xml` con la preview y `Editable=true`. Registrado en `android/settings.gradle` (`include ':app', ':wear', ':watchface'`).
+
+**Por qué se cambió:** es el único formato de esfera que el reloj del usuario acepta.
+
+### Cambio 2 - Diseño de la esfera en `res/raw/watchface.xml`
+
+**Código anterior:** `No existía res/raw/watchface.xml en android/watchface.`
+
+**Código nuevo:** documento WFF (450×450) con: `Metadata CLOCK_TYPE=ANALOG`; imagen `dial` (marcas + números generados); arco verde de batería junto al borde superior (−55°..55°, fuente directa `[BATTERY_PERCENT]`, con el porcentaje en texto verde) y arco azul de pasos junto al borde inferior izquierdo (`[STEP_PERCENT]` para el progreso y `[STEP_COUNT]` en texto azul) — estilo "mezcla" de la esfera Xiaomi que usaba el usuario; imagen estática `taxi_logo` de respaldo; hueco del logo (`slotId=1`, `SMALL_IMAGE`, 150×150 arriba) con `DefaultProviderPolicy primaryProvider="com.mijornada.app/com.mijornada.app.TurnoComplicationService"` — muestra el logo neón a color de la complicación de la app y al tocarlo se abre Mi Turno (tapAction de la complicación); 3 huecos redondos (`slotId` 2/3/4, 99×99 en franja inferior) con tipos `RANGED_VALUE SHORT_TEXT SMALL_IMAGE MONOCHROMATIC_IMAGE EMPTY`, plantillas de medidor con color de acento por hueco (ámbar izquierda, rojo centro, azul derecha; arco de progreso con la fórmula clamp de los ejemplos oficiales, valor en negrita 24 e icono tintado del acento) y por defecto batería/pulso/fecha; `AnalogClock` con agujas `hour`/`minute`/`second` (segundero ámbar oculto en ambiente, esfera al alpha 192 en ambiente) y punto central. Imágenes de agujas y dial generadas a 2× con PIL. (Nota de la misma sesión: la primera versión usaba aros grises neutros y sin arcos de batería/pasos; se sustituyó por esta tras verla el usuario en el reloj y pedir el estilo de medidores de color de su esfera Xiaomi. Segundo ajuste de la sesión: el hueco del logo pasó de 150×150 en (150,55) a 180×180 en (135,50), el logo estático de respaldo a 170×112 en (140,84), y `taxi_logo.png`/`preview.png` se regeneraron con `public/brand/brand-taxi-hero.png` (420×277) porque el logo se veía pixelado. Tercer ajuste, a petición del usuario para imitar el estilo nativo Xiaomi: los arcos lisos de batería/pasos se sustituyeron por arcos segmentados en rayitas con degradado generados por condición por rayita (batería verde `[BATTERY_PERCENT]`, pasos azul `[STEP_PERCENT]`, pulso naranja-rojo `round([HEART_RATE])/220` — las calorías no existen como fuente WFF), con el valor rotado siguiendo la curva (`PartText` con `angle` y `pivot`); la plantilla RANGED_VALUE de los huecos añadió punto blanco en la punta del progreso (`Transform target="angle"`), valor a 26 negrita e icono inferior tintado del acento. Cuarto ajuste, estado final: el usuario quería la disposición exacta de su esfera Xiaomi, así que la geometría pasó a: números grandes (0.185·r) en el borde con rayitas de minutos en el filo (dial regenerado), arcos de rayitas DENTRO de los números a radio 146–164 (batería de 10 a 2 con 30 rayitas, pasos de 7 a 8, pulso de 4 a 5, 12 rayitas cada uno), logo arriba-centro (hueco 160×160 en (145,76), respaldo estático 150×99 en (150,107)) y huecos en cruz: izquierda (70,197), derecha (280,197) y abajo-centro (175,272), de 100×100; en el wear, `logoSolo()` pasó a círculo negro sobre lienzo transparente para no tapar las rayitas de batería alrededor del hueco del logo.)
+
+**Por qué se cambió:** replica el diseño aprobado por el usuario en el formato que el reloj sí lista.
+
+### Cambio 3 - Retirar la esfera legacy del módulo wear
+
+**Código anterior:** `MiTurnoWatchFaceService.kt` (servicio + renderer de la entrada de las 00:39), su bloque `<service>` en el manifest del wear, las dependencias `androidx.wear.watchface:watchface:1.2.1` y `watchface-complications-rendering:1.2.1`, `res/xml/watch_face.xml`, `res/drawable/watch_face_preview.png` y el string `watchface_label`.
+
+**Código nuevo:** eliminados todos; el manifest, `build.gradle` y `strings.xml` del wear quedan como antes de la entrada de las 00:39.
+
+**Por qué se cambió:** en Wear OS 6 ese formato nunca aparecerá en el selector; mantenerlo era peso muerto y confusión.
+
+### Cambio 4 - Actualizar test de caracterización de la esfera
+
+**Código anterior:** el test `"expone esfera propia con logo neon y 3 huecos de complicaciones"` fijaba los invariantes de la esfera legacy (BIND_WALLPAPER, `WatchFaceType.ANALOG` en Kotlin, slots en `MiTurnoWatchFaceService.kt`).
+
+**Código nuevo:** test `"expone esfera propia en Watch Face Format con logo neon y 3 huecos"`: módulo en `settings.gradle`, `hasCode="false"`, property de versión WFF, `applicationId` propio, `CLOCK_TYPE ANALOG`, imágenes `dial`/`taxi_logo`, `primaryProvider` apuntando a la complicación de Mi Turno, exactamente 4 `ComplicationSlot`, recursos drawable presentes y ausencia confirmada del servicio legacy.
+
+**Por qué se cambió:** fija los invariantes del formato nuevo y garantiza que la esfera legacy no vuelva por error.
+
+### Cambio 5 - Scripts de instalación y diagnóstico
+
+**Código anterior:** `No existían instalar_esfera.bat, diagnostico_esfera.bat ni activar_esfera.bat en la raíz del proyecto.`
+
+**Código nuevo:** `instalar_esfera.bat` compila `:watchface:assembleDebug` e instala el APK pidiendo IP:PUERTO (el puerto de depuración inalámbrica cambia con frecuencia); `diagnostico_esfera.bat` muestra versión de Android del reloj, estado del paquete de la esfera y esfera activa; `activar_esfera.bat` (válido solo para la esfera legacy, conservado como referencia). (Misma sesión: el usuario movió los dos primeros a `Actualizaciones/Esfera/`; se reescribieron con ruta absoluta `ROOT=C:\Users\carlo\Desktop\APP Taxi` porque las rutas relativas a `%~dp0` dejaron de funcionar al moverlos, y el diagnóstico pasó a consultar `com.mijornada.app.esfera`.)
+
+**Por qué se cambió:** la esfera WFF es un APK distinto del wear y necesita su propio ciclo de compilar+instalar; los diagnósticos fueron los que destaparon el bloqueo de Wear OS 6.
+
+Verificación: `xmllint` sin errores en los XML del módulo, `npx tsc --noEmit` sin errores, suite de tests en verde (205 tests; los 63 del bridge pasan) y `vite build` compila. Los módulos Android no se pudieron compilar en el entorno del agente (sin SDK); compilar con `instalar_esfera.bat`.
+
+## 2026-06-12 00:39 - Añadir esfera propia con logo neón y 3 complicaciones
+
+**Archivos modificados:** `android/wear/src/main/java/com/mijornada/app/MiTurnoWatchFaceService.kt`, `android/wear/src/main/AndroidManifest.xml`, `android/wear/build.gradle`, `android/wear/src/main/res/xml/watch_face.xml`, `android/wear/src/main/res/values/strings.xml`, `android/wear/src/main/res/drawable/watch_face_preview.png`, `src/__tests__/android-wear-bridge.test.ts`
+
+### Contexto
+
+El hueco de complicación de la esfera Xiaomi del usuario solo admite tipo texto (icono monocromo pequeño), insuficiente para mostrar el logo neón como él quiere. Decisión del usuario: crear una esfera propia de Mi Turno. Diseño elegido: analógica con agujas, logo neón (`brand_taxi_logo.png`, a color) en la mitad superior con tap que abre la app, y 3 huecos redondos de complicaciones configurables en la mitad inferior. Se implementa con `androidx.wear.watchface` (compatible Wear OS 3+) dentro del mismo APK del módulo wear, por lo que `compilar_e_instalar_wear.bat` sigue valiendo sin cambios.
+
+### Cambio 1 - Crear MiTurnoWatchFaceService.kt
+
+**Código anterior:** `No existía MiTurnoWatchFaceService.kt en android/wear/src/main/java/com/mijornada/app/.`
+
+**Código nuevo:** servicio `MiTurnoWatchFaceService : WatchFaceService` con:
+
+- `createComplicationSlotsManager`: 3 slots redondos (`SLOT_IZQUIERDA=100` batería, `SLOT_CENTRO=101` pasos, `SLOT_DERECHA=102` fecha como valores por defecto, reconfigurables) con `CanvasComplicationDrawable`, bordes grises y fondo transparente; bounds relativos en la franja y 0.50–0.84.
+- `createWatchFace`: tipo `WatchFaceType.ANALOG` con `TapListener` que abre `WearMainActivity` al tocar la mitad superior (zona del logo) fuera de complicaciones.
+- `MiTurnoRenderer : Renderer.CanvasRenderer2` (1 fps): fondo negro, 60 marcas (las de hora más gruesas), números 1–12 en negrita a radio 0.82, logo neón a color al 40% del ancho centrado en y=0.295, agujas de hora/minuto blancas y segundero ámbar (oculto en modo ambiente; en ambiente las pinturas bajan de alpha).
+
+**Por qué se cambió:** es la única vía para que el logo neón se vea grande y a color con tap a la app: en los huecos de esferas de terceros el formato lo impone la esfera.
+
+### Cambio 2 - Registrar la esfera en AndroidManifest.xml (wear)
+
+**Código anterior:** `No existía el service MiTurnoWatchFaceService en android/wear/src/main/AndroidManifest.xml.`
+
+**Código nuevo:**
+
+```xml
+        <service
+            android:name="com.mijornada.app.MiTurnoWatchFaceService"
+            android:directBootAware="true"
+            android:exported="true"
+            android:label="@string/watchface_label"
+            android:permission="android.permission.BIND_WALLPAPER">
+            <intent-filter>
+                <action android:name="android.service.wallpaper.WallpaperService" />
+                <category android:name="com.google.android.wearable.watchface.category.WATCH_FACE" />
+            </intent-filter>
+            <meta-data android:name="android.service.wallpaper" android:resource="@xml/watch_face" />
+            <meta-data android:name="com.google.android.wearable.watchface.preview" android:resource="@drawable/watch_face_preview" />
+            <meta-data android:name="com.google.android.wearable.watchface.preview_circular" android:resource="@drawable/watch_face_preview" />
+        </service>
+```
+
+**Por qué se cambió:** registro estándar de una watch face en Wear OS (permiso `BIND_WALLPAPER`, categoría `WATCH_FACE` y vista previa para el selector).
+
+### Cambio 3 - Dependencias de watch face en build.gradle (wear)
+
+**Código anterior:**
+
+```groovy
+    implementation 'androidx.wear.watchface:watchface-complications-data-source-ktx:1.2.1'
+    implementation 'androidx.concurrent:concurrent-futures:1.1.0'
+```
+
+**Código nuevo:**
+
+```groovy
+    implementation 'androidx.wear.watchface:watchface-complications-data-source-ktx:1.2.1'
+    implementation 'androidx.concurrent:concurrent-futures:1.1.0'
+
+    // Esfera propia (logo neón + 3 huecos de complicaciones)
+    implementation 'androidx.wear.watchface:watchface:1.2.1'
+    implementation 'androidx.wear.watchface:watchface-complications-rendering:1.2.1'
+```
+
+**Por qué se cambió:** `watchface` aporta `WatchFaceService`/renderer y `watchface-complications-rendering` el dibujado de los huecos; 1.2.1 es la versión ya usada por la datasource y compatible con compileSdk 34.
+
+### Cambio 4 - Recursos nuevos: watch_face.xml, watchface_label y preview
+
+**Código anterior:** `No existían res/xml/watch_face.xml, el string watchface_label ni res/drawable/watch_face_preview.png en el módulo wear.`
+
+**Código nuevo:** `res/xml/watch_face.xml` con `<wallpaper/>` (requisito del meta-data `android.service.wallpaper`); en `strings.xml` se añadió `<string name="watchface_label">Mi Turno</string>`; `watch_face_preview.png` (450×450) generado con la misma geometría que pinta el renderer (dial, logo, 3 huecos, agujas).
+
+**Por qué se cambió:** recursos obligatorios para que el sistema liste la esfera con nombre e imagen en el selector.
+
+### Cambio 5 - Test de caracterización de la esfera propia
+
+**Código anterior:** `No existía el test "expone esfera propia con logo neon y 3 huecos de complicaciones" en src/__tests__/android-wear-bridge.test.ts.`
+
+**Código nuevo:** nuevo `it` tras el test de tile/complicación: comprueba el registro en el manifest (`BIND_WALLPAPER`, categoría `WATCH_FACE`, preview), las dependencias en gradle, y en `MiTurnoWatchFaceService.kt` los invariantes `WatchFaceType.ANALOG`, `R.drawable.brand_taxi_logo`, `WearMainActivity::class.java`, los tres slots y ausencia de `Firestore`; además exige que existan `watch_face.xml` y `watch_face_preview.png`.
+
+**Por qué se cambió:** fija los invariantes de la esfera nueva igual que ya se hace con la tile y la complicación.
+
+Verificación: `npx tsc --noEmit` sin errores, suite de tests en verde (55 archivos de test del bridge incluidos; los 63 del archivo pasan) y `vite build` compila. El módulo wear no se pudo compilar en el entorno del agente (sin SDK de Android); compilar con `compilar_e_instalar_wear.bat`.
+
+## 2026-06-11 13:04 - Eliminar texto de la complicación: solo logo de la app
+
+**Archivos modificados:** `android/wear/src/main/java/com/mijornada/app/TurnoComplicationService.kt`, `src/__tests__/android-wear-bridge.test.ts`
+
+### Contexto
+
+La esfera del Xiaomi Watch 5 elegía el tipo SHORT_TEXT y mostraba el icono con el texto "Libre"/"Pausa"/hora de inicio debajo. Decisión del usuario: la complicación debe mostrar únicamente el logo principal de la app (el taxi neón de `brand_taxi_logo.png`), sin texto de estado, sin hora y sin anillo de color indicador. Primero se eliminó por completo el tipo SHORT_TEXT, pero el hueco de la esfera Xiaomi del usuario no acepta SMALL_IMAGE y la app desaparecía del selector de complicaciones, así que el estado final conserva SHORT_TEXT como respaldo con texto en blanco: la esfera pinta solo el icono monocromo, sin texto. `AndroidManifest.xml` (wear) queda igual que al inicio de la sesión (`SMALL_IMAGE,SHORT_TEXT`).
+
+### Cambio 1 - Servir la complicación sin leer el estado del turno
+
+**Código anterior (preview y request con dos tipos):**
+
+```kotlin
+    override fun getPreviewData(type: ComplicationType): ComplicationData? = when (type) {
+        ComplicationType.SMALL_IMAGE -> smallImage(COLOR_ACTIVO)
+        ComplicationType.SHORT_TEXT -> shortText("13:34", "Turno")
+        else -> null
+    }
+
+    override suspend fun onComplicationRequest(request: ComplicationRequest): ComplicationData? {
+        val status = TurnoStatusStore.read(this)
+        return when (request.complicationType) {
+            ComplicationType.SMALL_IMAGE -> smallImage(colorEstado(status))
+            ComplicationType.SHORT_TEXT -> shortText(textoEstado(status), "Turno")
+            else -> null
+        }
+    }
+```
+
+**Código nuevo:**
+
+```kotlin
+    override fun getPreviewData(type: ComplicationType): ComplicationData? = when (type) {
+        ComplicationType.SMALL_IMAGE -> smallImage()
+        ComplicationType.SHORT_TEXT -> shortTextSoloIcono()
+        else -> null
+    }
+
+    override suspend fun onComplicationRequest(request: ComplicationRequest): ComplicationData? =
+        when (request.complicationType) {
+            ComplicationType.SMALL_IMAGE -> smallImage()
+            ComplicationType.SHORT_TEXT -> shortTextSoloIcono()
+            else -> null
+        }
+```
+
+**Por qué se cambió:** el usuario no quiere texto ni color de estado en la esfera; al desaparecer ambos, ya no se lee `TurnoStatusStore` en este servicio.
+
+### Cambio 2 - Sustituir shortText() con estado por shortTextSoloIcono() vacío
+
+**Código anterior:** la función `shortText(textoEstado: String, titulo: String)` construía `ShortTextComplicationData` con el texto de estado, `setTitle("Turno")` y `setMonochromaticImage`; se apoyaba en `textoEstado(status)` (devolvía "Abrir"/"Pausa"/hora/"Activo"/"Libre"), `colorEstado(status)` y las constantes `COLOR_ACTIVO`, `COLOR_PAUSA`, `COLOR_LIBRE` del companion object.
+
+**Código nuevo:** `textoEstado`, `colorEstado` y el companion object eliminados. Nuevo respaldo sin estado:
+
+```kotlin
+    private fun shortTextSoloIcono(): ComplicationData =
+        ShortTextComplicationData.Builder(
+            PlainComplicationText.Builder(" ").build(),
+            PlainComplicationText.Builder("Logo de Mi Turno").build(),
+        )
+            .setMonochromaticImage(
+                MonochromaticImage.Builder(
+                    Icon.createWithResource(this, R.drawable.complication_icon)
+                ).build()
+            )
+            .setTapAction(abrirApp())
+            .build()
+```
+
+**Por qué se cambió:** `textoEstado` era el origen del texto "Libre" en la esfera. El tipo SHORT_TEXT no puede eliminarse (el hueco de la esfera Xiaomi del usuario no acepta SMALL_IMAGE y la app desaparecía del selector), así que se sirve con texto en blanco (un espacio, el campo es obligatorio) y sin título: la esfera pinta solo el icono monocromo del logo.
+
+### Cambio 3 - logoConAnillo(colorAnillo) pasa a logoSolo() sin anillo
+
+> Nota de la misma sesión (madrugada del 12): tras ver el logo pixelado en la esfera propia, `logoSolo()` pasó de lienzo 128px/interior 0.72/fondo `#15151C` a lienzo 384px/interior 0.94/fondo negro puro (`Color.BLACK`), y `brand_taxi_logo.png` del wear se sustituyó por la versión a mayor resolución `public/brand/brand-taxi-hero.png` (420×277, mismo arte). El bloque siguiente documenta el estado en que quedó a las 13:04; el código vigente es el descrito en esta nota.
+
+**Código anterior (fondo circular + anillo de color):**
+
+```kotlin
+    private fun logoConAnillo(colorAnillo: Int): Bitmap {
+        ...
+        val fondo = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.parseColor("#15151C")
+            style = Paint.Style.FILL
+        }
+        canvas.drawCircle(centro, centro, centro, fondo)
+
+        val grosor = size * 0.075f
+        val anillo = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = colorAnillo
+            style = Paint.Style.STROKE
+            strokeWidth = grosor
+        }
+        canvas.drawCircle(centro, centro, centro - grosor / 2f, anillo)
+
+        val logo = BitmapFactory.decodeResource(resources, R.drawable.brand_taxi_logo)
+        if (logo != null) {
+            val interior = size * 0.62f
+        ...
+```
+
+**Código nuevo (cuadrado completo oscuro, logo más grande, sin anillo):**
+
+```kotlin
+    private fun logoSolo(): Bitmap {
+        ...
+        // Se rellena el cuadrado completo: las esferas recortan PHOTO en
+        // círculo, así no aparecen esquinas transparentes.
+        canvas.drawColor(Color.parseColor("#15151C"))
+
+        val logo = BitmapFactory.decodeResource(resources, R.drawable.brand_taxi_logo)
+        if (logo != null) {
+            val interior = size * 0.72f
+        ...
+```
+
+**Por qué se cambió:** el anillo era el indicador de estado y el usuario quiere solo el logo; sin anillo el logo puede crecer (0.62→0.72) y rellenar el cuadrado evita esquinas transparentes al recorte circular de PHOTO. `setAmbientImage` y `logoAmbiente()` se conservan sin cambios (requisito anti burn-in).
+
+### Cambio 4 - Actualizar test de caracterización de la complicación
+
+**Código anterior (en `src/__tests__/android-wear-bridge.test.ts`):**
+
+```ts
+    // Huecos SHORT_TEXT con icono (esferas tipo Xiaomi que pintan icono +
+    // texto): el fallback de texto lleva MonochromaticImage del logo.
+    expect(complicacion).toContain("setMonochromaticImage");
+```
+
+**Código nuevo:**
+
+```ts
+    // Decision del usuario (2026-06-11): la complicacion muestra solo el
+    // logo, sin texto de estado ni hora. SMALL_IMAGE con la foto del logo y
+    // respaldo SHORT_TEXT con texto en blanco + icono monocromo (huecos
+    // solo-texto como el de la esfera Xiaomi, que no acepta SMALL_IMAGE).
+    expect(manifest).toContain('android:value="SMALL_IMAGE,SHORT_TEXT"');
+    expect(complicacion).toContain("shortTextSoloIcono");
+    expect(complicacion).toContain('PlainComplicationText.Builder(" ")');
+    expect(complicacion).toContain("setMonochromaticImage");
+    expect(complicacion).not.toContain("textoEstado");
+    expect(complicacion).not.toContain("setTitle");
+```
+
+**Por qué se cambió:** el test fijaba el comportamiento anterior (fallback de texto con icono monocromo); el cambio de comportamiento es deliberado y el test pasa a fijar el nuevo invariante: sin tipo texto en la complicación. También se corrigió un carácter en el comentario de cabecera del archivo (`.kt/.java` → `.kt y .java`) al forzar una resincronización del archivo.
+
+Verificación: `npx tsc --noEmit` sin errores, suite de tests en verde (54 archivos / 254 tests) y `vite build` compila sin errores. El módulo `android/wear` no se pudo compilar en el entorno del agente (sin SDK de Android); compilar con `compilar_e_instalar_wear.bat`.
+
+## 2026-06-11 12:35 - Icono monocromo de la complicación: silueta del logo de la app
+
+**Archivos modificados:** `android/wear/src/main/res/drawable/complication_icon.xml`
+
+### Contexto
+
+Tras añadir `setMonochromaticImage` al fallback SHORT_TEXT, la esfera Xiaomi ya pintaba el icono, pero el vector existente (asa + placa redondeada, pensado como insignia de taxi) se leía como un maletín a tamaño de complicación. El logo real de la app (`brand_taxi_logo.png`) es un taxi clásico de neón con letrero "TAXI" en el techo, imposible de trasladar tal cual a un icono monocromo de 24dp; lo correcto según la guía oficial (icono blanco de un solo color) es una silueta simplificada y reconocible de ese logo.
+
+### Cambio - Redibujar complication_icon.xml como taxi clásico con letrero
+
+**Código anterior (los dos paths del vector):**
+
+```xml
+    <!-- Asa del letrero -->
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M9.5,3.5h5a1.2,1.2 0 0 1 1.2,1.2V7.5h-1.8V5.3h-3.8v2.2H8.3V4.7A1.2,1.2 0 0 1 9.5,3.5z" />
+    <!-- Placa de taxi -->
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M5.6,8h12.8a2,2 0 0 1 2,2.3l-0.8,5.4a2,2 0 0 1 -2,1.7H6.4a2,2 0 0 1 -2,-1.7l-0.8,-5.4A2,2 0 0 1 5.6,8z" />
+```
+
+**Código nuevo (cinco paths):** letrero del techo, cabina con ventanas recortadas (`fillType="evenOdd"`), carrocería y dos ruedas tipo dónut:
+
+```xml
+    <path android:fillColor="#FFFFFFFF"
+        android:pathData="M9.6,3.6 h4.8 a1,1 0 0 1 1,1 v1.2 a0.6,0.6 0 0 1 -0.6,0.6 h-5.6 a0.6,0.6 0 0 1 -0.6,-0.6 v-1.2 a1,1 0 0 1 1,-1 z" />
+    <path android:fillColor="#FFFFFFFF" android:fillType="evenOdd"
+        android:pathData="M8.8,7 h6.4 q1,0 1.4,0.9 l1.7,4.1 h-12.6 l1.7,-4.1 q0.4,-0.9 1.4,-0.9 z M9.1,8.3 h2.4 v2.4 h-3.4 z M12.7,8.3 h2.3 q0.5,0 0.7,0.45 l0.8,1.95 h-3.8 z" />
+    <path android:fillColor="#FFFFFFFF"
+        android:pathData="M2.8,12 h18.4 q1.6,0 1.6,1.6 v2 q0,1.3 -1.3,1.3 h-19 q-1.3,0 -1.3,-1.3 v-2 q0,-1.6 1.6,-1.6 z" />
+    <path android:fillColor="#FFFFFFFF" android:fillType="evenOdd"
+        android:pathData="M7,15.4 a2.5,2.5 0 1 1 -0.01,0 z M7,16.9 a1,1 0 1 0 0.01,0 z" />
+    <path android:fillColor="#FFFFFFFF" android:fillType="evenOdd"
+        android:pathData="M17,15.4 a2.5,2.5 0 1 1 -0.01,0 z M17,16.9 a1,1 0 1 0 0.01,0 z" />
+```
+
+**Por qué se cambió**
+
+El icono monocromo es ahora la representación visible de la app en la esfera (el hueco Xiaomi solo pide SHORT_TEXT) y debe reconocerse como el logo: taxi clásico de perfil con letrero en el techo. La forma se validó rasterizando el SVG equivalente a tamaño real antes de tocar el recurso. Decisión del usuario: el texto del estado no cambia (con turno activo sigue mostrando la hora de inicio); lo importante es que el icono de la app esté siempre presente. Sin cambios de código Kotlin: el recurso lo referencian el manifest (selector) y `setMonochromaticImage`.
+
+### Tests
+
+Sin aserciones nuevas: las existentes ya cubren `complication_icon` en el manifest y `setMonochromaticImage` en el servicio. XML validado (5 paths). Pendiente en máquina del usuario: build Gradle del módulo wear e instalación del APK.
+
+## 2026-06-11 12:20 - Complicación: icono monocromo en el fallback SHORT_TEXT
+
+**Archivos modificados:** `android/wear/src/main/java/com/mijornada/app/TurnoComplicationService.kt`, `src/__tests__/android-wear-bridge.test.ts`
+
+### Contexto
+
+En la esfera Xiaomi del usuario, la complicación de Mi Turno seguía mostrándose como texto plano («Libre / Turno») aunque la fuente prefiere SMALL_IMAGE (logo + anillo de color por estado). Causa verificada: el tipo lo decide el hueco de la esfera, no la fuente de datos — ese hueco solicita SHORT_TEXT, así que `onComplicationRequest` devuelve el fallback de texto. No es corregible desde la app. Sin embargo, el mismo hueco renderiza la complicación de WhatsApp como icono + texto: eso es un SHORT_TEXT con `MonochromaticImage`, que nuestro fallback no incluía.
+
+### Cambio - setMonochromaticImage en el fallback SHORT_TEXT
+
+**Código anterior:**
+
+```kotlin
+    private fun shortText(textoEstado: String, titulo: String): ComplicationData {
+        return ShortTextComplicationData.Builder(
+            PlainComplicationText.Builder(textoEstado).build(),
+            PlainComplicationText.Builder("Estado del turno de Mi Turno").build(),
+        )
+            .setTitle(PlainComplicationText.Builder(titulo).build())
+            .setTapAction(abrirApp())
+            .build()
+    }
+```
+
+**Código nuevo:**
+
+```kotlin
+    private fun shortText(textoEstado: String, titulo: String): ComplicationData {
+        return ShortTextComplicationData.Builder(
+            PlainComplicationText.Builder(textoEstado).build(),
+            PlainComplicationText.Builder("Estado del turno de Mi Turno").build(),
+        )
+            .setTitle(PlainComplicationText.Builder(titulo).build())
+            // Icono monocromo para esferas que pintan icono + texto en los
+            // huecos SHORT_TEXT (como hace WhatsApp): la esfera lo tinta a su
+            // estilo. Sin el, esas esferas muestran solo el texto.
+            .setMonochromaticImage(
+                MonochromaticImage.Builder(
+                    Icon.createWithResource(this, R.drawable.complication_icon)
+                ).build()
+            )
+            .setTapAction(abrirApp())
+            .build()
+    }
+```
+
+(y el import `androidx.wear.watchface.complications.data.MonochromaticImage`)
+
+**Por qué se cambió**
+
+API oficial de `ShortTextComplicationData.Builder`: `setMonochromaticImage` permite que la esfera muestre un icono de un solo color (tintado por la esfera) junto al texto en los huecos SHORT_TEXT. Reutiliza `complication_icon` (vector blanco ya creado para el selector, como exige la doc oficial). Limitación documentada y comunicada al usuario: el anillo de color por estado solo aparece en huecos que soliciten SMALL_IMAGE; esa esfera Xiaomi no lo solicita.
+
+### Tests
+
+Aserción nueva en `android-wear-bridge.test.ts`: la complicación debe contener `setMonochromaticImage`. Suite del bridge 62/62 en verde. Pendiente en máquina del usuario: `npx tsc --noEmit`, `npm test`, `npm run build` y Gradle del módulo wear.
+
+## 2026-06-11 12:10 - Editor de turno del reloj: atrás cierra la subpantalla y cuadrícula sin botón redundante
+
+**Archivos modificados:** `android/wear/src/main/java/com/mijornada/app/screens/EditTurnoDatosScreen.kt`, `src/__tests__/android-wear-bridge.test.ts`
+
+### Contexto
+
+Probando la pantalla de edición de turno en el Xiaomi Watch 5, el usuario señaló dos problemas: (1) el botón ancho "＋ Añadir entrada" era redundante porque la cuadrícula de categorías de debajo ya abre el editor de entrada directamente; (2) si tocaba una categoría por error, no podía volver atrás: el gesto atrás lo gestiona el `BackHandler` global de `WearMainActivity` y, como la subpantalla de entrada es estado interno de `EditTurnoDatosScreen` (`currentScreen` sigue siendo `EDIT_TURNO_DATOS`), `handleBack()` lo expulsaba de toda la edición perdiendo el borrador. La «‹» de `AddEntryScreen` sí cancela, pero el gesto natural de Wear OS (swipe atrás) destruía la edición entera.
+
+### Cambio 1 - BackHandler interno: el gesto atrás cierra solo la subpantalla
+
+**Código anterior:**
+
+```kotlin
+    val dinero = parseAmount(dineroText)
+    val km = parseAmount(kmText)
+    val valido = dinero > 0.0 && km > 0.0
+```
+
+**Código nuevo:**
+
+```kotlin
+    val dinero = parseAmount(dineroText)
+    val km = parseAmount(kmText)
+    val valido = dinero > 0.0 && km > 0.0
+
+    // Gesto atras dentro de la edicion: cierra solo la subpantalla abierta
+    // (editor de entrada) en vez de expulsar de toda la edicion. Compose
+    // invoca el BackHandler habilitado mas interno (orden LIFO oficial del
+    // OnBackPressedDispatcher), asi que este tiene prioridad sobre el global
+    // de la Activity mientras haya una subpantalla abierta.
+    BackHandler(enabled = editandoEntrada != null || nuevaCategoria != null) {
+        editandoEntrada = null
+        nuevaCategoria = null
+    }
+```
+
+(y el import `androidx.activity.compose.BackHandler` al principio del archivo)
+
+**Por qué se cambió**
+
+Solución estructural, no parche: el `OnBackPressedDispatcher` de androidx invoca los callbacks en orden LIFO, así que el `BackHandler` compuesto más interno y habilitado tiene prioridad sobre el global de la Activity (comportamiento documentado de `androidx.activity.compose.BackHandler`). Con subpantalla abierta, el gesto atrás la cierra y conserva el borrador de la edición; sin subpantalla, el handler queda deshabilitado y el atrás vuelve a fluir al global (edición → resumen), sin listas de excepciones en la Activity.
+
+### Cambio 2 - Quitar el botón "＋ Añadir entrada" redundante
+
+**Código anterior:**
+
+```kotlin
+        Spacer(modifier = Modifier.height(6.dp))
+        BotonAncho("＋ Añadir entrada", ColorWhite, ColorNuloBg) { nuevaCategoria = "datafono" }
+
+        // Selector rapido de categoria para la entrada nueva.
+        Spacer(modifier = Modifier.height(5.dp))
+```
+
+**Código nuevo:**
+
+```kotlin
+        // Anadir entrada: directamente la cuadricula de categorias (el boton
+        // ancho era redundante; tocar una categoria ya abre el editor).
+        Spacer(modifier = Modifier.height(10.dp))
+        SeccionTitulo("AÑADIR ENTRADA")
+```
+
+**Por qué se cambió**
+
+El botón abría el editor con la categoría "datafono" fijada, duplicando lo que ya hace la cuadrícula de 6 categorías que tiene justo debajo (y además inducía a crear entradas de datáfono sin querer). Se elimina y la cuadrícula pasa a tener su propio título de sección "AÑADIR ENTRADA" para que se entienda su función.
+
+### Tests
+
+En `android-wear-bridge.test.ts` (test del comando EDIT_TURNO) se añadieron dos aserciones: la pantalla debe contener `BackHandler(enabled = editandoEntrada != null || nuevaCategoria != null)` y no debe contener `＋ Añadir entrada`. Suite completa del bridge: 62/62 en verde. Pendiente en máquina del usuario: `npx tsc --noEmit`, `npm test`, `npm run build` y compilación Gradle del módulo wear.
+
 ## 2026-06-10 03:25 - Arreglar la X roja del commit dc8f250
 
 **Archivos modificados:** `src/services/watch-bridge.ts`, `src/__tests__/android-wear-bridge.test.ts`
@@ -120,6 +1986,104 @@ stateJson = readFileSync(
 **Por qué se cambió**
 
 Tras la línea 928 había un cierre `});` (del primer `it` de fondos) y otro `});` (del `describe`), pero después colgaba un duplicado parcial del `it` contable (sin la cabecera `it(...)`, con las variables sin declarar) y un `it` extra con el mismo nombre. TS marcaba las líneas 952 y 963 como "Declaration or statement expected" porque `stateJson = ...` no era una sentencia válida a nivel de módulo dentro del `describe` ya cerrado. Eliminado el duplicado parcial, el test queda con dos `it` (contabilidad + fondos) dentro del `describe`, sin código suelto.
+
+## 2026-06-11 15:10 - Invariante de navegación por pantallas de reposo y cumplimiento oficial de complicaciones
+
+**Archivos modificados:** `android/wear/src/main/java/com/mijornada/app/WearMainActivity.kt`, `android/wear/src/main/java/com/mijornada/app/TurnoStatusStore.kt`, `android/wear/src/main/java/com/mijornada/app/TurnoComplicationService.kt`, `android/wear/src/main/AndroidManifest.xml`, `android/wear/src/main/res/drawable/complication_icon.xml` (nuevo), `src/__tests__/android-wear-bridge.test.ts`
+
+### Contexto
+
+El usuario rechazó como "parche" la lista de excepciones que evitaba la expulsión del editor, y pidió aplicar las tres desviaciones detectadas al verificar contra la documentación oficial de complicaciones.
+
+### Cambio 1 - Invariante de navegación (sustituye las listas de excepciones)
+
+**Código anterior:** condicionales dispersos en STATUS/TURNOS_STATUS con listas de pantallas excluidas (`!= TURNOS && != TURNO_SUMMARY && != EDIT_TURNO_DATOS`).
+
+**Código nuevo:** dos conjuntos con nombre e invariante documentada — `pantallasDeReposo` (NO_CONNECTED, NO_ACTIVE_TURNO, ACTIVE_TURNO) y `pantallasFlujoTurnos` (TURNOS, TURNO_SUMMARY, EDIT_TURNO_DATOS). STATUS de fondo:
+
+```kotlin
+                if (currentScreen.value in pantallasDeReposo) {
+                    currentScreen.value = when {
+                        !isConnected.value -> ScreenState.NO_CONNECTED
+                        activeTurno.value -> ScreenState.ACTIVE_TURNO
+                        else -> ScreenState.NO_ACTIVE_TURNO
+                    }
+                }
+```
+
+TURNOS_STATUS navega a la lista solo si `currentScreen !in pantallasFlujoTurnos`; con desconexión solo redirige desde reposo. Cualquier pantalla futura queda protegida por defecto (lista blanca, no negra).
+
+**Por qué se cambió:** regla estructural en lugar de excepciones ad hoc: una sincronización de fondo nunca roba una pantalla que pertenece a una acción del usuario.
+
+### Cambio 2 - Cumplimiento oficial de complicaciones (3 puntos)
+
+1. **Throttle de push** (`TurnoStatusStore`): mínimo 60 s entre `requestUpdateAll()` (la doc oficial exige "no más a menudo que cada 5 minutos de media"; el uso real queda muy por encima). La tile no tiene esa restricción documentada y sigue refrescando al instante.
+2. **Imagen ambiente anti burn-in** (`TurnoComplicationService`): `setAmbientImage(...)` con bitmap de trazos finos blancos (anillo + T), porque la doc avisa de que sin ella la esfera puede no mostrar imagen con burn-in protection o low-bit ambient.
+3. **Icono blanco del selector**: `complication_icon.xml` vectorial monocromo (placa de taxi) y `android:icon` del servicio apuntando a él, según la guía ("a single-color white icon... shown in the complication picker").
+
+### Cambio 3 - Test de contrato
+
+Aserciones nuevas: icono del selector en el manifest, `setAmbientImage`, `MIN_COMPLICATION_UPDATE_MS`, y la invariante (`pantallasDeReposo`, `pantallasFlujoTurnos`, `if (currentScreen.value in pantallasDeReposo)`).
+
+### Verificación
+
+`npx tsc --noEmit` limpio; `android-wear-bridge.test.ts` 62/62. Pendiente: reinstalar APK wear y comprobar editor estable y complicación en modo ambiente.
+
+## 2026-06-11 14:05 - Evitar que STATUS/TURNOS_STATUS expulsen de la pantalla de edición
+
+**Archivos modificados:** `android/wear/src/main/java/com/mijornada/app/WearMainActivity.kt`
+
+### Contexto
+
+Probado en el reloj: al entrar en la edición de un turno (lápiz), a los ~2 segundos la app volvía sola al inicio. Causa: el resync automático (`scheduleResync` 2,5 s tras el GET_TURNOS del resumen) trae un `STATUS` sin turno activo, y el manejador forzaba `NO_ACTIVE_TURNO` para cualquier pantalla que no fuera TURNOS o TURNO_SUMMARY — la pantalla de edición no estaba exenta. El manejador de `TURNOS_STATUS` tenía el mismo agujero (navega a TURNOS salvo en TURNO_SUMMARY).
+
+### Cambio 1 - STATUS respeta la edición
+
+**Código anterior:**
+
+```kotlin
+                } else {
+                    if (currentScreen.value != ScreenState.TURNOS && currentScreen.value != ScreenState.TURNO_SUMMARY) {
+                        currentScreen.value = ScreenState.NO_ACTIVE_TURNO
+                    }
+                }
+```
+
+**Código nuevo:** añade `currentScreen.value != ScreenState.EDIT_TURNO_DATOS` a la condición (con comentario).
+
+### Cambio 2 - TURNOS_STATUS respeta la edición
+
+**Código anterior:** `if (currentScreen.value != ScreenState.TURNO_SUMMARY) { currentScreen.value = ScreenState.TURNOS }`
+
+**Código nuevo:** añade `&& currentScreen.value != ScreenState.EDIT_TURNO_DATOS`.
+
+### Verificación
+
+`android-wear-bridge.test.ts` 62/62. Pendiente: reinstalar APK wear y permanecer >5 s en la edición comprobando que no expulsa.
+
+## 2026-06-11 13:40 - Corregir acciones de la tile perdidas y blindar conexión del instalador
+
+**Archivos modificados:** `android/wear/src/main/AndroidManifest.xml`, `Actualizaciones/actualizar_reloj.bat`
+
+### Contexto
+
+Probado en el reloj: los dos botones de la tile abrían la app sin ejecutar su acción. Causa: `WearMainActivity` en launchMode estándar — si la app ya está viva, Android trae la tarea al frente pero descarta el intent (no llama a `onNewIntent`), perdiendo el extra `EXTRA_ACCION_TILE`. Además el .bat seguía adelante con un `adb connect` fallido (adb devuelve exit code 0 aunque no conecte) y moría después en la instalación con "device not found".
+
+### Cambio 1 - launchMode singleTop
+
+**Código anterior:** `<activity android:name="com.mijornada.app.WearMainActivity" android:exported="true" ...>` sin launchMode.
+
+**Código nuevo:** añadido `android:launchMode="singleTop"`. Con la app viva, el intent de la tile llega por `onNewIntent` (ya implementado) y la acción se ejecuta.
+
+### Cambio 2 - actualizar_reloj.bat verifica la conexión real
+
+**Código anterior:** `"%ADB%" connect !WATCH!` seguido de `if errorlevel 1` (nunca se cumple: adb connect devuelve 0 aunque falle).
+
+**Código nuevo:** `"%ADB%" connect !WATCH! | findstr /i "connected" >nul` — solo continúa si la salida confirma la conexión; si no, aborta avisando de que el puerto de Depuración inalámbrica rota.
+
+### Verificación
+
+`android-wear-bridge.test.ts` 62/62. Pendiente: reinstalar APK wear y probar los botones de la tile con la app abierta en segundo plano (el caso que fallaba). La complicación de imagen requiere volver a seleccionar "Mi Turno" en el hueco de la esfera; si el hueco solo admite texto, mostrará el modo texto (limitación de la esfera).
 
 ## 2026-06-11 04:15 - Ampliar EDIT_TURNO a edición completa (paridad con edit-turno-screen del móvil)
 
