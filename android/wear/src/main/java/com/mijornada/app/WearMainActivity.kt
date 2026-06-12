@@ -541,6 +541,7 @@ class WearMainActivity : ComponentActivity() {
                     TurnoSummaryScreen(
                         turno = turno,
                         onBack = { currentScreen.value = ScreenState.TURNOS },
+                        onHome = { currentScreen.value = if (activeTurno.value) ScreenState.ACTIVE_TURNO else ScreenState.NO_ACTIVE_TURNO },
                         onEdit = { currentScreen.value = ScreenState.EDIT_TURNO_DATOS }
                     )
                 }

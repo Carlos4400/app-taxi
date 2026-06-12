@@ -43,18 +43,35 @@ data class WatchTurno(
 data class CategoriaMeta(
     val label: String,
     val color: Color,
-    val bg: Color
+    val bg: Color,
+    val border: Color
 )
 
 fun categoriaMeta(type: String): CategoriaMeta = when (type) {
-    "propina" -> CategoriaMeta("Propinas", ColorPropina, ColorPropinaBg)
-    "datafono" -> CategoriaMeta("Datáfono", ColorDatafono, ColorDatafonoBg)
-    "agencia_bono" -> CategoriaMeta("Agencias", ColorAgencia, ColorAgenciaBg)
-    "extra" -> CategoriaMeta("Extras", ColorExtra, ColorExtraBg)
-    "gasolina" -> CategoriaMeta("Gasolina", ColorGasolina, ColorGasolinaBg)
-    "nulo" -> CategoriaMeta("Nulos", ColorNulo, ColorNuloBg)
-    "nota" -> CategoriaMeta("Nota", ColorWhite, ColorNuloBg)
-    else -> CategoriaMeta(type, ColorWhite, ColorNuloBg)
+    "propina" -> CategoriaMeta("Propinas", ColorPropina, ColorPropinaBg, ColorPropina.copy(alpha = 0.20f))
+    "datafono" -> CategoriaMeta("Datáfono", ColorDatafono, ColorDatafonoBg, ColorDatafono.copy(alpha = 0.20f))
+    "agencia_bono" -> CategoriaMeta("Agencias/Bonos", ColorAgencia, ColorAgenciaBg, ColorAgencia.copy(alpha = 0.20f))
+    "extra" -> CategoriaMeta("Extras", ColorExtra, ColorExtraBg, ColorExtra.copy(alpha = 0.20f))
+    "gasolina" -> CategoriaMeta("Gasolina", ColorGasolina, ColorGasolinaBg, ColorGasolina.copy(alpha = 0.20f))
+    "nulo" -> CategoriaMeta("Nulos", ColorNulo, ColorNuloBg, ColorNulo.copy(alpha = 0.20f))
+    "nota" -> CategoriaMeta("Nota", ColorWhite, ColorNuloBg, ColorWhite.copy(alpha = 0.20f))
+    else -> CategoriaMeta(type, ColorWhite, ColorNuloBg, ColorWhite.copy(alpha = 0.20f))
+}
+
+data class CardVisualStyle(
+    val color: Color,
+    val bg: Color,
+    val border: Color
+)
+
+fun metricCardStyle(type: String): CardVisualStyle = when (type) {
+    "taximetro" -> CardVisualStyle(ColorTaximetro, ColorTaximetroBg, ColorTaximetroBorder)
+    "ganancia" -> CardVisualStyle(ColorGanancia, ColorGananciaBg, ColorGananciaBorder)
+    "km" -> CardVisualStyle(ColorKm, ColorKmBg, ColorKmBorder)
+    "tiempo" -> CardVisualStyle(ColorTiempo, ColorTiempoBg, ColorTiempoBorder)
+    "descontar" -> CardVisualStyle(ColorGasolina, ColorGasolinaBg, ColorGasolina.copy(alpha = 0.35f))
+    "dar" -> CardVisualStyle(ColorPropina, ColorPropinaBg, ColorPropina.copy(alpha = 0.35f))
+    else -> CardVisualStyle(ColorWhite, ColorNuloBg, ColorWhite.copy(alpha = 0.20f))
 }
 
 /** Etiqueta en singular para la cabecera del teclado al añadir/editar. */

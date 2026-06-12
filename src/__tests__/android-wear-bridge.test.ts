@@ -795,6 +795,31 @@ describe("Android Wear bridge", () => {
     expect(resumen).toContain("Total a dar");
   });
 
+  it("iguala la composicion del resumen Wear con la app movil", () => {
+    const resumen = readFileSync(
+      resolve(root, "android/wear/src/main/java/com/mijornada/app/screens/TurnoSummaryScreen.kt"),
+      "utf8",
+    );
+    const main = readFileSync(
+      resolve(root, "android/wear/src/main/java/com/mijornada/app/WearMainActivity.kt"),
+      "utf8",
+    );
+
+    expect(resumen).toContain("onHome: () -> Unit");
+    expect(resumen).toContain("CategorySummary(turno, notasTurno)");
+    expect(resumen).toContain("private fun CategorySummary(turno: WatchTurno, notasTurno: List<WatchEntry>)");
+    expect(resumen).toContain("CategoryNotes(notasTurno)");
+    expect(resumen).toContain("private fun CategoryNotes(entries: List<WatchEntry>)");
+    expect(resumen).toContain("private fun BottomSummary(");
+    expect(resumen).toContain('Text("Volver al inicio"');
+    expect(resumen).toContain("private val CardTitleFontSize = 9.sp");
+    expect(resumen.match(/fontSize = CardTitleFontSize/g)).toHaveLength(1);
+    expect(resumen).not.toContain("Modifier.offset(y = (-2).dp)");
+    expect(main).toContain(
+      "onHome = { currentScreen.value = if (activeTurno.value) ScreenState.ACTIVE_TURNO else ScreenState.NO_ACTIVE_TURNO }",
+    );
+  });
+
   it("pide confirmacion antes de borrar una entrada desde el reloj", () => {
     const source = readFileSync(
       resolve(root, "android/wear/src/main/java/com/mijornada/app/WearMainActivity.kt"),
@@ -1082,8 +1107,9 @@ describe("Android Wear bridge", () => {
     expect(resumen).toContain('"descontar"');
     expect(resumen).toContain('"dar"');
     expect(turnos).toContain('MiniMetric("taximetro"');
-    // Sin notas: una sola linea en cursiva, sin bloque con cabecera.
-    expect(resumen).toContain("notasTurno.isEmpty() && notasDetalladas.isEmpty()");
+    // Sin notas: una sola linea en cursiva dentro del panel de categorias.
+    expect(resumen).toContain("CategoryNotes(notasTurno)");
+    expect(resumen).toContain("if (entries.isEmpty())");
     expect(resumen).toContain("FontStyle.Italic");
     expect(cierre).toContain("FontStyle.Italic");
   });
@@ -1305,7 +1331,102 @@ describe("Android Wear bridge", () => {
       "utf8",
     );
 
-    expect(source).toContain("ColorDatafonoBg = Color(0xFF151032)");
+    expect(source).toContain("ColorDatafonoBg = Color(0xFF0B082C)");
     expect(source).toContain("Color(");
+  });
+
+  it("iguala colores bordes iconos y textos de las tarjetas Wear con el movil", () => {
+    const colores = readFileSync(
+      resolve(root, "android/wear/src/main/java/com/mijornada/app/theme/Color.kt"),
+      "utf8",
+    );
+    const modelos = readFileSync(
+      resolve(root, "android/wear/src/main/java/com/mijornada/app/screens/WatchModels.kt"),
+      "utf8",
+    );
+    const turnos = readFileSync(
+      resolve(root, "android/wear/src/main/java/com/mijornada/app/screens/TurnosScreen.kt"),
+      "utf8",
+    );
+    const resumen = readFileSync(
+      resolve(root, "android/wear/src/main/java/com/mijornada/app/screens/TurnoSummaryScreen.kt"),
+      "utf8",
+    );
+    const activo = readFileSync(
+      resolve(root, "android/wear/src/main/java/com/mijornada/app/screens/ActiveTurnoScreen.kt"),
+      "utf8",
+    );
+    const cierre = readFileSync(
+      resolve(root, "android/wear/src/main/java/com/mijornada/app/screens/EndTurnoScreen.kt"),
+      "utf8",
+    );
+
+    // Equivalentes sRGB de los colores OKLCH usados literalmente por el móvil.
+    for (const color of [
+      "ColorPropina = Color(0xFF26B63D)",
+      "ColorDatafono = Color(0xFF7C79FF)",
+      "ColorAgencia = Color(0xFFED990E)",
+      "ColorExtra = Color(0xFF00BEC7)",
+      "ColorGasolina = Color(0xFFFA6863)",
+      "ColorNulo = Color(0xFF7187AB)",
+      "ColorTaximetro = Color(0xFFFFC200)",
+      "ColorGanancia = Color(0xFF4CD676)",
+      "ColorKm = Color(0xFF25D2FC)",
+      "ColorTiempo = Color(0xFF5BE3F9)",
+    ]) {
+      expect(colores).toContain(color);
+    }
+    expect(modelos).toContain("data class CardVisualStyle(");
+    expect(modelos).toContain("fun metricCardStyle(type: String): CardVisualStyle");
+    expect(modelos).toContain('CategoriaMeta("Agencias/Bonos"');
+    expect(turnos).toContain('"Tiempo trabajado"');
+    expect(turnos).toContain('metricCardStyle("km")');
+    expect(turnos).toContain('metricCardStyle("tiempo")');
+    expect(resumen).toContain(".border(1.dp, meta.border, RoundedCornerShape(12.dp))");
+    expect(activo).toContain(".border(1.dp, meta.border, RoundedCornerShape(14.dp))");
+    expect(cierre).toContain(".border(1.dp, meta.border, RoundedCornerShape(12.dp))");
+    expect(turnos).not.toContain("ColorExtra, ColorExtraBg");
+    expect(turnos).not.toContain("ColorNulo, ColorNuloBg");
+    expect(resumen).not.toContain("ColorExtra, ColorExtraBg");
+    expect(resumen).not.toContain("ColorNulo, ColorNuloBg");
+  });
+
+  it("mantiene Agencias Bonos en una linea y centra importes del turno activo", () => {
+    const activo = readFileSync(
+      resolve(root, "android/wear/src/main/java/com/mijornada/app/screens/ActiveTurnoScreen.kt"),
+      "utf8",
+    );
+
+    expect(activo).toContain("val categoryTitleFontSize = if (type == \"agencia_bono\") 7.sp else if (grande) 11.sp else 10.sp");
+    expect(activo).toContain("maxLines = 1");
+    expect(activo).toContain("softWrap = false");
+    expect(activo).toContain("modifier = Modifier.fillMaxWidth()");
+    expect(activo).toContain("textAlign = TextAlign.Center");
+  });
+
+  it("mantiene Agencias Bonos en una linea y centra importes del resumen Wear", () => {
+    const resumen = readFileSync(
+      resolve(root, "android/wear/src/main/java/com/mijornada/app/screens/TurnoSummaryScreen.kt"),
+      "utf8",
+    );
+
+    expect(resumen).toContain("val categoryTitleFontSize = if (type == \"agencia_bono\") 7.sp else CardTitleFontSize");
+    expect(resumen).toContain("fontSize = categoryTitleFontSize");
+    expect(resumen).toContain("maxLines = 1");
+    expect(resumen).toContain("softWrap = false");
+    expect(resumen).toContain("modifier = Modifier.fillMaxWidth()");
+    expect(resumen).toContain("textAlign = androidx.compose.ui.text.style.TextAlign.Center");
+  });
+
+  it("reduce solo los titulos de total a descontar y total a dar a 8 sp", () => {
+    const resumen = readFileSync(
+      resolve(root, "android/wear/src/main/java/com/mijornada/app/screens/TurnoSummaryScreen.kt"),
+      "utf8",
+    );
+
+    expect(resumen).toContain("private val BottomSummaryTitleFontSize = 8.sp");
+    expect(resumen).toContain("fontSize = BottomSummaryTitleFontSize");
+    expect(resumen.match(/fontSize = BottomSummaryTitleFontSize/g)).toHaveLength(1);
+    expect(resumen).toContain("fontSize = 12.sp");
   });
 });

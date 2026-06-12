@@ -68,16 +68,14 @@ fun EndTurnoScreen(
                 CampoCierre(
                     label = "Total Taxímetro",
                     value = if (dineroText.isBlank()) "€" else "${dineroText}€",
-                    color = ColorAgencia,
-                    bg = ColorAgenciaBg,
+                    style = metricCardStyle("taximetro"),
                     active = activeField == "dinero",
                     modifier = Modifier.weight(1f)
                 ) { activeField = "dinero" }
                 CampoCierre(
                     label = "Total KM",
                     value = if (kmText.isBlank()) "KM" else "$kmText km",
-                    color = ColorExtra,
-                    bg = ColorExtraBg,
+                    style = metricCardStyle("km"),
                     active = activeField == "km",
                     modifier = Modifier.weight(1f)
                 ) { activeField = "km" }
@@ -141,8 +139,7 @@ fun EndTurnoScreen(
 private fun CampoCierre(
     label: String,
     value: String,
-    color: Color,
-    bg: Color,
+    style: CardVisualStyle,
     active: Boolean,
     modifier: Modifier = Modifier,
     onClick: () -> Unit
@@ -152,8 +149,8 @@ private fun CampoCierre(
         modifier = modifier
             .height(76.dp)
             .clip(shape)
-            .background(bg)
-            .border(1.dp, if (active) color else color.copy(alpha = 0.35f), shape)
+            .background(style.bg)
+            .border(1.dp, if (active) style.color else style.border, shape)
             .clickable { onClick() }
             .padding(horizontal = 7.dp, vertical = 9.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -161,7 +158,7 @@ private fun CampoCierre(
     ) {
         Text(label, color = ColorGrey, fontSize = 8.sp, fontWeight = FontWeight.Bold)
         Spacer(modifier = Modifier.height(5.dp))
-        Text(value, color = color, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+        Text(value, color = style.color, fontSize = 18.sp, fontWeight = FontWeight.Bold)
     }
 }
 
@@ -238,7 +235,7 @@ private fun ResumenCategoriaCard(
         modifier = modifier
             .clip(RoundedCornerShape(12.dp))
             .background(meta.bg)
-            .border(1.dp, meta.color.copy(alpha = 0.22f), RoundedCornerShape(12.dp))
+            .border(1.dp, meta.border, RoundedCornerShape(12.dp))
             .padding(horizontal = 7.dp, vertical = 8.dp)
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -311,7 +308,7 @@ private fun TecladoCierreOverlay(
     onKey: (String) -> Unit,
     onDone: () -> Unit
 ) {
-    val color = if (field == "dinero") ColorAgencia else ColorExtra
+    val color = metricCardStyle(if (field == "dinero") "taximetro" else "km").color
     // Pantalla completa diseñada para el círculo: sin tarjeta flotante ni
     // bordes que el marco redondo pueda cortar. Las medidas verticales son
     // fracciones del diámetro y cada fila del teclado se estrecha según la

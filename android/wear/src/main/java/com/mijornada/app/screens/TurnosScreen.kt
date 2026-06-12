@@ -78,19 +78,19 @@ private fun TurnoCard(turno: WatchTurno, onClick: () -> Unit) {
         Spacer(modifier = Modifier.height(8.dp))
 
         Row(horizontalArrangement = Arrangement.spacedBy(7.dp), modifier = Modifier.fillMaxWidth()) {
-            MiniMetric("taximetro", "Total Taxímetro", fmtEur(turno.totalTaximetro), ColorAgencia, ColorAgenciaBg, Modifier.weight(1f))
+            MiniMetric("taximetro", "Total Taxímetro", fmtEur(turno.totalTaximetro), metricCardStyle("taximetro"), Modifier.weight(1f))
             // Contabilidad pendiente de la app: nunca mostrar un numero incorrecto.
             MiniMetric(
                 "ganancia",
                 "Mi Ganancia",
                 if (turno.contablePendiente) "Pendiente" else fmtEur(turno.miGanancia),
-                ColorPropina, ColorPropinaBg, Modifier.weight(1f)
+                metricCardStyle("ganancia"), Modifier.weight(1f)
             )
         }
         Spacer(modifier = Modifier.height(7.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(7.dp), modifier = Modifier.fillMaxWidth()) {
-            MiniMetric("km", "Total KM", "${fmtKmNumber(turno.km)} km", ColorExtra, ColorExtraBg, Modifier.weight(1f))
-            MiniMetric("tiempo", "Tiempo", turno.tiempoTrabajado, ColorNulo, ColorNuloBg, Modifier.weight(1f))
+            MiniMetric("km", "Total KM", "${fmtKmNumber(turno.km)} km", metricCardStyle("km"), Modifier.weight(1f))
+            MiniMetric("tiempo", "Tiempo trabajado", turno.tiempoTrabajado, metricCardStyle("tiempo"), Modifier.weight(1f))
         }
     }
 }
@@ -100,26 +100,25 @@ private fun MiniMetric(
     iconType: String,
     label: String,
     value: String,
-    color: androidx.compose.ui.graphics.Color,
-    bg: androidx.compose.ui.graphics.Color,
+    style: CardVisualStyle,
     modifier: Modifier = Modifier
 ) {
     Column(
         modifier = modifier
             .clip(RoundedCornerShape(12.dp))
-            .background(bg)
-            .border(1.dp, color.copy(alpha = 0.25f), RoundedCornerShape(12.dp))
+            .background(style.bg)
+            .border(1.dp, style.border, RoundedCornerShape(12.dp))
             .padding(horizontal = 7.dp, vertical = 7.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         // Icono + etiqueta, como las tarjetas de métricas de la app móvil.
         Row(verticalAlignment = Alignment.CenterVertically) {
-            MetricIcon(iconType, color, 13.dp)
+            MetricIcon(iconType, style.color, 13.dp)
             Spacer(modifier = Modifier.width(4.dp))
             Text(label, color = ColorGrey, fontSize = 7.sp, fontWeight = FontWeight.Bold)
         }
         Spacer(modifier = Modifier.height(3.dp))
-        Text(value, color = color, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+        Text(value, color = style.color, fontSize = 11.sp, fontWeight = FontWeight.Bold)
     }
 }
 

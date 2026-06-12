@@ -19,6 +19,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -322,24 +323,35 @@ private fun TarjetaCategoria(
     val meta = categoriaMeta(type)
     val total = totalsPorTipo[type] ?: 0.0
     val count = numPorTipo[type] ?: 0
+    val categoryTitleFontSize = if (type == "agencia_bono") 7.sp else if (grande) 11.sp else 10.sp
     Column(
         modifier = modifier
             .clip(RoundedCornerShape(14.dp))
             .background(meta.bg)
+            .border(1.dp, meta.border, RoundedCornerShape(14.dp))
             .clickable { onClick() }
             .padding(horizontal = 8.dp, vertical = if (grande) 8.dp else 6.dp)
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             CategoriaIcon(type, meta.color, if (grande) 16.dp else 13.dp)
             Spacer(modifier = Modifier.width(5.dp))
-            Text(meta.label, color = meta.color, fontSize = if (grande) 11.sp else 10.sp, fontWeight = FontWeight.Medium)
+            Text(
+                meta.label,
+                color = meta.color,
+                fontSize = categoryTitleFontSize,
+                fontWeight = FontWeight.Medium,
+                maxLines = 1,
+                softWrap = false
+            )
         }
         Spacer(modifier = Modifier.height(2.dp))
         Text(
             fmtEur(total),
             color = meta.color,
             fontSize = if (grande) 18.sp else 14.sp,
-            fontWeight = FontWeight.Bold
+            fontWeight = FontWeight.Bold,
+            modifier = Modifier.fillMaxWidth(),
+            textAlign = TextAlign.Center
         )
         if (grande) {
             Text("$count ${if (count == 1) "entrada" else "entradas"}", color = ColorGrey, fontSize = 9.sp)

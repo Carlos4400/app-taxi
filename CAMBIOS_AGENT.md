@@ -1,3 +1,768 @@
+## 2026-06-12 23:29 - Reducir títulos de totales finales
+
+**Archivos modificados:** `android/wear/src/main/java/com/mijornada/app/screens/TurnoSummaryScreen.kt`, `src/__tests__/android-wear-bridge.test.ts`
+
+### Cambio 1 - Reducir únicamente los títulos inferiores
+
+#### Código anterior
+```kotlin
+private val CardTitleFontSize = 9.sp
+```
+
+```kotlin
+fontSize = CardTitleFontSize,
+```
+
+#### Código nuevo
+```kotlin
+private val CardTitleFontSize = 9.sp
+private val BottomSummaryTitleFontSize = 8.sp
+```
+
+```kotlin
+fontSize = BottomSummaryTitleFontSize,
+```
+
+#### Por qué se cambió
+Se solicitó bajar únicamente los títulos `TOTAL A DESCONTAR` y `TOTAL A DAR` de `9.sp` a `8.sp`. Los importes permanecen en `12.sp` y las tarjetas permanecen en `70.dp`.
+
+### Cambio 2 - Proteger el tamaño específico
+
+#### Código anterior
+```ts
+expect(resumen.match(/fontSize = CardTitleFontSize/g)).toHaveLength(2);
+```
+
+`No existía la prueba "reduce solo los titulos de total a descontar y total a dar a 8 sp" en src/__tests__/android-wear-bridge.test.ts.`
+
+#### Código nuevo
+```ts
+expect(resumen.match(/fontSize = CardTitleFontSize/g)).toHaveLength(1);
+```
+
+```ts
+it("reduce solo los titulos de total a descontar y total a dar a 8 sp", () => {
+  expect(resumen).toContain("private val BottomSummaryTitleFontSize = 8.sp");
+  expect(resumen).toContain("fontSize = BottomSummaryTitleFontSize");
+  expect(resumen.match(/fontSize = BottomSummaryTitleFontSize/g)).toHaveLength(1);
+  expect(resumen).toContain("fontSize = 12.sp");
+});
+```
+
+#### Por qué se cambió
+La prueba distingue el tamaño específico de los títulos inferiores y evita que se reduzcan los demás títulos o los importes.
+
+## 2026-06-12 23:25 - Ajustar categorías del resumen Wear
+
+**Archivos modificados:** `android/wear/src/main/java/com/mijornada/app/screens/TurnoSummaryScreen.kt`, `src/__tests__/android-wear-bridge.test.ts`
+
+### Cambio 1 - Mantener Agencias/Bonos en una línea en el resumen
+
+#### Código anterior
+```kotlin
+Text(meta.label, color = ColorGrey, fontSize = CardTitleFontSize, fontWeight = FontWeight.Bold)
+```
+
+#### Código nuevo
+```kotlin
+val categoryTitleFontSize = if (type == "agencia_bono") 7.sp else CardTitleFontSize
+```
+
+```kotlin
+Text(
+    meta.label,
+    color = ColorGrey,
+    fontSize = categoryTitleFontSize,
+    fontWeight = FontWeight.Bold,
+    maxLines = 1,
+    softWrap = false
+)
+```
+
+#### Por qué se cambió
+En las categorías del resumen, `Agencias/Bonos` también saltaba a dos líneas y alteraba la altura visual de su fila. Se reduce únicamente ese título sin cambiar medidas ni distribución.
+
+### Cambio 2 - Centrar importes de categorías del resumen
+
+#### Código anterior
+```kotlin
+Text(fmtEur(total), color = meta.color, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+```
+
+#### Código nuevo
+```kotlin
+Text(
+    fmtEur(total),
+    color = meta.color,
+    fontSize = 12.sp,
+    fontWeight = FontWeight.Bold,
+    modifier = Modifier.fillMaxWidth(),
+    textAlign = androidx.compose.ui.text.style.TextAlign.Center
+)
+```
+
+#### Por qué se cambió
+Los importes de categorías del resumen estaban alineados al inicio. Ahora se centran dentro de cada tarjeta sin cambiar títulos, contadores o dimensiones.
+
+### Cambio 3 - Actualizar pruebas del ajuste
+
+#### Código anterior
+```ts
+expect(resumen.match(/fontSize = CardTitleFontSize/g)).toHaveLength(3);
+```
+
+`No existía la prueba "mantiene Agencias Bonos en una linea y centra importes del resumen Wear" en src/__tests__/android-wear-bridge.test.ts.`
+
+#### Código nuevo
+```ts
+expect(resumen.match(/fontSize = CardTitleFontSize/g)).toHaveLength(2);
+```
+
+```ts
+it("mantiene Agencias Bonos en una linea y centra importes del resumen Wear", () => {
+  expect(resumen).toContain("val categoryTitleFontSize = if (type == \"agencia_bono\") 7.sp else CardTitleFontSize");
+  expect(resumen).toContain("fontSize = categoryTitleFontSize");
+  expect(resumen).toContain("maxLines = 1");
+  expect(resumen).toContain("softWrap = false");
+  expect(resumen).toContain("modifier = Modifier.fillMaxWidth()");
+  expect(resumen).toContain("textAlign = androidx.compose.ui.text.style.TextAlign.Center");
+});
+```
+
+#### Por qué se cambió
+La prueba anterior exigía tres usos directos de `CardTitleFontSize`; ahora las categorías usan una variable que conserva `9.sp` salvo para `Agencias/Bonos`.
+
+## 2026-06-12 23:21 - Ajustar título e importes del turno activo
+
+**Archivos modificados:** `android/wear/src/main/java/com/mijornada/app/screens/ActiveTurnoScreen.kt`, `src/__tests__/android-wear-bridge.test.ts`
+
+### Cambio 1 - Mantener Agencias/Bonos en una línea
+
+#### Código anterior
+```kotlin
+Text(meta.label, color = meta.color, fontSize = if (grande) 11.sp else 10.sp, fontWeight = FontWeight.Medium)
+```
+
+#### Código nuevo
+```kotlin
+val categoryTitleFontSize = if (type == "agencia_bono") 7.sp else if (grande) 11.sp else 10.sp
+```
+
+```kotlin
+Text(
+    meta.label,
+    color = meta.color,
+    fontSize = categoryTitleFontSize,
+    fontWeight = FontWeight.Medium,
+    maxLines = 1,
+    softWrap = false
+)
+```
+
+#### Por qué se cambió
+El texto completo `Agencias/Bonos` saltaba a dos líneas y aumentaba la altura de su tarjeta. Se reduce únicamente ese título para probar si cabe en una línea manteniendo los tamaños y la distribución existentes.
+
+### Cambio 2 - Centrar importes de categorías
+
+#### Código anterior
+```kotlin
+Text(
+    fmtEur(total),
+    color = meta.color,
+    fontSize = if (grande) 18.sp else 14.sp,
+    fontWeight = FontWeight.Bold
+)
+```
+
+#### Código nuevo
+```kotlin
+Text(
+    fmtEur(total),
+    color = meta.color,
+    fontSize = if (grande) 18.sp else 14.sp,
+    fontWeight = FontWeight.Bold,
+    modifier = Modifier.fillMaxWidth(),
+    textAlign = TextAlign.Center
+)
+```
+
+#### Por qué se cambió
+Los importes estaban alineados al inicio de cada tarjeta. Ahora ocupan el ancho disponible y se centran sin cambiar el centrado del título, icono o contador.
+
+### Cambio 3 - Proteger el ajuste experimental
+
+#### Código anterior
+`No existía la prueba "mantiene Agencias Bonos en una linea y centra importes del turno activo" en src/__tests__/android-wear-bridge.test.ts.`
+
+#### Código nuevo
+```ts
+it("mantiene Agencias Bonos en una linea y centra importes del turno activo", () => {
+  expect(activo).toContain("val categoryTitleFontSize = if (type == \"agencia_bono\") 7.sp else if (grande) 11.sp else 10.sp");
+  expect(activo).toContain("maxLines = 1");
+  expect(activo).toContain("softWrap = false");
+  expect(activo).toContain("modifier = Modifier.fillMaxWidth()");
+  expect(activo).toContain("textAlign = TextAlign.Center");
+});
+```
+
+#### Por qué se cambió
+La prueba fija que el experimento no altere los tamaños de las tarjetas y que el nombre completo y el centrado de importes permanezcan aplicados.
+
+## 2026-06-12 22:28 - Igualar colores de tarjetas Wear al móvil
+
+**Archivos modificados:** `android/wear/src/main/java/com/mijornada/app/theme/Color.kt`, `android/wear/src/main/java/com/mijornada/app/screens/WatchModels.kt`, `android/wear/src/main/java/com/mijornada/app/screens/TurnosScreen.kt`, `android/wear/src/main/java/com/mijornada/app/screens/TurnoSummaryScreen.kt`, `android/wear/src/main/java/com/mijornada/app/screens/ActiveTurnoScreen.kt`, `android/wear/src/main/java/com/mijornada/app/screens/EndTurnoScreen.kt`, `src/__tests__/android-wear-bridge.test.ts`
+
+### Cambio 1 - Igualar la paleta Wear con la paleta móvil
+
+#### Código anterior
+```kotlin
+val ColorPropina = Color(0xFF38D66F)
+val ColorPropinaBg = Color(0xFF06240D)
+val ColorDatafono = Color(0xFF8C7CFF)
+val ColorDatafonoBg = Color(0xFF151032)
+val ColorAgencia = Color(0xFFFFB03A)
+val ColorAgenciaBg = Color(0xFF2D1A05)
+val ColorExtra = Color(0xFF22D0E5)
+val ColorExtraBg = Color(0xFF052C32)
+val ColorGasolina = Color(0xFFFF6868)
+val ColorGasolinaBg = Color(0xFF3A0A0A)
+val ColorNulo = Color(0xFF9AA8C7)
+val ColorNuloBg = Color(0xFF151922)
+```
+
+#### Código nuevo
+```kotlin
+val ColorPropina = Color(0xFF26B63D)
+val ColorPropinaBg = Color(0xFF001900)
+val ColorDatafono = Color(0xFF7C79FF)
+val ColorDatafonoBg = Color(0xFF0B082C)
+val ColorAgencia = Color(0xFFED990E)
+val ColorAgenciaBg = Color(0xFF260F00)
+val ColorExtra = Color(0xFF00BEC7)
+val ColorExtraBg = Color(0xFF001A1D)
+val ColorGasolina = Color(0xFFFA6863)
+val ColorGasolinaBg = Color(0xFF290606)
+val ColorNulo = Color(0xFF7187AB)
+val ColorNuloBg = Color(0xFF0A121F)
+
+val ColorTaximetro = Color(0xFFFFC200)
+val ColorTaximetroBg = Color(0x0FFFB400)
+val ColorTaximetroBorder = Color(0x33FFB400)
+val ColorGanancia = Color(0xFF4CD676)
+val ColorGananciaBg = Color(0xFF001D06)
+val ColorGananciaBorder = Color(0x59139948)
+val ColorKm = Color(0xFF25D2FC)
+val ColorKmBg = Color(0xFF001823)
+val ColorKmBorder = Color(0x5900A1CA)
+val ColorTiempo = Color(0xFF5BE3F9)
+val ColorTiempoBg = Color(0x0D00B4FF)
+val ColorTiempoBorder = Color(0x2600B4FF)
+```
+
+#### Por qué se cambió
+Las categorías Wear utilizaban colores aproximados y las métricas reutilizaban colores de categorías distintas. Los nuevos valores son los equivalentes sRGB de los colores usados por las tarjetas de la pantalla móvil.
+
+### Cambio 2 - Compartir estilos visuales de tarjetas
+
+#### Código anterior
+```kotlin
+data class CategoriaMeta(
+    val label: String,
+    val color: Color,
+    val bg: Color
+)
+```
+
+`No existían CardVisualStyle ni metricCardStyle en android/wear/src/main/java/com/mijornada/app/screens/WatchModels.kt.`
+
+#### Código nuevo
+```kotlin
+data class CategoriaMeta(
+    val label: String,
+    val color: Color,
+    val bg: Color,
+    val border: Color
+)
+
+data class CardVisualStyle(
+    val color: Color,
+    val bg: Color,
+    val border: Color
+)
+
+fun metricCardStyle(type: String): CardVisualStyle = when (type) {
+    "taximetro" -> CardVisualStyle(ColorTaximetro, ColorTaximetroBg, ColorTaximetroBorder)
+    "ganancia" -> CardVisualStyle(ColorGanancia, ColorGananciaBg, ColorGananciaBorder)
+    "km" -> CardVisualStyle(ColorKm, ColorKmBg, ColorKmBorder)
+    "tiempo" -> CardVisualStyle(ColorTiempo, ColorTiempoBg, ColorTiempoBorder)
+    "descontar" -> CardVisualStyle(ColorGasolina, ColorGasolinaBg, ColorGasolina.copy(alpha = 0.35f))
+    "dar" -> CardVisualStyle(ColorPropina, ColorPropinaBg, ColorPropina.copy(alpha = 0.35f))
+    else -> CardVisualStyle(ColorWhite, ColorNuloBg, ColorWhite.copy(alpha = 0.20f))
+}
+```
+
+#### Por qué se cambió
+Cada métrica necesita conservar su propio primer plano, fondo y borde en todas las pantallas sin reutilizar colores semánticamente incorrectos.
+
+### Cambio 3 - Aplicar estilos propios a las métricas
+
+#### Código anterior
+```kotlin
+MiniMetric("km", "Total KM", "${fmtKmNumber(turno.km)} km", ColorExtra, ColorExtraBg, Modifier.weight(1f))
+MiniMetric("tiempo", "Tiempo", turno.tiempoTrabajado, ColorNulo, ColorNuloBg, Modifier.weight(1f))
+```
+
+```kotlin
+SummaryMetric("km", "Total KM", "${fmtKmNumber(turno.km)} km", ColorExtra, ColorExtraBg, Modifier.weight(1f))
+SummaryMetric("tiempo", "Tiempo trabajado", turno.tiempoTrabajado, ColorNulo, ColorNuloBg, Modifier.weight(1f))
+```
+
+```kotlin
+color = ColorAgencia,
+bg = ColorAgenciaBg,
+```
+
+```kotlin
+color = ColorExtra,
+bg = ColorExtraBg,
+```
+
+#### Código nuevo
+```kotlin
+MiniMetric("km", "Total KM", "${fmtKmNumber(turno.km)} km", metricCardStyle("km"), Modifier.weight(1f))
+MiniMetric("tiempo", "Tiempo trabajado", turno.tiempoTrabajado, metricCardStyle("tiempo"), Modifier.weight(1f))
+```
+
+```kotlin
+SummaryMetric("km", "Total KM", "${fmtKmNumber(turno.km)} km", metricCardStyle("km"), Modifier.weight(1f))
+SummaryMetric("tiempo", "Tiempo trabajado", turno.tiempoTrabajado, metricCardStyle("tiempo"), Modifier.weight(1f))
+```
+
+```kotlin
+style = metricCardStyle("taximetro"),
+```
+
+```kotlin
+style = metricCardStyle("km"),
+```
+
+#### Por qué se cambió
+KM deja de usar el estilo de Extras, Tiempo trabajado deja de usar el estilo de Nulos y las tarjetas de cierre usan los mismos estilos visuales que las demás pantallas.
+
+### Cambio 4 - Añadir bordes de categoría y unificar Agencias/Bonos
+
+#### Código anterior
+```kotlin
+"agencia_bono" -> CategoriaMeta("Agencias", ColorAgencia, ColorAgenciaBg)
+```
+
+```kotlin
+.background(meta.bg)
+.padding(horizontal = 7.dp, vertical = 8.dp)
+```
+
+```kotlin
+.background(meta.bg)
+.clickable { onClick() }
+```
+
+#### Código nuevo
+```kotlin
+"agencia_bono" -> CategoriaMeta("Agencias/Bonos", ColorAgencia, ColorAgenciaBg, ColorAgencia.copy(alpha = 0.20f))
+```
+
+```kotlin
+.background(meta.bg)
+.border(1.dp, meta.border, RoundedCornerShape(12.dp))
+.padding(horizontal = 7.dp, vertical = 8.dp)
+```
+
+```kotlin
+.background(meta.bg)
+.border(1.dp, meta.border, RoundedCornerShape(14.dp))
+.clickable { onClick() }
+```
+
+#### Por qué se cambió
+Las tarjetas de categoría del resumen y del turno activo no mostraban el borde coloreado del móvil, y el nombre de Agencias/Bonos no era consistente entre pantallas.
+
+### Cambio 5 - Proteger la paridad visual con una prueba
+
+#### Código anterior
+`No existía la prueba "iguala colores bordes iconos y textos de las tarjetas Wear con el movil" en src/__tests__/android-wear-bridge.test.ts.`
+
+#### Código nuevo
+```ts
+it("iguala colores bordes iconos y textos de las tarjetas Wear con el movil", () => {
+  expect(modelos).toContain("data class CardVisualStyle(");
+  expect(modelos).toContain("fun metricCardStyle(type: String): CardVisualStyle");
+  expect(modelos).toContain('CategoriaMeta("Agencias/Bonos"');
+  expect(turnos).toContain('"Tiempo trabajado"');
+  expect(turnos).toContain('metricCardStyle("km")');
+  expect(turnos).toContain('metricCardStyle("tiempo")');
+  expect(resumen).toContain(".border(1.dp, meta.border, RoundedCornerShape(12.dp))");
+  expect(activo).toContain(".border(1.dp, meta.border, RoundedCornerShape(14.dp))");
+  expect(cierre).toContain(".border(1.dp, meta.border, RoundedCornerShape(12.dp))");
+});
+```
+
+#### Por qué se cambió
+La prueba impide que las métricas vuelvan a reutilizar colores de otras categorías y que las pantallas pierdan los bordes o textos acordados.
+
+## 2026-06-12 21:42 - Aumentar títulos de tarjetas del resumen
+
+**Archivos modificados:** `android/wear/src/main/java/com/mijornada/app/screens/TurnoSummaryScreen.kt`, `src/__tests__/android-wear-bridge.test.ts`
+
+### Cambio 1 - Sustituir desplazamiento por tamaño tipográfico
+
+#### Código anterior
+```kotlin
+Row(
+    modifier = Modifier.offset(y = (-2).dp),
+    verticalAlignment = Alignment.CenterVertically
+) {
+    MetricIcon(iconType, color, 13.dp)
+    Spacer(modifier = Modifier.width(4.dp))
+    Text(label, color = ColorGrey, fontSize = 7.sp, fontWeight = FontWeight.Bold)
+}
+```
+
+```kotlin
+Row(
+    modifier = Modifier.offset(y = (-2).dp),
+    verticalAlignment = Alignment.CenterVertically
+) {
+    CategoriaIcon(type, meta.color, 11.dp)
+    Spacer(modifier = Modifier.width(4.dp))
+    Text(if (type == "agencia_bono") "Agencias/Bonos" else meta.label, color = ColorGrey, fontSize = 7.sp, fontWeight = FontWeight.Bold)
+}
+```
+
+```kotlin
+Row(
+    modifier = Modifier.offset(y = (-2).dp),
+    verticalAlignment = Alignment.CenterVertically,
+    horizontalArrangement = Arrangement.Center
+) {
+    MetricIcon(iconType, color, 13.dp)
+    Spacer(modifier = Modifier.width(4.dp))
+    Text(
+        label.uppercase().replace(" A ", " A\n"),
+        color = ColorGrey,
+        fontSize = 7.sp,
+        fontWeight = FontWeight.Bold,
+        textAlign = androidx.compose.ui.text.style.TextAlign.Center
+    )
+}
+```
+
+#### Código nuevo
+```kotlin
+private val CardTitleFontSize = 9.sp
+```
+
+```kotlin
+Row(verticalAlignment = Alignment.CenterVertically) {
+    MetricIcon(iconType, color, 13.dp)
+    Spacer(modifier = Modifier.width(4.dp))
+    Text(label, color = ColorGrey, fontSize = CardTitleFontSize, fontWeight = FontWeight.Bold)
+}
+```
+
+```kotlin
+Row(verticalAlignment = Alignment.CenterVertically) {
+    CategoriaIcon(type, meta.color, 11.dp)
+    Spacer(modifier = Modifier.width(4.dp))
+    Text(if (type == "agencia_bono") "Agencias/Bonos" else meta.label, color = ColorGrey, fontSize = CardTitleFontSize, fontWeight = FontWeight.Bold)
+}
+```
+
+```kotlin
+Row(
+    verticalAlignment = Alignment.CenterVertically,
+    horizontalArrangement = Arrangement.Center
+) {
+    MetricIcon(iconType, color, 13.dp)
+    Spacer(modifier = Modifier.width(4.dp))
+    Text(
+        label.uppercase().replace(" A ", " A\n"),
+        color = ColorGrey,
+        fontSize = CardTitleFontSize,
+        fontWeight = FontWeight.Bold,
+        textAlign = androidx.compose.ui.text.style.TextAlign.Center
+    )
+}
+```
+
+#### Por qué se cambió
+La petición era aumentar dos unidades el tamaño de las letras de los títulos, no mover los títulos verticalmente. Se eliminan los tres desplazamientos `-2.dp` y los títulos pasan de `7.sp` a `9.sp`. Los importes y contadores no cambian.
+
+### Cambio 2 - Proteger el aumento tipográfico
+
+#### Código anterior
+```ts
+expect(resumen).toContain("Modifier.offset(y = (-2).dp)");
+```
+
+#### Código nuevo
+```ts
+expect(resumen).toContain("private val CardTitleFontSize = 9.sp");
+expect(resumen.match(/fontSize = CardTitleFontSize/g)).toHaveLength(3);
+expect(resumen).not.toContain("Modifier.offset(y = (-2).dp)");
+```
+
+#### Por qué se cambió
+La prueba anterior protegía la interpretación incorrecta. La nueva prueba exige que los tres tipos de tarjeta usen títulos de `9.sp` y que no vuelva a introducirse el desplazamiento vertical.
+
+## 2026-06-12 20:57 - Igualar resumen Wear al diseño móvil
+
+**Archivos modificados:** `android/wear/src/main/java/com/mijornada/app/WearMainActivity.kt`, `android/wear/src/main/java/com/mijornada/app/screens/TurnoSummaryScreen.kt`, `src/__tests__/android-wear-bridge.test.ts`
+
+### Cambio 1 - Integrar notas generales en categorías
+
+#### Código anterior
+```kotlin
+Spacer(modifier = Modifier.height(10.dp))
+CategorySummary(turno)
+
+// Notas como en la app móvil: si no hay ninguna, una sola línea sin
+// bloque con cabecera; si las hay, cada bloque solo cuando tiene contenido.
+if (notasTurno.isEmpty() && notasDetalladas.isEmpty()) {
+    Spacer(modifier = Modifier.height(10.dp))
+    Text("Sin notas del turno", color = ColorGrey, fontSize = 10.sp, fontStyle = FontStyle.Italic)
+} else {
+    if (notasTurno.isNotEmpty()) {
+        Spacer(modifier = Modifier.height(10.dp))
+        NotesBlock("Notas del turno", notasTurno, general = true)
+    }
+    if (notasDetalladas.isNotEmpty()) {
+        Spacer(modifier = Modifier.height(10.dp))
+        NotesBlock("Notas detalladas", notasDetalladas, general = false)
+    }
+}
+```
+
+#### Código nuevo
+```kotlin
+Spacer(modifier = Modifier.height(10.dp))
+CategorySummary(turno, notasTurno)
+
+if (notasDetalladas.isNotEmpty()) {
+    Spacer(modifier = Modifier.height(10.dp))
+    DetailedNotesBlock(notasDetalladas)
+}
+```
+
+#### Por qué se cambió
+Las notas generales y el texto `Sin notas del turno` debían aparecer dentro del mismo panel que las seis categorías, como en la app móvil. Las notas detalladas continúan fuera del panel.
+
+### Cambio 2 - Añadir composición de notas y totales finales
+
+#### Código anterior
+`No existían CategoryNotes, BottomSummary, BottomSummaryCard ni DetailedNotesBlock en android/wear/src/main/java/com/mijornada/app/screens/TurnoSummaryScreen.kt.`
+
+#### Código nuevo
+```kotlin
+@Composable
+private fun CategoryNotes(entries: List<WatchEntry>) {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(1.dp)
+            .background(ColorWhite.copy(alpha = 0.06f))
+    )
+    Spacer(modifier = Modifier.height(9.dp))
+    if (entries.isEmpty()) {
+        Text(
+            "Sin notas del turno",
+            color = ColorGrey,
+            fontSize = 9.sp,
+            fontStyle = FontStyle.Italic,
+            modifier = Modifier.fillMaxWidth(),
+            textAlign = androidx.compose.ui.text.style.TextAlign.Center
+        )
+    } else {
+        Text("Notas del turno", color = ColorGrey, fontSize = 8.sp, fontWeight = FontWeight.Bold)
+        Spacer(modifier = Modifier.height(6.dp))
+        entries.forEach { entry ->
+            NoteRow(entry, general = true)
+            Spacer(modifier = Modifier.height(5.dp))
+        }
+    }
+}
+
+@Composable
+private fun BottomSummary(turno: WatchTurno) {
+    Row(
+        horizontalArrangement = Arrangement.spacedBy(7.dp),
+        modifier = Modifier
+            .fillMaxWidth(0.88f)
+            .clip(RoundedCornerShape(18.dp))
+            .background(Color(0xFF15151C))
+            .border(1.dp, Color(0xFF252631), RoundedCornerShape(18.dp))
+            .padding(10.dp)
+    ) {
+        BottomSummaryCard(
+            iconType = "descontar",
+            label = "Total a descontar",
+            value = if (turno.contablePendiente) "Pendiente" else fmtEur(turno.totalADescontar),
+            color = ColorGasolina,
+            bg = ColorGasolinaBg,
+            modifier = Modifier.weight(1f)
+        )
+        BottomSummaryCard(
+            iconType = "dar",
+            label = "Total a dar",
+            value = if (turno.contablePendiente) "Pendiente" else fmtEur(turno.totalADar),
+            color = ColorPropina,
+            bg = ColorPropinaBg,
+            modifier = Modifier.weight(1f)
+        )
+    }
+}
+
+@Composable
+private fun BottomSummaryCard(
+    iconType: String,
+    label: String,
+    value: String,
+    color: Color,
+    bg: Color,
+    modifier: Modifier = Modifier
+) {
+    Column(
+        modifier = modifier
+            .height(70.dp)
+            .clip(RoundedCornerShape(13.dp))
+            .background(bg)
+            .border(1.dp, color.copy(alpha = 0.35f), RoundedCornerShape(13.dp))
+            .padding(horizontal = 5.dp, vertical = 7.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
+    ) {
+        Row(
+            modifier = Modifier.offset(y = (-2).dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.Center
+        ) {
+            MetricIcon(iconType, color, 13.dp)
+            Spacer(modifier = Modifier.width(4.dp))
+            Text(
+                label.uppercase().replace(" A ", " A\n"),
+                color = ColorGrey,
+                fontSize = 7.sp,
+                fontWeight = FontWeight.Bold,
+                textAlign = androidx.compose.ui.text.style.TextAlign.Center
+            )
+        }
+        Spacer(modifier = Modifier.height(4.dp))
+        Text(value, color = color, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+    }
+}
+
+@Composable
+private fun DetailedNotesBlock(entries: List<WatchEntry>) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth(0.88f)
+            .clip(RoundedCornerShape(16.dp))
+            .background(Color(0xFF15151C))
+            .border(1.dp, Color(0xFF252631), RoundedCornerShape(16.dp))
+            .padding(horizontal = 10.dp, vertical = 10.dp)
+    ) {
+        Text("Notas detalladas", color = ColorGasolina, fontSize = 9.sp, fontWeight = FontWeight.Bold)
+        Spacer(modifier = Modifier.height(6.dp))
+        entries.forEach { entry ->
+            NoteRow(entry, general = false)
+            Spacer(modifier = Modifier.height(5.dp))
+        }
+    }
+}
+```
+
+#### Por qué se cambió
+El panel de categorías necesitaba su separador y zona de notas interna. Los totales `Total a descontar` y `Total a dar` necesitaban un contenedor exterior común y títulos centrados en dos líneas como en el móvil. `DetailedNotesBlock` elimina las ramas generales y vacías que ya no se usan fuera del panel.
+
+### Cambio 3 - Subir títulos de tarjetas dos unidades
+
+#### Código anterior
+```kotlin
+Row(verticalAlignment = Alignment.CenterVertically) {
+```
+
+#### Código nuevo
+```kotlin
+Row(
+    modifier = Modifier.offset(y = (-2).dp),
+    verticalAlignment = Alignment.CenterVertically
+) {
+```
+
+#### Por qué se cambió
+Se solicitó subir únicamente los títulos de todas las tarjetas del resumen del reloj para probar su alineación visual. El desplazamiento se aplica a las filas de icono y título, no a los importes ni a los contadores.
+
+### Cambio 4 - Añadir botón Volver al inicio
+
+#### Código anterior
+```kotlin
+fun TurnoSummaryScreen(
+    turno: WatchTurno,
+    onBack: () -> Unit,
+    onEdit: () -> Unit = {}
+) {
+```
+
+#### Código nuevo
+```kotlin
+fun TurnoSummaryScreen(
+    turno: WatchTurno,
+    onBack: () -> Unit,
+    onHome: () -> Unit,
+    onEdit: () -> Unit = {}
+) {
+```
+
+```kotlin
+onHome = { currentScreen.value = if (activeTurno.value) ScreenState.ACTIVE_TURNO else ScreenState.NO_ACTIVE_TURNO },
+```
+
+#### Por qué se cambió
+El resumen Wear no tenía el botón `Volver al inicio` presente en el móvil. La nueva acción vuelve a la pantalla inicial correspondiente al estado real del turno.
+
+### Cambio 5 - Proteger la composición Wear con una prueba
+
+#### Código anterior
+`No existía la prueba "iguala la composicion del resumen Wear con la app movil" en src/__tests__/android-wear-bridge.test.ts.`
+
+#### Código nuevo
+```ts
+it("iguala la composicion del resumen Wear con la app movil", () => {
+  const resumen = readFileSync(
+    resolve(root, "android/wear/src/main/java/com/mijornada/app/screens/TurnoSummaryScreen.kt"),
+    "utf8",
+  );
+  const main = readFileSync(
+    resolve(root, "android/wear/src/main/java/com/mijornada/app/WearMainActivity.kt"),
+    "utf8",
+  );
+
+  expect(resumen).toContain("onHome: () -> Unit");
+  expect(resumen).toContain("CategorySummary(turno, notasTurno)");
+  expect(resumen).toContain("private fun CategorySummary(turno: WatchTurno, notasTurno: List<WatchEntry>)");
+  expect(resumen).toContain("CategoryNotes(notasTurno)");
+  expect(resumen).toContain("private fun CategoryNotes(entries: List<WatchEntry>)");
+  expect(resumen).toContain("private fun BottomSummary(");
+  expect(resumen).toContain('Text("Volver al inicio"');
+  expect(resumen).toContain("Modifier.offset(y = (-2).dp)");
+  expect(main).toContain(
+    "onHome = { currentScreen.value = if (activeTurno.value) ScreenState.ACTIVE_TURNO else ScreenState.NO_ACTIVE_TURNO }",
+  );
+});
+```
+
+#### Por qué se cambió
+La prueba fija la estructura solicitada y evita que futuras modificaciones vuelvan a separar las notas, eliminen el contenedor inferior, quiten el botón o deshagan el desplazamiento de títulos.
+
 ## 2026-06-12 16:48 - Borde en Terminar Turno de la pantalla de cierre
 
 **Archivos modificados:** `android/wear/src/main/java/com/mijornada/app/screens/EndTurnoScreen.kt`
@@ -1147,6 +1912,51 @@ El test fija que la complicación no vuelva a ocultar el texto mediante un espac
 
 #### Por qué se cambió
 El hueco `SHORT_TEXT` de la esfera Xiaomi obliga a mostrar un icono monocromo. La silueta lateral anterior no era fiel al icono principal de la app. La nueva versión reproduce su vista frontal y conserva sus rasgos identificativos dentro de la restricción monocroma.
+
+## 2026-06-12 21:06 - Precargar las imágenes de marca en el service worker
+
+**Archivos modificados:** `public/sw.js`, `src/__tests__/brand-assets.test.ts`
+
+### Contexto
+
+En la app web el logo de la portada salía como imagen rota (captura del usuario): las imágenes de `/brand/` no estaban en la precarga del service worker ni entran en su caché en caliente (que solo guarda `/assets/` y `.js`), así que cada visita las pedía a la red; sin conexión, el `catch` del fetch devuelve un 503 "Offline" y el `<img>` se rompe aunque el resto de la app cargue de caché. Verificado también con graphify: el nodo `ASSETS` no tenía relación con ningún asset de marca y ningún otro mecanismo las precachea.
+
+### Cambio 1 - Añadir las 4 imágenes de marca a ASSETS
+
+**Código anterior:**
+
+```js
+const ASSETS = [
+  './',
+  './index.html',
+  './manifest.json',
+  './icon-192.png',
+  './icon-512.png',
+  'https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800;900&display=swap',
+];
+```
+
+**Código nuevo:** la misma lista con `./brand/brand-taxi-logo.png`, `./brand/brand-taxi-hero.png`, `./brand/brand-taxi-mini-18.png` y `./brand/brand-taxi-mini-20.png` añadidas (con comentario del porqué) antes de la fuente de Google.
+
+**Por qué se cambió:** son los únicos recursos visuales de la app que quedaban fuera de toda caché.
+
+### Cambio 2 - CACHE de mi-turno-v5 a mi-turno-v6
+
+**Código anterior:** `const CACHE = 'mi-turno-v5';`
+
+**Código nuevo:** `const CACHE = 'mi-turno-v6';`
+
+**Por qué se cambió:** convención ya usada por el archivo para forzar precarga limpia en clientes existentes (el `activate` borra las cachés con otro nombre).
+
+### Cambio 3 - Test que fija la precarga
+
+**Código anterior:** `No existía el test "precarga las imagenes de marca en el service worker" en brand-assets.test.ts.`
+
+**Código nuevo:** comprueba que las 4 rutas de `/brand/` están dentro del bloque `ASSETS` de `public/sw.js` y que `CACHE` ya no es `mi-turno-v5`.
+
+**Por qué se cambió:** que las imágenes de marca no puedan volver a quedarse fuera de la precarga sin que salte un test.
+
+Verificación: `npx tsc --noEmit` sin errores; `brand-assets`, `sw-version` y `service-worker-registration` en verde (10 tests); `vite build` compila y el `sw.js` resultante contiene las 4 rutas de marca. Pendiente del usuario: desplegar la web/build del móvil con su proceso habitual para que los clientes reciban el SW v6.
 
 ## 2026-06-12 14:48 - Adaptar el teclado de cierre de turno a la pantalla redonda
 

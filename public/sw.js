@@ -1,4 +1,4 @@
-const CACHE = 'mi-turno-v5';
+const CACHE = 'mi-turno-v6';
 // Versión real de esta build. El marcador __BUILD_VERSION__ lo sustituye el
 // plugin de Vite (ver vite.config.ts) por la versión de la app en cada build.
 // En desarrollo sin build queda el marcador y checkVersion() omite la
@@ -10,6 +10,13 @@ const ASSETS = [
   './manifest.json',
   './icon-192.png',
   './icon-512.png',
+  // Imágenes de marca: sin precarga, el fetch sin red devolvía el 503
+  // "Offline" del catch y el logo salía roto aunque el resto de la app
+  // cargara de caché (visto en la portada el 2026-06-12).
+  './brand/brand-taxi-logo.png',
+  './brand/brand-taxi-hero.png',
+  './brand/brand-taxi-mini-18.png',
+  './brand/brand-taxi-mini-20.png',
   'https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800;900&display=swap',
 ];
 

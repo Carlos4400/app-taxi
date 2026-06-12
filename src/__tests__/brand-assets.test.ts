@@ -23,6 +23,21 @@ describe("brand taxi assets", () => {
     expect(existsSync(resolve(root, "public/brand/brand-taxi-hero.png"))).toBe(true);
   });
 
+  it("precarga las imagenes de marca en el service worker", () => {
+    // Sin precarga, con la red caida el catch del SW devolvia un 503 "Offline"
+    // y el logo salia roto en portada/ajustes aunque la app cargara de cache
+    // (fallo visto el 2026-06-12). Las cuatro imagenes deben ir en ASSETS.
+    const sw = readFileSync(resolve(root, "public/sw.js"), "utf8");
+    const assetsBlock = sw.slice(sw.indexOf("const ASSETS"), sw.indexOf("];"));
+
+    expect(assetsBlock).toContain("'./brand/brand-taxi-logo.png'");
+    expect(assetsBlock).toContain("'./brand/brand-taxi-hero.png'");
+    expect(assetsBlock).toContain("'./brand/brand-taxi-mini-18.png'");
+    expect(assetsBlock).toContain("'./brand/brand-taxi-mini-20.png'");
+    // Cache renombrada para forzar precarga limpia en clientes existentes.
+    expect(sw).toMatch(/const CACHE = 'mi-turno-v(?!5')\d+'/);
+  });
+
   it("sustituye los emojis de marca por assets propios en pantallas visibles", () => {
     const main = readFileSync(resolve(root, "src/main.tsx"), "utf8");
     const home = readFileSync(resolve(root, "src/screens/home-screen.tsx"), "utf8");
