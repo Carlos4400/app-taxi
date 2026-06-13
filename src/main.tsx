@@ -1528,7 +1528,7 @@ function App({ uid }: { uid: string }) {
             bg={PBG}
             total={totalD}
             count={datafonos.length}
-            icon={<IconCard s={26} c={P} />}
+            icon={<IconCard s={28} c={P} />}
             disabled={!current.startTime}
             onClick={() => {
               hapticOpen();
@@ -1542,7 +1542,7 @@ function App({ uid }: { uid: string }) {
             bg={GBG}
             total={totalP}
             count={propinas.length}
-            icon={<IconCoin s={26} c={G} />}
+            icon={<IconCoin s={28} c={G} />}
             disabled={!current.startTime}
             onClick={() => {
               hapticOpen();
@@ -1557,7 +1557,7 @@ function App({ uid }: { uid: string }) {
             color={A}
             bg={ABG}
             total={totalA}
-            icon={<IconAgency s={18} c={A} />}
+            icon={<IconAgency s={20} c={A} />}
             disabled={!current.startTime}
             onClick={() => {
               hapticOpen();
@@ -1570,7 +1570,7 @@ function App({ uid }: { uid: string }) {
             color={E}
             bg={EBG}
             total={totalE}
-            icon={<IconExtra s={18} c={E} />}
+            icon={<IconExtra s={20} c={E} />}
             disabled={!current.startTime}
             onClick={() => {
               hapticOpen();
@@ -1585,7 +1585,7 @@ function App({ uid }: { uid: string }) {
             color={F}
             bg={FBG}
             total={totalF}
-            icon={<IconFuel s={22} c={F} />}
+            icon={<IconFuel s={24} c={F} />}
             disabled={!current.startTime}
             onClick={() => {
               hapticOpen();
@@ -1598,7 +1598,7 @@ function App({ uid }: { uid: string }) {
             color={N}
             bg={NBG}
             total={totalN}
-            icon={<IconNulo s={18} c={N} />}
+            icon={<IconNulo s={20} c={N} />}
             disabled={!current.startTime}
             onClick={() => {
               hapticOpen();

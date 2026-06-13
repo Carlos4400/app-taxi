@@ -21,7 +21,7 @@ import com.mijornada.app.theme.*
 fun AddEntryScreen(
     categoryLabel: String,
     categoryColor: Color,
-    onSave: (amount: Double, note: String) -> Unit,
+    onSave: (amount: Double, note: String) -> Boolean,
     onCancel: () -> Unit,
     onRequestNote: (current: String, onResult: (String) -> Unit) -> Unit,
     initialAmount: Double = 0.0,
@@ -41,8 +41,7 @@ fun AddEntryScreen(
             onEditarTexto = { onRequestNote(note) { result -> note = result } },
             onSave = {
                 if (note.isNotBlank() && !saving) {
-                    saving = true
-                    onSave(0.0, note)
+                    saving = onSave(0.0, note)
                 }
             },
             onCancel = onCancel,
@@ -95,8 +94,7 @@ fun AddEntryScreen(
                     color = categoryColor,
                     onClick = {
                         if (!saving) {
-                            saving = true
-                            onSave(amount, note)
+                            saving = onSave(amount, note)
                         }
                     }
                 )

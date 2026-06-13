@@ -1326,8 +1326,10 @@ describe("Android Wear bridge", () => {
     expect(parserKt).toContain('private val TIPOS_ENTRADA_TURNO = TIPOS_ENTRADA + "nota"');
     expect(parserKt).toContain("if (it !in TIPOS_ENTRADA)");
     expect(parserKt).toContain("if (tipo !in TIPOS_ENTRADA_TURNO)");
-    expect(pantalla).toContain("onConfirm: (Double, Double, List<WatchEntry>) -> Unit");
+    expect(pantalla).toContain("onConfirm: (Double, Double, List<WatchEntry>) -> Boolean");
     expect(pantalla).toContain("AddEntryScreen(");
+    expect(pantalla).toMatch(/editandoEntrada = null\s+true/);
+    expect(pantalla).toMatch(/nuevaCategoria = null\s+true/);
     expect(procesadorTs).toContain('command.type === "EDIT_TURNO"');
     expect(parserKt).toContain('"EDIT_TURNO" -> WatchCommand.EditTurno(');
     expect(procesadorKt).toContain("processEditTurno");

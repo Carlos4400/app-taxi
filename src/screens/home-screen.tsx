@@ -97,7 +97,9 @@ export const HomeScreen: FC<HomeScreenProps> = ({
               gap: 12,
             }}
           >
-            {active ? (
+            {isPaused ? (
+              <IconPlay s={40} c="#3b82f6" />
+            ) : active ? (
               <>
                 <IconRocket s={30} c={G} />
                 <IconPlay s={40} c="#3b82f6" />
@@ -105,7 +107,7 @@ export const HomeScreen: FC<HomeScreenProps> = ({
             ) : (
               <IconRocket s={30} c={G} />
             )}
-            {active ? "Continuar Turno" : "Iniciar Turno"}
+            {isPaused ? "Turno Pausado" : active ? "Continuar Turno" : "Iniciar Turno"}
           </button>
           <button
             onClick={() => onSetScreen("PantallaTurnos")}

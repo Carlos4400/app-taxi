@@ -19,4 +19,24 @@ describe("Common component extraction", () => {
     expect(mainSource).not.toMatch(/^function MainCard/m);
     expect(mainSource).not.toMatch(/^function ConfirmDialog/m);
   });
+
+  it("aligns the SmallCard icon with its label row", () => {
+    const commonSource = readFileSync(commonPath, "utf8");
+    const smallCardSource = commonSource.slice(
+      commonSource.indexOf("export function SmallCard"),
+      commonSource.indexOf("export function MainCard"),
+    );
+
+    expect(smallCardSource).toMatch(/display: "flex",\s*alignItems: "center",\s*gap: 6,/);
+    expect(smallCardSource).toMatch(/\{icon\}\s*<div[\s\S]*?\{label\}\s*<\/div>\s*<\/div>\s*<div/);
+  });
+
+  it("keeps the active-turn category icon sizes", () => {
+    expect(mainSource).toContain("icon={<IconCard s={28} c={P} />}");
+    expect(mainSource).toContain("icon={<IconCoin s={28} c={G} />}");
+    expect(mainSource).toContain("icon={<IconAgency s={20} c={A} />}");
+    expect(mainSource).toContain("icon={<IconExtra s={20} c={E} />}");
+    expect(mainSource).toContain("icon={<IconFuel s={24} c={F} />}");
+    expect(mainSource).toContain("icon={<IconNulo s={20} c={N} />}");
+  });
 });

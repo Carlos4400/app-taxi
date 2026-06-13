@@ -399,11 +399,12 @@ class WearMainActivity : ComponentActivity() {
             ScreenState.CONFIRM_START_TURNO -> ConfirmStartTurnoScreen(
                 onCancel = { currentScreen.value = ScreenState.NO_ACTIVE_TURNO },
                 onConfirm = {
-                    val sent = sendStartTurno()
-                    if (sent) {
-                        currentScreen.value = ScreenState.NO_ACTIVE_TURNO
-                    }
-                    sent
+                    // sendStartTurno() ya navega de forma optimista a ACTIVE_TURNO
+                    // si el comando sale. No sobrescribir aqui: hacerlo dejaba la
+                    // pantalla de inicio (NO_ACTIVE_TURNO) tras confirmar, hasta el
+                    // siguiente STATUS de fondo. Si no sale (sent=false) se queda
+                    // en la confirmacion para reintentar.
+                    sendStartTurno()
                 }
             )
             ScreenState.ACTIVE_TURNO -> ActiveTurnoScreen(
@@ -430,7 +431,10 @@ class WearMainActivity : ComponentActivity() {
                     currentScreen.value = ScreenState.ADD_ENTRY
                 },
                 onAddNote = {
-                    if (requestNote("") { text ->
+                    if (hasPendingCriticalOperation()) {
+                        performFeedback("Operacion pendiente", strong = true)
+                        false
+                    } else if (requestNote("") { text ->
                         if (text.isNotBlank()) sendAddNote(text)
                     }) {
                         requestingNote.value = true
@@ -462,9 +466,9 @@ class WearMainActivity : ComponentActivity() {
                 categoryLabel = selectedCategoryLabel.value,
                 categoryColor = selectedCategoryColor.value,
                 onSave = { amount, note ->
-                    if (sendAddEntry(selectedCategory.value, amount, note)) {
-                        currentScreen.value = ScreenState.ACTIVE_TURNO
-                    }
+                    val sent = sendAddEntry(selectedCategory.value, amount, note)
+                    if (sent) currentScreen.value = ScreenState.ACTIVE_TURNO
+                    sent
                 },
                 onCancel = {
                     currentScreen.value = ScreenState.ACTIVE_TURNO
@@ -483,9 +487,9 @@ class WearMainActivity : ComponentActivity() {
                         initialAmount = e.amount,
                         initialNote = e.note,
                         onSave = { amount, note ->
-                            if (sendEditEntry(e.id, amount, note)) {
-                                currentScreen.value = ScreenState.ACTIVE_TURNO
-                            }
+                            val sent = sendEditEntry(e.id, amount, note)
+                            if (sent) currentScreen.value = ScreenState.ACTIVE_TURNO
+                            sent
                         },
                         onCancel = { currentScreen.value = ScreenState.ACTIVE_TURNO },
                         onRequestNote = { current, onResult -> requestNote(current, onResult) },
@@ -503,9 +507,9 @@ class WearMainActivity : ComponentActivity() {
                         entry = e,
                         onCancel = { currentScreen.value = ScreenState.EDIT_ENTRY },
                         onConfirm = {
-                            if (sendDeleteEntry(e.id)) {
-                                currentScreen.value = ScreenState.ACTIVE_TURNO
-                            }
+                            val sent = sendDeleteEntry(e.id)
+                            if (sent) currentScreen.value = ScreenState.ACTIVE_TURNO
+                            sent
                         }
                     )
                 }
@@ -515,9 +519,9 @@ class WearMainActivity : ComponentActivity() {
                 numPorTipo = numPorTipo.value,
                 entradas = entradas.value,
                 onConfirm = { dinero, km ->
-                    if (sendEndTurno(dinero, km)) {
-                        currentScreen.value = ScreenState.NO_ACTIVE_TURNO
-                    }
+                    val sent = sendEndTurno(dinero, km)
+                    if (sent) currentScreen.value = ScreenState.NO_ACTIVE_TURNO
+                    sent
                 },
                 onCancel = {
                     currentScreen.value = ScreenState.ACTIVE_TURNO
@@ -557,9 +561,7 @@ class WearMainActivity : ComponentActivity() {
                         turno = turno,
                         onRequestNote = { current, onResult -> requestNote(current, onResult) },
                         onConfirm = { dinero, km, entradas ->
-                            if (!sendEditTurno(turno.id, dinero, km, entradas)) {
-                                currentScreen.value = ScreenState.TURNO_SUMMARY
-                            }
+                            sendEditTurno(turno.id, dinero, km, entradas)
                         },
                         onCancel = { currentScreen.value = ScreenState.TURNO_SUMMARY }
                     )
@@ -1216,7 +1218,7 @@ private fun ConfirmStartTurnoScreen(
 private fun ConfirmDeleteScreen(
     entry: WatchEntry,
     onCancel: () -> Unit,
-    onConfirm: () -> Unit
+    onConfirm: () -> Boolean
 ) {
     val meta = categoriaMeta(entry.type)
     Box(
@@ -1259,8 +1261,7 @@ private fun ConfirmDeleteScreen(
                     modifier = Modifier.weight(1f),
                     onClick = {
                         if (!deleting) {
-                            deleting = true
-                            onConfirm()
+                            deleting = onConfirm()
                         }
                     }
                 )

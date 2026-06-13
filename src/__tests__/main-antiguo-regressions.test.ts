@@ -16,6 +16,13 @@ describe("Main antiguo regression locks", () => {
     expect(mainSource).toContain("confirmDialog={confirmDialog}");
   });
 
+  it("shows the paused home button with only play and Turno Pausado", () => {
+    const homeSource = readSource("src/screens/home-screen.tsx");
+
+    expect(homeSource).toMatch(/\{isPaused \? \(\s*<IconPlay s=\{40\} c="#3b82f6" \/>\s*\) : active \?/);
+    expect(homeSource).toContain('{isPaused ? "Turno Pausado" : active ? "Continuar Turno" : "Iniciar Turno"}');
+  });
+
   it("keeps calendar navigation and note creation handlers from mainAntiguo", () => {
     const calendarSource = readSource("src/screens/calendar-screen.tsx");
     const mainSource = readSource("src/main.tsx");

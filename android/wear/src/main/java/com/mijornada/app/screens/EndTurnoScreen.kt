@@ -24,7 +24,7 @@ fun EndTurnoScreen(
     totalsPorTipo: Map<String, Double>,
     numPorTipo: Map<String, Int>,
     entradas: List<WatchEntry>,
-    onConfirm: (dinero: Double, km: Double) -> Unit,
+    onConfirm: (dinero: Double, km: Double) -> Boolean,
     onCancel: () -> Unit
 ) {
     var activeField by remember { mutableStateOf<String?>(null) }
@@ -111,8 +111,7 @@ fun EndTurnoScreen(
                 borderColor = ColorGasolina
             ) {
                 if (!saving) {
-                    saving = true
-                    onConfirm(dinero, km)
+                    saving = onConfirm(dinero, km)
                 }
             }
             Spacer(modifier = Modifier.height(7.dp))

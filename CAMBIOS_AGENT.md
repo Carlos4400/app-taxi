@@ -1,3 +1,633 @@
+## 2026-06-14 00:24 - Corregir compilación del editor de turno Wear
+
+**Archivos modificados:** `android/wear/src/main/java/com/mijornada/app/screens/EditTurnoDatosScreen.kt`, `src/__tests__/android-wear-bridge.test.ts`
+
+### Cambio 1 - Devolver éxito en guardados locales del editor
+
+#### Código anterior
+```kotlin
+                editandoEntrada = null
+```
+
+```kotlin
+                nuevaCategoria = null
+```
+
+#### Código nuevo
+```kotlin
+                editandoEntrada = null
+                true
+```
+
+```kotlin
+                nuevaCategoria = null
+                true
+```
+
+#### Por qué se cambió
+`AddEntryScreen` exige que `onSave` devuelva `Boolean`. Los dos callbacks locales de `EditTurnoDatosScreen` seguían devolviendo `Unit`, por lo que `:wear:assembleDebug` fallaba con errores de tipo y `actualizar_reloj.bat` no podía generar ni instalar el APK.
+
+### Cambio 2 - Proteger el contrato booleano del editor
+
+#### Código anterior
+```ts
+    expect(pantalla).toContain("onConfirm: (Double, Double, List<WatchEntry>) -> Unit");
+    expect(pantalla).toContain("AddEntryScreen(");
+```
+
+#### Código nuevo
+```ts
+    expect(pantalla).toContain("onConfirm: (Double, Double, List<WatchEntry>) -> Boolean");
+    expect(pantalla).toContain("AddEntryScreen(");
+    expect(pantalla).toMatch(/editandoEntrada = null\s+true/);
+    expect(pantalla).toMatch(/nuevaCategoria = null\s+true/);
+```
+
+#### Por qué se cambió
+La prueba conservaba la firma antigua `Unit` y no verificaba que los guardados locales devolvieran el `Boolean` requerido. Las nuevas expectativas detectan la incompatibilidad que impedía compilar Wear.
+
+## 2026-06-13 20:06 - Mostrar estado pausado en inicio móvil
+
+**Archivos modificados:** `src/screens/home-screen.tsx`, `src/__tests__/main-antiguo-regressions.test.ts`
+
+### Cambio 1 - Mostrar solo play y Turno Pausado
+
+#### Código anterior
+```tsx
+            {active ? (
+              <>
+                <IconRocket s={30} c={G} />
+                <IconPlay s={40} c="#3b82f6" />
+              </>
+            ) : (
+              <IconRocket s={30} c={G} />
+            )}
+            {active ? "Continuar Turno" : "Iniciar Turno"}
+```
+
+#### Código nuevo
+```tsx
+            {isPaused ? (
+              <IconPlay s={40} c="#3b82f6" />
+            ) : active ? (
+              <>
+                <IconRocket s={30} c={G} />
+                <IconPlay s={40} c="#3b82f6" />
+              </>
+            ) : (
+              <IconRocket s={30} c={G} />
+            )}
+            {isPaused ? "Turno Pausado" : active ? "Continuar Turno" : "Iniciar Turno"}
+```
+
+#### Por qué se cambió
+Cuando el turno está pausado, el botón de inicio móvil debe comunicar el estado pausado como el reloj, manteniendo únicamente el icono play solicitado.
+
+### Cambio 2 - Proteger el botón pausado del inicio móvil
+
+#### Código anterior
+`No existía la prueba "shows the paused home button with only play and Turno Pausado" en src/__tests__/main-antiguo-regressions.test.ts.`
+
+#### Código nuevo
+```ts
+  it("shows the paused home button with only play and Turno Pausado", () => {
+    const homeSource = readSource("src/screens/home-screen.tsx");
+
+    expect(homeSource).toMatch(/\{isPaused \? \(\s*<IconPlay s=\{40\} c="#3b82f6" \/>\s*\) : active \?/);
+    expect(homeSource).toContain('{isPaused ? "Turno Pausado" : active ? "Continuar Turno" : "Iniciar Turno"}');
+  });
+```
+
+#### Por qué se cambió
+La prueba evita que el estado pausado vuelva a mostrar el cohete o el texto `Continuar Turno`.
+
+## 2026-06-13 16:20 - Conservar la edición del turno al rechazarse EDIT_TURNO
+
+**Archivos modificados:** `android/wear/src/main/java/com/mijornada/app/screens/EditTurnoDatosScreen.kt`, `android/wear/src/main/java/com/mijornada/app/WearMainActivity.kt`
+
+### Cambio 1 - EditTurnoDatosScreen propaga el resultado del envío
+
+#### Código anterior
+```kotlin
+    onConfirm: (Double, Double, List<WatchEntry>) -> Unit,
+    onCancel: () -> Unit
+```
+
+```kotlin
+        ) {
+            enviando = true
+            onConfirm(dinero, km, entradas)
+        }
+```
+
+#### Código nuevo
+```kotlin
+    onConfirm: (Double, Double, List<WatchEntry>) -> Boolean,
+    onCancel: () -> Unit
+```
+
+```kotlin
+        ) {
+            enviando = onConfirm(dinero, km, entradas)
+        }
+```
+
+#### Por qué se cambió
+`enviando` se ponía a `true` y nunca se reseteaba dentro de la pantalla. En éxito eso es correcto (la pantalla debe seguir en "Guardando..." hasta que el ACK del móvil navegue a `TURNO_SUMMARY` con la contabilidad ya recalculada, manejado en el bloque `OK`/`DUPLICATE_IGNORED`). En fallo, en cambio, se dependía de que el call site navegara fuera. Asignar el resultado de `onConfirm` a `enviando` mantiene el botón en envío cuando el comando se encola y lo rehabilita cuando se rechaza, sin tocar el flujo de confirmación contable.
+
+### Cambio 2 - El call site de EDIT_TURNO conserva la edición al fallar
+
+#### Código anterior
+```kotlin
+                        onConfirm = { dinero, km, entradas ->
+                            if (!sendEditTurno(turno.id, dinero, km, entradas)) {
+                                currentScreen.value = ScreenState.TURNO_SUMMARY
+                            }
+                        },
+```
+
+#### Código nuevo
+```kotlin
+                        onConfirm = { dinero, km, entradas ->
+                            sendEditTurno(turno.id, dinero, km, entradas)
+                        },
+```
+
+#### Por qué se cambió
+Al rechazarse el envío (operación crítica pendiente o sesión no confirmada), la lambda navegaba a `TURNO_SUMMARY` y se perdían los cambios introducidos (dinero, km, entradas). Devolver directamente el booleano de `sendEditTurno` elimina esa pérdida: en éxito (`true`) la pantalla permanece esperando el ACK que recalcula la contabilidad y navega; en fallo (`false`) se rehabilita el botón y se conserva la edición para reintentar. No se modifica `applyOptimisticEditTurno` ni la lógica contable.
+
+## 2026-06-13 16:13 - Rehabilitar el botón de envío cuando una operación se rechaza
+
+**Archivos modificados:** `android/wear/src/main/java/com/mijornada/app/screens/AddEntryScreen.kt`, `android/wear/src/main/java/com/mijornada/app/screens/EndTurnoScreen.kt`, `android/wear/src/main/java/com/mijornada/app/WearMainActivity.kt`
+
+### Cambio 1 - AddEntryScreen propaga el resultado del guardado
+
+#### Código anterior
+```kotlin
+    onSave: (amount: Double, note: String) -> Unit,
+    onCancel: () -> Unit,
+```
+
+```kotlin
+            onSave = {
+                if (note.isNotBlank() && !saving) {
+                    saving = true
+                    onSave(0.0, note)
+                }
+            },
+```
+
+```kotlin
+                    onClick = {
+                        if (!saving) {
+                            saving = true
+                            onSave(amount, note)
+                        }
+                    }
+```
+
+#### Código nuevo
+```kotlin
+    onSave: (amount: Double, note: String) -> Boolean,
+    onCancel: () -> Unit,
+```
+
+```kotlin
+            onSave = {
+                if (note.isNotBlank() && !saving) {
+                    saving = onSave(0.0, note)
+                }
+            },
+```
+
+```kotlin
+                    onClick = {
+                        if (!saving) {
+                            saving = onSave(amount, note)
+                        }
+                    }
+```
+
+#### Por qué se cambió
+`saving` se ponía a `true` al pulsar guardar y solo se descartaba al desmontarse la pantalla tras navegar. Si `sendAddEntry`/`sendEditEntry` se rechazaba (operación crítica pendiente), el call site no navegaba y la pantalla seguía montada con `saving = true`, dejando el botón Guardar deshabilitado para siempre; el usuario tenía que cancelar y reintroducir el importe. Haciendo que `onSave` devuelva el éxito del envío y asignándolo a `saving`, el botón se rehabilita al fallar (mismo patrón que ya usaban `ConfirmPauseTurnoScreen` y `ConfirmStartTurnoScreen` con `pausing = onConfirm()`).
+
+### Cambio 2 - EndTurnoScreen propaga el resultado del cierre
+
+#### Código anterior
+```kotlin
+    onConfirm: (dinero: Double, km: Double) -> Unit,
+    onCancel: () -> Unit
+```
+
+```kotlin
+                if (!saving) {
+                    saving = true
+                    onConfirm(dinero, km)
+                }
+```
+
+#### Código nuevo
+```kotlin
+    onConfirm: (dinero: Double, km: Double) -> Boolean,
+    onCancel: () -> Unit
+```
+
+```kotlin
+                if (!saving) {
+                    saving = onConfirm(dinero, km)
+                }
+```
+
+#### Por qué se cambió
+Mismo defecto que en `AddEntryScreen`: al rechazarse `sendEndTurno`, el botón "Terminar Turno" quedaba bloqueado en "Enviando..." sin posibilidad de reintento. Propagar el resultado lo rehabilita.
+
+### Cambio 3 - ConfirmDeleteScreen propaga el resultado del borrado
+
+#### Código anterior
+```kotlin
+private fun ConfirmDeleteScreen(
+    entry: WatchEntry,
+    onCancel: () -> Unit,
+    onConfirm: () -> Unit
+) {
+```
+
+```kotlin
+                    onClick = {
+                        if (!deleting) {
+                            deleting = true
+                            onConfirm()
+                        }
+                    }
+```
+
+#### Código nuevo
+```kotlin
+private fun ConfirmDeleteScreen(
+    entry: WatchEntry,
+    onCancel: () -> Unit,
+    onConfirm: () -> Boolean
+) {
+```
+
+```kotlin
+                    onClick = {
+                        if (!deleting) {
+                            deleting = onConfirm()
+                        }
+                    }
+```
+
+#### Por qué se cambió
+Mismo defecto: al rechazarse `sendDeleteEntry`, el botón "Borrar" quedaba en "Borrando..." de forma permanente. Propagar el resultado lo rehabilita.
+
+### Cambio 4 - Los call sites de MainContent devuelven el resultado del envío
+
+#### Código anterior
+```kotlin
+                onSave = { amount, note ->
+                    if (sendAddEntry(selectedCategory.value, amount, note)) {
+                        currentScreen.value = ScreenState.ACTIVE_TURNO
+                    }
+                },
+```
+
+```kotlin
+                        onSave = { amount, note ->
+                            if (sendEditEntry(e.id, amount, note)) {
+                                currentScreen.value = ScreenState.ACTIVE_TURNO
+                            }
+                        },
+```
+
+```kotlin
+                        onConfirm = {
+                            if (sendDeleteEntry(e.id)) {
+                                currentScreen.value = ScreenState.ACTIVE_TURNO
+                            }
+                        }
+```
+
+```kotlin
+                onConfirm = { dinero, km ->
+                    if (sendEndTurno(dinero, km)) {
+                        currentScreen.value = ScreenState.NO_ACTIVE_TURNO
+                    }
+                },
+```
+
+#### Código nuevo
+```kotlin
+                onSave = { amount, note ->
+                    val sent = sendAddEntry(selectedCategory.value, amount, note)
+                    if (sent) currentScreen.value = ScreenState.ACTIVE_TURNO
+                    sent
+                },
+```
+
+```kotlin
+                        onSave = { amount, note ->
+                            val sent = sendEditEntry(e.id, amount, note)
+                            if (sent) currentScreen.value = ScreenState.ACTIVE_TURNO
+                            sent
+                        },
+```
+
+```kotlin
+                        onConfirm = {
+                            val sent = sendDeleteEntry(e.id)
+                            if (sent) currentScreen.value = ScreenState.ACTIVE_TURNO
+                            sent
+                        }
+```
+
+```kotlin
+                onConfirm = { dinero, km ->
+                    val sent = sendEndTurno(dinero, km)
+                    if (sent) currentScreen.value = ScreenState.NO_ACTIVE_TURNO
+                    sent
+                },
+```
+
+#### Por qué se cambió
+Las lambdas devolvían `Unit`, así que la pantalla no sabía si el envío había tenido éxito y no podía rehabilitar su botón. Ahora devuelven el booleano de `send…`, preservando la navegación solo en caso de éxito y permitiendo a la pantalla revertir su estado de envío cuando se rechaza. `EditTurnoDatosScreen` (EDIT_TURNO) se deja fuera deliberadamente: su navegación está invertida y afecta al recálculo contable, por lo que requiere tratamiento aparte.
+
+## 2026-06-13 16:10 - Aumentar iconos del turno activo
+
+**Archivos modificados:** `src/main.tsx`, `src/__tests__/common-components-extraction.test.ts`
+
+### Cambio 1 - Aumentar los seis iconos de categorías
+
+#### Código anterior
+```tsx
+            icon={<IconCard s={26} c={P} />}
+            icon={<IconCoin s={26} c={G} />}
+            icon={<IconAgency s={18} c={A} />}
+            icon={<IconExtra s={18} c={E} />}
+            icon={<IconFuel s={22} c={F} />}
+            icon={<IconNulo s={18} c={N} />}
+```
+
+#### Código nuevo
+```tsx
+            icon={<IconCard s={28} c={P} />}
+            icon={<IconCoin s={28} c={G} />}
+            icon={<IconAgency s={20} c={A} />}
+            icon={<IconExtra s={20} c={E} />}
+            icon={<IconFuel s={24} c={F} />}
+            icon={<IconNulo s={20} c={N} />}
+```
+
+#### Por qué se cambió
+Se aumentaron dos píxeles los iconos de las seis tarjetas de categorías de la pantalla de turno activo.
+
+### Cambio 2 - Proteger los tamaños de iconos del turno activo
+
+#### Código anterior
+`No existía la prueba "keeps the active-turn category icon sizes" en src/__tests__/common-components-extraction.test.ts.`
+
+#### Código nuevo
+```ts
+  it("keeps the active-turn category icon sizes", () => {
+    expect(mainSource).toContain("icon={<IconCard s={28} c={P} />}");
+    expect(mainSource).toContain("icon={<IconCoin s={28} c={G} />}");
+    expect(mainSource).toContain("icon={<IconAgency s={20} c={A} />}");
+    expect(mainSource).toContain("icon={<IconExtra s={20} c={E} />}");
+    expect(mainSource).toContain("icon={<IconFuel s={24} c={F} />}");
+    expect(mainSource).toContain("icon={<IconNulo s={20} c={N} />}");
+  });
+```
+
+#### Por qué se cambió
+La prueba evita que los tamaños concretos de los seis iconos del turno activo cambien accidentalmente.
+
+## 2026-06-13 16:09 - Evitar pérdida silenciosa de una segunda nota en el reloj
+
+**Archivos modificados:** `android/wear/src/main/java/com/mijornada/app/WearMainActivity.kt`, `android/wear/src/main/java/com/mijornada/app/screens/ActiveTurnoScreen.kt`
+
+### Cambio 1 - Bloquear la segunda nota antes de abrir el teclado
+
+#### Código anterior
+```kotlin
+                onAddNote = {
+                    if (requestNote("") { text ->
+                        if (text.isNotBlank()) sendAddNote(text)
+                    }) {
+                        requestingNote.value = true
+                        true
+                    } else {
+                        false
+                    }
+                },
+```
+
+#### Código nuevo
+```kotlin
+                onAddNote = {
+                    if (hasPendingCriticalOperation()) {
+                        performFeedback("Operacion pendiente", strong = true)
+                        false
+                    } else if (requestNote("") { text ->
+                        if (text.isNotBlank()) sendAddNote(text)
+                    }) {
+                        requestingNote.value = true
+                        true
+                    } else {
+                        false
+                    }
+                },
+```
+
+#### Por qué se cambió
+Tras enviar la primera nota, `requestingNote` vuelve a `false` al cerrar el RemoteInput (no al recibir el ACK), así que el botón se rehabilitaba aunque la nota siguiera en el outbox. La segunda nota se rechazaba dentro de `sendCommand` (`hasPendingCriticalOperation()`), pero solo después de que el usuario había escrito el texto, y ese texto se descartaba porque el resultado de `sendAddNote` se ignora en la lambda. Comprobar `hasPendingCriticalOperation()` antes de abrir el teclado convierte el rechazo tardío (post-escritura) en uno temprano: el usuario nunca escribe en vano y no se pierde la nota.
+
+### Cambio 2 - Atenuar el botón de nota mientras hay una operación pendiente
+
+#### Código anterior
+```kotlin
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth(WatchSafeButtonWidth)
+                    .clip(RoundedCornerShape(14.dp))
+                    .background(ColorNuloBg)
+                    .clickable(enabled = !requestingNote) {
+                        onAddNote()
+                    }
+                    .padding(vertical = 9.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = if (requestingNote) "Abriendo..." else "✎  Añadir nota al turno",
+                    color = ColorWhite,
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+```
+
+#### Código nuevo
+```kotlin
+            val notaBloqueada = pendingOpsCount > 0
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth(WatchSafeButtonWidth)
+                    .clip(RoundedCornerShape(14.dp))
+                    .background(if (notaBloqueada) ColorDisabledBg else ColorNuloBg)
+                    .clickable(enabled = !requestingNote && !notaBloqueada) {
+                        onAddNote()
+                    }
+                    .padding(vertical = 9.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = when {
+                        notaBloqueada -> "Sincronizando nota…"
+                        requestingNote -> "Abriendo..."
+                        else -> "✎  Añadir nota al turno"
+                    },
+                    color = if (notaBloqueada) ColorDisabledText else ColorWhite,
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+```
+
+#### Por qué se cambió
+El botón solo se deshabilitaba durante el instante en que el RemoteInput estaba abierto (`requestingNote`), por lo que el usuario podía volver a pulsarlo con una nota aún pendiente y solo descubría el bloqueo mediante un toast efímero. Deshabilitar y atenuar el botón mientras `pendingOpsCount > 0` da estado visible y persistente del porqué, reutilizando los colores `ColorDisabledBg`/`ColorDisabledText` ya existentes en la paleta y el `SyncIndicator` que ya muestra el contador de pendientes. En uso normal (sin pendientes) el botón se ve igual que antes.
+
+## 2026-06-13 15:48 - Corregir alineación de iconos en turno activo
+
+**Archivos modificados:** `src/components/common.tsx`, `src/__tests__/common-components-extraction.test.ts`
+
+### Cambio 1 - Alinear el icono con el título de SmallCard
+
+#### Código anterior
+```tsx
+        display: "flex",
+        alignItems: "center",
+        gap: 10,
+```
+
+```tsx
+      {icon}
+      <div style={{ flex: 1 }}>
+        <div
+          style={{
+            fontSize: 11,
+            fontWeight: 600,
+            color: "rgba(255,255,255,0.45)",
+            letterSpacing: "0.5px",
+          }}
+        >
+          {label}
+        </div>
+        <div
+          style={{
+            fontSize: 18,
+            fontWeight: 800,
+            color,
+            letterSpacing: "-0.3px",
+            marginTop: 2,
+          }}
+        >
+          {fmt(total)}
+        </div>
+      </div>
+```
+
+#### Código nuevo
+```tsx
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 6,
+        }}
+      >
+        {icon}
+        <div
+          style={{
+            fontSize: 11,
+            fontWeight: 600,
+            color: "rgba(255,255,255,0.45)",
+            letterSpacing: "0.5px",
+          }}
+        >
+          {label}
+        </div>
+      </div>
+      <div
+        style={{
+          fontSize: 18,
+          fontWeight: 800,
+          color,
+          letterSpacing: "-0.3px",
+          marginTop: 2,
+        }}
+      >
+        {fmt(total)}
+      </div>
+```
+
+#### Por qué se cambió
+El icono estaba centrado verticalmente respecto al bloque completo formado por título e importe. La fila nueva alinea el icono exclusivamente con el título, igual que las tarjetas de las demás pantallas.
+
+### Cambio 2 - Proteger la fila de icono y título de SmallCard
+
+#### Código anterior
+`No existía la prueba "aligns the SmallCard icon with its label row" en src/__tests__/common-components-extraction.test.ts.`
+
+#### Código nuevo
+```ts
+  it("aligns the SmallCard icon with its label row", () => {
+    const commonSource = readFileSync(commonPath, "utf8");
+    const smallCardSource = commonSource.slice(
+      commonSource.indexOf("export function SmallCard"),
+      commonSource.indexOf("export function MainCard"),
+    );
+
+    expect(smallCardSource).toMatch(/display: "flex",\s*alignItems: "center",\s*gap: 6,/);
+    expect(smallCardSource).toMatch(/\{icon\}\s*<div[\s\S]*?\{label\}\s*<\/div>\s*<\/div>\s*<div/);
+  });
+```
+
+#### Por qué se cambió
+La prueba evita que el icono vuelva a quedar fuera de la fila del título y centrado respecto al bloque completo.
+
+## 2026-06-13 13:34 - Corregir navegación tras confirmar inicio de turno
+
+**Archivos modificados:** `android/wear/src/main/java/com/mijornada/app/WearMainActivity.kt`
+
+### Cambio 1 - No sobrescribir la navegación optimista de START_TURNO
+
+El handler `onConfirm` de `CONFIRM_START_TURNO` ponía la pantalla en `NO_ACTIVE_TURNO` después de que `sendStartTurno()` ya la hubiera puesto de forma optimista en `ACTIVE_TURNO`. Resultado: al confirmar "Iniciar", el reloj mostraba la pantalla de inicio (sin turno) pese a tener el turno activo, hasta que llegaba el siguiente STATUS de fondo que lo corregía. Se elimina la sobrescritura y se deja que `sendStartTurno()` controle la navegación.
+
+#### Código anterior
+```kotlin
+                onConfirm = {
+                    val sent = sendStartTurno()
+                    if (sent) {
+                        currentScreen.value = ScreenState.NO_ACTIVE_TURNO
+                    }
+                    sent
+                }
+```
+
+#### Código nuevo
+```kotlin
+                onConfirm = {
+                    // sendStartTurno() ya navega de forma optimista a ACTIVE_TURNO
+                    // si el comando sale. No sobrescribir aqui: hacerlo dejaba la
+                    // pantalla de inicio (NO_ACTIVE_TURNO) tras confirmar, hasta el
+                    // siguiente STATUS de fondo. Si no sale (sent=false) se queda
+                    // en la confirmacion para reintentar.
+                    sendStartTurno()
+                }
+```
+
+#### Por qué se cambió
+La sobrescritura contradecía la navegación optimista a `ACTIVE_TURNO` de `sendTurnoStateCommand("START_TURNO")` (asimétrica respecto al handler de pausa, que sí vuelve a `ACTIVE_TURNO`). Provocaba una pantalla incorrecta tras iniciar y riesgo de doble `START_TURNO` si el usuario volvía a pulsar "Iniciar" antes del STATUS. `sendStartTurno()` sigue devolviendo `Boolean`, que es lo que espera `onConfirm`.
+
 ## 2026-06-12 23:29 - Reducir títulos de totales finales
 
 **Archivos modificados:** `android/wear/src/main/java/com/mijornada/app/screens/TurnoSummaryScreen.kt`, `src/__tests__/android-wear-bridge.test.ts`

@@ -36,7 +36,7 @@ import com.mijornada.app.theme.*
 fun EditTurnoDatosScreen(
     turno: WatchTurno,
     onRequestNote: (String, (String) -> Unit) -> Unit,
-    onConfirm: (Double, Double, List<WatchEntry>) -> Unit,
+    onConfirm: (Double, Double, List<WatchEntry>) -> Boolean,
     onCancel: () -> Unit
 ) {
     var dineroText by remember { mutableStateOf(amountToText(turno.dinero)) }
@@ -78,6 +78,7 @@ fun EditTurnoDatosScreen(
                     if (it.id == editando.id) it.copy(amount = if (it.type == "nota") it.amount else amount, note = note.trim()) else it
                 }
                 editandoEntrada = null
+                true
             },
             onCancel = { editandoEntrada = null },
             onRequestNote = onRequestNote,
@@ -106,6 +107,7 @@ fun EditTurnoDatosScreen(
                     time = horaActual(),
                 )
                 nuevaCategoria = null
+                true
             },
             onCancel = { nuevaCategoria = null },
             onRequestNote = onRequestNote
@@ -229,8 +231,7 @@ fun EditTurnoDatosScreen(
             ColorPropinaBg,
             enabled = valido && !enviando
         ) {
-            enviando = true
-            onConfirm(dinero, km, entradas)
+            enviando = onConfirm(dinero, km, entradas)
         }
         Spacer(modifier = Modifier.height(6.dp))
         BotonAncho("Cancelar", ColorGrey, ColorNuloBg) { onCancel() }

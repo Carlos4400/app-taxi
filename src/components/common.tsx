@@ -35,9 +35,6 @@ export function SmallCard({
         borderRadius: 16,
         padding: "12px 14px",
         border: `1px solid ${color}33`,
-        display: "flex",
-        alignItems: "center",
-        gap: 10,
         cursor: disabled ? "default" : onClick ? "pointer" : "default",
         transition: "all 0.15s",
         opacity: disabled ? 0.35 : 1,
@@ -45,8 +42,14 @@ export function SmallCard({
         filter: disabled ? "grayscale(0.4)" : "none",
       }}
     >
-      {icon}
-      <div style={{ flex: 1 }}>
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 6,
+        }}
+      >
+        {icon}
         <div
           style={{
             fontSize: 11,
@@ -57,17 +60,17 @@ export function SmallCard({
         >
           {label}
         </div>
-        <div
-          style={{
-            fontSize: 18,
-            fontWeight: 800,
-            color,
-            letterSpacing: "-0.3px",
-            marginTop: 2,
-          }}
-        >
-          {fmt(total)}
-        </div>
+      </div>
+      <div
+        style={{
+          fontSize: 18,
+          fontWeight: 800,
+          color,
+          letterSpacing: "-0.3px",
+          marginTop: 2,
+        }}
+      >
+        {fmt(total)}
       </div>
     </div>
   );

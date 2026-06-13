@@ -125,20 +125,25 @@ fun ActiveTurnoScreen(
 
             Spacer(modifier = Modifier.height(8.dp))
 
+            val notaBloqueada = pendingOpsCount > 0
             Box(
                 modifier = Modifier
                     .fillMaxWidth(WatchSafeButtonWidth)
                     .clip(RoundedCornerShape(14.dp))
-                    .background(ColorNuloBg)
-                    .clickable(enabled = !requestingNote) {
+                    .background(if (notaBloqueada) ColorDisabledBg else ColorNuloBg)
+                    .clickable(enabled = !requestingNote && !notaBloqueada) {
                         onAddNote()
                     }
                     .padding(vertical = 9.dp),
                 contentAlignment = Alignment.Center
             ) {
                 Text(
-                    text = if (requestingNote) "Abriendo..." else "✎  Añadir nota al turno",
-                    color = ColorWhite,
+                    text = when {
+                        notaBloqueada -> "Sincronizando nota…"
+                        requestingNote -> "Abriendo..."
+                        else -> "✎  Añadir nota al turno"
+                    },
+                    color = if (notaBloqueada) ColorDisabledText else ColorWhite,
                     fontSize = 11.sp,
                     fontWeight = FontWeight.Bold
                 )
