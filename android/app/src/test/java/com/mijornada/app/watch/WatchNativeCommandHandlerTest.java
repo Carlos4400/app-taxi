@@ -73,7 +73,7 @@ public class WatchNativeCommandHandlerTest {
         );
 
         JSONObject duplicate = new JSONObject(duplicateJson);
-        assertEquals("DUPLICATE_IGNORED", duplicate.getString("type"));
+        assertEquals("OK", duplicate.getString("type"));
         assertEquals(1, database.operationDao().getAppliedOperationIds().size());
         assertEquals("10:00", database.currentTurnoDao().getCurrent().getStartTime());
     }

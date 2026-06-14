@@ -1,13 +1,13 @@
 package com.mijornada.app
 
 import android.app.RemoteInput
+import android.Manifest
 import android.content.Intent
 import android.content.SharedPreferences
 import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
-import android.os.PowerManager
 import android.os.VibrationEffect
 import android.os.Vibrator
 import android.widget.Toast
@@ -33,8 +33,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.wear.compose.material.Text
 import androidx.wear.input.RemoteInputIntentHelper
-import com.google.android.gms.wearable.PutDataMapRequest
-import com.google.android.gms.wearable.Wearable
 import com.mijornada.app.screens.*
 import com.mijornada.app.theme.*
 import org.json.JSONArray
@@ -44,6 +42,12 @@ import java.util.concurrent.atomic.AtomicReference
 
 /** Extra con la acción solicitada desde la tile ("iniciar_turno", "continuar", "turnos", "abrir"). */
 const val EXTRA_ACCION_TILE = "com.mijornada.app.ACCION_TILE"
+
+/** Claves para restaurar la navegacion tras recreacion de la Activity (cambio de
+ *  configuracion o muerte de proceso). El estado del turno y los comandos
+ *  pendientes se reconstruyen aparte desde STATUS y la outbox. */
+private const val STATE_SCREEN = "wear_state_screen"
+private const val STATE_CATEGORY = "wear_state_category"
 
 enum class ScreenState {
     NO_CONNECTED,
@@ -57,7 +61,8 @@ enum class ScreenState {
     CONFIRM_START_TURNO,
     CONFIRM_PAUSE_TURNO,
     CONFIRM_DELETE,
-    END_TURNO
+    END_TURNO,
+    PAUSED_MENU
 }
 
 class WearMainActivity : ComponentActivity() {
@@ -96,28 +101,6 @@ class WearMainActivity : ComponentActivity() {
         mainHandler.postDelayed(resyncRunnable, delayMs)
     }
 
-    /** WakeLock parcial breve para que el OutboxWorker pueda completar sus reenvios
-     *  antes de que el reloj entre en Doze al cerrarse la pantalla del usuario. */
-    private var operationWakeLock: PowerManager.WakeLock? = null
-    private fun acquireOperationWakeLock() {
-        if (operationWakeLock?.isHeld == true) return
-        val pm = getSystemService(PowerManager::class.java) ?: return
-        val wl = pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "MiTurno:operation-pending")
-        try {
-            wl.setReferenceCounted(false)
-            wl.acquire(15_000L) // 15s maximo
-            operationWakeLock = wl
-        } catch (_: Exception) {
-            // si el sistema rechaza el wakelock, ignorar; el WorkManager seguira igualmente
-        }
-    }
-    private fun releaseOperationWakeLockIfIdle() {
-        if (WatchOutbox.hasPendingCommands(this).not()) {
-            try { operationWakeLock?.takeIf { it.isHeld }?.release() } catch (_: Exception) {}
-            operationWakeLock = null
-        }
-    }
-
     private fun refreshPendingOpsCount() {
         pendingOpsCount.value = WatchOutbox.pendingCommands(this).size
     }
@@ -140,13 +123,6 @@ class WearMainActivity : ComponentActivity() {
         ScreenState.EDIT_TURNO_DATOS,
     )
 
-    /** Pantallas tipo formulario donde un OK/DUPLICATE_IGNORED de un comando debe cerrar el form. */
-    private val formScreens = setOf(
-        ScreenState.ADD_ENTRY,
-        ScreenState.EDIT_ENTRY,
-        ScreenState.CONFIRM_DELETE,
-        ScreenState.END_TURNO,
-    )
     private var isUiActive = false
 
     private val prefs by lazy { getSharedPreferences(WearConstants.Response.PREFS, MODE_PRIVATE) }
@@ -156,14 +132,19 @@ class WearMainActivity : ComponentActivity() {
      *  la pantalla no avanzaba hasta bloquear/desbloquear el reloj. Valido porque
      *  servicio y Activity comparten proceso. */
     private val responsePrefsListener = SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
-        if (key == WearConstants.Response.RESPONSE_TIMESTAMP) {
+        if (key == WearConstants.Response.RESPONSE_SEQUENCE) {
             pollResponseState()
         }
     }
-    private val timestampPrefs by lazy { getSharedPreferences("wear_main_activity_state", MODE_PRIVATE) }
-    private var lastKnownResponseTimestamp: Long
-        get() = timestampPrefs.getLong("last_known_response_ts", 0L)
-        set(value) { timestampPrefs.edit().putLong("last_known_response_ts", value).apply() }
+
+    /** operationIds cuya respuesta con feedback (OK/DUPLICATE/ERROR) ya se ha
+     *  presentado al usuario. Evita el doble toast/vibracion cuando la misma
+     *  respuesta llega por los dos canales (MessageClient + DataClient). */
+    private val shownResponseOpIds = java.util.LinkedHashSet<String>()
+
+    /** True mientras el movil responde que no esta preparado. Evita repetir el
+     *  aviso en cada reintento; se reinicia al recibir un STATUS valido. */
+    private var movilNoPreparadoAvisado = false
 
     // Entrada de texto (nota) vía teclado / voz del sistema (RemoteInput)
     private val NOTE_KEY = "wear_note"
@@ -172,8 +153,24 @@ class WearMainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            requestPermissions(arrayOf(Manifest.permission.POST_NOTIFICATIONS), 1001)
+        }
         refreshPendingOpsCount()
         pendingTileAction = intent?.getStringExtra(EXTRA_ACCION_TILE)
+
+        // Restaurar la navegacion tras recreacion. El turno y los comandos
+        // pendientes se reconstruyen aparte (STATUS + outbox, sin duplicar por
+        // operationId). Las pantallas que dependen de un objeto no serializado
+        // (editingEntry/selectedTurno) caen a un destino seguro por sus guards.
+        // Una accion de tile entrante tiene prioridad sobre la pantalla guardada.
+        if (savedInstanceState != null && pendingTileAction == null) {
+            savedInstanceState.getString(STATE_SCREEN)?.let { name ->
+                runCatching { ScreenState.valueOf(name) }.getOrNull()?.let { currentScreen.value = it }
+            }
+            selectedCategory.value = savedInstanceState.getString(STATE_CATEGORY, "")
+            if (selectedCategory.value.isNotBlank()) setupCategoryMeta(selectedCategory.value)
+        }
 
         noteLauncher = registerForActivityResult(
             ActivityResultContracts.StartActivityForResult()
@@ -194,6 +191,12 @@ class WearMainActivity : ComponentActivity() {
                 MainContent()
             }
         }
+    }
+
+    override fun onSaveInstanceState(outState: Bundle) {
+        super.onSaveInstanceState(outState)
+        outState.putString(STATE_SCREEN, currentScreen.value.name)
+        outState.putString(STATE_CATEGORY, selectedCategory.value)
     }
 
     override fun onNewIntent(intent: Intent) {
@@ -235,7 +238,14 @@ class WearMainActivity : ComponentActivity() {
     override fun onResume() {
         super.onResume()
         isUiActive = true
+        WearUiVisibility.isVisible = true
         refreshPendingOpsCount()
+        // Reactivar el envio de la outbox al volver a primer plano: si el worker
+        // agoto sus reintentos mientras la app estuvo en segundo plano, esto lo
+        // vuelve a programar. KEEP es idempotente si ya hay trabajo activo.
+        if (WatchOutbox.unpublishedCommands(this).isNotEmpty()) {
+            MobileResponseService.enqueueOutboxRetry(this)
+        }
         prefs.registerOnSharedPreferenceChangeListener(responsePrefsListener)
         pollResponseState()
         consumeTileAction()
@@ -249,33 +259,57 @@ class WearMainActivity : ComponentActivity() {
 
     override fun onPause() {
         isUiActive = false
+        WearUiVisibility.isVisible = false
         prefs.unregisterOnSharedPreferenceChangeListener(responsePrefsListener)
+        // Detener el sondeo de estado en segundo plano: onResume vuelve a
+        // pedir STATUS y reprograma el resync si sigue haciendo falta.
+        mainHandler.removeCallbacks(resyncRunnable)
         super.onPause()
     }
 
     private fun pollResponseState() {
-        val ts = prefs.getLong(WearConstants.Response.RESPONSE_TIMESTAMP, 0L)
-        if (ts != lastKnownResponseTimestamp) {
-            lastKnownResponseTimestamp = ts
-            val responseJson = prefs.getString(WearConstants.Response.LAST_RESPONSE, null) ?: return
-            processResponseFromPrefs(responseJson)
+        val responses = WearConstants.Response.pending(this)
+        for (responseJson in responses) {
+            if (processResponseFromPrefs(responseJson)) {
+                WearConstants.Response.acknowledge(this, responseJson)
+            }
         }
     }
 
-    private fun processResponseFromPrefs(responseJson: String) {
-        try {
+    private fun processResponseFromPrefs(responseJson: String): Boolean {
+        return try {
             val json = JSONObject(responseJson)
             val responseType = json.optString("type")
             val operationId = json.optString("operationId", "")
-            val isTerminal = WearConstants.isTerminalResponse(responseType, json.optString("code", ""))
+            val responseCode = json.optString("code", "")
+            val isTerminal = WearConstants.isTerminalResponse(responseType, responseCode)
+            // P2: deduplicar la PRESENTACION. La misma respuesta llega por dos
+            // canales; los tipos con feedback (toast/vibracion/navegacion) solo
+            // deben procesarse una vez por operationId. STATUS y TURNOS_STATUS no
+            // se deduplican: son idempotentes y refrescan datos.
+            val tieneFeedback = responseType == "OK" ||
+                responseType == "DUPLICATE_IGNORED" ||
+                responseType == "ERROR"
+            if (tieneFeedback && isTerminal && operationId.isNotBlank()) {
+                if (!shownResponseOpIds.add(operationId)) return true
+                while (shownResponseOpIds.size > WearConstants.HANDLED_OPERATION_LIMIT) {
+                    shownResponseOpIds.remove(shownResponseOpIds.iterator().next())
+                }
+            }
             if (operationId.isNotBlank() && isTerminal) {
-                WatchOutbox.remove(this, operationId)
+                if (!WatchOutbox.remove(this, operationId)) return false
             }
             if (responseType == "STATUS") {
                 refreshPendingOpsCount()
+                // El movil respondio: esta preparado. Permitir un nuevo aviso si
+                // mas adelante volviera a no estarlo.
+                movilNoPreparadoAvisado = false
                 val nextUserSessionId = json.optString("userSessionId", "")
                 if (nextUserSessionId.isNotBlank()) {
-                    WatchOutbox.removeCommandsFromOtherSessions(this, nextUserSessionId)
+                    val previousSessionPending = WatchOutbox.commandsFromOtherSessions(this, nextUserSessionId)
+                    if (previousSessionPending.isNotEmpty()) {
+                        performFeedback("Hay una operacion pendiente de otra cuenta", strong = false)
+                    }
                 }
                 userSessionId.value = nextUserSessionId
                 isConnected.value = json.optBoolean("connected", false)
@@ -287,7 +321,9 @@ class WearMainActivity : ComponentActivity() {
                 totalPausedMinutes.value = json.optInt("totalPausedMinutes", 0)
                 parseTotals(json.optJSONObject("totals"))
                 parseEntradas(json.optJSONArray("entradas"))
-                MobileResponseService.enqueueOutboxRetry(this)
+                if (WatchOutbox.unpublishedCommands(this).isNotEmpty()) {
+                    MobileResponseService.enqueueOutboxRetry(this)
+                }
 
                 // Invariante: un STATUS de fondo solo navega entre pantallas de
                 // reposo. Nunca expulsa de consultas, formularios o ediciones.
@@ -327,47 +363,68 @@ class WearMainActivity : ComponentActivity() {
                 }
             } else if ("OK" == json.optString("type")) {
                 refreshPendingOpsCount()
-                releaseOperationWakeLockIfIdle()
                 performFeedback(json.optString("message", "Hecho"), strong = false)
                 if (openTurnosAfterOk) {
                     openTurnosAfterOk = false
                     sendGetTurnos()
                 } else {
-                    // Solo navegar a ACTIVE_TURNO si el usuario sigue en un formulario.
-                    // En TURNOS, TURNO_SUMMARY, NO_CONNECTED: respetar pantalla actual.
+                    // La edicion de turno cerrado espera el ACK para volver al
+                    // resumen. Los demas formularios ya navegan al encolar su
+                    // comando, asi que un OK (que puede ser de otra operacion ya
+                    // pendiente) no debe sacar al usuario del formulario actual
+                    // ni perder lo que este escribiendo: solo se valida la
+                    // pantalla que realmente espera confirmacion.
                     if (currentScreen.value == ScreenState.EDIT_TURNO_DATOS) {
-                        // Edicion de turno cerrado confirmada: volver al resumen
-                        // y re-pedir la lista para mostrar los datos del movil.
                         currentScreen.value = ScreenState.TURNO_SUMMARY
                         sendGetTurnos()
-                    } else if (currentScreen.value in formScreens) {
-                        currentScreen.value = ScreenState.ACTIVE_TURNO
                     }
                     requestStatus()
                 }
             } else if ("DUPLICATE_IGNORED" == json.optString("type")) {
                 refreshPendingOpsCount()
-                releaseOperationWakeLockIfIdle()
                 performFeedback(json.optString("message", "Ya aplicado"), strong = false)
                 if (currentScreen.value == ScreenState.EDIT_TURNO_DATOS) {
                     currentScreen.value = ScreenState.TURNO_SUMMARY
                     sendGetTurnos()
-                } else if (currentScreen.value in formScreens) {
-                    currentScreen.value = if (activeTurno.value) ScreenState.ACTIVE_TURNO else ScreenState.NO_ACTIVE_TURNO
                 }
                 requestStatus()
-                MobileResponseService.enqueueOutboxRetry(this)
+                if (WatchOutbox.unpublishedCommands(this).isNotEmpty()) {
+                    MobileResponseService.enqueueOutboxRetry(this)
+                }
             } else if ("ERROR" == json.optString("type")) {
                 openTurnosAfterOk = false
                 refreshPendingOpsCount()
-                releaseOperationWakeLockIfIdle()
-                performFeedback(json.optString("message", "Error"), strong = true)
-                // Optimismo: si aplicamos un cambio local y el movil rechazo, resync
-                // con el estado real para evitar inconsistencias visuales.
-                requestStatus()
+                val code = responseCode
+                val noTerminal = code == "USER_NOT_PREPARED" || code == "APP_NOT_READY"
+                if (noTerminal) {
+                    // El movil aun no esta listo (app cerrada / sesion no
+                    // preparada). No es un fallo del comando: el outbox lo
+                    // conserva y se reintenta. Avisar suave UNA sola vez y
+                    // re-pedir estado con espera (backoff), nunca en bucle
+                    // inmediato ni con vibracion fuerte repetida.
+                    if (!movilNoPreparadoAvisado) {
+                        performFeedback(json.optString("message", "Abre Mi Turno en el movil"), strong = false)
+                        movilNoPreparadoAvisado = true
+                    }
+                    scheduleResync(8000L)
+                } else {
+                    performFeedback(json.optString("message", "Error"), strong = true)
+                    // Si la edicion de un turno cerrado fue rechazada, salir de la
+                    // pantalla de edicion (que quedaria bloqueada en "Guardando...")
+                    // y volver al resumen re-pidiendo la lista, igual que en OK.
+                    if (currentScreen.value == ScreenState.EDIT_TURNO_DATOS) {
+                        currentScreen.value = ScreenState.TURNO_SUMMARY
+                        sendGetTurnos()
+                    }
+                    // Optimismo: si aplicamos un cambio local y el movil rechazo,
+                    // resync con el estado real para evitar inconsistencias.
+                    requestStatus()
+                }
             }
+            true
         } catch (e: Exception) {
             performFeedback("Error al leer respuesta", strong = true)
+            false
         }
     }
 
@@ -390,6 +447,23 @@ class WearMainActivity : ComponentActivity() {
                 onOpenTurnos = {
                     // Navegacion inmediata con estado de carga; la lista llega
                     // despues con TURNOS_STATUS.
+                    if (sendGetTurnos()) {
+                        turnosLoading.value = true
+                        currentScreen.value = ScreenState.TURNOS
+                    }
+                }
+            )
+            // Menu de pausa: misma pantalla de inicio reutilizada como espejo
+            // del tile (Turno Pausado / Volver al turno + Turnos). Se llega con
+            // el gesto atras estando pausado.
+            ScreenState.PAUSED_MENU -> NoActiveTurnoScreen(
+                pendingOpsCount = pendingOpsCount.value,
+                activeTurno = activeTurno.value,
+                isPaused = isPaused.value,
+                conectado = isConnected.value,
+                onStartTurno = { currentScreen.value = ScreenState.CONFIRM_START_TURNO },
+                onContinuar = { currentScreen.value = ScreenState.ACTIVE_TURNO },
+                onOpenTurnos = {
                     if (sendGetTurnos()) {
                         turnosLoading.value = true
                         currentScreen.value = ScreenState.TURNOS
@@ -586,7 +660,15 @@ class WearMainActivity : ComponentActivity() {
             ScreenState.TURNO_SUMMARY -> currentScreen.value = ScreenState.TURNOS
             ScreenState.EDIT_TURNO_DATOS -> currentScreen.value = ScreenState.TURNO_SUMMARY
             ScreenState.NO_ACTIVE_TURNO -> Unit
-            ScreenState.ACTIVE_TURNO -> Unit
+            // Estando pausado, el gesto atras lleva al menu de pausa (espejo del
+            // tile). En el turno activo sin pausar no hace nada para no salir
+            // por accidente.
+            ScreenState.ACTIVE_TURNO -> if (isPaused.value) { currentScreen.value = ScreenState.PAUSED_MENU }
+            // Si el turno se cerro desde el movil mientras se estaba en el menu,
+            // volver a inicio en vez de mostrar un ACTIVE_TURNO vacio (mismo
+            // criterio que la rama TURNOS).
+            ScreenState.PAUSED_MENU -> currentScreen.value =
+                if (activeTurno.value) ScreenState.ACTIVE_TURNO else ScreenState.NO_ACTIVE_TURNO
             ScreenState.NO_CONNECTED -> Unit
         }
     }
@@ -690,7 +772,8 @@ class WearMainActivity : ComponentActivity() {
             type = entryType,
             amount = amount,
             note = note,
-            time = java.text.SimpleDateFormat("HH:mm", java.util.Locale.getDefault()).format(java.util.Date())
+            time = java.text.SimpleDateFormat("HH:mm", java.util.Locale.getDefault()).format(java.util.Date()),
+            pendiente = true
         )
         entradas.value = entradas.value + newEntry
         if (entryType != "nota") {
@@ -705,7 +788,7 @@ class WearMainActivity : ComponentActivity() {
 
     private fun applyOptimisticEditEntry(id: Long, amount: Double, note: String) {
         val before = entradas.value.firstOrNull { it.id == id } ?: return
-        val updated = before.copy(amount = amount, note = note)
+        val updated = before.copy(amount = amount, note = note, pendiente = true)
         entradas.value = entradas.value.map { if (it.id == id) updated else it }
         if (before.type != "nota") {
             val diff = amount - before.amount
@@ -1008,22 +1091,16 @@ class WearMainActivity : ComponentActivity() {
         if (isRetry && !matchesCurrentSession(commandJson)) {
             return false
         }
-        refreshPendingOpsCount()
-        scheduleResync(2500L)
-        if (pendingOpsCount.value > 0) acquireOperationWakeLock()
         if (!isRetry && shouldPersistOutbox(commandJson)) {
             val operationId = JSONObject(commandJson).optString("operationId", "")
-            WatchOutbox.save(this, operationId, commandJson)
+            if (!WatchOutbox.save(this, operationId, commandJson)) {
+                performFeedback("No se pudo guardar la operacion", strong = true)
+                return false
+            }
             MobileResponseService.enqueueOutboxRetry(this)
         }
-        Wearable.getNodeClient(this).connectedNodes
-            .addOnSuccessListener { nodes ->
-                val nodeId = nodes.firstOrNull()?.id ?: ""
-                writeCommandDataItem(commandJson, nodeId)
-            }
-            .addOnFailureListener {
-                writeCommandDataItem(commandJson, "")
-            }
+        refreshPendingOpsCount()
+        scheduleResync(2500L)
         return true
     }
 
@@ -1046,32 +1123,6 @@ class WearMainActivity : ComponentActivity() {
             performFeedback("Comando invalido", strong = true)
             null
         }
-    }
-
-    private fun writeCommandDataItem(commandJson: String, nodeId: String) {
-        val operationId = try {
-            JSONObject(commandJson).optString("operationId", "")
-        } catch (e: Exception) {
-            ""
-        }
-
-        if (operationId.isBlank()) {
-            performFeedback("operationId invalido", strong = true)
-            return
-        }
-
-        val request = PutDataMapRequest.create("/watch-command/$operationId")
-        val dataMap = request.dataMap
-        dataMap.putString("command", commandJson)
-        dataMap.putString("targetNodeId", nodeId)
-        dataMap.putLong("createdAt", System.currentTimeMillis())
-        val dataRequest = request.asPutDataRequest()
-        dataRequest.setUrgent()
-
-        Wearable.getDataClient(this).putDataItem(dataRequest)
-            .addOnFailureListener {
-                showDisconnectedIfUiActive()
-            }
     }
 
     private fun showDisconnectedIfUiActive() {

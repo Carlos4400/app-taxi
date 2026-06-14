@@ -120,18 +120,6 @@ object WatchNativeCommandHandler {
         nowTime: String,
         nowId: Long,
     ): String {
-        if (expectedUserSessionId.isNotBlank()) {
-            val commandSessionId = try {
-                JSONObject(commandJson).optString("userSessionId", "")
-            } catch (e: Exception) {
-                ""
-            }
-            if (commandSessionId != expectedUserSessionId) {
-                return WatchResponseJson.toJson(
-                    WatchResponse.Error(pathOperationId, "USER_SESSION_MISMATCH", "Sesion de usuario no valida"),
-                )
-            }
-        }
         val command = try {
             WatchCommandJson.parse(commandJson)
         } catch (e: MalformedJsonException) {
@@ -152,9 +140,18 @@ object WatchNativeCommandHandler {
             )
         }
 
+        if (expectedUserSessionId.isNotBlank()) {
+            val commandSessionId = JSONObject(commandJson).optString("userSessionId", "")
+            if (commandSessionId != expectedUserSessionId) {
+                return WatchResponseJson.toJson(
+                    WatchResponse.Error(pathOperationId, "USER_SESSION_MISMATCH", "Sesion de usuario no valida"),
+                )
+            }
+        }
+
         if (pathOperationId.isNotBlank() && command.operationId != pathOperationId) {
             return WatchResponseJson.toJson(
-                WatchResponse.Error(command.operationId, "OPERATION_ID_MISMATCH", "operationId no coincide"),
+                WatchResponse.Error(pathOperationId, "OPERATION_ID_MISMATCH", "operationId no coincide"),
             )
         }
 

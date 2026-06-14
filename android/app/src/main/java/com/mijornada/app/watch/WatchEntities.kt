@@ -11,6 +11,11 @@ data class OperationEntity(
     val createdAtClient: String,
     val createdAtPhone: String,
     val applied: Boolean,
+    val resultType: String,
+    val resultCode: String?,
+    val resultMessage: String?,
+    val responseJson: String,
+    val processedAtEpochMs: Long,
 )
 
 @Entity(tableName = "watch_current_turno")

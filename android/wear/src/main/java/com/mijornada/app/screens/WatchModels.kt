@@ -10,7 +10,11 @@ data class WatchEntry(
     val type: String,
     val amount: Double,
     val note: String,
-    val time: String
+    val time: String,
+    /** true = cambio aplicado de forma optimista en el reloj, aun no confirmado
+     *  por el movil. Se muestra marcado como pendiente hasta el ACK/STATUS, que
+     *  lo reconcilia (lo sustituye por el dato real) o lo revierte. */
+    val pendiente: Boolean = false
 )
 
 data class WatchTurnoTotals(

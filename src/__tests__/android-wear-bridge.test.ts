@@ -36,30 +36,30 @@ describe("Android Wear bridge", () => {
     );
 
     expect(source).not.toContain("for (node in nodes)");
-    expect(source).toContain("val nodeId = nodes.firstOrNull()?.id ?: \"\"");
+    expect(source).not.toContain("connectedNodes");
   });
 
   it("escribe el DataItem aunque no haya nodo conectado en ese instante", () => {
     const source = readFileSync(
-      resolve(root, "android/wear/src/main/java/com/mijornada/app/WearMainActivity.kt"),
+      resolve(root, "android/wear/src/main/java/com/mijornada/app/OutboxWorker.kt"),
       "utf8",
     );
 
     expect(source).not.toContain(`if (nodes.isEmpty()) {
                     isConnected.value = false`);
-    expect(source).toContain("Wearable.getDataClient(this).putDataItem(dataRequest)");
+    expect(source).toContain("Wearable.getDataClient(applicationContext).putDataItem(dataRequest)");
   });
 
   it("envia comandos criticos Wear como DataItem persistente con operationId", () => {
     const source = readFileSync(
-      resolve(root, "android/wear/src/main/java/com/mijornada/app/WearMainActivity.kt"),
+      resolve(root, "android/wear/src/main/java/com/mijornada/app/OutboxWorker.kt"),
       "utf8",
     );
 
-    expect(source).toContain("PutDataMapRequest.create(\"/watch-command/\$operationId\")");
-    expect(source).toContain("dataMap.putString(\"command\", commandJson)");
-    expect(source).toContain("dataRequest.setUrgent()");
-    expect(source).toContain("Wearable.getDataClient(this).putDataItem");
+    expect(source).toContain('PutDataMapRequest.create("/watch-command/${command.operationId}")');
+    expect(source).toContain('request.dataMap.putString("command", command.commandJson)');
+    expect(source).toContain("asPutDataRequest().setUrgent()");
+    expect(source).toContain("Wearable.getDataClient(applicationContext).putDataItem");
     expect(source).not.toContain("sendMessage(node.id, \"/watch-command\"");
   });
 
@@ -187,8 +187,8 @@ describe("Android Wear bridge", () => {
     expect(source).toContain("WatchOutbox.remove(this, operationId)");
     expect(outbox).toContain("getSharedPreferences");
     expect(outbox).toContain("pendingCommands");
-    expect(worker).toContain("WatchOutbox.pendingCommands");
-    expect(worker).toContain("WatchOutbox.hasPendingCommands");
+    expect(worker).toContain("WatchOutbox.unpublishedCommands");
+    expect(worker).toContain("WatchOutbox.markPublished");
   });
 
   it("reintenta el outbox con el mismo operationId usando solo el backoff de WorkManager", () => {
@@ -253,14 +253,11 @@ describe("Android Wear bridge", () => {
     );
 
     expect(constants).toContain('const val PREFS = "mobile_response_prefs"');
-    expect(constants).toContain('const val LAST_RESPONSE = "last_response"');
-    expect(constants).toContain('const val RESPONSE_TIMESTAMP = "response_timestamp"');
+    expect(constants).toContain('const val RESPONSE_QUEUE = "response_queue"');
+    expect(constants).toContain('const val RESPONSE_SEQUENCE = "response_sequence"');
     expect(activity).toContain("WearConstants.Response.PREFS");
-    expect(activity).toContain("WearConstants.Response.LAST_RESPONSE");
-    expect(activity).toContain("WearConstants.Response.RESPONSE_TIMESTAMP");
-    expect(responseService).toContain("WearConstants.Response.PREFS");
-    expect(responseService).toContain("WearConstants.Response.LAST_RESPONSE");
-    expect(responseService).toContain("WearConstants.Response.RESPONSE_TIMESTAMP");
+    expect(activity).toContain("WearConstants.Response.RESPONSE_SEQUENCE");
+    expect(responseService).toContain("WearConstants.Response.enqueue(this, responseJson)");
   });
 
   it("mantiene el contrato Wear alineado con la retencion y el backoff implementados", () => {
@@ -269,7 +266,8 @@ describe("Android Wear bridge", () => {
       "utf8",
     );
 
-    expect(contract).toContain("limite de 512 elementos");
+    expect(contract).toContain("resultados terminales se conservan en Room durante 90 dias");
+    expect(contract).toContain("512 identificadores aplicados mas recientes");
     expect(contract).toContain("WorkManager es el unico responsable del backoff");
     expect(contract).not.toContain("limite de 50 elementos");
   });
@@ -297,7 +295,7 @@ describe("Android Wear bridge", () => {
     expect(constantes).toContain("fun isTerminalResponse(responseType: String, code: String)");
     expect(constantes).toContain('"USER_NOT_PREPARED"');
     expect(source).toContain("WearConstants.isTerminalResponse(responseType, json.optString(\"code\", \"\"))");
-    expect(activityWear).toContain("WearConstants.isTerminalResponse(responseType, json.optString(\"code\", \"\"))");
+    expect(activityWear).toContain("WearConstants.isTerminalResponse(responseType, responseCode)");
     expect(source).not.toContain("private fun isTerminalResponse");
     expect(activityWear).not.toContain("private fun isTerminalResponse");
   });
@@ -333,15 +331,17 @@ describe("Android Wear bridge", () => {
     expect(daos).not.toContain("markSynced");
     expect(daos).not.toContain("getPendingSyncOperations");
     expect(repository).not.toContain("synced = false");
-    expect(database).toContain("version = 5");
+    expect(database).toContain("version = 6");
     expect(database).toContain("MIGRATION_1_2");
     expect(database).toContain("MIGRATION_2_3");
     expect(database).toContain("MIGRATION_3_4");
     expect(database).toContain("MIGRATION_4_5");
+    expect(database).toContain("MIGRATION_5_6");
     expect(provider).toContain("WatchDatabase.MIGRATION_1_2");
     expect(provider).toContain("WatchDatabase.MIGRATION_2_3");
     expect(provider).toContain("WatchDatabase.MIGRATION_3_4");
     expect(provider).toContain("WatchDatabase.MIGRATION_4_5");
+    expect(provider).toContain("WatchDatabase.MIGRATION_5_6");
   });
 
   it("declara CDM y foreground service de turno activo", () => {
@@ -500,17 +500,81 @@ describe("Android Wear bridge", () => {
     expect(screen).not.toContain("Modifier.fillMaxWidth(0.82f)");
   });
 
-  it("guarda respuesta y timestamp juntos y protege el historial terminal", () => {
+  it("encola respuestas con una secuencia monotona y protege el historial terminal", () => {
     const source = readFileSync(
       resolve(root, "android/wear/src/main/java/com/mijornada/app/MobileResponseService.kt"),
       "utf8",
     );
+    const constants = readFileSync(
+      resolve(root, "android/wear/src/main/java/com/mijornada/app/WearConstants.kt"),
+      "utf8",
+    );
 
-    expect(source).toContain("putString(WearConstants.Response.LAST_RESPONSE, responseJson)");
-    expect(source).toContain("putLong(WearConstants.Response.RESPONSE_TIMESTAMP, System.currentTimeMillis())");
+    expect(source).toContain("WearConstants.Response.enqueue(this, responseJson)");
+    expect(constants).toContain("const val RESPONSE_SEQUENCE");
+    expect(constants).toContain("prefs.getLong(RESPONSE_SEQUENCE, 0L) + 1L");
+    expect(constants).toContain(".putLong(RESPONSE_SEQUENCE, prefs.getLong(RESPONSE_SEQUENCE, 0L) + 1L)");
     expect(source).toContain("private fun rememberTerminalOperation(operationId: String): Boolean");
     expect(source).toContain("synchronized(handledTerminalOperationIds)");
-    expect(source).not.toContain("val editor = prefs.edit()");
+    expect(source).not.toContain('prefs.getLong("ts_${\'$\'}id", 0L)');
+  });
+
+  it("permite que un aviso provisional evolucione a una confirmacion terminal", () => {
+    const activity = readFileSync(
+      resolve(root, "android/wear/src/main/java/com/mijornada/app/WearMainActivity.kt"),
+      "utf8",
+    );
+
+    expect(activity).toContain('val responseCode = json.optString("code", "")');
+    expect(activity).toContain(
+      "val isTerminal = WearConstants.isTerminalResponse(responseType, responseCode)",
+    );
+    expect(activity).toContain("if (tieneFeedback && isTerminal && operationId.isNotBlank())");
+    expect(activity).not.toContain("if (tieneFeedback && operationId.isNotBlank())");
+  });
+
+  it("persiste la respuesta terminal antes de marcarla como entregada", () => {
+    const service = readFileSync(
+      resolve(root, "android/wear/src/main/java/com/mijornada/app/MobileResponseService.kt"),
+      "utf8",
+    );
+    const handler = service.slice(
+      service.indexOf("private fun handleResponseJson"),
+      service.indexOf("private fun rememberTerminalOperation"),
+    );
+
+    expect(handler.indexOf("WearConstants.Response.enqueue(this, responseJson)"))
+      .toBeLessThan(handler.indexOf("rememberTerminalOperation(operationId)"));
+    expect(handler).not.toContain("if (handledTerminalOperationIds.contains(operationId)) return");
+    expect(handler).toContain("if (!alreadyHandled)");
+    expect(handler).toContain("if (!WatchOutbox.remove(this, operationId)) return");
+  });
+
+  it("rechaza payloads incompletos antes de procesar el comando", () => {
+    const parser = readFileSync(
+      resolve(root, "android/app/src/main/java/com/mijornada/app/watch/WatchCommandJson.kt"),
+      "utf8",
+    );
+
+    expect(parser).toContain("private fun requireFields(payload: JSONObject, vararg fields: String)");
+    expect(parser).toContain('requireFields(payload, "entryType", "amount")');
+    expect(parser).toContain('requireFields(payload, "note")');
+    expect(parser).toContain('requireFields(payload, "id", "amount")');
+    expect(parser).toContain('requireFields(payload, "id", "dinero", "km", "entradas")');
+    expect(parser).toContain('requireFields(payload, "dinero", "km")');
+  });
+
+  it("clasifica JSON malformado antes de validar sesion y conserva el operationId de ruta", () => {
+    const handler = readFileSync(
+      resolve(root, "android/app/src/main/java/com/mijornada/app/watch/WatchNativeCommandHandler.kt"),
+      "utf8",
+    );
+
+    expect(handler.indexOf("WatchCommandJson.parse(commandJson)"))
+      .toBeLessThan(handler.indexOf("if (expectedUserSessionId.isNotBlank())"));
+    expect(handler).toContain(
+      'WatchResponse.Error(pathOperationId, "OPERATION_ID_MISMATCH", "operationId no coincide")',
+    );
   });
 
   it("reintenta fallos transitorios del worker movil con backoff exponencial", () => {
@@ -1328,10 +1392,9 @@ describe("Android Wear bridge", () => {
     expect(parserKt).toContain("if (tipo !in TIPOS_ENTRADA_TURNO)");
     expect(pantalla).toContain("onConfirm: (Double, Double, List<WatchEntry>) -> Boolean");
     expect(pantalla).toContain("AddEntryScreen(");
-    expect(pantalla).toMatch(/editandoEntrada = null\s+true/);
-    expect(pantalla).toMatch(/nuevaCategoria = null\s+true/);
     expect(procesadorTs).toContain('command.type === "EDIT_TURNO"');
-    expect(parserKt).toContain('"EDIT_TURNO" -> WatchCommand.EditTurno(');
+    expect(parserKt).toContain('"EDIT_TURNO" -> {');
+    expect(parserKt).toContain("WatchCommand.EditTurno(");
     expect(procesadorKt).toContain("processEditTurno");
     // Regla de oro: editar anula la contabilidad guardada (Pendiente).
     expect(procesadorKt).toContain("totalTaximetro = null");
@@ -1457,5 +1520,77 @@ describe("Android Wear bridge", () => {
     expect(resumen).toContain("fontSize = BottomSummaryTitleFontSize");
     expect(resumen.match(/fontSize = BottomSummaryTitleFontSize/g)).toHaveLength(1);
     expect(resumen).toContain("fontSize = 12.sp");
+  });
+
+  it("garantiza publicacion unica, persistencia sincronica y privacidad de sesion", () => {
+    const outbox = readFileSync(
+      resolve(root, "android/wear/src/main/java/com/mijornada/app/WatchOutbox.kt"),
+      "utf8",
+    );
+    const worker = readFileSync(
+      resolve(root, "android/wear/src/main/java/com/mijornada/app/OutboxWorker.kt"),
+      "utf8",
+    );
+    const activity = readFileSync(
+      resolve(root, "android/wear/src/main/java/com/mijornada/app/WearMainActivity.kt"),
+      "utf8",
+    );
+    const response = readFileSync(
+      resolve(root, "android/wear/src/main/java/com/mijornada/app/WearConstants.kt"),
+      "utf8",
+    );
+    const mobileWorker = readFileSync(
+      resolve(root, "android/app/src/main/java/com/mijornada/app/watch/WearCommandWorker.kt"),
+      "utf8",
+    );
+
+    expect(outbox).toContain("val publishedAt: Long");
+    expect(outbox).toContain("fun unpublishedCommands");
+    expect(outbox).toContain("fun markPublished");
+    expect(outbox).toContain(".commit()");
+    expect(outbox).not.toContain("removeCommandsFromOtherSessions");
+    expect(worker).toContain("WatchOutbox.unpublishedCommands");
+    expect(worker).toContain("WatchOutbox.markPublished");
+    expect(worker).not.toContain("MAX_RUN_ATTEMPTS");
+    expect(activity).not.toContain("PowerManager.WakeLock");
+    expect(activity).not.toContain("writeCommandDataItem");
+    expect(response).toContain("fun pending(context: Context)");
+    expect(response).toContain("fun acknowledge(context: Context, responseJson: String)");
+    expect(response).not.toContain("fun drain(context: Context)");
+    expect(mobileWorker).toContain("Tasks.await(");
+    expect(mobileWorker).toContain("publishAckDataItem");
+    expect(
+      readFileSync(
+        resolve(root, "android/app/src/main/java/com/mijornada/app/WearOsBridgePlugin.java"),
+        "utf8",
+      ),
+    ).toContain("publishAckDataItem(getContext(), operationId, responseJson).addOnSuccessListener");
+    const session = readFileSync(
+      resolve(root, "android/app/src/main/java/com/mijornada/app/watch/WatchUserSession.kt"),
+      "utf8",
+    );
+    expect(session).toContain(".commit()");
+    expect(session).not.toContain(".apply()");
+  });
+
+  it("notifica respuestas terminales cuando la interfaz Wear no esta visible", () => {
+    const manifest = readFileSync(
+      resolve(root, "android/wear/src/main/AndroidManifest.xml"),
+      "utf8",
+    );
+    const service = readFileSync(
+      resolve(root, "android/wear/src/main/java/com/mijornada/app/MobileResponseService.kt"),
+      "utf8",
+    );
+    const notification = readFileSync(
+      resolve(root, "android/wear/src/main/java/com/mijornada/app/WearResponseNotification.kt"),
+      "utf8",
+    );
+
+    expect(manifest).toContain("android.permission.POST_NOTIFICATIONS");
+    expect(service).toContain("WearResponseNotification.showIfBackground");
+    expect(notification).toContain("setOnlyAlertOnce(true)");
+    expect(notification).toContain("operationId.hashCode()");
+    expect(notification).toContain("WearUiVisibility.isVisible");
   });
 });

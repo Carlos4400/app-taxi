@@ -114,7 +114,7 @@ public class WatchMultiUserTest {
         org.json.JSONObject json2 = new org.json.JSONObject(response2);
 
         assertEquals("OK", json1.getString("type"));
-        assertEquals("DUPLICATE_IGNORED", json2.getString("type"));
+        assertEquals(response1, response2);
     }
 
     @Test

@@ -7,6 +7,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -29,8 +30,10 @@ fun AddEntryScreen(
     onDelete: (() -> Unit)? = null,
     esNota: Boolean = false
 ) {
-    var amountText by remember { mutableStateOf(amountToText(initialAmount)) }
-    var note by remember { mutableStateOf(initialNote) }
+    // rememberSaveable: el borrador (importe y nota) sobrevive a la recreacion
+    // de la Activity (cambio de configuracion o muerte de proceso).
+    var amountText by rememberSaveable { mutableStateOf(amountToText(initialAmount)) }
+    var note by rememberSaveable { mutableStateOf(initialNote) }
     var saving by remember { mutableStateOf(false) }
 
     val amount = parseAmount(amountText)

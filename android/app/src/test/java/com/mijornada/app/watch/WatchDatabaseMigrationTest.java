@@ -102,4 +102,31 @@ public class WatchDatabaseMigrationTest {
             assertEquals(0, turno.getInt(1));
         }
     }
+    @Test
+    public void migracionCincoASeisConservaOperacionYAñadeResultadoPersistente() {
+        SupportSQLiteDatabase database = helper.getWritableDatabase();
+        database.execSQL(
+            "CREATE TABLE watch_operations_v5 (" +
+                "operationId TEXT NOT NULL PRIMARY KEY, type TEXT NOT NULL, payloadJson TEXT NOT NULL, " +
+                "createdAtClient TEXT NOT NULL, createdAtPhone TEXT NOT NULL, applied INTEGER NOT NULL)"
+        );
+        database.execSQL(
+            "INSERT INTO watch_operations_v5 VALUES " +
+                "('op-v5', 'START_TURNO', '{}', 'cliente', 'movil', 1)"
+        );
+        database.execSQL("DROP TABLE watch_operations");
+        database.execSQL("ALTER TABLE watch_operations_v5 RENAME TO watch_operations");
+
+        WatchDatabase.MIGRATION_5_6.migrate(database);
+
+        try (Cursor operation = database.query(
+            "SELECT operationId, resultType, responseJson, processedAtEpochMs FROM watch_operations"
+        )) {
+            operation.moveToFirst();
+            assertEquals("op-v5", operation.getString(0));
+            assertEquals("APPLIED", operation.getString(1));
+            assertEquals("", operation.getString(2));
+            org.junit.Assert.assertTrue(operation.getLong(3) > 0L);
+        }
+    }
 }

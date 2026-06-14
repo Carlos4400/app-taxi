@@ -1,50 +1,2035 @@
-## 2026-06-14 00:24 - Corregir compilación del editor de turno Wear
+## 2026-06-14 23:13 - Reforzar entrega fiable entre reloj y móvil
 
-**Archivos modificados:** `android/wear/src/main/java/com/mijornada/app/screens/EditTurnoDatosScreen.kt`, `src/__tests__/android-wear-bridge.test.ts`
+**Archivos modificados:**
+- `ARQUITECTURA_RELOJ_WEAR_OS.md`
+- `android/app/src/main/java/com/mijornada/app/WearOsBridgePlugin.java`
+- `android/app/src/main/java/com/mijornada/app/watch/WatchDaos.kt`
+- `android/app/src/main/java/com/mijornada/app/watch/WatchDatabase.kt`
+- `android/app/src/main/java/com/mijornada/app/watch/WatchDatabaseProvider.kt`
+- `android/app/src/main/java/com/mijornada/app/watch/WatchEntities.kt`
+- `android/app/src/main/java/com/mijornada/app/watch/WatchRepository.kt`
+- `android/app/src/main/java/com/mijornada/app/watch/WatchResponseJson.kt`
+- `android/app/src/main/java/com/mijornada/app/watch/WatchUserSession.kt`
+- `android/app/src/main/java/com/mijornada/app/watch/WearCommandWorker.kt`
+- `android/app/src/test/java/com/mijornada/app/watch/WatchDatabaseMigrationTest.java`
+- `android/app/src/test/java/com/mijornada/app/watch/WatchDatabaseProviderTest.java`
+- `android/app/src/test/java/com/mijornada/app/watch/WatchMultiUserTest.java`
+- `android/app/src/test/java/com/mijornada/app/watch/WatchNativeCommandHandlerTest.java`
+- `android/app/src/test/java/com/mijornada/app/watch/WatchRoomPersistenceTest.java`
+- `android/wear/src/main/AndroidManifest.xml`
+- `android/wear/src/main/java/com/mijornada/app/MobileResponseService.kt`
+- `android/wear/src/main/java/com/mijornada/app/OutboxWorker.kt`
+- `android/wear/src/main/java/com/mijornada/app/WatchOutbox.kt`
+- `android/wear/src/main/java/com/mijornada/app/WearConstants.kt`
+- `android/wear/src/main/java/com/mijornada/app/WearMainActivity.kt`
+- `android/wear/src/main/java/com/mijornada/app/WearResponseNotification.kt`
+- `src/__tests__/android-wear-bridge.test.ts`
 
-### Cambio 1 - Devolver éxito en guardados locales del editor
+### Cambio 1 - Persistir el resultado real de cada operación
 
 #### Código anterior
 ```kotlin
-                editandoEntrada = null
-```
-
-```kotlin
-                nuevaCategoria = null
+persistState(result.state)
+database.operationDao().markApplied(command.operationId)
+database.operationDao().pruneAppliedOperations(processedOperationLimit)
+result
 ```
 
 #### Código nuevo
 ```kotlin
-                editandoEntrada = null
-                true
-```
-
-```kotlin
-                nuevaCategoria = null
-                true
+val applied = result.response !is WatchResponse.Error
+if (applied) {
+    persistState(result.state)
+}
+val responseJson = WatchResponseJson.toJson(result.response)
+val error = result.response as? WatchResponse.Error
+database.operationDao().finalize(
+    operationId = command.operationId,
+    applied = applied,
+    resultType = if (applied) "APPLIED" else "REJECTED",
+    resultCode = error?.code,
+    resultMessage = when (val response = result.response) {
+        is WatchResponse.Ok -> response.message
+        is WatchResponse.DuplicateIgnored -> response.message
+        is WatchResponse.Error -> response.message
+    },
+    responseJson = responseJson,
+    processedAtEpochMs = nowId,
+)
+database.operationDao().pruneFinalizedBefore(nowId - operationRetentionMs)
+result
 ```
 
 #### Por qué se cambió
-`AddEntryScreen` exige que `onSave` devuelva `Boolean`. Los dos callbacks locales de `EditTurnoDatosScreen` seguían devolviendo `Unit`, por lo que `:wear:assembleDebug` fallaba con errores de tipo y `actualizar_reloj.bat` no podía generar ni instalar el APK.
+Una operación rechazada no debe modificar el turno ni convertirse en aplicada. Guardar su respuesta exacta permite devolver el mismo resultado al recibir de nuevo el mismo `operationId`.
 
-### Cambio 2 - Proteger el contrato booleano del editor
+### Cambio 2 - Conservar resultados durante 90 días
 
 #### Código anterior
-```ts
-    expect(pantalla).toContain("onConfirm: (Double, Double, List<WatchEntry>) -> Unit");
-    expect(pantalla).toContain("AddEntryScreen(");
+```kotlin
+@Query(
+    "DELETE FROM watch_operations WHERE applied = 1 AND rowid NOT IN " +
+        "(SELECT rowid FROM watch_operations WHERE applied = 1 ORDER BY rowid DESC LIMIT :limit)",
+)
+fun pruneAppliedOperations(limit: Int)
 ```
 
 #### Código nuevo
-```ts
-    expect(pantalla).toContain("onConfirm: (Double, Double, List<WatchEntry>) -> Boolean");
-    expect(pantalla).toContain("AddEntryScreen(");
-    expect(pantalla).toMatch(/editandoEntrada = null\s+true/);
-    expect(pantalla).toMatch(/nuevaCategoria = null\s+true/);
+```kotlin
+@Query(
+    "DELETE FROM watch_operations WHERE resultType != 'PENDING' " +
+        "AND processedAtEpochMs > 0 AND processedAtEpochMs < :cutoffEpochMs",
+)
+fun pruneFinalizedBefore(cutoffEpochMs: Long)
 ```
 
 #### Por qué se cambió
-La prueba conservaba la firma antigua `Unit` y no verificaba que los guardados locales devolvieran el `Boolean` requerido. Las nuevas expectativas detectan la incompatibilidad que impedía compilar Wear.
+La poda por cantidad podía permitir duplicados antiguos demasiado pronto. La poda por fecha conserva resultados terminales durante 90 días y nunca elimina operaciones pendientes.
+
+### Cambio 3 - Migrar Room sin borrar datos existentes
+
+#### Código anterior
+```kotlin
+legacy.delete()
+listOf("-wal", "-shm").forEach { suffix ->
+    val legacySidecar = context.getDatabasePath(LEGACY_DATABASE_NAME + suffix)
+    if (legacySidecar.exists()) {
+        legacySidecar.delete()
+    }
+}
+```
+
+#### Código nuevo
+```kotlin
+target.parentFile?.mkdirs()
+legacy.copyTo(target, overwrite = false)
+listOf("-wal", "-shm").forEach { suffix ->
+    val legacySidecar = context.getDatabasePath(LEGACY_DATABASE_NAME + suffix)
+    if (legacySidecar.exists()) {
+        legacySidecar.copyTo(context.getDatabasePath(databaseName + suffix), overwrite = false)
+    }
+}
+```
+
+#### Por qué se cambió
+La migración anterior borraba la base legacy. La nueva migración copia la base y sus archivos auxiliares al primer usuario sin eliminar el original ni perder turnos.
+
+### Cambio 4 - Publicar cada comando una sola vez
+
+#### Código anterior
+```kotlin
+val pending = WatchOutbox.pendingCommands(applicationContext).values
+pending.forEach { command ->
+    Tasks.await(Wearable.getDataClient(applicationContext).putDataItem(dataRequest))
+}
+return if (WatchOutbox.hasPendingCommands(applicationContext)) Result.retry() else Result.success()
+```
+
+#### Código nuevo
+```kotlin
+WatchOutbox.unpublishedCommands(applicationContext).values.forEach { command ->
+    Tasks.await(Wearable.getDataClient(applicationContext).putDataItem(dataRequest))
+    if (!WatchOutbox.markPublished(applicationContext, command.operationId, System.currentTimeMillis())) {
+        return Result.retry()
+    }
+}
+return if (WatchOutbox.unpublishedCommands(applicationContext).isEmpty()) {
+    Result.success()
+} else {
+    Result.retry()
+}
+```
+
+#### Por qué se cambió
+Después de una publicación local correcta, DataClient conserva y sincroniza el `DataItem`. Reenviarlo mientras esperaba el ACK consumía batería y generaba entregas repetidas innecesarias.
+
+### Cambio 5 - Confirmar escrituras críticas del reloj
+
+#### Código anterior
+```kotlin
+private fun writePending(context: Context, pending: JSONObject) {
+    context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        .edit()
+        .putString(KEY_PENDING_COMMANDS, pending.toString())
+        .apply()
+}
+```
+
+#### Código nuevo
+```kotlin
+private fun writePending(context: Context, pending: JSONObject): Boolean =
+    context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        .edit()
+        .putString(KEY_PENDING_COMMANDS, pending.toString())
+        .commit()
+```
+
+#### Por qué se cambió
+`apply()` no informa si la escritura falla. `commit()` permite impedir el envío cuando la operación todavía no ha quedado guardada en la outbox.
+
+### Cambio 6 - No borrar operaciones de otra sesión
+
+#### Código anterior
+```kotlin
+fun removeCommandsFromOtherSessions(context: Context, userSessionId: String): List<String> {
+    operationIdsToRemove.forEach(pending::remove)
+    writePending(context, pending)
+    return operationIdsToRemove
+}
+```
+
+#### Código nuevo
+```kotlin
+fun commandsFromOtherSessions(context: Context, userSessionId: String): List<String> {
+    return pendingCommands(context).values.mapNotNull { command ->
+        command.operationId.takeIf { commandSessionId != userSessionId }
+    }
+}
+```
+
+#### Por qué se cambió
+Cambiar de usuario no debe borrar silenciosamente trabajo pendiente. La interfaz solo comunica que existe una operación de otra cuenta, sin mostrar sus detalles.
+
+### Cambio 7 - Procesar confirmaciones antes de reconocerlas
+
+#### Código anterior
+```kotlin
+val responses = WearConstants.Response.drain(this)
+for (responseJson in responses) {
+    processResponseFromPrefs(responseJson)
+}
+```
+
+#### Código nuevo
+```kotlin
+val responses = WearConstants.Response.pending(this)
+for (responseJson in responses) {
+    if (processResponseFromPrefs(responseJson)) {
+        WearConstants.Response.acknowledge(this, responseJson)
+    }
+}
+```
+
+#### Por qué se cambió
+Vaciar la cola antes de procesarla podía perder confirmaciones si la interfaz fallaba o el proceso terminaba en ese intervalo.
+
+### Cambio 8 - Notificar confirmaciones en segundo plano
+
+#### Código anterior
+`No existía WearResponseNotification en android/wear/src/main/java/com/mijornada/app/WearResponseNotification.kt.`
+
+#### Código nuevo
+```kotlin
+object WearResponseNotification {
+    fun showIfBackground(context: Context, responseJson: String) {
+        if (WearUiVisibility.isVisible) return
+        manager.notify(operationId.hashCode(), notification)
+    }
+}
+```
+
+#### Por qué se cambió
+Una respuesta terminal recibida con la interfaz cerrada debe generar una confirmación visible y vibración sin duplicar alertas para el mismo `operationId`.
+
+### Cambio 9 - Esperar la publicación persistente del ACK móvil
+
+#### Código anterior
+```kotlin
+com.mijornada.app.WearOsBridgePlugin.publishAckDataItem(applicationContext, operationId, responseJson)
+sendFastResponse(nodeId, responseJson)
+```
+
+#### Código nuevo
+```kotlin
+Tasks.await(
+    com.mijornada.app.WearOsBridgePlugin.publishAckDataItem(
+        applicationContext,
+        operationId,
+        responseJson,
+    ),
+)
+sendFastResponse(nodeId, responseJson)
+```
+
+#### Por qué se cambió
+El worker móvil no debe terminar correctamente hasta que DataClient confirme que el ACK persistente quedó publicado localmente.
+
+### Cambio 10 - Verificar migración, idempotencia y transporte
+
+#### Código anterior
+`No existían las pruebas de resultado rechazado persistente, retención temporal, conservación de la base legacy, publicación única y notificación en segundo plano.`
+
+#### Código nuevo
+```text
+WatchRoomPersistenceTest:
+- rechazoSeConservaYDuplicadoDevuelveElMismoErrorSinModificarEstado
+- podaSoloResultadosFinalizadosAnterioresAlPeriodoDeRetencion
+
+WatchDatabaseMigrationTest:
+- migracionCincoASeisConservaOperacionYAñadeResultadoPersistente
+
+WatchDatabaseProviderTest:
+- migraBaseLegacySinBorrarlaNiPerderTurnoActual
+
+WatchMultiUserTest y WatchNativeCommandHandlerTest:
+- los duplicados esperan exactamente la respuesta original
+
+android-wear-bridge.test.ts:
+- garantiza publicacion unica, persistencia sincronica y privacidad de sesion
+- notifica respuestas terminales cuando la interfaz Wear no esta visible
+```
+
+#### Por qué se cambió
+Las pruebas demuestran los comportamientos críticos y evitan regresiones en migraciones, duplicados, pérdidas de confirmaciones y consumo innecesario de batería.
+
+### Cambio 11 - Persistir ACK y sesión antes de resolver
+
+#### Código anterior
+```java
+publishAckDataItem(getContext(), operationId, responseJson);
+```
+
+```kotlin
+.apply()
+```
+
+#### Código nuevo
+```java
+publishAckDataItem(getContext(), operationId, responseJson).addOnSuccessListener(
+    dataItem -> sendFastResponse(call, responseJson)
+).addOnFailureListener(
+    e -> call.reject("Error al publicar ACK persistente: " + e.getMessage())
+);
+```
+
+```kotlin
+.commit()
+```
+
+#### Por qué se cambió
+La ruta Capacitor no debe resolver antes de publicar el ACK persistente y la sesión móvil no debe declararse preparada o limpia sin confirmar su escritura.
+
+### Cambio 12 - Completar limpieza tras una entrega repetida
+
+#### Código anterior
+```kotlin
+if (handledTerminalOperationIds.contains(operationId)) return
+if (!WearConstants.Response.enqueue(this, responseJson)) return
+if (!rememberTerminalOperation(operationId)) return
+WearResponseNotification.showIfBackground(this, responseJson)
+WatchOutbox.remove(this, operationId)
+```
+
+#### Código nuevo
+```kotlin
+val alreadyHandled = handledTerminalOperationIds.contains(operationId)
+if (!alreadyHandled) {
+    if (!WearConstants.Response.enqueue(this, responseJson)) return
+    if (!rememberTerminalOperation(operationId)) return
+    WearResponseNotification.showIfBackground(this, responseJson)
+}
+WatchOutbox.remove(this, operationId)
+```
+
+#### Por qué se cambió
+Una entrega repetida no debe volver a notificar, pero sí debe retirar la outbox si el proceso terminó después de persistir la marca terminal y antes de completar la limpieza.
+
+### Cambio 13 - Conservar confirmación si falla la limpieza
+
+#### Código anterior
+```kotlin
+WatchOutbox.remove(this, operationId)
+cleanupTerminalDataItems(operationId)
+```
+
+#### Código nuevo
+```kotlin
+if (!WatchOutbox.remove(this, operationId)) return
+cleanupTerminalDataItems(operationId)
+```
+
+#### Por qué se cambió
+Si falla la escritura que retira la outbox, el ACK y la respuesta persistentes deben conservarse para poder repetir la limpieza sin perder la confirmación.
+
+## 2026-06-14 20:59 - Corregir confirmaciones finales del reloj
+
+**Archivos modificados:** `android/app/src/main/java/com/mijornada/app/watch/WatchCommandJson.kt`, `android/app/src/main/java/com/mijornada/app/watch/WatchNativeCommandHandler.kt`, `android/wear/src/main/AndroidManifest.xml`, `android/wear/src/main/java/com/mijornada/app/MobileResponseService.kt`, `android/wear/src/main/java/com/mijornada/app/WearConstants.kt`, `android/wear/src/main/java/com/mijornada/app/WearMainActivity.kt`, `android/wear/src/main/java/com/mijornada/app/screens/ActiveTurnoScreen.kt`, `src/__tests__/android-wear-bridge.test.ts`
+
+### Cambio 1 - Permitir confirmación tras aviso provisional
+
+#### Código anterior
+```kotlin
+if (tieneFeedback && operationId.isNotBlank()) {
+    if (!shownResponseOpIds.add(operationId)) return
+}
+val isTerminal = WearConstants.isTerminalResponse(responseType, json.optString("code", ""))
+```
+
+#### Código nuevo
+```kotlin
+val responseCode = json.optString("code", "")
+val isTerminal = WearConstants.isTerminalResponse(responseType, responseCode)
+if (tieneFeedback && isTerminal && operationId.isNotBlank()) {
+    if (!shownResponseOpIds.add(operationId)) return
+}
+```
+
+#### Por qué se cambió
+Un aviso `USER_NOT_PREPARED` usaba el mismo `operationId` que el `OK` posterior y hacía que el reloj descartara la confirmación final y su vibración.
+
+### Cambio 2 - Señalizar cada respuesta con secuencia monotónica
+
+#### Código anterior
+```kotlin
+const val LAST_RESPONSE = "last_response"
+const val RESPONSE_TIMESTAMP = "response_timestamp"
+```
+
+#### Código nuevo
+```kotlin
+const val RESPONSE_SEQUENCE = "response_sequence"
+```
+
+```kotlin
+val nextSequence = prefs.getLong(RESPONSE_SEQUENCE, 0L) + 1L
+prefs.edit()
+    .putString(RESPONSE_QUEUE, recortada.toString())
+    .putLong(RESPONSE_SEQUENCE, nextSequence)
+    .apply()
+```
+
+#### Por qué se cambió
+Cada respuesta debe emitir una señal distinta aunque varias lleguen dentro del mismo milisegundo.
+
+### Cambio 3 - Preservar correctamente el TTL terminal
+
+#### Código anterior
+```kotlin
+val existing = prefs.getLong("ts_${'$'}id", 0L)
+```
+
+#### Código nuevo
+```kotlin
+val previous = try {
+    org.json.JSONObject(prefs.getString(HANDLED_TERMINAL_KEY, "{}") ?: "{}")
+} catch (_: Exception) {
+    org.json.JSONObject()
+}
+val existing = previous.optLong(id, 0L)
+```
+
+#### Por qué se cambió
+Los timestamps se almacenan dentro de `HANDLED_TERMINAL_KEY`; leer claves individuales inexistentes renovaba incorrectamente su antigüedad.
+
+### Cambio 4 - Descartar doble entrega antes de encolarla
+
+#### Código anterior
+```kotlin
+WearConstants.Response.enqueue(this, responseJson)
+
+try {
+    val json = org.json.JSONObject(responseJson)
+```
+
+#### Código nuevo
+```kotlin
+try {
+    val json = org.json.JSONObject(responseJson)
+    // ...
+    WearConstants.Response.enqueue(this, responseJson)
+} catch (e: Exception) {
+    Log.e(TAG, "Error al procesar mensaje", e)
+    WearConstants.Response.enqueue(this, responseJson)
+}
+```
+
+#### Por qué se cambió
+La respuesta terminal duplicada se encolaba antes de comprobar si ya había llegado por el otro canal. Deduplicarla primero garantiza una sola confirmación incluso tras recrear la Activity.
+
+### Cambio 5 - Rechazar payloads incompletos
+
+#### Código anterior
+```kotlin
+val array = payload.optJSONArray("entradas") ?: return emptyList()
+```
+
+#### Código nuevo
+```kotlin
+private fun requireFields(payload: JSONObject, vararg fields: String) {
+    val missing = fields.filterNot(payload::has)
+    if (missing.isNotEmpty()) {
+        throw InvalidPayloadException("Campos requeridos faltantes en payload: ${missing.joinToString(", ")}")
+    }
+}
+
+val array = payload.optJSONArray("entradas")
+    ?: throw InvalidPayloadException("entradas debe ser una lista")
+```
+
+#### Por qué se cambió
+Los campos ausentes se convertían en ceros o listas vacías y producían errores engañosos o ediciones incompletas.
+
+### Cambio 6 - Clasificar JSON antes de validar sesión
+
+#### Código anterior
+```kotlin
+if (expectedUserSessionId.isNotBlank()) {
+    val commandSessionId = try {
+        JSONObject(commandJson).optString("userSessionId", "")
+    } catch (e: Exception) {
+        ""
+    }
+}
+val command = try {
+    WatchCommandJson.parse(commandJson)
+```
+
+#### Código nuevo
+```kotlin
+val command = try {
+    WatchCommandJson.parse(commandJson)
+```
+
+```kotlin
+if (expectedUserSessionId.isNotBlank()) {
+    val commandSessionId = JSONObject(commandJson).optString("userSessionId", "")
+}
+```
+
+#### Por qué se cambió
+Un JSON malformado se respondía como error de sesión antes de alcanzar la clasificación `MALFORMED_JSON`.
+
+### Cambio 7 - Limpiar el comando con el identificador de ruta
+
+#### Código anterior
+```kotlin
+WatchResponse.Error(command.operationId, "OPERATION_ID_MISMATCH", "operationId no coincide")
+```
+
+#### Código nuevo
+```kotlin
+WatchResponse.Error(pathOperationId, "OPERATION_ID_MISMATCH", "operationId no coincide")
+```
+
+#### Por qué se cambió
+El reloj debe eliminar de la outbox el identificador usado en la ruta persistente, no el identificador interno discrepante.
+
+### Cambio 8 - Corregir estado y previsualización visibles
+
+#### Código anterior
+```kotlin
+notaBloqueada -> "Sincronizando nota…"
+```
+
+```xml
+android:resource="@drawable/brand_taxi_logo"
+```
+
+#### Código nuevo
+```kotlin
+notaBloqueada -> "Sincronizando operación…"
+```
+
+```xml
+android:resource="@mipmap/ic_launcher_background"
+```
+
+#### Por qué se cambió
+El texto anterior afirmaba que siempre se sincronizaba una nota y la previsualización anterior de la Tile incumplía el formato cuadrado mínimo validado por lint.
+
+### Cambio 9 - Proteger el protocolo con pruebas
+
+#### Código anterior
+`No existían pruebas para la transición de aviso provisional a confirmación terminal, la secuencia monotónica, los payloads incompletos ni la clasificación previa del JSON.`
+
+#### Código nuevo
+```ts
+it("permite que un aviso provisional evolucione a una confirmacion terminal", () => {
+  expect(activity).toContain("if (tieneFeedback && isTerminal && operationId.isNotBlank())");
+});
+
+it("rechaza payloads incompletos antes de procesar el comando", () => {
+  expect(parser).toContain("private fun requireFields(payload: JSONObject, vararg fields: String)");
+});
+```
+
+#### Por qué se cambió
+Las pruebas fijan los comportamientos que garantizan que una operación pendiente pueda terminar mostrando una única confirmación final.
+
+## 2026-06-14 18:27 - Corregir avisos y manejo de respuestas del reloj
+
+**Archivos modificados:** `android/wear/src/main/java/com/mijornada/app/WearConstants.kt`, `android/wear/src/main/java/com/mijornada/app/MobileResponseService.kt`, `android/wear/src/main/java/com/mijornada/app/WearMainActivity.kt`, `android/wear/src/main/java/com/mijornada/app/screens/ActiveTurnoScreen.kt`
+
+### Cambio 1 - Cola FIFO persistente de respuestas (P5)
+
+#### Código anterior
+```kotlin
+    object Response {
+        const val PREFS = "mobile_response_prefs"
+        const val LAST_RESPONSE = "last_response"
+        const val RESPONSE_TIMESTAMP = "response_timestamp"
+    }
+```
+
+#### Código nuevo
+```kotlin
+    object Response {
+        const val PREFS = "mobile_response_prefs"
+        const val LAST_RESPONSE = "last_response"
+        const val RESPONSE_TIMESTAMP = "response_timestamp"
+
+        /** Cola FIFO persistente de respuestas del movil pendientes de presentar.
+         *  Sustituye al hueco unico LAST_RESPONSE, que perdia respuestas cuando
+         *  llegaban dos seguidas antes de que la Activity leyera la primera. */
+        const val RESPONSE_QUEUE = "response_queue"
+
+        /** Limite defensivo de la cola para que no crezca sin control si la
+         *  Activity no la consume durante mucho tiempo. */
+        const val QUEUE_LIMIT = 100
+
+        /** Cerrojo compartido por el servicio (productor) y la Activity
+         *  (consumidor), que viven en el mismo proceso. Protege el ciclo
+         *  leer-modificar-escribir de la cola para no perder ni duplicar items. */
+        val QUEUE_LOCK = Any()
+
+        /** Encola una respuesta del movil de forma atomica y refresca el
+         *  timestamp, que sirve de senal de cambio para la Activity. */
+        fun enqueue(context: Context, responseJson: String) {
+            synchronized(QUEUE_LOCK) {
+                val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+                val arr = try {
+                    JSONArray(prefs.getString(RESPONSE_QUEUE, "[]"))
+                } catch (e: Exception) {
+                    JSONArray()
+                }
+                arr.put(responseJson)
+                val recortada = if (arr.length() > QUEUE_LIMIT) {
+                    val nueva = JSONArray()
+                    for (i in (arr.length() - QUEUE_LIMIT) until arr.length()) {
+                        nueva.put(arr.optString(i))
+                    }
+                    nueva
+                } else {
+                    arr
+                }
+                prefs.edit()
+                    .putString(RESPONSE_QUEUE, recortada.toString())
+                    .putString(LAST_RESPONSE, responseJson)
+                    .putLong(RESPONSE_TIMESTAMP, System.currentTimeMillis())
+                    .apply()
+            }
+        }
+
+        /** Vacia la cola de forma atomica y devuelve sus respuestas en orden de
+         *  llegada. Si no hay nada, devuelve lista vacia y no escribe. */
+        fun drain(context: Context): List<String> {
+            synchronized(QUEUE_LOCK) {
+                val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+                val arr = try {
+                    JSONArray(prefs.getString(RESPONSE_QUEUE, "[]"))
+                } catch (e: Exception) {
+                    JSONArray()
+                }
+                if (arr.length() == 0) return emptyList()
+                val out = ArrayList<String>(arr.length())
+                for (i in 0 until arr.length()) {
+                    val item = arr.optString(i, "")
+                    if (item.isNotBlank()) out.add(item)
+                }
+                prefs.edit().putString(RESPONSE_QUEUE, "[]").apply()
+                return out
+            }
+        }
+    }
+```
+
+(Se añadieron también los imports `android.content.Context` y `org.json.JSONArray` al inicio del archivo, antes ausentes.)
+
+#### Por qué se cambió
+El reloj guardaba la respuesta del móvil en un único hueco (`LAST_RESPONSE` + un timestamp). Si llegaban dos respuestas seguidas, la segunda pisaba a la primera antes de que la Activity la leyera, y se perdía. Una cola FIFO persistente con cerrojo permite que el productor (servicio) y el consumidor (Activity), que comparten proceso, no pierdan ni dupliquen respuestas.
+
+### Cambio 2 - El servicio encola en vez de pisar el hueco único (P5)
+
+#### Código anterior
+```kotlin
+    private fun handleResponseJson(responseJson: String) {
+        val prefs = getSharedPreferences(WearConstants.Response.PREFS, MODE_PRIVATE)
+        prefs.edit()
+            .putString(WearConstants.Response.LAST_RESPONSE, responseJson)
+            .putLong(WearConstants.Response.RESPONSE_TIMESTAMP, System.currentTimeMillis())
+            .apply()
+
+        try {
+```
+
+#### Código nuevo
+```kotlin
+    private fun handleResponseJson(responseJson: String) {
+        // Encolar la respuesta (FIFO persistente) en vez de pisar un hueco unico.
+        // Asi, si llegan dos respuestas seguidas (incluida la doble entrega por
+        // MessageClient + DataClient), ninguna se pierde: la Activity las drena
+        // en orden y deduplica la presentacion por operationId.
+        WearConstants.Response.enqueue(this, responseJson)
+
+        try {
+```
+
+#### Por qué se cambió
+Para alimentar la nueva cola en lugar del hueco único, sin tocar el resto del manejo terminal (outbox, ACK, STATUS) que sigue igual.
+
+### Cambio 3 - Campos de dedup y aviso, y eliminación del timestamp muerto (P2/P1)
+
+#### Código anterior
+```kotlin
+    private val responsePrefsListener = SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
+        if (key == WearConstants.Response.RESPONSE_TIMESTAMP) {
+            pollResponseState()
+        }
+    }
+    private val timestampPrefs by lazy { getSharedPreferences("wear_main_activity_state", MODE_PRIVATE) }
+    private var lastKnownResponseTimestamp: Long
+        get() = timestampPrefs.getLong("last_known_response_ts", 0L)
+        set(value) { timestampPrefs.edit().putLong("last_known_response_ts", value).apply() }
+```
+
+#### Código nuevo
+```kotlin
+    private val responsePrefsListener = SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
+        if (key == WearConstants.Response.RESPONSE_TIMESTAMP) {
+            pollResponseState()
+        }
+    }
+
+    /** operationIds cuya respuesta con feedback (OK/DUPLICATE/ERROR) ya se ha
+     *  presentado al usuario. Evita el doble toast/vibracion cuando la misma
+     *  respuesta llega por los dos canales (MessageClient + DataClient). */
+    private val shownResponseOpIds = java.util.LinkedHashSet<String>()
+
+    /** True mientras el movil responde que no esta preparado. Evita repetir el
+     *  aviso en cada reintento; se reinicia al recibir un STATUS valido. */
+    private var movilNoPreparadoAvisado = false
+```
+
+#### Por qué se cambió
+Con la cola (Cambio 4) ya no hace falta recordar el último timestamp leído, así que se elimina ese estado. Se añaden el set de deduplicación de presentación (P2) y el flag que evita repetir el aviso de "móvil no preparado" (P1).
+
+### Cambio 4 - pollResponseState drena la cola (P5)
+
+#### Código anterior
+```kotlin
+    private fun pollResponseState() {
+        val ts = prefs.getLong(WearConstants.Response.RESPONSE_TIMESTAMP, 0L)
+        if (ts != lastKnownResponseTimestamp) {
+            lastKnownResponseTimestamp = ts
+            val responseJson = prefs.getString(WearConstants.Response.LAST_RESPONSE, null) ?: return
+            processResponseFromPrefs(responseJson)
+        }
+    }
+```
+
+#### Código nuevo
+```kotlin
+    private fun pollResponseState() {
+        // Drenar TODAS las respuestas encoladas, en orden de llegada. Antes solo
+        // se leia la ultima (un hueco unico), por lo que las respuestas rapidas
+        // se perdian. processResponseFromPrefs deduplica por operationId.
+        val responses = WearConstants.Response.drain(this)
+        for (responseJson in responses) {
+            processResponseFromPrefs(responseJson)
+        }
+    }
+```
+
+#### Por qué se cambió
+Para procesar todas las respuestas acumuladas en orden, en vez de solo la última, eliminando la pérdida de respuestas rápidas.
+
+### Cambio 5 - Deduplicar la presentación por operationId y reiniciar aviso en STATUS (P2)
+
+#### Código anterior
+```kotlin
+    private fun processResponseFromPrefs(responseJson: String) {
+        try {
+            val json = JSONObject(responseJson)
+            val responseType = json.optString("type")
+            val operationId = json.optString("operationId", "")
+            val isTerminal = WearConstants.isTerminalResponse(responseType, json.optString("code", ""))
+            if (operationId.isNotBlank() && isTerminal) {
+                WatchOutbox.remove(this, operationId)
+            }
+            if (responseType == "STATUS") {
+                refreshPendingOpsCount()
+                val nextUserSessionId = json.optString("userSessionId", "")
+```
+
+#### Código nuevo
+```kotlin
+    private fun processResponseFromPrefs(responseJson: String) {
+        try {
+            val json = JSONObject(responseJson)
+            val responseType = json.optString("type")
+            val operationId = json.optString("operationId", "")
+            // P2: deduplicar la PRESENTACION. La misma respuesta llega por dos
+            // canales; los tipos con feedback (toast/vibracion/navegacion) solo
+            // deben procesarse una vez por operationId. STATUS y TURNOS_STATUS no
+            // se deduplican: son idempotentes y refrescan datos.
+            val tieneFeedback = responseType == "OK" ||
+                responseType == "DUPLICATE_IGNORED" ||
+                responseType == "ERROR"
+            if (tieneFeedback && operationId.isNotBlank()) {
+                if (!shownResponseOpIds.add(operationId)) return
+                while (shownResponseOpIds.size > WearConstants.HANDLED_OPERATION_LIMIT) {
+                    shownResponseOpIds.remove(shownResponseOpIds.iterator().next())
+                }
+            }
+            val isTerminal = WearConstants.isTerminalResponse(responseType, json.optString("code", ""))
+            if (operationId.isNotBlank() && isTerminal) {
+                WatchOutbox.remove(this, operationId)
+            }
+            if (responseType == "STATUS") {
+                refreshPendingOpsCount()
+                // El movil respondio: esta preparado. Permitir un nuevo aviso si
+                // mas adelante volviera a no estarlo.
+                movilNoPreparadoAvisado = false
+                val nextUserSessionId = json.optString("userSessionId", "")
+```
+
+#### Por qué se cambió
+El móvil responde por dos canales y cada respuesta se procesaba dos veces, mostrando doble toast y doble vibración. Se deduplica por `operationId` para los tipos con feedback. Además, al recibir un STATUS válido se reinicia el flag de "móvil no preparado" para volver a permitir el aviso si el móvil dejara de estar listo.
+
+### Cambio 6 - Cortar el bucle de avisos de "móvil no preparado" (P1)
+
+#### Código anterior
+```kotlin
+            } else if ("ERROR" == json.optString("type")) {
+                openTurnosAfterOk = false
+                refreshPendingOpsCount()
+                releaseOperationWakeLockIfIdle()
+                performFeedback(json.optString("message", "Error"), strong = true)
+                // Si la edicion de un turno cerrado fue rechazada, salir de la
+                // pantalla de edicion (que quedaria bloqueada en "Guardando...")
+                // y volver al resumen re-pidiendo la lista, igual que en OK.
+                if (currentScreen.value == ScreenState.EDIT_TURNO_DATOS) {
+                    currentScreen.value = ScreenState.TURNO_SUMMARY
+                    sendGetTurnos()
+                }
+                // Optimismo: si aplicamos un cambio local y el movil rechazo, resync
+                // con el estado real para evitar inconsistencias visuales.
+                requestStatus()
+            }
+```
+
+#### Código nuevo
+```kotlin
+            } else if ("ERROR" == json.optString("type")) {
+                openTurnosAfterOk = false
+                refreshPendingOpsCount()
+                releaseOperationWakeLockIfIdle()
+                val code = json.optString("code", "")
+                val noTerminal = code == "USER_NOT_PREPARED" || code == "APP_NOT_READY"
+                if (noTerminal) {
+                    // El movil aun no esta listo (app cerrada / sesion no
+                    // preparada). No es un fallo del comando: el outbox lo
+                    // conserva y se reintenta. Avisar suave UNA sola vez y
+                    // re-pedir estado con espera (backoff), nunca en bucle
+                    // inmediato ni con vibracion fuerte repetida.
+                    if (!movilNoPreparadoAvisado) {
+                        performFeedback(json.optString("message", "Abre Mi Turno en el movil"), strong = false)
+                        movilNoPreparadoAvisado = true
+                    }
+                    scheduleResync(8000L)
+                } else {
+                    performFeedback(json.optString("message", "Error"), strong = true)
+                    // Si la edicion de un turno cerrado fue rechazada, salir de la
+                    // pantalla de edicion (que quedaria bloqueada en "Guardando...")
+                    // y volver al resumen re-pidiendo la lista, igual que en OK.
+                    if (currentScreen.value == ScreenState.EDIT_TURNO_DATOS) {
+                        currentScreen.value = ScreenState.TURNO_SUMMARY
+                        sendGetTurnos()
+                    }
+                    // Optimismo: si aplicamos un cambio local y el movil rechazo,
+                    // resync con el estado real para evitar inconsistencias.
+                    requestStatus()
+                }
+            }
+```
+
+#### Por qué se cambió
+Cuando el móvil no estaba preparado respondía `USER_NOT_PREPARED`/`APP_NOT_READY` (no terminales) y el reloj vibraba fuerte y re-pedía estado de inmediato, creando un bucle de avisos y vibración. Ahora esos errores muestran un aviso suave una sola vez y reintentan con espera (8 s), en línea con la recomendación de WorkManager de no reintentar errores no transitorios en bucle.
+
+### Cambio 7 - Bloquear por adelantado las acciones críticas con operación pendiente (P4)
+
+#### Código anterior
+```kotlin
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(ColorBackground)
+    ) {
+        if (pendingOpsCount > 0) {
+            SyncIndicator(
+```
+
+```kotlin
+                TarjetaCategoria("datafono", totalsPorTipo, numPorTipo, grande = true, modifier = Modifier.weight(1f)) { onSelectCategory("datafono") }
+                TarjetaCategoria("propina", totalsPorTipo, numPorTipo, grande = true, modifier = Modifier.weight(1f)) { onSelectCategory("propina") }
+```
+
+```kotlin
+            var togglingPause by remember { mutableStateOf(false) }
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth(WatchSafeButtonWidth)
+                    .clip(RoundedCornerShape(14.dp))
+                    .background(ColorPauseBg)
+                    .clickable(enabled = !togglingPause) {
+                        togglingPause = onTogglePause()
+                    }
+                    .padding(vertical = 8.dp),
+```
+
+```kotlin
+                    .border(2.dp, ColorGasolina, RoundedCornerShape(16.dp))
+                    .clickable { onEndTurno() }
+                    .padding(vertical = 11.dp),
+```
+
+```kotlin
+private fun TarjetaCategoria(
+    type: String,
+    totalsPorTipo: Map<String, Double>,
+    numPorTipo: Map<String, Int>,
+    grande: Boolean,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit
+) {
+    ...
+            .border(1.dp, meta.border, RoundedCornerShape(14.dp))
+            .clickable { onClick() }
+            .padding(horizontal = 8.dp, vertical = if (grande) 8.dp else 6.dp)
+```
+
+#### Código nuevo
+```kotlin
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(ColorBackground)
+    ) {
+        // P4: con una operacion critica pendiente solo puede haber una a la vez
+        // (ver arquitectura Wear). Se deshabilitan por adelantado las acciones
+        // criticas en vez de dejar pulsarlas y rechazarlas al final.
+        val accionesBloqueadas = pendingOpsCount > 0
+        if (pendingOpsCount > 0) {
+            SyncIndicator(
+```
+
+```kotlin
+                TarjetaCategoria("datafono", totalsPorTipo, numPorTipo, grande = true, enabled = !accionesBloqueadas, modifier = Modifier.weight(1f)) { onSelectCategory("datafono") }
+                TarjetaCategoria("propina", totalsPorTipo, numPorTipo, grande = true, enabled = !accionesBloqueadas, modifier = Modifier.weight(1f)) { onSelectCategory("propina") }
+```
+
+```kotlin
+            var togglingPause by remember { mutableStateOf(false) }
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth(WatchSafeButtonWidth)
+                    .clip(RoundedCornerShape(14.dp))
+                    .background(ColorPauseBg)
+                    .alpha(if (accionesBloqueadas) 0.5f else 1f)
+                    .clickable(enabled = !togglingPause && !accionesBloqueadas) {
+                        togglingPause = onTogglePause()
+                    }
+                    .padding(vertical = 8.dp),
+```
+
+```kotlin
+                    .border(2.dp, ColorGasolina, RoundedCornerShape(16.dp))
+                    .alpha(if (accionesBloqueadas) 0.5f else 1f)
+                    .clickable(enabled = !accionesBloqueadas) { onEndTurno() }
+                    .padding(vertical = 11.dp),
+```
+
+```kotlin
+private fun TarjetaCategoria(
+    type: String,
+    totalsPorTipo: Map<String, Double>,
+    numPorTipo: Map<String, Int>,
+    grande: Boolean,
+    enabled: Boolean = true,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit
+) {
+    ...
+            .border(1.dp, meta.border, RoundedCornerShape(14.dp))
+            .alpha(if (enabled) 1f else 0.5f)
+            .clickable(enabled = enabled) { onClick() }
+            .padding(horizontal = 8.dp, vertical = if (grande) 8.dp else 6.dp)
+```
+
+(El parámetro `enabled = !accionesBloqueadas` se añadió a las seis llamadas a `TarjetaCategoria`: datáfono, propina, agencia_bono, extra, gasolina y nulo.)
+
+#### Por qué se cambió
+Con una operación crítica pendiente, antes el usuario podía pulsar tarjetas, pausar o terminar y solo al enviar recibía "Operación pendiente" con vibración fuerte. Ahora esas acciones se deshabilitan y atenúan por adelantado, respetando la invariante de "una sola operación crítica pendiente a la vez".
+
+### Cambio 8 - No permitir editar una entrada pendiente (P3)
+
+#### Código anterior
+```kotlin
+                entradas.forEach { entry ->
+                    Spacer(modifier = Modifier.height(6.dp))
+                    EntradaHistorial(entry) { onEditEntry(entry) }
+                }
+```
+
+```kotlin
+private fun EntradaHistorial(entry: WatchEntry, onClick: () -> Unit) {
+    val meta = categoriaMeta(entry.type)
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp))
+            .background(Color(0xFF15151C))
+            // Atenuar la fila mientras el cambio esta pendiente de confirmacion.
+            .alpha(if (entry.pendiente) 0.55f else 1f)
+            .clickable { onClick() }
+```
+
+#### Código nuevo
+```kotlin
+                entradas.forEach { entry ->
+                    Spacer(modifier = Modifier.height(6.dp))
+                    // P3: una entrada pendiente aun tiene id temporal; editarla
+                    // daria "Entrada no encontrada". Tampoco se edita con otra
+                    // operacion en curso (P4).
+                    EntradaHistorial(entry, bloqueado = entry.pendiente || accionesBloqueadas) { onEditEntry(entry) }
+                }
+```
+
+```kotlin
+private fun EntradaHistorial(entry: WatchEntry, bloqueado: Boolean = false, onClick: () -> Unit) {
+    val meta = categoriaMeta(entry.type)
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp))
+            .background(Color(0xFF15151C))
+            // Atenuar la fila mientras el cambio esta pendiente de confirmacion.
+            .alpha(if (entry.pendiente) 0.55f else 1f)
+            .clickable(enabled = !bloqueado) { onClick() }
+```
+
+#### Por qué se cambió
+Una entrada recién añadida es optimista y tiene un id temporal negativo. Si el usuario la pulsaba para editarla antes de que el móvil la confirmara, se enviaba `EDIT_ENTRY` con ese id y el móvil respondía "Entrada no encontrada". Ahora la fila no es pulsable mientras está pendiente (ni con otra operación crítica en curso).
+
+## 2026-06-13 22:30 - Restaurar navegación y borrador tras recrear la Activity
+
+**Archivos modificados:** `android/wear/src/main/java/com/mijornada/app/WearMainActivity.kt`, `android/wear/src/main/java/com/mijornada/app/screens/AddEntryScreen.kt`, `ARQUITECTURA_RELOJ_WEAR_OS.md`
+
+### Cambio 1 - Claves de estado para la restauración
+
+#### Código anterior
+`No existían las constantes STATE_SCREEN/STATE_CATEGORY en WearMainActivity.kt.`
+
+#### Código nuevo
+```kotlin
+/** Claves para restaurar la navegacion tras recreacion de la Activity (cambio de
+ *  configuracion o muerte de proceso). El estado del turno y los comandos
+ *  pendientes se reconstruyen aparte desde STATUS y la outbox. */
+private const val STATE_SCREEN = "wear_state_screen"
+private const val STATE_CATEGORY = "wear_state_category"
+```
+
+#### Por qué se cambió
+Identificadores estables para guardar y restaurar el estado de navegación en el `Bundle`.
+
+### Cambio 2 - Restaurar navegación en onCreate y guardarla en onSaveInstanceState
+
+#### Código anterior
+```kotlin
+        super.onCreate(savedInstanceState)
+        refreshPendingOpsCount()
+        pendingTileAction = intent?.getStringExtra(EXTRA_ACCION_TILE)
+```
+
+```kotlin
+        setContent {
+            WearAppTheme {
+                MainContent()
+            }
+        }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+```
+
+#### Código nuevo
+```kotlin
+        super.onCreate(savedInstanceState)
+        refreshPendingOpsCount()
+        pendingTileAction = intent?.getStringExtra(EXTRA_ACCION_TILE)
+
+        // Restaurar la navegacion tras recreacion. El turno y los comandos
+        // pendientes se reconstruyen aparte (STATUS + outbox, sin duplicar por
+        // operationId). Las pantallas que dependen de un objeto no serializado
+        // (editingEntry/selectedTurno) caen a un destino seguro por sus guards.
+        // Una accion de tile entrante tiene prioridad sobre la pantalla guardada.
+        if (savedInstanceState != null && pendingTileAction == null) {
+            savedInstanceState.getString(STATE_SCREEN)?.let { name ->
+                runCatching { ScreenState.valueOf(name) }.getOrNull()?.let { currentScreen.value = it }
+            }
+            selectedCategory.value = savedInstanceState.getString(STATE_CATEGORY, "")
+            if (selectedCategory.value.isNotBlank()) setupCategoryMeta(selectedCategory.value)
+        }
+```
+
+```kotlin
+        setContent {
+            WearAppTheme {
+                MainContent()
+            }
+        }
+    }
+
+    override fun onSaveInstanceState(outState: Bundle) {
+        super.onSaveInstanceState(outState)
+        outState.putString(STATE_SCREEN, currentScreen.value.name)
+        outState.putString(STATE_CATEGORY, selectedCategory.value)
+    }
+
+    override fun onNewIntent(intent: Intent) {
+```
+
+#### Por qué se cambió
+`currentScreen`, `selectedCategory` y demás estado de UI viven en `mutableStateOf` de la Activity, que se reinician al recrearse (cambio de configuración o muerte de proceso), perdiendo en qué pantalla estaba el usuario. Guardar y restaurar la pantalla y la categoría devuelve al usuario a donde estaba. El estado crítico (comandos pendientes, datos del turno) ya se reconstruye sin duplicar vía outbox + `operationId` + STATUS, así que aquí solo se persiste lo de UI. Las pantallas que requieren un objeto no serializado se apoyan en sus guards (`if (e == null) -> ACTIVE_TURNO`, etc.) para no quedar a medias, y una acción de tile entrante tiene prioridad.
+
+### Cambio 3 - El borrador de entrada sobrevive a la recreación
+
+#### Código anterior
+```kotlin
+    var amountText by remember { mutableStateOf(amountToText(initialAmount)) }
+    var note by remember { mutableStateOf(initialNote) }
+    var saving by remember { mutableStateOf(false) }
+```
+
+#### Código nuevo
+```kotlin
+    // rememberSaveable: el borrador (importe y nota) sobrevive a la recreacion
+    // de la Activity (cambio de configuracion o muerte de proceso).
+    var amountText by rememberSaveable { mutableStateOf(amountToText(initialAmount)) }
+    var note by rememberSaveable { mutableStateOf(initialNote) }
+    var saving by remember { mutableStateOf(false) }
+```
+
+(Se añade el import `androidx.compose.runtime.saveable.rememberSaveable`.)
+
+#### Por qué se cambió
+Con la pantalla ya restaurada (Cambio 2), `rememberSaveable` recupera el importe y la nota a medio escribir tras la recreación, evitando que el usuario los reescriba. `saving` se mantiene en `remember` para reiniciarse a `false` (botón disponible) tras recrear.
+
+### Cambio 4 - Documentar la política de restauración
+
+#### Código anterior
+`No existía la seccion "Restauracion tras recreacion o cierre del proceso" en ARQUITECTURA_RELOJ_WEAR_OS.md.`
+
+#### Código nuevo
+```text
+## Restauracion tras recreacion o cierre del proceso
+
+La Activity del reloj puede recrearse por un cambio de configuracion o ser
+eliminada por Android en segundo plano. El estado de UI (pantalla actual,
+seleccion, borradores de formulario) vive en memoria y se perderia.
+
+Politica:
+
+1. Estado critico: se reconstruye siempre. Los comandos pendientes viven en
+   `WatchOutbox` (persistente) y se reintentan sin duplicar por `operationId`;
+   los datos del turno se rehidratan del `STATUS` del movil al volver a primer
+   plano. No requiere codigo de UI adicional.
+2. Navegacion: `currentScreen` y la categoria seleccionada se guardan en
+   `onSaveInstanceState` y se restauran en `onCreate`. Las pantallas que dependen
+   de un objeto no serializado (`editingEntry`, `selectedTurno`) caen a un
+   destino seguro por sus guards existentes, en lugar de restaurarse a medias.
+3. Borrador: el importe y la nota en curso usan `rememberSaveable`, por lo que
+   sobreviven a la recreacion si la pantalla se restaura.
+
+Una accion entrante desde la tile tiene prioridad sobre la pantalla restaurada.
+Nunca se restaura un estado que pueda reaplicar un comando ya enviado: la
+reactivacion pasa siempre por la outbox con su `operationId`.
+```
+
+#### Por qué se cambió
+Deja escrito el comportamiento esperado tras recreación/muerte de proceso (qué se restaura y qué no), cerrando el punto pendiente del plan de remediación.
+
+## 2026-06-13 22:10 - Marcar las entradas optimistas como pendientes en el reloj
+
+**Archivos modificados:** `android/wear/src/main/java/com/mijornada/app/screens/WatchModels.kt`, `android/wear/src/main/java/com/mijornada/app/WearMainActivity.kt`, `android/wear/src/main/java/com/mijornada/app/screens/ActiveTurnoScreen.kt`
+
+### Cambio 1 - Flag pendiente en WatchEntry
+
+#### Código anterior
+```kotlin
+data class WatchEntry(
+    val id: Long,
+    val type: String,
+    val amount: Double,
+    val note: String,
+    val time: String
+)
+```
+
+#### Código nuevo
+```kotlin
+data class WatchEntry(
+    val id: Long,
+    val type: String,
+    val amount: Double,
+    val note: String,
+    val time: String,
+    /** true = cambio aplicado de forma optimista en el reloj, aun no confirmado
+     *  por el movil. Se muestra marcado como pendiente hasta el ACK/STATUS, que
+     *  lo reconcilia (lo sustituye por el dato real) o lo revierte. */
+    val pendiente: Boolean = false
+)
+```
+
+#### Por qué se cambió
+Implementa la política de presentación optimista (sección "Presentacion de estado optimista" del doc Wear): cada entrada aplicada de forma optimista debe poder distinguirse de las confirmadas. El campo tiene valor por defecto `false`, así que las entradas que llegan del móvil (`parseEntradas`, `parseEntryArray`) y las del editor de turno quedan como confirmadas sin tocar sus constructores.
+
+### Cambio 2 - El optimismo de añadir y editar marca la entrada como pendiente
+
+#### Código anterior
+```kotlin
+        val newEntry = WatchEntry(
+            id = -System.currentTimeMillis(),
+            type = entryType,
+            amount = amount,
+            note = note,
+            time = java.text.SimpleDateFormat("HH:mm", java.util.Locale.getDefault()).format(java.util.Date())
+        )
+```
+
+```kotlin
+        val updated = before.copy(amount = amount, note = note)
+        entradas.value = entradas.value.map { if (it.id == id) updated else it }
+```
+
+#### Código nuevo
+```kotlin
+        val newEntry = WatchEntry(
+            id = -System.currentTimeMillis(),
+            type = entryType,
+            amount = amount,
+            note = note,
+            time = java.text.SimpleDateFormat("HH:mm", java.util.Locale.getDefault()).format(java.util.Date()),
+            pendiente = true
+        )
+```
+
+```kotlin
+        val updated = before.copy(amount = amount, note = note, pendiente = true)
+        entradas.value = entradas.value.map { if (it.id == id) updated else it }
+```
+
+#### Por qué se cambió
+`applyOptimisticAddEntry` y `applyOptimisticEditEntry` aplican el cambio en la UI antes del ACK. Marcarlos como `pendiente` permite mostrarlos como no confirmados. La reconciliación y la reversión ya ocurren sin código nuevo: cuando llega el STATUS, `parseEntradas` reemplaza la lista por las entradas reales del móvil (todas con `pendiente = false`); ante `ERROR` la rama ya llama a `requestStatus()`, que trae el estado real y descarta el optimismo.
+
+### Cambio 3 - Pintar las entradas pendientes en la lista del turno
+
+#### Código anterior
+```kotlin
+import androidx.compose.ui.draw.clip
+```
+
+```kotlin
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp))
+            .background(Color(0xFF15151C))
+            .clickable { onClick() }
+            .padding(horizontal = 12.dp, vertical = 9.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        CategoriaIcon(entry.type, meta.color, 14.dp)
+```
+
+```kotlin
+        Text(entry.time, color = ColorGrey, fontSize = 10.sp)
+        Spacer(modifier = Modifier.width(8.dp))
+        if (entry.type == "nota") {
+            Text("✎", color = ColorWhite, fontSize = 12.sp)
+        } else {
+            Text(fmtEurSigned(entry.amount), color = meta.color, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+        }
+```
+
+#### Código nuevo
+```kotlin
+import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.clip
+```
+
+```kotlin
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp))
+            .background(Color(0xFF15151C))
+            // Atenuar la fila mientras el cambio esta pendiente de confirmacion.
+            .alpha(if (entry.pendiente) 0.55f else 1f)
+            .clickable { onClick() }
+            .padding(horizontal = 12.dp, vertical = 9.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        CategoriaIcon(entry.type, meta.color, 14.dp)
+```
+
+```kotlin
+        Text(entry.time, color = ColorGrey, fontSize = 10.sp)
+        Spacer(modifier = Modifier.width(8.dp))
+        // Icono de pendiente (reloj) mientras el movil no ha confirmado.
+        if (entry.pendiente) {
+            Text("⏱", color = ColorTaximetro, fontSize = 11.sp)
+            Spacer(modifier = Modifier.width(6.dp))
+        }
+        if (entry.type == "nota") {
+            Text("✎", color = ColorWhite, fontSize = 12.sp)
+        } else {
+            Text(fmtEurSigned(entry.amount), color = meta.color, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+        }
+```
+
+#### Por qué se cambió
+La entrada pendiente se atenúa (alpha 0.55) y muestra un icono de reloj amarillo hasta que el móvil la confirma, en lugar de aparecer idéntica a una confirmada. Cumple la regla 1 de la política (marca sobre la propia entrada, no solo el contador global).
+
+#### Alcance
+Esta tanda cubre las entradas de añadir y editar, que es donde se muestran importes como confirmados. El borrado optimista sigue retirando la entrada (su reversión se da vía STATUS si el móvil rechaza) y las acciones de turno (iniciar/pausar/reanudar) mantienen por ahora el indicador global `pendingOpsCount`/`SyncIndicator`. Convergencia pendiente para una tanda posterior.
+
+## 2026-06-13 21:55 - Definir política de presentación optimista en el doc Wear
+
+**Archivos modificados:** `ARQUITECTURA_RELOJ_WEAR_OS.md`
+
+### Cambio 1 - Nueva sección "Presentacion de estado optimista"
+
+#### Código anterior
+`No existía la seccion "Presentacion de estado optimista (pendiente vs confirmado)" en ARQUITECTURA_RELOJ_WEAR_OS.md (se inserta tras "Estado movil hacia reloj").`
+
+#### Código nuevo
+```text
+## Presentacion de estado optimista (pendiente vs confirmado)
+
+El reloj aplica los cambios criticos de forma optimista para responder al
+instante (iniciar, pausar, reanudar, anadir, editar y borrar se reflejan en la
+UI antes de recibir el ACK). Esto es deseable: el transporte Bluetooth, Doze y
+el segundo plano introducen latencia que no debe penalizar la interaccion. Por
+eso la politica adoptada es optimista, no "esperar al ACK para mostrar".
+
+Para no contradecir la invariante de "no confirmar lo pendiente", la
+presentacion optimista debe cumplir tres reglas:
+
+1. Mostrar ya, pero marcado como pendiente. Cada cambio aplicado de forma
+   optimista se muestra con un indicador de pendiente sobre la propia accion o
+   entrada, no solo en el contador global. El usuario debe poder distinguir que
+   ese dato concreto aun no esta confirmado por el movil.
+2. Reconciliar al recibir respuesta. Al llegar el ACK (`OK`) o el `STATUS`
+   actualizado, se retira la marca y el dato queda confirmado.
+   `DUPLICATE_IGNORED` se trata igual que confirmado.
+3. Revertir ante error terminal. Ante un `ERROR` terminal, el cambio optimista
+   se deshace o se re-sincroniza desde el `STATUS`/`GET_TURNOS` real, y se avisa
+   al usuario. Los errores no terminales (`USER_NOT_PREPARED`, `APP_NOT_READY`)
+   mantienen el dato como pendiente; no lo revierten.
+
+Senales de estado disponibles para implementar esta politica:
+
+- `pendingOpsCount` y `SyncIndicator`: numero de operaciones pendientes (vista
+  global). Punto de partida, pero insuficiente por si solo: no indica que dato
+  concreto esta pendiente.
+- `contablePendiente` (turnos): ya marca un turno cuyo recalculo contable no se
+  ha confirmado. Es el modelo a replicar a nivel de accion y de entrada.
+
+El flujo de edicion de turno cerrado (`EDIT_TURNO`) es el ejemplo correcto: ya
+espera el ACK antes de volver al resumen y marca su contabilidad como pendiente.
+El resto de acciones deben converger al mismo criterio: optimista en la UI,
+pendiente hasta el ACK, reconciliado o revertido segun la respuesta.
+
+La marca de pendiente nunca altera los datos brutos enviados al movil ni la
+contabilidad, que se sigue calculando en TypeScript al hidratar.
+```
+
+#### Por qué se cambió
+La opción profesional para el estado optimista es UI optimista con marca explícita de "pendiente" y reconciliación al recibir respuesta (no esperar al ACK para mostrar, que penalizaría la latencia del transporte). Se documenta como política previa a implementarla por pantallas, para que todos los flujos converjan al mismo criterio sin romper la invariante #9.
+
+### Cambio 2 - Ampliar la invariante #9
+
+#### Código anterior
+```text
+9. El reloj no debe inventar estado ni confirmar acciones pendientes.
+```
+
+#### Código nuevo
+```text
+9. El reloj no debe inventar estado ni confirmar acciones pendientes. Todo
+   cambio optimista se muestra marcado como pendiente hasta el ACK/`STATUS` y se
+   reconcilia o revierte segun la respuesta (ver «Presentacion de estado
+   optimista»).
+```
+
+#### Por qué se cambió
+La invariante #9 enunciaba el principio pero no la mecánica. Se amplía para enlazar con la nueva sección y dejar la regla accionable: optimista + marca de pendiente + reconciliación.
+
+## 2026-06-13 21:40 - Evitar expulsión de formularios y reactivar la outbox
+
+**Archivos modificados:** `android/wear/src/main/java/com/mijornada/app/WearMainActivity.kt`
+
+### Cambio 1 - Eliminar la declaración de formScreens (ya sin uso)
+
+#### Código anterior
+```kotlin
+    /** Pantallas tipo formulario donde un OK/DUPLICATE_IGNORED de un comando debe cerrar el form. */
+    private val formScreens = setOf(
+        ScreenState.ADD_ENTRY,
+        ScreenState.EDIT_ENTRY,
+        ScreenState.CONFIRM_DELETE,
+        ScreenState.END_TURNO,
+    )
+    private var isUiActive = false
+```
+
+#### Código nuevo
+```kotlin
+    private var isUiActive = false
+```
+
+#### Por qué se cambió
+`formScreens` solo se usaba en las ramas genéricas de `OK`/`DUPLICATE_IGNORED` que se eliminan en el Cambio 2. Sin esos usos quedaba como código muerto (y warning de lint), por lo que se elimina la declaración.
+
+### Cambio 2 - Un OK/DUPLICATE ajeno ya no expulsa del formulario
+
+#### Código anterior
+```kotlin
+                } else {
+                    // Solo navegar a ACTIVE_TURNO si el usuario sigue en un formulario.
+                    // En TURNOS, TURNO_SUMMARY, NO_CONNECTED: respetar pantalla actual.
+                    if (currentScreen.value == ScreenState.EDIT_TURNO_DATOS) {
+                        // Edicion de turno cerrado confirmada: volver al resumen
+                        // y re-pedir la lista para mostrar los datos del movil.
+                        currentScreen.value = ScreenState.TURNO_SUMMARY
+                        sendGetTurnos()
+                    } else if (currentScreen.value in formScreens) {
+                        currentScreen.value = ScreenState.ACTIVE_TURNO
+                    }
+                    requestStatus()
+                }
+```
+
+```kotlin
+                if (currentScreen.value == ScreenState.EDIT_TURNO_DATOS) {
+                    currentScreen.value = ScreenState.TURNO_SUMMARY
+                    sendGetTurnos()
+                } else if (currentScreen.value in formScreens) {
+                    currentScreen.value = if (activeTurno.value) ScreenState.ACTIVE_TURNO else ScreenState.NO_ACTIVE_TURNO
+                }
+                requestStatus()
+                MobileResponseService.enqueueOutboxRetry(this)
+```
+
+#### Código nuevo
+```kotlin
+                } else {
+                    // La edicion de turno cerrado espera el ACK para volver al
+                    // resumen. Los demas formularios ya navegan al encolar su
+                    // comando, asi que un OK (que puede ser de otra operacion ya
+                    // pendiente) no debe sacar al usuario del formulario actual
+                    // ni perder lo que este escribiendo: solo se valida la
+                    // pantalla que realmente espera confirmacion.
+                    if (currentScreen.value == ScreenState.EDIT_TURNO_DATOS) {
+                        currentScreen.value = ScreenState.TURNO_SUMMARY
+                        sendGetTurnos()
+                    }
+                    requestStatus()
+                }
+```
+
+```kotlin
+                if (currentScreen.value == ScreenState.EDIT_TURNO_DATOS) {
+                    currentScreen.value = ScreenState.TURNO_SUMMARY
+                    sendGetTurnos()
+                }
+                requestStatus()
+                MobileResponseService.enqueueOutboxRetry(this)
+```
+
+#### Por qué se cambió
+Las ramas `OK` y `DUPLICATE_IGNORED` sacaban al usuario de cualquier pantalla de `formScreens` sin comprobar si la respuesta correspondía al formulario mostrado. Como `ADD_ENTRY`/`EDIT_ENTRY`/`CONFIRM_DELETE`/`END_TURNO` ya navegan al encolar su comando, esas ramas solo se disparaban con un ACK ajeno (de otra operación ya pendiente), expulsando al usuario de un formulario nuevo y perdiendo lo introducido. Se conserva únicamente el caso `EDIT_TURNO_DATOS`, que sí espera el ACK por la confirmación contable.
+
+### Cambio 3 - Reactivar la outbox al volver a primer plano
+
+#### Código anterior
+```kotlin
+    override fun onResume() {
+        super.onResume()
+        isUiActive = true
+        refreshPendingOpsCount()
+        prefs.registerOnSharedPreferenceChangeListener(responsePrefsListener)
+```
+
+#### Código nuevo
+```kotlin
+    override fun onResume() {
+        super.onResume()
+        isUiActive = true
+        refreshPendingOpsCount()
+        // Reactivar el envio de la outbox al volver a primer plano: si el worker
+        // agoto sus reintentos mientras la app estuvo en segundo plano, esto lo
+        // vuelve a programar. KEEP es idempotente si ya hay trabajo activo.
+        if (WatchOutbox.hasPendingCommands(this)) {
+            MobileResponseService.enqueueOutboxRetry(this)
+        }
+        prefs.registerOnSharedPreferenceChangeListener(responsePrefsListener)
+```
+
+#### Por qué se cambió
+`OutboxWorker` abandona tras `MAX_RUN_ATTEMPTS = 8` (~40 min de backoff) pero conserva el comando en la outbox. En primer plano el STATUS periódico ya re-encola el worker, pero si los reintentos se agotaron con la app en segundo plano nada lo reactivaba hasta enviar otro comando. Re-encolar en `onResume` cuando hay pendientes garantiza que abrir la app reanude el envío. Con `ExistingWorkPolicy.KEEP` la llamada es idempotente si ya hay trabajo activo.
+
+## 2026-06-13 21:20 - Corregir compilación y cinco fallos del módulo Wear
+
+**Archivos modificados:** `android/wear/src/main/java/com/mijornada/app/screens/EditTurnoDatosScreen.kt`, `android/wear/src/main/java/com/mijornada/app/WearMainActivity.kt`, `android/wear/src/main/java/com/mijornada/app/screens/NoActiveTurnoScreen.kt`
+
+### Cambio 1 - Los call sites de AddEntryScreen en EditTurnoDatosScreen devuelven Boolean
+
+#### Código anterior
+```kotlin
+            onSave = { amount, note ->
+                entradas = entradas.map {
+                    if (it.id == editando.id) it.copy(amount = if (it.type == "nota") it.amount else amount, note = note.trim()) else it
+                }
+                editandoEntrada = null
+            },
+```
+
+```kotlin
+            onSave = { amount, note ->
+                entradas = entradas + WatchEntry(
+                    id = System.currentTimeMillis(),
+                    type = categoria,
+                    amount = amount,
+                    note = note.trim(),
+                    time = horaActual(),
+                )
+                nuevaCategoria = null
+            },
+```
+
+#### Código nuevo
+```kotlin
+            onSave = { amount, note ->
+                entradas = entradas.map {
+                    if (it.id == editando.id) it.copy(amount = if (it.type == "nota") it.amount else amount, note = note.trim()) else it
+                }
+                editandoEntrada = null
+                true
+            },
+```
+
+```kotlin
+            onSave = { amount, note ->
+                entradas = entradas + WatchEntry(
+                    id = System.currentTimeMillis(),
+                    type = categoria,
+                    amount = amount,
+                    note = note.trim(),
+                    time = horaActual(),
+                )
+                nuevaCategoria = null
+                true
+            },
+```
+
+#### Por qué se cambió
+La firma de `AddEntryScreen.onSave` se había cambiado a `(Double, String) -> Boolean`, pero estos dos call sites de `EditTurnoDatosScreen` seguían terminando en una asignación (`editandoEntrada = null` / `nuevaCategoria = null`), que devuelve `Unit`. Eso rompía la compilación del módulo `wear`. Son ediciones locales en memoria que nunca se rechazan, por lo que devuelven `true`.
+
+### Cambio 2 - Cancelar el sondeo de estado en onPause
+
+#### Código anterior
+```kotlin
+    override fun onPause() {
+        isUiActive = false
+        prefs.unregisterOnSharedPreferenceChangeListener(responsePrefsListener)
+        super.onPause()
+    }
+```
+
+#### Código nuevo
+```kotlin
+    override fun onPause() {
+        isUiActive = false
+        prefs.unregisterOnSharedPreferenceChangeListener(responsePrefsListener)
+        // Detener el sondeo de estado en segundo plano: onResume vuelve a
+        // pedir STATUS y reprograma el resync si sigue haciendo falta.
+        mainHandler.removeCallbacks(resyncRunnable)
+        super.onPause()
+    }
+```
+
+#### Por qué se cambió
+`requestStatus()` programa `resyncRunnable` cada 2,5 s mediante `scheduleResync()`, y `requestStatus` se vuelve a invocar en bucle. `onPause()` no cancelaba el runnable, así que el sondeo `GET_STATUS` seguía ejecutándose en segundo plano indefinidamente y drenaba batería. Cancelarlo en `onPause` lo detiene; `onResume` ya llama a `requestStatus()` y reprograma el resync al volver a primer plano.
+
+### Cambio 3 - Adquirir el WakeLock también en el primer comando crítico
+
+#### Código anterior
+```kotlin
+        refreshPendingOpsCount()
+        scheduleResync(2500L)
+        if (pendingOpsCount.value > 0) acquireOperationWakeLock()
+        if (!isRetry && shouldPersistOutbox(commandJson)) {
+            val operationId = JSONObject(commandJson).optString("operationId", "")
+            WatchOutbox.save(this, operationId, commandJson)
+            MobileResponseService.enqueueOutboxRetry(this)
+        }
+```
+
+#### Código nuevo
+```kotlin
+        // Guardar primero el comando en la outbox para que el conteo posterior
+        // lo incluya y el WakeLock se adquiera ya en el primer envio critico.
+        if (!isRetry && shouldPersistOutbox(commandJson)) {
+            val operationId = JSONObject(commandJson).optString("operationId", "")
+            WatchOutbox.save(this, operationId, commandJson)
+            MobileResponseService.enqueueOutboxRetry(this)
+        }
+        refreshPendingOpsCount()
+        scheduleResync(2500L)
+        if (pendingOpsCount.value > 0) acquireOperationWakeLock()
+```
+
+#### Por qué se cambió
+`refreshPendingOpsCount()` contaba la outbox antes de guardar el comando, así que en el primer envío `pendingOpsCount` valía 0 y no se adquiría el `WakeLock`. Guardando el comando en la outbox antes del conteo, el primer comando crítico ya queda contado y adquiere el `WakeLock`.
+
+### Cambio 4 - Desbloquear la edición de turno ante una respuesta ERROR
+
+#### Código anterior
+```kotlin
+            } else if ("ERROR" == json.optString("type")) {
+                openTurnosAfterOk = false
+                refreshPendingOpsCount()
+                releaseOperationWakeLockIfIdle()
+                performFeedback(json.optString("message", "Error"), strong = true)
+                // Optimismo: si aplicamos un cambio local y el movil rechazo, resync
+                // con el estado real para evitar inconsistencias visuales.
+                requestStatus()
+            }
+```
+
+#### Código nuevo
+```kotlin
+            } else if ("ERROR" == json.optString("type")) {
+                openTurnosAfterOk = false
+                refreshPendingOpsCount()
+                releaseOperationWakeLockIfIdle()
+                performFeedback(json.optString("message", "Error"), strong = true)
+                // Si la edicion de un turno cerrado fue rechazada, salir de la
+                // pantalla de edicion (que quedaria bloqueada en "Guardando...")
+                // y volver al resumen re-pidiendo la lista, igual que en OK.
+                if (currentScreen.value == ScreenState.EDIT_TURNO_DATOS) {
+                    currentScreen.value = ScreenState.TURNO_SUMMARY
+                    sendGetTurnos()
+                }
+                // Optimismo: si aplicamos un cambio local y el movil rechazo, resync
+                // con el estado real para evitar inconsistencias visuales.
+                requestStatus()
+            }
+```
+
+#### Por qué se cambió
+`EditTurnoDatosScreen` no navega al encolar (espera el ACK), por lo que su botón queda en "Guardando...". Si el móvil respondía `ERROR`, la rama no salía de la pantalla ni reseteaba el estado, dejando el botón bloqueado sin posibilidad de reintento. Ahora, ante `ERROR` estando en `EDIT_TURNO_DATOS`, se vuelve a `TURNO_SUMMARY` y se re-pide la lista (simétrico a `OK`/`DUPLICATE_IGNORED`), revirtiendo además el cambio optimista con los datos reales del móvil.
+
+### Cambio 5 - Mostrar el estado de conexión real en la pantalla de inicio
+
+#### Código anterior
+```kotlin
+fun NoActiveTurnoScreen(
+    pendingOpsCount: Int = 0,
+    activeTurno: Boolean = false,
+    isPaused: Boolean = false,
+    onStartTurno: () -> Unit,
+    onContinuar: () -> Unit = {},
+    onOpenTurnos: () -> Unit
+) {
+```
+
+```kotlin
+            Text("Móvil conectado", color = ColorPropina, fontSize = 9.sp)
+```
+
+#### Código nuevo
+```kotlin
+fun NoActiveTurnoScreen(
+    pendingOpsCount: Int = 0,
+    activeTurno: Boolean = false,
+    isPaused: Boolean = false,
+    conectado: Boolean = true,
+    onStartTurno: () -> Unit,
+    onContinuar: () -> Unit = {},
+    onOpenTurnos: () -> Unit
+) {
+```
+
+```kotlin
+            Text(
+                if (conectado) "Móvil conectado" else "Móvil desconectado",
+                color = if (conectado) ColorPropina else ColorGasolina,
+                fontSize = 9.sp
+            )
+```
+
+#### Por qué se cambió
+La pantalla mostraba "Móvil conectado" como texto fijo. Como `PAUSED_MENU` queda fuera de `pantallasDeReposo`, un STATUS desconectado no la saca a `NO_CONNECTED`, y el menú de pausa podía mostrar "Móvil conectado" estando desconectado. Se añade el parámetro `conectado` (por defecto `true`, así el caso de inicio sin turno no cambia) y el call site de `PAUSED_MENU` pasa `isConnected.value`, derivando el texto del último estado real.
+
+## 2026-06-13 20:58 - Evitar turno vacío al volver del menú de pausa
+
+**Archivos modificados:** `android/wear/src/main/java/com/mijornada/app/WearMainActivity.kt`
+
+### Cambio 1 - El gesto atrás desde PAUSED_MENU respeta si hay turno
+
+#### Código anterior
+```kotlin
+            ScreenState.PAUSED_MENU -> currentScreen.value = ScreenState.ACTIVE_TURNO
+            ScreenState.NO_CONNECTED -> Unit
+```
+
+#### Código nuevo
+```kotlin
+            // Si el turno se cerro desde el movil mientras se estaba en el menu,
+            // volver a inicio en vez de mostrar un ACTIVE_TURNO vacio (mismo
+            // criterio que la rama TURNOS).
+            ScreenState.PAUSED_MENU -> currentScreen.value =
+                if (activeTurno.value) ScreenState.ACTIVE_TURNO else ScreenState.NO_ACTIVE_TURNO
+            ScreenState.NO_CONNECTED -> Unit
+```
+
+#### Por qué se cambió
+`PAUSED_MENU` queda fuera de `pantallasDeReposo`, así que un STATUS de fondo no lo abandona. Si el turno se cierra desde el móvil mientras el usuario está en el menú de pausa, `activeTurno` pasa a `false` pero la pantalla sigue en `PAUSED_MENU`. Con la versión anterior, el gesto atrás navegaba incondicionalmente a `ACTIVE_TURNO`, mostrando la pantalla de turno con datos vacíos hasta el siguiente STATUS. Ahora se decide el destino según `activeTurno.value`, igual que ya hace la rama `TURNOS`, evitando ese parpadeo.
+
+## 2026-06-13 20:53 - Añadir menú de pausa en la app espejo del tile
+
+**Archivos modificados:** `android/wear/src/main/res/drawable/ic_pausa.xml`, `android/wear/src/main/java/com/mijornada/app/screens/NoActiveTurnoScreen.kt`, `android/wear/src/main/java/com/mijornada/app/WearMainActivity.kt`
+
+### Cambio 1 - Icono vectorial de pausa
+
+#### Código anterior
+`No existía ic_pausa.xml en res/drawable.`
+
+#### Código nuevo
+```xml
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Dos barras de pausa. Blanco para tintarlo desde Compose con el color del
+     boton (mismo criterio que ic_cohete). -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <path
+        android:pathData="M8.5,5 L10.5,5 L10.5,19 L8.5,19 Z"
+        android:fillColor="#FFFFFFFF" />
+    <path
+        android:pathData="M13.5,5 L15.5,5 L15.5,19 L13.5,19 Z"
+        android:fillColor="#FFFFFFFF" />
+</vector>
+```
+
+#### Por qué se cambió
+El menú de pausa necesita un icono de pausa tintable desde Compose para el botón "Turno Pausado", igual que el tile. No existía un vector de pausa (solo `tile_pausa_azul.png`, pensado para el tile); se añade uno monocromo coherente con `ic_cohete.xml`.
+
+### Cambio 2 - Nuevo estado PAUSED_MENU
+
+#### Código anterior
+```kotlin
+    CONFIRM_DELETE,
+    END_TURNO
+}
+```
+
+#### Código nuevo
+```kotlin
+    CONFIRM_DELETE,
+    END_TURNO,
+    PAUSED_MENU
+}
+```
+
+#### Por qué se cambió
+El menú de pausa necesita un estado propio fuera de `pantallasDeReposo`, para que el STATUS de fondo no lo sustituya automáticamente por `ACTIVE_TURNO` (cosa que sí pasa con `NO_ACTIVE_TURNO` cuando hay turno activo).
+
+### Cambio 3 - NoActiveTurnoScreen reutilizada como espejo del tile
+
+#### Código anterior
+```kotlin
+fun NoActiveTurnoScreen(
+    pendingOpsCount: Int = 0,
+    onStartTurno: () -> Unit,
+    onOpenTurnos: () -> Unit
+) {
+```
+
+```kotlin
+            HomeActionButton(
+                label = "Iniciar Turno",
+                iconRes = R.drawable.ic_cohete,
+                textColor = ColorPropina,
+                bg = ColorPropinaBg,
+                borderColor = ColorPropina,
+                onClick = onStartTurno
+            )
+            Spacer(modifier = Modifier.height(7.dp))
+```
+
+#### Código nuevo
+```kotlin
+fun NoActiveTurnoScreen(
+    pendingOpsCount: Int = 0,
+    activeTurno: Boolean = false,
+    isPaused: Boolean = false,
+    onStartTurno: () -> Unit,
+    onContinuar: () -> Unit = {},
+    onOpenTurnos: () -> Unit
+) {
+```
+
+```kotlin
+            // Boton principal espejo del tile (TurnoTileService): azul "Turno
+            // Pausado" si el turno esta pausado, verde "Continuar Turno" si esta
+            // activo, verde "Iniciar Turno" si no hay turno.
+            when {
+                activeTurno && isPaused -> HomeActionButton(
+                    label = "Turno Pausado",
+                    iconRes = R.drawable.ic_pausa,
+                    textColor = ColorPause,
+                    bg = ColorPauseBg,
+                    borderColor = ColorPause,
+                    onClick = onContinuar
+                )
+                activeTurno -> HomeActionButton(
+                    label = "Continuar Turno",
+                    iconRes = R.drawable.ic_cohete,
+                    textColor = ColorPropina,
+                    bg = ColorPropinaBg,
+                    borderColor = ColorPropina,
+                    onClick = onContinuar
+                )
+                else -> HomeActionButton(
+                    label = "Iniciar Turno",
+                    iconRes = R.drawable.ic_cohete,
+                    textColor = ColorPropina,
+                    bg = ColorPropinaBg,
+                    borderColor = ColorPropina,
+                    onClick = onStartTurno
+                )
+            }
+            Spacer(modifier = Modifier.height(7.dp))
+```
+
+#### Por qué se cambió
+En vez de crear una pantalla nueva duplicada, se generaliza la pantalla de inicio para que muestre el botón principal según el estado del turno, idéntico a la lógica del tile (`TurnoTileService`). Con los parámetros nuevos por defecto (`activeTurno=false`, `isPaused=false`, `onContinuar={}`), el caso de inicio sin turno se mantiene exactamente igual, sin regresión.
+
+### Cambio 4 - El gesto atrás vuelve a capturarse para llevar al menú
+
+#### Código anterior
+```kotlin
+        // Estando pausado se libera el gesto atras para que el deslizamiento
+        // nativo del reloj saque a la esfera/tile (que ya muestra "Turno
+        // Pausado" y "Turnos" y permite continuar). En el turno activo sin
+        // pausar se sigue capturando para no salir del turno por accidente.
+        BackHandler(
+            enabled = currentScreen.value != ScreenState.NO_CONNECTED &&
+                !(currentScreen.value == ScreenState.ACTIVE_TURNO && isPaused.value)
+        ) {
+            handleBack()
+        }
+```
+
+#### Código nuevo
+```kotlin
+        BackHandler(enabled = currentScreen.value != ScreenState.NO_CONNECTED) {
+            handleBack()
+        }
+```
+
+#### Por qué se cambió
+La versión anterior (entrada 20:08) liberaba el gesto en pausa para salir a la esfera. Ahora el destino es un menú dentro de la app, así que el `BackHandler` vuelve a capturar el gesto en todas las pantallas salvo `NO_CONNECTED`, y la navegación a `PAUSED_MENU` se decide en `handleBack`.
+
+### Cambio 5 - handleBack lleva de la pausa al menú y de vuelta
+
+#### Código anterior
+```kotlin
+            ScreenState.NO_ACTIVE_TURNO -> Unit
+            ScreenState.ACTIVE_TURNO -> Unit
+            ScreenState.NO_CONNECTED -> Unit
+        }
+```
+
+#### Código nuevo
+```kotlin
+            ScreenState.NO_ACTIVE_TURNO -> Unit
+            // Estando pausado, el gesto atras lleva al menu de pausa (espejo del
+            // tile). En el turno activo sin pausar no hace nada para no salir
+            // por accidente.
+            ScreenState.ACTIVE_TURNO -> if (isPaused.value) { currentScreen.value = ScreenState.PAUSED_MENU }
+            ScreenState.PAUSED_MENU -> currentScreen.value = ScreenState.ACTIVE_TURNO
+            ScreenState.NO_CONNECTED -> Unit
+        }
+```
+
+#### Por qué se cambió
+Estando pausado el gesto atrás navega al `PAUSED_MENU`; desde el menú, el gesto atrás devuelve al turno. En el turno activo sin pausar se conserva el comportamiento previo (no hacer nada para no salir por accidente).
+
+### Cambio 6 - Render del menú de pausa
+
+#### Código anterior
+`No existía la rama ScreenState.PAUSED_MENU en el when del render de MainContent.`
+
+#### Código nuevo
+```kotlin
+            // Menu de pausa: misma pantalla de inicio reutilizada como espejo
+            // del tile (Turno Pausado / Volver al turno + Turnos). Se llega con
+            // el gesto atras estando pausado.
+            ScreenState.PAUSED_MENU -> NoActiveTurnoScreen(
+                pendingOpsCount = pendingOpsCount.value,
+                activeTurno = activeTurno.value,
+                isPaused = isPaused.value,
+                onStartTurno = { currentScreen.value = ScreenState.CONFIRM_START_TURNO },
+                onContinuar = { currentScreen.value = ScreenState.ACTIVE_TURNO },
+                onOpenTurnos = {
+                    if (sendGetTurnos()) {
+                        turnosLoading.value = true
+                        currentScreen.value = ScreenState.TURNOS
+                    }
+                }
+            )
+```
+
+#### Por qué se cambió
+Conecta el nuevo estado con la pantalla reutilizada, pasándole el estado real del turno (`activeTurno`/`isPaused`) para que el botón principal refleje en vivo cualquier cambio recibido del móvil, y los callbacks para volver al turno (`onContinuar`) y abrir el historial (`onOpenTurnos`).
+
+## 2026-06-13 20:51 - Actualizar ESTRUCTURA.md con el estado real del proyecto
+
+**Archivos modificados:** `ESTRUCTURA.md`
+
+### Cambio 1 - Inventario completo de archivos en todas las carpetas de src/
+
+#### Código anterior
+```md
+| `src/logic/` | Lógica de negocio y utilidades **puras**: funciones que calculan, transforman o formatean datos. No tocan Firebase, ni el navegador, ni React. | `accounting.ts`, `week-logic.ts`, `csv.ts`, `date-time.ts`, `formatters.ts` |
+| `src/hooks/` | Custom Hooks de React. Todo código que use estados, efectos o referencias y encapsule lógica ligada a React sin renderizar UI. | `use-firestore-sync.ts` |
+| `src/services/` | Todo lo que habla con el exterior: Firebase, almacenamiento del dispositivo, plugins nativos. | `firebase.ts`, `firestore-sync.ts`, `user-storage.ts`, `apk-installer.ts` |
+| `src/screens/` | Pantallas completas de la app. | `add-entry-screen.tsx`, `add-nota-general-screen.tsx`, `add-single-entry-screen.tsx`, `login-screen.tsx`, `admin-screens.tsx`, `auth-gate.tsx` |
+| `src/components/` | Piezas de interfaz reutilizables que se usan dentro de las pantallas. | `shell.tsx`, `edit-entry-dialog.tsx`, `turno-notas.tsx` |
+| `src/shared/` | Tipos de TypeScript y constantes compartidas por todo el proyecto. | `types.ts`, `action-ids.ts`, `storage-keys.ts` |
+| `src/__tests__/` | Los tests. Uno por módulo. | `accounting-extraction.test.ts` |
+```
+
+#### Código nuevo
+La tabla de la sección principal ahora remite a "Ver lista completa abajo" para cada carpeta, y se añade la sección "Inventario completo de archivos actuales" con una tabla por cada carpeta (`logic/`, `hooks/`, `services/`, `screens/`, `components/`, `shared/`) listando todos los archivos reales con una descripción de su rol. Los 15 archivos de `logic/`, 2 de `hooks/`, 11 de `services/`, 19 de `screens/`, 14 de `components/` y 8 de `shared/` están ahora documentados.
+
+#### Por qué se cambió
+El documento solo mencionaba una fracción de los archivos existentes (5 de 15 en `logic/`, 3 de 14 en `components/`, 4 de 11 en `services/`, 6 de 19 en `screens/`, 3 de 8 en `shared/`, 1 de 2 en `hooks/`). Un agente o desarrollador nuevo que leyera el documento no podría saber qué archivos existen ni qué rol tiene cada uno, lo que puede llevar a duplicar código, ubicar archivos en carpetas incorrectas o ignorar módulos críticos como `watch-command-processor.ts` o `store.ts`.
+
+### Cambio 2 - Resolver la inconsistencia entre __BUILD_VERSION__ y __APP_VERSION__
+
+#### Código anterior
+```md
+## Versionado
+
+La versión de la app tiene una única fuente. No escribas números de versión a mano en `public/manifest.json` ni en `public/sw.js`: ambos usan el marcador `__BUILD_VERSION__`, que el proceso de build sustituye automáticamente por la versión real. Tocar esos números a mano vuelve a desincronizar las versiones.
+```
+
+#### Código nuevo
+```md
+## Versionado
+
+La versión de la app tiene una única fuente de verdad. El proceso de build de Vite (`vite.config.ts`) hace dos cosas:
+
+1. Inyecta la constante global `__APP_VERSION__` en el código de la app. La constante `APP_VERSION` de `src/shared/app-version.ts` la consume.
+2. Tras compilar, sustituye el marcador `__BUILD_VERSION__` en `dist/manifest.json` y `dist/sw.js` por la versión real.
+
+La versión proviene de `process.env.APP_VERSION` (CI) o de `package.json` (local). **No escribas números de versión a mano** en `public/manifest.json` ni en `public/sw.js`: desincronizaría la versión que ve la app de la que usa el Service Worker.
+```
+
+#### Por qué se cambió
+El documento anterior solo mencionaba `__BUILD_VERSION__` (el marcador de los archivos estáticos post-build) y no explicaba `__APP_VERSION__` (la constante global del código de la app). Esto generaba confusión: la skill de revisión usaba `__APP_VERSION__` y el documento `__BUILD_VERSION__`, sin aclarar que ambos existen y tienen roles distintos. La sección nueva refleja exactamente lo que hace `vite.config.ts`: los dos mecanismos, sus nombres correctos y su origen.
+
+### Cambio 3 - Documentar la excepción de entry-type-meta.tsx en shared/
+
+#### Código anterior
+```md
+Usa minúsculas con guiones (kebab-case): `week-logic.ts`, `edit-entry-dialog.tsx`. Pon extensión `.ts` a la lógica sin interfaz y `.tsx` a cualquier archivo que contenga componentes de React. El nombre debe dejar claro qué hace el archivo sin necesidad de abrirlo.
+```
+
+#### Código nuevo
+```md
+Usa minúsculas con guiones (kebab-case): `week-logic.ts`, `edit-entry-dialog.tsx`. Pon extensión `.ts` a la lógica sin interfaz y `.tsx` a cualquier archivo que contenga componentes de React. El nombre debe dejar claro qué hace el archivo sin necesidad de abrirlo.
+
+**Excepción documentada:** `src/shared/entry-type-meta.tsx` tiene extensión `.tsx` porque renderiza JSX (los iconos de cada tipo de entrada). Es la única excepción en `shared/` y está justificada.
+```
+
+#### Por qué se cambió
+`entry-type-meta.tsx` viola la convención implícita de que `shared/` solo contiene `.ts`. Sin documentar la excepción, cualquier agente o revisor podría considerarlo un error y moverlo o renombrarlo incorrectamente.
+
+### Cambio 4 - Añadir referencia a ARQUITECTURA_RELOJ_WEAR_OS.md en documentos relacionados
+
+#### Código anterior
+```md
+## Documentos relacionados
+
+`AGENTS.md` explica cómo registrar cada cambio en `CAMBIOS_AGENT.md`. `ANALISIS_PLAN_PROFESIONAL.md` y `REVISION_IMPLEMENTACION.md` son los análisis previos del proyecto.
+
+Mantén esta guía actualizada: si en el futuro se añade una carpeta nueva o cambia una convención, refléjalo aquí para que siga siendo la referencia fiable.
+```
+
+#### Código nuevo
+```md
+## Documentos relacionados
+
+- `AGENTS.md` — reglas de registro de cambios en `CAMBIOS_AGENT.md`.
+- `ARQUITECTURA_RELOJ_WEAR_OS.md` — arquitectura del bridge con Wear OS; consúltalo si el cambio toca `watch-bridge.ts`, `watch-command-processor.ts`, `companion-device.ts` o `watch-commands.ts`.
+- `graphify-out/GRAPH_REPORT.md` — vista global del código si la revisión se atasca y necesitas orientarte.
+
+Mantén esta guía actualizada: si en el futuro se añade un archivo nuevo, una carpeta nueva o cambia una convención, refléjalo aquí para que siga siendo la referencia fiable.
+```
+
+#### Por qué se cambió
+La sección de referencias citaba documentos que ya no existen en el proyecto (`ANALISIS_PLAN_PROFESIONAL.md`, `REVISION_IMPLEMENTACION.md`) y omitía referencias reales y útiles: `ARQUITECTURA_RELOJ_WEAR_OS.md` y `graphify-out/GRAPH_REPORT.md`, que sí existen y son relevantes para cualquiera que trabaje en el módulo Wear OS o necesite orientarse en el código.
+
+---
+
+## 2026-06-13 20:08 - Liberar el gesto atrás nativo con el turno pausado
+
+**Archivos modificados:** `android/wear/src/main/java/com/mijornada/app/WearMainActivity.kt`
+
+### Cambio 1 - Desactivar el BackHandler cuando el turno está pausado
+
+#### Código anterior
+```kotlin
+        BackHandler(enabled = currentScreen.value != ScreenState.NO_CONNECTED) {
+            handleBack()
+        }
+```
+
+#### Código nuevo
+```kotlin
+        // Estando pausado se libera el gesto atras para que el deslizamiento
+        // nativo del reloj saque a la esfera/tile (que ya muestra "Turno
+        // Pausado" y "Turnos" y permite continuar). En el turno activo sin
+        // pausar se sigue capturando para no salir del turno por accidente.
+        BackHandler(
+            enabled = currentScreen.value != ScreenState.NO_CONNECTED &&
+                !(currentScreen.value == ScreenState.ACTIVE_TURNO && isPaused.value)
+        ) {
+            handleBack()
+        }
+```
+
+#### Por qué se cambió
+El `BackHandler` capturaba el gesto de volver atrás en todas las pantallas salvo `NO_CONNECTED`, y para `ACTIVE_TURNO` lo anulaba (`handleBack` devuelve `Unit`), dejando el deslizamiento nativo del reloj sin efecto durante la pausa. Al estar pausado el usuario quedaba sin salida salvo reanudar. Desactivando el `BackHandler` cuando `ACTIVE_TURNO` está pausado, el sistema vuelve a gestionar el deslizamiento como swipe-to-dismiss nativo: el usuario sale a la esfera/tile —que ya muestra "Turno Pausado" y "Turnos" y permite continuar— sin perder el turno, que sigue activo en segundo plano. En el turno activo sin pausar el gesto se mantiene capturado para evitar salidas accidentales.
 
 ## 2026-06-13 20:06 - Mostrar estado pausado en inicio móvil
 

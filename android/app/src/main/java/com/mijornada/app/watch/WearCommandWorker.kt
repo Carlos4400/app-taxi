@@ -10,6 +10,7 @@ import androidx.work.WorkRequest
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
 import com.google.android.gms.wearable.Wearable
+import com.google.android.gms.tasks.Tasks
 import java.nio.charset.StandardCharsets
 import java.util.concurrent.TimeUnit
 
@@ -31,7 +32,13 @@ class WearCommandWorker(
                 WatchNativeCommandHandler.handleReadCommand(applicationContext, commandJson, operationId)
             }
 
-            com.mijornada.app.WearOsBridgePlugin.publishAckDataItem(applicationContext, operationId, responseJson)
+            Tasks.await(
+                com.mijornada.app.WearOsBridgePlugin.publishAckDataItem(
+                    applicationContext,
+                    operationId,
+                    responseJson,
+                ),
+            )
             sendFastResponse(nodeId, responseJson)
 
             if (isWrite && isSuccessfulWriteResponse(responseJson)) {

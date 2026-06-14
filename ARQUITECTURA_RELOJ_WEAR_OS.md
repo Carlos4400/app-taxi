@@ -100,13 +100,18 @@ Si no hay comunicacion:
 1. El reloj conserva el comando en `WatchOutbox`.
 2. La interfaz debe indicar que la operacion sigue pendiente o que el movil no
    esta disponible.
-3. `OutboxWorker` reintenta el mismo comando.
-4. Todos los reintentos utilizan el mismo `operationId`.
-5. Al recuperar la comunicacion, el movil procesa el comando una sola vez.
+3. `OutboxWorker` reintenta el mismo comando solo hasta que `putDataItem`
+   confirma la publicacion local.
+4. Tras la publicacion local, DataClient conserva el `DataItem` y lo sincroniza
+   al recuperar la comunicacion, sin retransmisiones periodicas de la app.
+5. Todos los reintentos utilizan el mismo `operationId`.
+6. Al recuperar la comunicacion, el movil procesa el comando una sola vez.
 
 WorkManager es el unico responsable del backoff entre reintentos. `WatchOutbox`
 conserva el comando pendiente hasta recibir una respuesta terminal, pero no
 mantiene un segundo temporizador ni elimina comandos por numero de intentos.
+El reloj conserva ademas el comando ya publicado en el outbox hasta recibir una
+respuesta terminal.
 
 El reloj conserva pendientes de transporte. No aplica por su cuenta cambios de
 negocio ni escribe en Firestore.
@@ -126,15 +131,18 @@ operationId nuevo
 
 operationId ya registrado
   -> no volver a aplicar
-  -> responder DUPLICATE_IGNORED
+  -> responder exactamente el resultado original, incluido ERROR
 ```
 
-El ACK se publica despues de aplicar el comando en Room. Si el ACK se pierde,
-el reloj reintenta con el mismo `operationId` y el movil responde
-`DUPLICATE_IGNORED` sin duplicar datos.
+El ACK se publica despues de guardar en Room el resultado `APPLIED` o
+`REJECTED`. El worker movil no termina hasta que `putDataItem` confirma la
+publicacion local del ACK. Si el worker se repite, Room devuelve exactamente el
+resultado original sin duplicar datos.
 
-Los identificadores procesados se conservan con un limite de 512 elementos tanto
-en la integracion nativa como en el store sincronizado.
+Los resultados terminales se conservan en Room durante 90 dias y se podan por
+fecha; nunca se poda una operacion `PENDING`. La lista de estado enviada a la
+interfaz puede limitarse a los 512 identificadores aplicados mas recientes sin
+reducir la ventana real de deduplicacion de Room.
 
 ## Aislamiento entre usuarios
 
@@ -213,6 +221,11 @@ El reloj elimina un comando del outbox cuando recibe:
 Los errores `USER_NOT_PREPARED` y `APP_NOT_READY` no son terminales. El comando
 se conserva para poder reintentarlo.
 
+Las respuestas se escriben de forma sincronica en una cola persistente antes de
+retirar el comando del outbox. La interfaz reconoce cada respuesta solo despues
+de procesarla. Si la interfaz no esta visible, una respuesta terminal genera una
+notificacion local con identificador estable y vibracion.
+
 ## Estado movil hacia reloj
 
 Tras aplicar cambios, el movil publica el estado en:
@@ -236,6 +249,68 @@ con `TURNOS_STATUS`.
 
 El reloj no debe presentar un cambio pendiente como confirmado antes de recibir
 el ACK o el estado actualizado.
+
+## Presentacion de estado optimista (pendiente vs confirmado)
+
+El reloj aplica los cambios criticos de forma optimista para responder al
+instante (iniciar, pausar, reanudar, anadir, editar y borrar se reflejan en la
+UI antes de recibir el ACK). Esto es deseable: el transporte Bluetooth, Doze y
+el segundo plano introducen latencia que no debe penalizar la interaccion. Por
+eso la politica adoptada es optimista, no "esperar al ACK para mostrar".
+
+Para no contradecir la invariante de "no confirmar lo pendiente", la
+presentacion optimista debe cumplir tres reglas:
+
+1. Mostrar ya, pero marcado como pendiente. Cada cambio aplicado de forma
+   optimista se muestra con un indicador de pendiente sobre la propia accion o
+   entrada, no solo en el contador global. El usuario debe poder distinguir que
+   ese dato concreto aun no esta confirmado por el movil.
+2. Reconciliar al recibir respuesta. Al llegar el ACK (`OK`) o el `STATUS`
+   actualizado, se retira la marca y el dato queda confirmado.
+   `DUPLICATE_IGNORED` se trata igual que confirmado.
+3. Revertir ante error terminal. Ante un `ERROR` terminal, el cambio optimista
+   se deshace o se re-sincroniza desde el `STATUS`/`GET_TURNOS` real, y se avisa
+   al usuario. Los errores no terminales (`USER_NOT_PREPARED`, `APP_NOT_READY`)
+   mantienen el dato como pendiente; no lo revierten.
+
+Senales de estado disponibles para implementar esta politica:
+
+- `pendingOpsCount` y `SyncIndicator`: numero de operaciones pendientes (vista
+  global). Punto de partida, pero insuficiente por si solo: no indica que dato
+  concreto esta pendiente.
+- `contablePendiente` (turnos): ya marca un turno cuyo recalculo contable no se
+  ha confirmado. Es el modelo a replicar a nivel de accion y de entrada.
+
+El flujo de edicion de turno cerrado (`EDIT_TURNO`) es el ejemplo correcto: ya
+espera el ACK antes de volver al resumen y marca su contabilidad como pendiente.
+El resto de acciones deben converger al mismo criterio: optimista en la UI,
+pendiente hasta el ACK, reconciliado o revertido segun la respuesta.
+
+La marca de pendiente nunca altera los datos brutos enviados al movil ni la
+contabilidad, que se sigue calculando en TypeScript al hidratar.
+
+## Restauracion tras recreacion o cierre del proceso
+
+La Activity del reloj puede recrearse por un cambio de configuracion o ser
+eliminada por Android en segundo plano. El estado de UI (pantalla actual,
+seleccion, borradores de formulario) vive en memoria y se perderia.
+
+Politica:
+
+1. Estado critico: se reconstruye siempre. Los comandos pendientes viven en
+   `WatchOutbox` (persistente) y se reintentan sin duplicar por `operationId`;
+   los datos del turno se rehidratan del `STATUS` del movil al volver a primer
+   plano. No requiere codigo de UI adicional.
+2. Navegacion: `currentScreen` y la categoria seleccionada se guardan en
+   `onSaveInstanceState` y se restauran en `onCreate`. Las pantallas que dependen
+   de un objeto no serializado (`editingEntry`, `selectedTurno`) caen a un
+   destino seguro por sus guards existentes, en lugar de restaurarse a medias.
+3. Borrador: el importe y la nota en curso usan `rememberSaveable`, por lo que
+   sobreviven a la recreacion si la pantalla se restaura.
+
+Una accion entrante desde la tile tiene prioridad sobre la pantalla restaurada.
+Nunca se restaura un estado que pueda reaplicar un comando ya enviado: la
+reactivacion pasa siempre por la outbox con su `operationId`.
 
 ## Hidratacion de Room en la app movil
 
@@ -369,7 +444,10 @@ Estas reglas no deben romperse en futuras modificaciones:
    cerrado.
 8. Firestore no debe considerarse actualizado hasta que la app movil ejecute la
    sincronizacion.
-9. El reloj no debe inventar estado ni confirmar acciones pendientes.
+9. El reloj no debe inventar estado ni confirmar acciones pendientes. Todo
+   cambio optimista se muestra marcado como pendiente hasta el ACK/`STATUS` y se
+   reconcilia o revierte segun la respuesta (ver «Presentacion de estado
+   optimista»).
 10. La integracion Wear no debe modificar como efecto secundario
     `src/logic/accounting.ts` ni `src/logic/week-logic.ts`.
 

@@ -19,9 +19,12 @@ import com.mijornada.app.watch.WatchStateDataPublisher;
 import com.mijornada.app.watch.WatchUserSession;
 import com.mijornada.app.watch.StaleWatchSnapshotException;
 import com.google.android.gms.wearable.DataMap;
+import com.google.android.gms.wearable.DataItem;
 import com.google.android.gms.wearable.Wearable;
 import com.google.android.gms.wearable.Node;
 import com.google.android.gms.wearable.PutDataMapRequest;
+import com.google.android.gms.tasks.Task;
+import com.google.android.gms.tasks.Tasks;
 import org.json.JSONObject;
 import java.nio.charset.StandardCharsets;
 import java.text.SimpleDateFormat;
@@ -94,8 +97,14 @@ public class WearOsBridgePlugin extends Plugin {
         }
 
         String operationId = readOperationId(responseJson);
-        publishAckDataItem(getContext(), operationId, responseJson);
+        publishAckDataItem(getContext(), operationId, responseJson).addOnSuccessListener(
+            dataItem -> sendFastResponse(call, responseJson)
+        ).addOnFailureListener(
+            e -> call.reject("Error al publicar ACK persistente: " + e.getMessage())
+        );
+    }
 
+    private void sendFastResponse(PluginCall call, String responseJson) {
         String nodeId = call.getString("nodeId");
         byte[] responseData = responseJson.getBytes(StandardCharsets.UTF_8);
         if (nodeId != null && !nodeId.trim().isEmpty()) {
@@ -176,9 +185,9 @@ public class WearOsBridgePlugin extends Plugin {
         });
     }
 
-    public static void publishAckDataItem(Context context, String operationId, String responseJson) {
+    public static Task<DataItem> publishAckDataItem(Context context, String operationId, String responseJson) {
         if (context == null) {
-            return;
+            return Tasks.forException(new IllegalArgumentException("context es obligatorio"));
         }
 
         final String resolvedOperationId;
@@ -188,7 +197,7 @@ public class WearOsBridgePlugin extends Plugin {
             resolvedOperationId = operationId;
         }
         if (resolvedOperationId == null || resolvedOperationId.trim().isEmpty()) {
-            return;
+            return Tasks.forException(new IllegalArgumentException("operationId es obligatorio"));
         }
 
         PutDataMapRequest request = PutDataMapRequest.create("/watch-ack/" + resolvedOperationId);
@@ -197,8 +206,7 @@ public class WearOsBridgePlugin extends Plugin {
         dataMap.putLong("updatedAt", System.currentTimeMillis());
         com.google.android.gms.wearable.PutDataRequest dataRequest = request.asPutDataRequest();
         dataRequest.setUrgent();
-        Wearable.getDataClient(context).putDataItem(dataRequest)
-            .addOnFailureListener(e -> android.util.Log.w("WearOsBridge", "ACK putDataItem failed for " + resolvedOperationId + ": " + e.getMessage()));
+        return Wearable.getDataClient(context).putDataItem(dataRequest);
     }
 
     private String readOperationId(String responseJson) {

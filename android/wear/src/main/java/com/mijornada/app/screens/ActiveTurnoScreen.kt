@@ -17,6 +17,7 @@ import androidx.compose.runtime.LaunchedEffect
 import kotlinx.coroutines.delay
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
@@ -67,6 +68,10 @@ fun ActiveTurnoScreen(
             .fillMaxSize()
             .background(ColorBackground)
     ) {
+        // P4: con una operacion critica pendiente solo puede haber una a la vez
+        // (ver arquitectura Wear). Se deshabilitan por adelantado las acciones
+        // criticas en vez de dejar pulsarlas y rechazarlas al final.
+        val accionesBloqueadas = pendingOpsCount > 0
         if (pendingOpsCount > 0) {
             SyncIndicator(
                 count = pendingOpsCount,
@@ -99,8 +104,8 @@ fun ActiveTurnoScreen(
                 modifier = Modifier.fillMaxWidth(WatchSafeRowWidth),
                 horizontalArrangement = Arrangement.spacedBy(6.dp)
             ) {
-                TarjetaCategoria("datafono", totalsPorTipo, numPorTipo, grande = true, modifier = Modifier.weight(1f)) { onSelectCategory("datafono") }
-                TarjetaCategoria("propina", totalsPorTipo, numPorTipo, grande = true, modifier = Modifier.weight(1f)) { onSelectCategory("propina") }
+                TarjetaCategoria("datafono", totalsPorTipo, numPorTipo, grande = true, enabled = !accionesBloqueadas, modifier = Modifier.weight(1f)) { onSelectCategory("datafono") }
+                TarjetaCategoria("propina", totalsPorTipo, numPorTipo, grande = true, enabled = !accionesBloqueadas, modifier = Modifier.weight(1f)) { onSelectCategory("propina") }
             }
 
             Spacer(modifier = Modifier.height(5.dp))
@@ -109,8 +114,8 @@ fun ActiveTurnoScreen(
                 modifier = Modifier.fillMaxWidth(WatchSafeRowWidth),
                 horizontalArrangement = Arrangement.spacedBy(6.dp)
             ) {
-                TarjetaCategoria("agencia_bono", totalsPorTipo, numPorTipo, grande = false, modifier = Modifier.weight(1f)) { onSelectCategory("agencia_bono") }
-                TarjetaCategoria("extra", totalsPorTipo, numPorTipo, grande = false, modifier = Modifier.weight(1f)) { onSelectCategory("extra") }
+                TarjetaCategoria("agencia_bono", totalsPorTipo, numPorTipo, grande = false, enabled = !accionesBloqueadas, modifier = Modifier.weight(1f)) { onSelectCategory("agencia_bono") }
+                TarjetaCategoria("extra", totalsPorTipo, numPorTipo, grande = false, enabled = !accionesBloqueadas, modifier = Modifier.weight(1f)) { onSelectCategory("extra") }
             }
 
             Spacer(modifier = Modifier.height(5.dp))
@@ -119,8 +124,8 @@ fun ActiveTurnoScreen(
                 modifier = Modifier.fillMaxWidth(WatchSafeRowWidth),
                 horizontalArrangement = Arrangement.spacedBy(6.dp)
             ) {
-                TarjetaCategoria("gasolina", totalsPorTipo, numPorTipo, grande = false, modifier = Modifier.weight(1f)) { onSelectCategory("gasolina") }
-                TarjetaCategoria("nulo", totalsPorTipo, numPorTipo, grande = false, modifier = Modifier.weight(1f)) { onSelectCategory("nulo") }
+                TarjetaCategoria("gasolina", totalsPorTipo, numPorTipo, grande = false, enabled = !accionesBloqueadas, modifier = Modifier.weight(1f)) { onSelectCategory("gasolina") }
+                TarjetaCategoria("nulo", totalsPorTipo, numPorTipo, grande = false, enabled = !accionesBloqueadas, modifier = Modifier.weight(1f)) { onSelectCategory("nulo") }
             }
 
             Spacer(modifier = Modifier.height(8.dp))
@@ -139,7 +144,7 @@ fun ActiveTurnoScreen(
             ) {
                 Text(
                     text = when {
-                        notaBloqueada -> "Sincronizando nota…"
+                        notaBloqueada -> "Sincronizando operación…"
                         requestingNote -> "Abriendo..."
                         else -> "✎  Añadir nota al turno"
                     },
@@ -157,7 +162,8 @@ fun ActiveTurnoScreen(
                     .fillMaxWidth(WatchSafeButtonWidth)
                     .clip(RoundedCornerShape(14.dp))
                     .background(ColorPauseBg)
-                    .clickable(enabled = !togglingPause) {
+                    .alpha(if (accionesBloqueadas) 0.5f else 1f)
+                    .clickable(enabled = !togglingPause && !accionesBloqueadas) {
                         togglingPause = onTogglePause()
                     }
                     .padding(vertical = 8.dp),
@@ -186,7 +192,10 @@ fun ActiveTurnoScreen(
                 )
                 entradas.forEach { entry ->
                     Spacer(modifier = Modifier.height(6.dp))
-                    EntradaHistorial(entry) { onEditEntry(entry) }
+                    // P3: una entrada pendiente aun tiene id temporal; editarla
+                    // daria "Entrada no encontrada". Tampoco se edita con otra
+                    // operacion en curso (P4).
+                    EntradaHistorial(entry, bloqueado = entry.pendiente || accionesBloqueadas) { onEditEntry(entry) }
                 }
             }
 
@@ -198,7 +207,8 @@ fun ActiveTurnoScreen(
                     .clip(RoundedCornerShape(16.dp))
                     .background(ColorGasolinaBg)
                     .border(2.dp, ColorGasolina, RoundedCornerShape(16.dp))
-                    .clickable { onEndTurno() }
+                    .alpha(if (accionesBloqueadas) 0.5f else 1f)
+                    .clickable(enabled = !accionesBloqueadas) { onEndTurno() }
                     .padding(vertical = 11.dp),
                 contentAlignment = Alignment.Center
             ) {
@@ -350,6 +360,7 @@ private fun TarjetaCategoria(
     totalsPorTipo: Map<String, Double>,
     numPorTipo: Map<String, Int>,
     grande: Boolean,
+    enabled: Boolean = true,
     modifier: Modifier = Modifier,
     onClick: () -> Unit
 ) {
@@ -362,7 +373,8 @@ private fun TarjetaCategoria(
             .clip(RoundedCornerShape(14.dp))
             .background(meta.bg)
             .border(1.dp, meta.border, RoundedCornerShape(14.dp))
-            .clickable { onClick() }
+            .alpha(if (enabled) 1f else 0.5f)
+            .clickable(enabled = enabled) { onClick() }
             .padding(horizontal = 8.dp, vertical = if (grande) 8.dp else 6.dp)
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -393,14 +405,16 @@ private fun TarjetaCategoria(
 }
 
 @Composable
-private fun EntradaHistorial(entry: WatchEntry, onClick: () -> Unit) {
+private fun EntradaHistorial(entry: WatchEntry, bloqueado: Boolean = false, onClick: () -> Unit) {
     val meta = categoriaMeta(entry.type)
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(12.dp))
             .background(Color(0xFF15151C))
-            .clickable { onClick() }
+            // Atenuar la fila mientras el cambio esta pendiente de confirmacion.
+            .alpha(if (entry.pendiente) 0.55f else 1f)
+            .clickable(enabled = !bloqueado) { onClick() }
             .padding(horizontal = 12.dp, vertical = 9.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -424,6 +438,11 @@ private fun EntradaHistorial(entry: WatchEntry, onClick: () -> Unit) {
         }
         Text(entry.time, color = ColorGrey, fontSize = 10.sp)
         Spacer(modifier = Modifier.width(8.dp))
+        // Icono de pendiente (reloj) mientras el movil no ha confirmado.
+        if (entry.pendiente) {
+            Text("⏱", color = ColorTaximetro, fontSize = 11.sp)
+            Spacer(modifier = Modifier.width(6.dp))
+        }
         if (entry.type == "nota") {
             Text("✎", color = ColorWhite, fontSize = 12.sp)
         } else {

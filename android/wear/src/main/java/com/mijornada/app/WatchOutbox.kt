@@ -11,23 +11,25 @@ object WatchOutbox {
     data class PendingCommand(
         val operationId: String,
         val commandJson: String,
+        val publishedAt: Long,
     )
 
-    fun save(context: Context, operationId: String, commandJson: String) {
+    fun save(context: Context, operationId: String, commandJson: String): Boolean {
         if (operationId.isBlank() || commandJson.isBlank()) {
-            return
+            return false
         }
         synchronized(lock) {
             val pending = JSONObject(rawPending(context))
             if (pending.has(operationId)) {
-                return
+                return true
             }
             pending.put(
                 operationId,
                 JSONObject()
-                    .put("commandJson", commandJson),
+                    .put("commandJson", commandJson)
+                    .put("publishedAt", 0L),
             )
-            writePending(context, pending)
+            return writePending(context, pending)
         }
     }
 
@@ -47,18 +49,21 @@ object WatchOutbox {
                 operationId to PendingCommand(
                     operationId = operationId,
                     commandJson = commandJson,
+                    publishedAt = item.optLong("publishedAt", 0L),
                 )
             }.toMap()
         }
     }
 
-    fun removeCommandsFromOtherSessions(context: Context, userSessionId: String): List<String> {
+    fun unpublishedCommands(context: Context): Map<String, PendingCommand> =
+        pendingCommands(context).filterValues { it.publishedAt <= 0L }
+
+    fun commandsFromOtherSessions(context: Context, userSessionId: String): List<String> {
         if (userSessionId.isBlank()) {
             return emptyList()
         }
         synchronized(lock) {
-            val pending = JSONObject(rawPending(context))
-            val operationIdsToRemove = pendingCommands(context).values.mapNotNull { command ->
+            return pendingCommands(context).values.mapNotNull { command ->
                 val commandSessionId = try {
                     JSONObject(command.commandJson).optString("userSessionId", "")
                 } catch (e: Exception) {
@@ -66,29 +71,33 @@ object WatchOutbox {
                 }
                 command.operationId.takeIf { commandSessionId != userSessionId }
             }
-            operationIdsToRemove.forEach(pending::remove)
-            if (operationIdsToRemove.isNotEmpty()) {
-                writePending(context, pending)
-            }
-            return operationIdsToRemove
         }
     }
 
-    private fun writePending(context: Context, pending: JSONObject) {
+    fun markPublished(context: Context, operationId: String, publishedAt: Long): Boolean {
+        synchronized(lock) {
+            val pending = JSONObject(rawPending(context))
+            val item = pending.optJSONObject(operationId) ?: return false
+            item.put("publishedAt", publishedAt)
+            return writePending(context, pending)
+        }
+    }
+
+    private fun writePending(context: Context, pending: JSONObject): Boolean =
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
             .edit()
             .putString(KEY_PENDING_COMMANDS, pending.toString())
-            .apply()
-    }
+            .commit()
 
-    fun remove(context: Context, operationId: String) {
+    fun remove(context: Context, operationId: String): Boolean {
         if (operationId.isBlank()) {
-            return
+            return false
         }
         synchronized(lock) {
             val pending = JSONObject(rawPending(context))
+            if (!pending.has(operationId)) return true
             pending.remove(operationId)
-            writePending(context, pending)
+            return writePending(context, pending)
         }
     }
 

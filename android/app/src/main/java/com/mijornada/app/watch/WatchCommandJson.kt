@@ -49,7 +49,9 @@ object WatchCommandJson {
             "START_TURNO" -> WatchCommand.StartTurno(operationId, createdAt)
             "PAUSE_TURNO" -> WatchCommand.PauseTurno(operationId, createdAt)
             "RESUME_TURNO" -> WatchCommand.ResumeTurno(operationId, createdAt)
-            "ADD_ENTRY" -> WatchCommand.AddEntry(
+            "ADD_ENTRY" -> {
+                requireFields(payload, "entryType", "amount")
+                WatchCommand.AddEntry(
                 operationId = operationId,
                 createdAt = createdAt,
                 entryType = payload.optString("entryType", "").also {
@@ -59,49 +61,75 @@ object WatchCommandJson {
                 },
                 amount = payload.optDouble("amount", 0.0),
                 note = payload.optString("note", ""),
-            )
-            "ADD_NOTE" -> WatchCommand.AddNote(
+                )
+            }
+            "ADD_NOTE" -> {
+                requireFields(payload, "note")
+                WatchCommand.AddNote(
                 operationId = operationId,
                 createdAt = createdAt,
                 note = payload.optString("note", ""),
-            )
-            "EDIT_ENTRY" -> WatchCommand.EditEntry(
+                )
+            }
+            "EDIT_ENTRY" -> {
+                requireFields(payload, "id", "amount")
+                WatchCommand.EditEntry(
                 operationId = operationId,
                 createdAt = createdAt,
                 id = payload.optLong("id", 0L),
                 amount = payload.optDouble("amount", 0.0),
                 note = payload.optString("note", ""),
-            )
-            "DELETE_ENTRY" -> WatchCommand.DeleteEntry(
+                )
+            }
+            "DELETE_ENTRY" -> {
+                requireFields(payload, "id")
+                WatchCommand.DeleteEntry(
                 operationId = operationId,
                 createdAt = createdAt,
                 id = payload.optLong("id", 0L),
-            )
-            "EDIT_TURNO" -> WatchCommand.EditTurno(
+                )
+            }
+            "EDIT_TURNO" -> {
+                requireFields(payload, "id", "dinero", "km", "entradas")
+                WatchCommand.EditTurno(
                 operationId = operationId,
                 createdAt = createdAt,
                 id = payload.optLong("id", 0L),
                 dinero = payload.optDouble("dinero", 0.0),
                 km = payload.optDouble("km", 0.0),
                 entradas = parseEntradas(payload),
-            )
-            "END_TURNO" -> WatchCommand.EndTurno(
+                )
+            }
+            "END_TURNO" -> {
+                requireFields(payload, "dinero", "km")
+                WatchCommand.EndTurno(
                 operationId = operationId,
                 createdAt = createdAt,
                 dinero = payload.optDouble("dinero", 0.0),
                 km = payload.optDouble("km", 0.0),
                 note = payload.optString("note", ""),
-            )
+                )
+            }
             else -> throw InvalidCommandException("Comando Wear no reconocido: $type")
         }
     }
 }
 
+private fun requireFields(payload: JSONObject, vararg fields: String) {
+    val missing = fields.filterNot(payload::has)
+    if (missing.isNotEmpty()) {
+        throw InvalidPayloadException("Campos requeridos faltantes en payload: ${missing.joinToString(", ")}")
+    }
+}
+
 private fun parseEntradas(payload: JSONObject): List<WatchEntry> {
-    val array = payload.optJSONArray("entradas") ?: return emptyList()
+    val array = payload.optJSONArray("entradas")
+        ?: throw InvalidPayloadException("entradas debe ser una lista")
     val entradas = mutableListOf<WatchEntry>()
     for (i in 0 until array.length()) {
-        val item = array.optJSONObject(i) ?: continue
+        val item = array.optJSONObject(i)
+            ?: throw InvalidPayloadException("entradas[$i] debe ser un objeto")
+        requireFields(item, "id", "type", "amount", "note", "time")
         val tipo = item.optString("type", "")
         if (tipo !in TIPOS_ENTRADA_TURNO) {
             throw InvalidPayloadException("Tipo de entrada desconocido en entradas[$i]: \"$tipo\"")

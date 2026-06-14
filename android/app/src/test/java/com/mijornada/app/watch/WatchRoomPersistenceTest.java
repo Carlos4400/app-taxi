@@ -1,6 +1,7 @@
 package com.mijornada.app.watch;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
 import android.content.Context;
@@ -61,7 +62,7 @@ public class WatchRoomPersistenceTest {
             1001L
         );
 
-        assertTrue(duplicateStart.getResponse() instanceof WatchResponse.DuplicateIgnored);
+        assertEquals(startResult.getResponse(), duplicateStart.getResponse());
         assertEquals("10:00", database.currentTurnoDao().getCurrent().getStartTime());
         assertEquals(1, database.operationDao().getAppliedOperationIds().size());
 
@@ -212,7 +213,14 @@ public class WatchRoomPersistenceTest {
 
     @Test
     public void limitaOperacionesAplicadasSinBloquearSnapshotsRecientes() {
-        for (int index = 0; index < 520; index++) {
+        repository.applyCommand(
+            new WatchCommand.StartTurno("op-limit-start", "2026-06-01T10:00:00"),
+            "{\"operationId\":\"op-limit-start\",\"type\":\"START_TURNO\"}",
+            "2026-06-01",
+            "10:00",
+            1999L
+        );
+        for (int index = 0; index < 519; index++) {
             String operationId = "op-limit-" + index;
             repository.applyCommand(
                 new WatchCommand.AddNote(operationId, "2026-06-01T10:00:00", "nota"),
@@ -226,11 +234,66 @@ public class WatchRoomPersistenceTest {
         WatchProcessorState state = repository.readState("2026-06-01", "10:01", 3000L);
 
         assertEquals(512, state.getProcessedOperationIds().size());
-        assertEquals(512, database.operationDao().getAppliedOperationIds().size());
+        assertEquals(520, database.operationDao().getAppliedOperationIds().size());
         repository.replaceAppState(new WatchAppSnapshot(
             WatchCurrentState.empty(),
             java.util.Collections.emptyList(),
             state.getProcessedOperationIds()
         ));
+    }
+
+    @Test
+    public void rechazoSeConservaYDuplicadoDevuelveElMismoErrorSinModificarEstado() {
+        WatchCommand command = new WatchCommand.AddEntry(
+            "op-rechazada",
+            "2026-06-01T10:02:00",
+            "propina",
+            2.5,
+            "cliente"
+        );
+
+        WatchProcessorResult first = repository.applyCommand(
+            command,
+            "{\"operationId\":\"op-rechazada\",\"type\":\"ADD_ENTRY\"}",
+            "2026-06-01",
+            "10:02",
+            1002L
+        );
+        WatchProcessorResult duplicate = repository.applyCommand(
+            command,
+            "{\"operationId\":\"op-rechazada\",\"type\":\"ADD_ENTRY\"}",
+            "2026-06-01",
+            "10:03",
+            1003L
+        );
+
+        assertTrue(first.getResponse() instanceof WatchResponse.Error);
+        assertEquals(first.getResponse(), duplicate.getResponse());
+        assertFalse(database.operationDao().exists("op-rechazada"));
+        assertEquals("REJECTED", database.operationDao().getById("op-rechazada").getResultType());
+        assertTrue(repository.readState("2026-06-01", "10:04", 1004L).getCurrent().getEntries().isEmpty());
+    }
+
+    @Test
+    public void podaSoloResultadosFinalizadosAnterioresAlPeriodoDeRetencion() {
+        repository.applyCommand(
+            new WatchCommand.StartTurno("op-antigua", "2026-06-01T10:00:00"),
+            "{\"operationId\":\"op-antigua\",\"type\":\"START_TURNO\"}",
+            "2026-06-01",
+            "10:00",
+            1000L
+        );
+        repository.applyCommand(
+            new WatchCommand.AddNote("op-reciente", "2026-06-01T10:01:00", "nota"),
+            "{\"operationId\":\"op-reciente\",\"type\":\"ADD_NOTE\"}",
+            "2026-06-01",
+            "10:01",
+            2000L
+        );
+
+        database.operationDao().pruneFinalizedBefore(1500L);
+
+        assertTrue(database.operationDao().getById("op-antigua") == null);
+        assertTrue(database.operationDao().getById("op-reciente") != null);
     }
 }

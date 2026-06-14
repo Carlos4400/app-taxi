@@ -28,7 +28,11 @@ import java.util.Locale
 @Composable
 fun NoActiveTurnoScreen(
     pendingOpsCount: Int = 0,
+    activeTurno: Boolean = false,
+    isPaused: Boolean = false,
+    conectado: Boolean = true,
     onStartTurno: () -> Unit,
+    onContinuar: () -> Unit = {},
     onOpenTurnos: () -> Unit
 ) {
     val fechaLabel = LocalDate.now()
@@ -79,14 +83,35 @@ fun NoActiveTurnoScreen(
             Text(fechaLabel, color = ColorGrey, fontSize = 9.sp)
             Spacer(modifier = Modifier.height(10.dp))
 
-            HomeActionButton(
-                label = "Iniciar Turno",
-                iconRes = R.drawable.ic_cohete,
-                textColor = ColorPropina,
-                bg = ColorPropinaBg,
-                borderColor = ColorPropina,
-                onClick = onStartTurno
-            )
+            // Boton principal espejo del tile (TurnoTileService): azul "Turno
+            // Pausado" si el turno esta pausado, verde "Continuar Turno" si esta
+            // activo, verde "Iniciar Turno" si no hay turno.
+            when {
+                activeTurno && isPaused -> HomeActionButton(
+                    label = "Turno Pausado",
+                    iconRes = R.drawable.ic_pausa,
+                    textColor = ColorPause,
+                    bg = ColorPauseBg,
+                    borderColor = ColorPause,
+                    onClick = onContinuar
+                )
+                activeTurno -> HomeActionButton(
+                    label = "Continuar Turno",
+                    iconRes = R.drawable.ic_cohete,
+                    textColor = ColorPropina,
+                    bg = ColorPropinaBg,
+                    borderColor = ColorPropina,
+                    onClick = onContinuar
+                )
+                else -> HomeActionButton(
+                    label = "Iniciar Turno",
+                    iconRes = R.drawable.ic_cohete,
+                    textColor = ColorPropina,
+                    bg = ColorPropinaBg,
+                    borderColor = ColorPropina,
+                    onClick = onStartTurno
+                )
+            }
             Spacer(modifier = Modifier.height(7.dp))
             HomeActionButton(
                 label = "Turnos",
@@ -97,7 +122,11 @@ fun NoActiveTurnoScreen(
                 onClick = onOpenTurnos
             )
             Spacer(modifier = Modifier.height(8.dp))
-            Text("Móvil conectado", color = ColorPropina, fontSize = 9.sp)
+            Text(
+                if (conectado) "Móvil conectado" else "Móvil desconectado",
+                color = if (conectado) ColorPropina else ColorGasolina,
+                fontSize = 9.sp
+            )
         }
     }
 }

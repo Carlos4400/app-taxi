@@ -2,6 +2,7 @@ package com.mijornada.app.watch
 
 class WatchRepository(private val database: WatchDatabase) {
     private val processedOperationLimit = 512
+    private val operationRetentionMs = 90L * 24L * 60L * 60L * 1000L
 
     fun replaceAppState(snapshot: WatchAppSnapshot) {
         if (snapshot.current.startTime == null && snapshot.current.entries.isNotEmpty()) {
@@ -46,13 +47,22 @@ class WatchRepository(private val database: WatchDatabase) {
                     createdAtClient = command.createdAt,
                     createdAtPhone = "$nowDate $nowTime",
                     applied = false,
+                    resultType = "PENDING",
+                    resultCode = null,
+                    resultMessage = null,
+                    responseJson = "",
+                    processedAtEpochMs = 0L,
                 ),
             )
 
             if (inserted == -1L) {
+                val storedResponse = database.operationDao().getById(command.operationId)
+                    ?.responseJson
+                    ?.let(WatchResponseJson::fromJson)
                 return@runInTransaction WatchProcessorResult(
                     state = stateBeforeCommand,
-                    response = WatchResponse.DuplicateIgnored(command.operationId, "Operacion ya procesada"),
+                    response = storedResponse
+                        ?: WatchResponse.DuplicateIgnored(command.operationId, "Operacion ya procesada"),
                 )
             }
 
@@ -61,9 +71,26 @@ class WatchRepository(private val database: WatchDatabase) {
                 stateBeforeCommand,
                 operationExists = { id -> database.operationDao().exists(id) },
             )
-            persistState(result.state)
-            database.operationDao().markApplied(command.operationId)
-            database.operationDao().pruneAppliedOperations(processedOperationLimit)
+            val applied = result.response !is WatchResponse.Error
+            if (applied) {
+                persistState(result.state)
+            }
+            val responseJson = WatchResponseJson.toJson(result.response)
+            val error = result.response as? WatchResponse.Error
+            database.operationDao().finalize(
+                operationId = command.operationId,
+                applied = applied,
+                resultType = if (applied) "APPLIED" else "REJECTED",
+                resultCode = error?.code,
+                resultMessage = when (val response = result.response) {
+                    is WatchResponse.Ok -> response.message
+                    is WatchResponse.DuplicateIgnored -> response.message
+                    is WatchResponse.Error -> response.message
+                },
+                responseJson = responseJson,
+                processedAtEpochMs = nowId,
+            )
+            database.operationDao().pruneFinalizedBefore(nowId - operationRetentionMs)
             result
         }
     }

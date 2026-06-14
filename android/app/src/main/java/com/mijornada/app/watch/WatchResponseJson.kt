@@ -26,6 +26,23 @@ object WatchResponseJson {
         return json.toString()
     }
 
+    fun fromJson(responseJson: String): WatchResponse? {
+        if (responseJson.isBlank()) return null
+        return try {
+            val json = JSONObject(responseJson)
+            val operationId = json.optString("operationId", "")
+            val message = json.optString("message", "")
+            when (json.optString("type", "")) {
+                "OK" -> WatchResponse.Ok(operationId, message)
+                "DUPLICATE_IGNORED" -> WatchResponse.DuplicateIgnored(operationId, message)
+                "ERROR" -> WatchResponse.Error(operationId, json.optString("code", ""), message)
+                else -> null
+            }
+        } catch (_: Exception) {
+            null
+        }
+    }
+
     @JvmStatic
     fun statusToJson(operationId: String, state: WatchProcessorState, userSessionId: String = ""): String {
         return JSONObject()

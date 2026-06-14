@@ -33,6 +33,7 @@ object WatchDatabaseProvider {
                     WatchDatabase.MIGRATION_2_3,
                     WatchDatabase.MIGRATION_3_4,
                     WatchDatabase.MIGRATION_4_5,
+                    WatchDatabase.MIGRATION_5_6,
                 )
                 .build()
                 .also { database -> instances[databaseName] = database }
@@ -51,11 +52,12 @@ object WatchDatabaseProvider {
         val legacy = context.getDatabasePath(LEGACY_DATABASE_NAME)
         if (target.exists() || !legacy.exists()) return
 
-        legacy.delete()
+        target.parentFile?.mkdirs()
+        legacy.copyTo(target, overwrite = false)
         listOf("-wal", "-shm").forEach { suffix ->
             val legacySidecar = context.getDatabasePath(LEGACY_DATABASE_NAME + suffix)
             if (legacySidecar.exists()) {
-                legacySidecar.delete()
+                legacySidecar.copyTo(context.getDatabasePath(databaseName + suffix), overwrite = false)
             }
         }
     }

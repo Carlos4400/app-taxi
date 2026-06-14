@@ -11,7 +11,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         CurrentTurnoEntity::class,
         TurnoEntity::class,
     ],
-    version = 5,
+    version = 6,
     exportSchema = false,
 )
 abstract class WatchDatabase : RoomDatabase() {
@@ -96,6 +96,21 @@ abstract class WatchDatabase : RoomDatabase() {
                         """.trimIndent(),
                     )
                 }
+            }
+        }
+
+        @JvmField
+        val MIGRATION_5_6 = object : Migration(5, 6) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE `watch_operations` ADD COLUMN `resultType` TEXT NOT NULL DEFAULT 'APPLIED'")
+                db.execSQL("ALTER TABLE `watch_operations` ADD COLUMN `resultCode` TEXT DEFAULT NULL")
+                db.execSQL("ALTER TABLE `watch_operations` ADD COLUMN `resultMessage` TEXT DEFAULT NULL")
+                db.execSQL("ALTER TABLE `watch_operations` ADD COLUMN `responseJson` TEXT NOT NULL DEFAULT ''")
+                db.execSQL("ALTER TABLE `watch_operations` ADD COLUMN `processedAtEpochMs` INTEGER NOT NULL DEFAULT 0")
+                db.execSQL(
+                    "UPDATE `watch_operations` SET `processedAtEpochMs` = " +
+                        "CAST(strftime('%s', 'now') AS INTEGER) * 1000 WHERE `processedAtEpochMs` = 0",
+                )
             }
         }
     }

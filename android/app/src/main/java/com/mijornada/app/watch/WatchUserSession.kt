@@ -19,11 +19,13 @@ object WatchUserSession {
         } else {
             UUID.randomUUID().toString()
         }
-        prefs
+        check(
+            prefs
             .edit()
             .putString(KEY_UID, normalizedUid)
             .putString(KEY_SESSION_ID, sessionId)
-            .apply()
+            .commit(),
+        ) { "No se pudo persistir la sesion Wear" }
         return sessionId
     }
 
@@ -50,10 +52,12 @@ object WatchUserSession {
 
     @JvmStatic
     fun clear(context: Context) {
-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        check(
+            context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
             .edit()
             .remove(KEY_UID)
             .remove(KEY_SESSION_ID)
-            .apply()
+            .commit(),
+        ) { "No se pudo limpiar la sesion Wear" }
     }
 }
