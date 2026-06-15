@@ -1,3 +1,95 @@
+## 2026-06-15 13:41 - Restaurar instalación de actualizaciones APK
+
+**Archivos modificados:** `android/app/src/main/java/com/mijornada/app/ApkInstallerPlugin.java`, `android/app/src/main/AndroidManifest.xml`, `android/app/src/main/java/com/mijornada/app/MainActivity.java`
+
+Contexto: la UI de ajustes mostraba «Error al instalar el APK. Inténtalo de nuevo.» porque el plugin nativo `ApkInstaller` que invoca `src/services/apk-installer.ts` no existía en el proyecto. Su implementación se había hecho en el commit `8f0864e` pero se perdió al reescribir `main` (no es ancestro del HEAD actual). Se restaura el código original probado, sin tocar TypeScript.
+
+### Cambio 1 - Recrear el plugin nativo ApkInstaller
+
+#### Código anterior
+```java
+No existía ApkInstallerPlugin.java en android/app/src/main/java/com/mijornada/app/.
+```
+
+#### Código nuevo
+```java
+@CapacitorPlugin(name = "ApkInstaller")
+public class ApkInstallerPlugin extends Plugin {
+
+    @PluginMethod
+    public void canInstallPackages(PluginCall call) {
+        JSObject ret = new JSObject();
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                ret.put("value", getContext().getPackageManager().canRequestPackageInstalls());
+            } else {
+                ret.put("value", true);
+            }
+        } else {
+            ret.put("value", true);
+        }
+        call.resolve(ret);
+    }
+
+    @PluginMethod
+    public void openInstallPermissionSettings(PluginCall call) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            Intent intent = new Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES);
+            intent.setData(Uri.parse("package:" + getContext().getPackageName()));
+            getActivity().startActivity(intent);
+            call.resolve();
+        } else {
+            call.reject("Not required on this Android version");
+        }
+    }
+
+    @PluginMethod
+    public void downloadAndInstall(PluginCall call) {
+        // Descarga el APK a cacheDir siguiendo redirects, lo expone por FileProvider
+        // (autoridad ${applicationId}.fileprovider) y lanza ACTION_VIEW con
+        // application/vnd.android.package-archive y FLAG_GRANT_READ_URI_PERMISSION.
+        // (Cuerpo completo en el archivo.)
+    }
+}
+```
+
+#### Por qué se cambió
+Sin la clase nativa, `ApkInstaller.canInstallPackages()` lanzaba «not implemented on android» y el `catch` de `handleInstallUpdate` mostraba el error genérico. La implementación cumple el modelo oficial de Android 8+ (`REQUEST_INSTALL_PACKAGES` + `canRequestPackageInstalls()` + `ACTION_MANAGE_UNKNOWN_APP_SOURCES`) y respeta la interfaz `ApkInstallerPluginType` ya existente en TypeScript.
+
+### Cambio 2 - Declarar permiso de instalación en el manifest
+
+#### Código anterior
+```xml
+    <uses-permission android:name="android.permission.INTERNET" />
+```
+
+#### Código nuevo
+```xml
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
+```
+
+#### Por qué se cambió
+Desde Android 8.0 (API 26, el minSdk del proyecto) instalar un APK de origen desconocido exige declarar `REQUEST_INSTALL_PACKAGES`. Sin él, `canRequestPackageInstalls()` no puede concederse y la instalación nunca llega a lanzarse.
+
+### Cambio 3 - Registrar el plugin en MainActivity
+
+#### Código anterior
+```java
+        registerPlugin(WearOsBridgePlugin.class);
+        registerPlugin(CdmPairPlugin.class);
+```
+
+#### Código nuevo
+```java
+        registerPlugin(WearOsBridgePlugin.class);
+        registerPlugin(CdmPairPlugin.class);
+        registerPlugin(ApkInstallerPlugin.class);
+```
+
+#### Por qué se cambió
+Capacitor requiere registrar cada plugin local con `registerPlugin()` en `MainActivity` para que el puente JS↔Java exista. Al perderse la implementación, también se había perdido este registro.
+
 ## 2026-06-14 23:13 - Reforzar entrega fiable entre reloj y móvil
 
 **Archivos modificados:**
