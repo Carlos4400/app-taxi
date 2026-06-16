@@ -266,9 +266,17 @@ describe("Android Wear bridge", () => {
       "utf8",
     );
 
-    expect(contract).toContain("resultados terminales se conservan en Room durante 90 dias");
-    expect(contract).toContain("512 identificadores aplicados mas recientes");
+    // Retencion 90 dias en Room del movil (poda operaciones finalizadas).
+    expect(contract).toContain("operationRetentionMs");
+    expect(contract).toContain("90 dias");
+    // Retencion 90 dias en SharedPreferences del reloj (set de IDs ya manejados).
+    expect(contract).toContain("HANDLED_TERMINAL_TTL_MS");
+    // Ventana de 512 ids: solo para la lista que ve la UI; la deduplicacion
+    // real la hace Room por PK.
+    expect(contract).toContain("512");
+    // WorkManager es el unico responsable del backoff entre reintentos.
     expect(contract).toContain("WorkManager es el unico responsable del backoff");
+    // Guardas: nada de limites ficticios.
     expect(contract).not.toContain("limite de 50 elementos");
   });
 

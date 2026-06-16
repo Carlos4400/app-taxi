@@ -62,7 +62,7 @@ Esta guía explica cómo está organizado el proyecto y dónde colocar cada cosa
 | `service-worker-registration.ts` | Registra el Service Worker de la PWA y detecta actualizaciones disponibles. |
 | `watch-bridge.ts` | Puente con el reloj Wear OS: escucha comandos en Firestore, los procesa con `watch-command-processor.ts` y escribe la respuesta de vuelta. |
 
-### `src/screens/` — 19 archivos
+### `src/screens/` — 20 archivos
 
 | Archivo | Pantalla |
 |---|---|
@@ -79,6 +79,7 @@ Esta guía explica cómo está organizado el proyecto y dónde colocar cada cosa
 | `summary-screen.tsx` | Resumen global de ganancias por períodos. |
 | `contabilidad-screen.tsx` | Detalle contable de un turno: cálculo de porcentajes y entrega. |
 | `liquidacion-semana-screen.tsx` | Liquidación semanal: semanas contables, entrega al jefe, marcar como entregada. |
+| `liquidacion-turno-screen.tsx` | Liquidación de un turno suelto fuera de semana: genera ticket, copia liquidación e imprime ticket. |
 | `detalle-semana-screen.tsx` | Detalle de todos los turnos de una semana contable. |
 | `detalle-mes-screen.tsx` | Detalle de todos los turnos de un mes. |
 | `detalle-anual-screen.tsx` | Detalle de todos los turnos de un año. |

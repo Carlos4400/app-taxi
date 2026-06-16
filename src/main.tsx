@@ -52,6 +52,7 @@ import { DetalleAnualScreen } from "./screens/detalle-anual-screen";
 import { DetalleMesScreen } from "./screens/detalle-mes-screen";
 import { DetalleSemanaScreen } from "./screens/detalle-semana-screen";
 import { LiquidacionSemanaScreen } from "./screens/liquidacion-semana-screen";
+import { LiquidacionTurnoScreen } from "./screens/liquidacion-turno-screen";
 
 import { Shell } from "./components/shell";
 import type { UpdateState } from "./logic/update-flow";
@@ -1339,6 +1340,16 @@ function App({ uid }: { uid: string }) {
         selectedWeekId={selectedWeekId}
         setSelectedWeekId={setSelectedWeekId}
         updateWeekOverride={updateWeekOverride}
+      />
+    );
+  }
+
+
+  if (screen === "liquidacionTurno" && viewTurno) {
+    return (
+      <LiquidacionTurnoScreen
+        viewTurno={viewTurno}
+        settings={settings}
       />
     );
   }

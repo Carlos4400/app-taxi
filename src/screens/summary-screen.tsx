@@ -141,6 +141,23 @@ export const SummaryScreen: FC<SummaryScreenProps> = ({
           <div style={{ flex: 1 }}>
             <div style={{ fontSize: 20, fontWeight: 800, color: 'white' }}>Resumen del Turno</div>
           </div>
+          {isLooseAccountingTurno && (
+            <button
+              onClick={() => setScreen("liquidacionTurno")}
+              style={{
+                background: "rgba(80, 220, 140, 0.08)",
+                border: `1px solid ${G}`,
+                borderRadius: 12,
+                color: G,
+                padding: "8px 14px",
+                fontSize: 13,
+                fontWeight: 700,
+                cursor: "pointer",
+              }}
+            >
+              Liquidación
+            </button>
+          )}
           <button style={{ ...iconBtnStyle, background: 'rgba(255,255,255,0.09)' }} onClick={() => {
             setEditJ({ ...viewTurno, entries: [...viewTurno.entries] });
             setScreen('editTurno');

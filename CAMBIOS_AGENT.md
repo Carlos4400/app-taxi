@@ -1,3 +1,884 @@
+## 2026-06-16 22:30 - Reauditar arquitectura Wear OS en el doc canonico
+
+**Archivos modificados:** `ARQUITECTURA_RELOJ_WEAR_OS.md`
+
+### Cambio 1 - Sello de revision y contabilidad precalculada
+
+#### Código anterior
+```md
+Este documento es la unica fuente de verdad funcional para la integracion entre:
+
+- Mi Turno Watch.
+- La app Mi Turno instalada en el movil.
+- La base local nativa Room del movil.
+- El store de la app movil.
+- Cloud Firestore.
+
+Describe el comportamiento que debe conservarse. No es una lista de ideas ni de
+fases pendientes.
+```
+
+#### Código nuevo
+```md
+Este documento es la unica fuente de verdad funcional para la integracion entre:
+
+- Mi Turno Watch.
+- La app Mi Turno instalada en el movil.
+- La base local nativa Room del movil.
+- El store de la app movil.
+- Cloud Firestore.
+
+Describe el comportamiento que debe conservarse. No es una lista de ideas ni de
+fases pendientes.
+
+Ultima revision: 2026-06-16 contra `HEAD` (sin commit separado; se regenera
+manualmente cuando cambia el flujo Wear). Grafo de conocimiento del codigo en
+`graphify-out/` (no versionado) como apoyo de exploracion.
+```
+
+#### Por qué se cambió
+El doc se quedaba sin fecha de auditoria y sin pista de que existe un grafo del codigo (graphify) que sirve para verificarlo. Tambien faltaba la contabilidad precalculada como fila propia de la tabla de fuente de verdad, que es la pieza central del flujo.
+
+### Cambio 2 - Tabla de codigos de error
+
+#### Código anterior
+`No existia la tabla de codigos de error en ARQUITECTURA_RELOJ_WEAR_OS.md.`
+
+#### Código nuevo
+```md
+### Codigos de error posibles
+
+Emitidos por `WatchNativeCommandHandler` o `WatchCommandProcessor`:
+
+| Codigo | Origen | Terminal | Significado |
+|---|---|---|---|
+| `USER_NOT_PREPARED` | `WatchNativeCommandHandler.userNotPrepared` (no hay `uid` preparado) | No | El usuario no ha abierto la app movil. El reloj lo muestra una sola vez (`movilNoPreparadoAvisado`) y reintenta con `scheduleResync(8000ms)`. |
+| `USER_SESSION_MISMATCH` | `WatchNativeCommandHandler.kt:143-150` | Si | El `userSessionId` del comando no coincide con la sesion preparada. |
+| `OPERATION_ID_MISMATCH` | `WatchNativeCommandHandler.kt:152-156` | Si | El `operationId` del path `/watch-command/...` no coincide con el del JSON. |
+| `INVALID_OPERATION_ID` | `WatchCommandProcessor` / `WatchRepository` | Si | `operationId` vacio. |
+| `MALFORMED_JSON` / `INVALID_PAYLOAD` / `INVALID_COMMAND` | `WatchCommandJson.parse` | Si | JSON malformado, campos requeridos faltantes, `entryType` desconocido, etc. |
+| `ACTIVE_TURNO` / `NO_ACTIVE_TURNO` / `ALREADY_PAUSED` / `NOT_PAUSED` | `WatchCommandProcessor` | Si | Estado incoherente con el comando. |
+| `INVALID_AMOUNT` / `INVALID_NOTE` / `INVALID_END_VALUES` / `INVALID_EDIT_VALUES` | `WatchCommandProcessor` | Si | Validacion de payload. |
+| `ENTRY_NOT_FOUND` / `TURNO_NOT_FOUND` | `WatchCommandProcessor` | Si | El id no existe en el estado actual. |
+| `UNKNOWN_COMMAND` | `WatchNativeCommandHandler.handleReadCommand` | Si | Tipo no reconocido en una operacion de lectura. |
+```
+
+#### Por qué se cambió
+El doc listaba tres codigos de respuesta (OK, DUPLICATE_IGNORED, ERROR) sin detallar los `code` posibles. El codigo usa ~15 codigos distintos y los agentes que lean el doc necesitan saberlo para validar logs y disenar tests.
+
+### Cambio 3 - Seccion de superficies de solo lectura
+
+#### Código anterior
+`No existia la seccion "Superficies de solo lectura (Tile y Complicacion)" en ARQUITECTURA_RELOJ_WEAR_OS.md.`
+
+#### Código nuevo
+```md
+## Superficies de solo lectura (Tile y Complicacion)
+
+`TurnoTileService` (cuadricula) y `TurnoComplicationService` (complicacion
+de esfera) son consumidores pasivos del ultimo `STATUS` confirmado por el
+movil, persistido en `TurnoStatusStore` (SharedPreferences
+`turno_status_store`). La Activity y el `MobileResponseService` lo
+actualizan; las superficies solo lo leen.
+
+### Tile (`TurnoTileService`)
+
+- `RESOURCES_VERSION = "4"`.
+- `freshnessIntervalMillis = 5 * 60 * 1000` (5 min) para que el sistema
+  refresque periodicamente.
+- Estructura: logo + boton principal segun estado (`Iniciar Turno` /
+  `Continuar Turno` / `Turno Pausado`) + boton `Turnos`.
+- Acciones del boton: `iniciar_turno`, `continuar`, `turnos`. La accion
+  `abrir` abre la app sin disparar nada.
+- Tocar un boton abre la app con `EXTRA_ACCION_TILE`; el circuito Wear
+  normal (outbox, operationId, sesion) sigue intacto. La tile nunca escribe
+  por su cuenta.
+
+### Complicacion (`TurnoComplicationService`)
+
+- Tipos soportados: `MONOCHROMATIC_IMAGE`, `SMALL_IMAGE`, `SHORT_TEXT`.
+- Muestra el logo de la app ("Mi Turno") sin texto de estado ni hora, con
+  version ambiente segura para burn-in (trazos blancos finos).
+- Refresco limitado a 1 por minuto (`MIN_COMPLICATION_UPDATE_MS = 60_000L`)
+  para respetar la recomendacion oficial de no spammear `requestUpdate`.
+```
+
+#### Por qué se cambió
+Tile y Complicacion estaban mencionados solo como archivos en el listado final, sin explicar su mecanismo, su versionado de recursos ni el suelo de 60s para respetar la guia oficial de no saturar `requestUpdate`.
+
+### Cambio 4 - Tests especificos del flujo Wear
+
+#### Código anterior
+`No existia la subseccion "Tests especificos del flujo Wear" en ARQUITECTURA_RELOJ_WEAR_OS.md.`
+
+#### Código nuevo
+```md
+### Tests especificos del flujo Wear
+
+- `src/__tests__/android-wear-bridge.test.ts` — comandos y respuestas
+  nativas (`WatchCommand`, `WatchResponse`, serializacion JSON).
+- `src/__tests__/watch-bridge.test.ts` — hidratacion, snapshot canonico,
+  deduplicacion, listeners.
+- `src/__tests__/watch-command-processor.test.ts` — procesador puro
+  (`processWatchCommand` y auxiliares: `computeWatchTotals`,
+  `buildWatchEntradas`, `buildWatchTurnos`).
+- `src/__tests__/pending-sync.test.ts` — marcas de pendiente y
+  `PENDING_SYNC_CHANGED_EVENT`.
+```
+
+#### Por qué se cambió
+El doc listaba los gates (`tsc`, `npm test`, `npm run build`, gradle) pero no apuntaba a los tests que cubren especificamente el flujo Wear, que son los que daran senal real si una regresion rompe el contrato.
+
+### Cambio 5 - Inventario completo de archivos responsables
+
+#### Código anterior
+```md
+### Reloj
+
+- `android/wear/src/main/java/com/mijornada/app/WearMainActivity.kt`
+- `android/wear/src/main/java/com/mijornada/app/TurnoTileService.kt` (tile de solo lectura)
+- `android/wear/src/main/java/com/mijornada/app/TurnoComplicationService.kt` (complicacion de solo lectura)
+- `android/wear/src/main/java/com/mijornada/app/TurnoStatusStore.kt` (ultimo STATUS para tile/complicacion)
+- `android/wear/src/main/java/com/mijornada/app/WatchOutbox.kt`
+- `android/wear/src/main/java/com/mijornada/app/OutboxWorker.kt`
+- `android/wear/src/main/java/com/mijornada/app/MobileResponseService.kt`
+
+### Movil nativo
+
+- `android/app/src/main/java/com/mijornada/app/WearListenerService.java`
+- `android/app/src/main/java/com/mijornada/app/WearOsBridgePlugin.java`
+- `android/app/src/main/java/com/mijornada/app/TurnoForegroundService.kt`
+- `android/app/src/main/java/com/mijornada/app/watch/WearCommandWorker.kt`
+- `android/app/src/main/java/com/mijornada/app/watch/WatchNativeCommandHandler.kt`
+- `android/app/src/main/java/com/mijornada/app/watch/WatchRepository.kt`
+- `android/app/src/main/java/com/mijornada/app/watch/WatchDatabaseProvider.kt`
+- `android/app/src/main/java/com/mijornada/app/watch/WatchUserSession.kt`
+
+### App movil
+
+- `src/services/watch-bridge.ts`
+- `src/hooks/use-firestore-sync.ts`
+- `src/services/pending-sync.ts`
+- `src/shared/watch-commands.ts`
+```
+
+#### Código nuevo
+```md
+### Reloj (`android/wear/src/main/java/com/mijornada/app/`)
+
+- `WearMainActivity.kt` — `ComponentActivity` Compose con el enum
+  `ScreenState` (13 pantallas: `NO_CONNECTED`, `NO_ACTIVE_TURNO`,
+  `ACTIVE_TURNO`, `TURNOS`, `TURNO_SUMMARY`, `EDIT_TURNO_DATOS`,
+  `ADD_ENTRY`, `EDIT_ENTRY`, `CONFIRM_START_TURNO`, `CONFIRM_PAUSE_TURNO`,
+  `CONFIRM_DELETE`, `END_TURNO`, `PAUSED_MENU`). Procesa respuestas en vivo
+  via listener de `SharedPreferences`, aplica feedback (toast/vibracion),
+  mantiene `pendingOpsCount` y aplica los `applyOptimistic*` cuando un
+  comando sale.
+- `WatchOutbox.kt` — Outbox persistente (SharedPreferences
+  `watch_outbox`, JSON). Guarda comandos con `publishedAt=0`; expone
+  `unpublishedCommands` y `commandsFromOtherSessions`.
+- `OutboxWorker.kt` — `CoroutineWorker` con exponential backoff. Reenvia
+  `unpublishedCommands` por `DataClient` con `setUrgent()` y marca
+  `publishedAt=now` al confirmar.
+- `MobileResponseService.kt` — `WearableListenerService` que escucha
+  `/watch-ack/<operationId>`, `/turno/state` y `/watch-response` (Message).
+  Encola respuestas en `WearConstants.Response`, retira del outbox las
+  terminales, deduplica con `handledTerminalOperationIds` (90d TTL en
+  SharedPreferences) y dispara notificaciones en background.
+- `WearConstants.kt` — `HANDLED_OPERATION_LIMIT = 128`,
+  `isTerminalResponse(type, code)`, y el object `Response` con la cola
+  persistente de respuestas.
+- `WearResponseNotification.kt` — Notificaciones en background (canal
+  `watch_responses`, `IMPORTANCE_HIGH`, vibracion, abre la app al tap).
+- `TurnoStatusStore.kt` — Persistencia del ultimo `STATUS` confirmado
+  para alimentar tile y complicacion; pide refresh con un suelo de
+  60 segundos.
+- `TurnoTileService.kt` — Tile cuadricula con logo + botones
+  (`iniciar_turno`, `continuar`, `turnos`, `abrir`).
+- `TurnoComplicationService.kt` — Complicacion de esfera
+  (`MONOCHROMATIC_IMAGE`, `SMALL_IMAGE`, `SHORT_TEXT`) con version
+  ambiente burn-in safe.
+- `screens/` — Composables de cada pantalla (`ActiveTurnoScreen`,
+  `NoActiveTurnoScreen`, `NoConnectedScreen`, `ConfirmStartTurnoScreen`,
+  `ConfirmPauseTurnoScreen`, `ConfirmDeleteScreen`, `AddEntryScreen`,
+  `EndTurnoScreen`, `EditTurnoDatosScreen`, `TurnosScreen`,
+  `TurnoSummaryScreen`, `NumericKeypad`, `CategoriaIcons`).
+
+### Movil nativo (`android/app/src/main/java/com/mijornada/app/`)
+
+- `WearListenerService.java` — Solo `onDataChanged` para
+  `/watch-command/<operationId>`; encola `WearCommandWorker` por cada
+  comando. **No** implementa `onMessageReceived` ni
+  `onCapabilityChanged` aunque el manifest los declara (filtra por path
+  `/watch-command/`).
+- `WearOsBridgePlugin.java` — Plugin Capacitor. Metodos:
+  `setPrepared({uid})`, `clearPrepared({uid})`, `sendResponse({response,
+  nodeId?})`, `getNativeState()`, `syncState({state})`. Publica ACKs
+  persistentes por DataClient (`/watch-ack/<id>`, `setUrgent()`) y
+  respuestas rapidas por MessageClient (`/watch-response`). El receiver
+  de `WatchStateChangeNotifier` dispara `notifyListeners("onNativeStateChanged")`
+  para que la TS rehidrate.
+- `TurnoForegroundService.kt` — `foregroundServiceType=connectedDevice`,
+  canal `turno_activo`, ID 4102. Arranca/para segun el worker.
+- `MainActivity.java` — Launcher activity (Capacitor, no del flujo Wear).
+- `watch/` (subpaquete Kotlin dedicado a Wear):
+  - `WatchCommandWorker.kt` — `CoroutineWorker` expedited que enruta a
+    `WatchNativeCommandHandler.handleCommand` (writes) o
+    `handleReadCommand` (reads), publica ACK por DataClient y respuesta
+    rapida por MessageClient, y dispara `TurnoForegroundService.start/stop`
+    segun el comando.
+  - `WatchNativeCommandHandler.kt` — Despacho de comandos. Valida sesion
+    (`USER_SESSION_MISMATCH`) y consistencia del `operationId`
+    (`OPERATION_ID_MISMATCH`); delega en `WatchRepository`.
+  - `WatchRepository.kt` — Transacciones Room. `applyCommand` inserta
+    `OperationEntity` (PENDING), procesa, persiste, finaliza y poda con
+    90 dias. `replaceAppState` rechaza snapshots mas viejos que el estado
+    nativo (`StaleWatchSnapshotException`).
+  - `WatchDatabaseProvider.kt` — DB por `sha256(uid)[:32]`, con migracion
+    del legacy `mi-turno-watch.db` y migraciones Room 1_2 a 5_6.
+  - `WatchUserSession.kt` — `prepare/getUid/getSessionId/clearIfMatches`
+    sobre SharedPreferences `watch_user_session`.
+  - `WatchDatabase.kt` — `RoomDatabase` version 6 con entidades
+    `OperationEntity`, `CurrentTurnoEntity`, `TurnoEntity` y las 5
+    migraciones (incluye las columnas de contabilidad en 4_5 y de
+    `resultType`/`responseJson` en 5_6).
+  - `WatchDaos.kt` — `OperationDao` (insert/get/finalize/prune/exists),
+    `CurrentTurnoDao`, `TurnoDao`.
+  - `WatchEntities.kt` — Las 3 entidades Room.
+  - `WatchModels.kt` — `WatchEntry`, `WatchCurrentState`, `WatchTurno`
+    (con `totalTaximetro/miGanancia/totalADescontar/totalADar` nuleables),
+    `WatchProcessorState`, `WatchProcessorResult`, `WatchAppSnapshot`,
+    `WatchResponse` (sealed), `WatchCommand` (sealed con sus 9 tipos).
+  - `WatchCommandJson.kt` — Parser del comando con
+    `MalformedJsonException` / `InvalidPayloadException` /
+    `InvalidCommandException`. Lista cerrada de `entryType`.
+  - `WatchResponseJson.kt` — Serializa `WatchResponse` a JSON y
+    `statusToJson` / `turnosStatusToJson` (limita a 30 turnos y marca
+    `contablePendiente` si falta contabilidad).
+  - `WatchStateJson.kt` — `stateToJson` (sin contable, solo datos brutos)
+    y `snapshotFromJson` (lee el subobjeto `contable` por turno).
+  - `WatchStateDataPublisher.kt` — Publica `/turno/state` tras cada
+    cambio de Room (con `setUrgent`).
+  - `WatchStateChangeNotifier.kt` — Broadcast interno
+    (`com.mijornada.app.WATCH_STATE_CHANGED`) que la TS escucha como
+    `onNativeStateChanged`.
+
+### Capa TypeScript (`src/`)
+
+- `services/watch-bridge.ts` — Bridge TS↔nativo. `setupWatchBridge(uid)` y
+  `teardownWatchBridge(uid)`. Serializa el snapshot canonico (con
+  `contable` por turno calculado con `calcularTurnoContable`); hidrata
+  desde `getNativeState()`; deduplica `processedOperationIds` a 512.
+- `hooks/use-firestore-sync.ts` — Suscripciones Firestore, montaje del
+  bridge Wear, gestion de `pending-sync`, espera de `waitForPendingWrites`
+  para limpiar marcas huerfanas.
+- `services/pending-sync.ts` — Marcas por area (`current`, `settings`,
+  `turnos`, `reservations`, `notes`, `weekOverrides`,
+  `processedOperationIds`) + evento `PENDING_SYNC_CHANGED_EVENT`.
+- `shared/watch-commands.ts` — Tipos del protocolo
+  (`WatchCommand`/`WatchCommandResponse` y auxiliares). El `STATUS`
+  incluye `userSessionId` opcional.
+- `logic/watch-command-processor.ts` — Procesador puro
+  (`processWatchCommand`, `computeWatchTotals`, `buildWatchEntradas`,
+  `buildWatchTurnos`). Maneja `EDIT_TURNO` recomputando totales por
+  categoria; el contable derivado se rellena via `syncState` y Room.
+- `logic/accounting.ts` — **PROTEGIDO.** Implementa
+  `calcularTurnoContable` (usado por la TS) y `buildTurnoConfigFromSettings`.
+- `logic/turnos.ts` — `mergeTurnos` y `sortTurnosByDateDesc` (usados por
+  el bridge para fusionar historial nativo con el del store).
+- `services/firestore-sync.ts` — Primitivas de lectura/escritura Firestore
+  (`userMetaDocRef`, `userSubcollectionRef`, `saveUserDoc`,
+  `syncSubcollection`, `userHasFirestoreData`).
+```
+
+#### Por qué se cambió
+El doc anterior listaba 7 archivos del reloj, 8 del movil y 4 de TS. La realidad tiene 9 archivos del reloj, 17 del movil (incluido todo el subpaquete `watch/` con sus 13 ficheros) y 7 de TS. Sin el inventario completo no se puede saber qué archivo tocar cuando se cambia un comportamiento.
+
+### Cambio 6 - Tabla de retenciones y limites
+
+#### Código anterior
+`No existia la tabla "Retencion y limites" en ARQUITECTURA_RELOJ_WEAR_OS.md.`
+
+#### Código nuevo
+```md
+### Retencion y limites
+
+Hay tres retenciones/límites que no se deben confundir:
+
+| Capa | Mecanismo | Valor | Finalidad |
+|---|---|---|---|
+| Movil Room (`WatchRepository.operationRetentionMs`) | `OperationDao.pruneFinalizedBefore` | 90 dias | Podar operaciones finalizadas (no afecta a `PENDING`) |
+| Reloj SharedPreferences (`MobileResponseService.HANDLED_TERMINAL_TTL_MS`) | Set de `operationId` ya manejados con timestamp | 90 dias | No re-encolar notificaciones ni re-marcar `WatchOutbox` ya vaciado tras un reinicio del servicio |
+| Movil Room (`processedOperationLimit`) y TS (`MAX_PROCESSED_OPERATION_IDS`) | Cola de deduplicacion en memoria + persistida | 512 ids | Limite de la lista de estado enviada a la UI; la deduplicacion real la hace Room por PK, no esta ventana |
+| Reloj (`WearConstants.HANDLED_OPERATION_LIMIT`) | Set `shownResponseOpIds` en la Activity | 128 ids | Evitar doble toast/vibracion cuando la misma respuesta llega por DataClient y por MessageClient |
+```
+
+#### Por qué se cambió
+El doc solo decia "los resultados terminales se conservan en Room durante 90 dias" lo cual es engañoso: hay dos 90 dias distintos (Room del movil y SharedPreferences del reloj), mas dos limites de tamano (512 y 128) que sirven para cosas diferentes. Un agente que tocara el prune podria borrar las 512 ids sin saber que la deduplicacion real vive en Room.
+
+### Cambio 7 - Invariante obligatoria #11
+
+#### Código anterior
+```md
+10. La integracion Wear no debe modificar como efecto secundario
+    `src/logic/accounting.ts` ni `src/logic/week-logic.ts`.
+```
+
+#### Código nuevo
+```md
+10. La integracion Wear no debe modificar como efecto secundario
+    `src/logic/accounting.ts` ni `src/logic/week-logic.ts`.
+11. La contabilidad de un turno (`totalTaximetro`, `miGanancia`,
+    `totalADescontar`, `totalADar`) se calcula en `accounting.ts` y se
+    persiste en Room. Si falta en el JSON que llega al reloj, este debe
+    mostrar el turno como «Pendiente», nunca inventar el numero.
+```
+
+#### Por qué se cambió
+La regla de oro "no inventar numeros contables" ya estaba descrita en dos sitios (Presentacion optimista y Finalizacion) pero faltaba como invariante formal. Subirla a invariante obliga a que cualquier cambio futuro la respete en code review.
+
+### Cambio 8 - Alinear el test de contrato del doc
+
+#### Código anterior
+```ts
+expect(contract).toContain("resultados terminales se conservan en Room durante 90 dias");
+expect(contract).toContain("512 identificadores aplicados mas recientes");
+expect(contract).toContain("WorkManager es el unico responsable del backoff");
+expect(contract).not.toContain("limite de 50 elementos");
+```
+
+#### Código nuevo
+```ts
+expect(contract).toContain("operationRetentionMs");
+expect(contract).toContain("90 dias");
+expect(contract).toContain("HANDLED_TERMINAL_TTL_MS");
+expect(contract).toContain("512");
+expect(contract).toContain("WorkManager es el unico responsable del backoff");
+expect(contract).not.toContain("limite de 50 elementos");
+```
+
+#### Por qué se cambió
+El test de contrato de `android-wear-bridge.test.ts` buscaba tres frases literales del doc antiguo. La reescritura del doc conserva los mismos conceptos (90 dias en dos retenciones distintas, ventana de 512 ids, WorkManager como unico backoff) pero con wording mas preciso y con los nombres reales de los simbolos Kotlin (`operationRetentionMs`, `HANDLED_TERMINAL_TTL_MS`). El test se reescribe para validar los mismos invariantes contractuales sin atarse al phrasing antiguo.
+
+## 2026-06-16 22:16 - Ajustar estado de semanas
+
+**Archivos modificados:** `src/__tests__/liquidacion-semana.test.ts`, `src/screens/contabilidad-screen.tsx`
+
+### Cambio 1 - Estilo del badge semanal
+
+#### Código anterior
+`No existía weeklyStatusBadgeStyle en src/screens/contabilidad-screen.tsx.`
+
+#### Código nuevo
+```tsx
+const weeklyStatusBadgeStyle = (entregada: boolean): React.CSSProperties => ({
+  alignSelf: "flex-start",
+  fontSize: 11,
+  fontWeight: 900,
+  color: entregada ? G : "oklch(0.75 0.16 70)",
+  background: entregada ? "rgba(80,220,140,0.12)" : "rgba(255,200,80,0.10)",
+  padding: "4px 10px",
+  borderRadius: 8,
+  letterSpacing: "0.6px",
+  textTransform: "uppercase",
+  lineHeight: 1.1,
+});
+```
+
+#### Por qué se cambió
+Las tarjetas de semanas necesitaban mostrar el estado de entrega con formato de badge, igual que el turno fuera de semana.
+
+### Cambio 2 - Estado semanal en tarjeta
+
+#### Código anterior
+```tsx
+                    <div style={{
+                      fontSize: WEEK_LIST_CARD_TEXT_SIZES.meta,
+                      color: "rgba(255,255,255,0.4)",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 6,
+                    }}>
+                      <span>{numTurnos} {numTurnos === 1 ? "turno" : "turnos"}</span>
+                      <span style={{ opacity: 0.5 }}>•</span>
+                      <span style={{ color: entregada ? G : "oklch(0.75 0.16 70)", fontWeight: 800 }}>
+                        {entregada ? "Entregada" : "Pendiente"}
+                      </span>
+                    </div>
+```
+
+#### Código nuevo
+```tsx
+                    <div style={{
+                      fontSize: WEEK_LIST_CARD_TEXT_SIZES.meta,
+                      color: "rgba(255,255,255,0.4)",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 8,
+                      flexWrap: "wrap",
+                    }}>
+                      <span>{numTurnos} {numTurnos === 1 ? "turno" : "turnos"}</span>
+                      <span style={weeklyStatusBadgeStyle(entregada)}>
+                        {entregada ? "ENTREGADA" : "PENDIENTE"}
+                      </span>
+                    </div>
+```
+
+#### Por qué se cambió
+El estado de la semana aparecía como texto inline separado por un punto; ahora aparece como badge independiente para igualar el patrón visual del turno fuera de semana.
+
+### Cambio 3 - Cobertura del badge semanal
+
+#### Código anterior
+`No existía test shows weekly delivery status as a badge instead of inline text en src/__tests__/liquidacion-semana.test.ts.`
+
+#### Código nuevo
+```ts
+  it("shows weekly delivery status as a badge instead of inline text", () => {
+    expect(contabilidadSource).toContain("const weeklyStatusBadgeStyle = (entregada: boolean)");
+    expect(contabilidadSource).toContain("<span style={weeklyStatusBadgeStyle(entregada)}>");
+    expect(contabilidadSource).toContain('{entregada ? "ENTREGADA" : "PENDIENTE"}');
+    expect(contabilidadSource).not.toContain('{entregada ? "Entregada" : "Pendiente"}');
+  });
+```
+
+#### Por qué se cambió
+El cambio visual queda verificado para evitar que el estado de las semanas vuelva al formato inline anterior.
+
+## 2026-06-16 21:18 - Priorizar turno suelto reciente
+
+**Archivos modificados:** `src/__tests__/liquidacion-semana.test.ts`, `src/screens/contabilidad-screen.tsx`
+
+### Cambio 1 - Selección del destacado contable
+
+#### Código anterior
+```tsx
+  const heroSelection = selectAccountingHeroWeek(
+    enCurso?.weekId || null,
+    otros.filter((e): e is ElemSemana => e.kind === "semana").map((e) => e.weekId)
+  );
+  const heroWeek = heroSelection
+    ? elementos.find((e): e is ElemSemana => e.kind === "semana" && e.weekId === heroSelection.weekId)
+    : undefined;
+  const otrosSinHero = heroSelection?.kind === "latest"
+    ? otros.filter((e) => e.kind !== "semana" || e.weekId !== heroSelection.weekId)
+    : otros;
+```
+
+#### Código nuevo
+```tsx
+  const heroElem = enCurso || otros[0];
+  const heroWeek = heroElem?.kind === "semana" ? heroElem : undefined;
+  const heroTurno = heroElem?.kind === "turno" ? heroElem.turno : undefined;
+  const heroKind = enCurso ? "current" : "latest";
+  const otrosSinHero = heroElem && heroElem !== enCurso
+    ? otros.filter((e) => e !== heroElem)
+    : otros;
+```
+
+#### Por qué se cambió
+El destacado de Contabilidad solo elegía entre semanas y por eso ignoraba un turno suelto fuera de semana aunque fuera más reciente que la última semana terminada.
+
+### Cambio 2 - Render del turno suelto destacado
+
+#### Código anterior
+`No existía bloque heroTurno en src/screens/contabilidad-screen.tsx.`
+
+#### Código nuevo
+```tsx
+        {heroTurno && (() => {
+          const calculo = calcularTurnoContable(heroTurno, settings);
+          const totalTaximetroHero = calculo.dineroBase;
+          const entregadaHero = heroTurno.entregada || false;
+          const turnoTitle =
+            heroTurno.startDate && heroTurno.startDate !== heroTurno.date
+              ? `${fmtDate(heroTurno.startDate)} ${heroTurno.startTime} - ${fmtDate(heroTurno.date)} ${heroTurno.endTime}`
+              : `${fmtDate(heroTurno.date)} · ${heroTurno.startTime} - ${heroTurno.endTime}`;
+
+          let totalMinsHero = 0;
+          if (heroTurno.startTime && heroTurno.endTime) {
+            totalMinsHero = getDiffMins(heroTurno.startTime, heroTurno.endTime);
+            if (heroTurno.totalPausedMinutes) {
+              totalMinsHero = Math.max(0, totalMinsHero - heroTurno.totalPausedMinutes);
+            }
+          }
+          const durationStrHero = fmtDuration(totalMinsHero);
+
+          return (
+            <div
+              onClick={() => {
+                setReturnScreen("contabilidad");
+                setViewTurno(heroTurno);
+                setScreen("summary");
+              }}
+```
+
+```tsx
+                    <span style={{
+                      fontSize: 11,
+                      fontWeight: 800,
+                      color: A,
+                      background: "rgba(0,0,0,0.3)",
+                      padding: "4px 10px",
+                      borderRadius: 8,
+                      letterSpacing: "0.8px",
+                    }}>
+                      ÚLTIMO TURNO
+                    </span>
+                    <span style={{
+                      fontSize: 11,
+                      fontWeight: 800,
+                      color: E,
+                      background: "rgba(0, 210, 255, 0.10)",
+                      padding: "4px 10px",
+                      borderRadius: 8,
+                      letterSpacing: "0.8px",
+                    }}>
+                      FUERA DE SEMANA
+                    </span>
+```
+
+#### Por qué se cambió
+Cuando el elemento destacado más reciente es un turno suelto, la pantalla necesitaba una tarjeta grande equivalente a la de semana para mostrar taxímetro, ganancia, kilómetros, tiempo y estado, y abrir el resumen del turno al pulsarla.
+
+### Cambio 3 - Estado vacío tras extraer el destacado
+
+#### Código anterior
+```tsx
+        {grupos2.length === 0 && !heroWeek && (
+```
+
+#### Código nuevo
+```tsx
+        {grupos2.length === 0 && !heroElem && (
+```
+
+#### Por qué se cambió
+Si el único elemento contable es un turno suelto destacado, no debe mostrarse debajo el mensaje de que no hay semanas registradas.
+
+### Cambio 4 - Test del turno suelto como destacado
+
+#### Código anterior
+```ts
+  const summarySource = readFileSync(resolve("src/screens/summary-screen.tsx"), "utf8");
+  const detalleSemanaSource = readFileSync(resolve("src/screens/detalle-semana-screen.tsx"), "utf8");
+```
+
+`No existía test para permitir que un turno suelto más reciente fuese el destacado contable.`
+
+#### Código nuevo
+```ts
+  const summarySource = readFileSync(resolve("src/screens/summary-screen.tsx"), "utf8");
+  const contabilidadSource = readFileSync(resolve("src/screens/contabilidad-screen.tsx"), "utf8");
+  const detalleSemanaSource = readFileSync(resolve("src/screens/detalle-semana-screen.tsx"), "utf8");
+```
+
+```ts
+  it("allows a loose turno newer than the latest closed week to become the accounting hero", () => {
+    expect(contabilidadSource).toContain("const heroElem = enCurso || otros[0];");
+    expect(contabilidadSource).toContain('const heroTurno = heroElem?.kind === "turno" ? heroElem.turno : undefined;');
+    expect(contabilidadSource).toContain("heroTurno && (() =>");
+    expect(contabilidadSource).toContain("ÚLTIMO TURNO");
+    expect(contabilidadSource).toContain("FUERA DE SEMANA");
+    expect(contabilidadSource).toContain('setReturnScreen("contabilidad");');
+    expect(contabilidadSource).toContain('setScreen("summary");');
+  });
+```
+
+#### Por qué se cambió
+La regresión fija que Contabilidad ya no limita el destacado a semanas y que el turno suelto puede ocupar el bloque principal si es el elemento más reciente.
+
+## 2026-06-16 19:48 - Añadir liquidación de turno suelto
+
+**Archivos modificados:** `ESTRUCTURA.md`, `src/__tests__/liquidacion-semana.test.ts`, `src/main.tsx`, `src/screens/liquidacion-turno-screen.tsx`, `src/screens/summary-screen.tsx`
+
+### Cambio 1 - Pantalla de liquidación de turno
+
+#### Código anterior
+`No existía LiquidacionTurnoScreen en src/screens/liquidacion-turno-screen.tsx.`
+
+#### Código nuevo
+```tsx
+export function LiquidacionTurnoScreen({
+  viewTurno,
+  settings,
+}: Props) {
+  const replaceScreen = useAppStore((s) => s.replaceScreen);
+  const calculo = calcularTurnoContable(viewTurno, settings);
+  const brutoJefe = roundMoney(calculo.dineroBase * (calculo.config.porcentajeJefe / 100));
+  const descD = roundMoney(calculo.descD);
+  const descG = roundMoney(calculo.descF);
+  const descA = roundMoney(calculo.descA);
+  const descE = roundMoney(calculo.descE);
+  const totalDescontar = roundMoney(calculo.totalDescontar);
+  const totalNeto = roundMoney(calculo.totalADar);
+  const taximetroLimpio = roundMoney(calculo.dineroBase);
+  const totalKM = viewTurno.km || 0;
+  const turnoTitle =
+    viewTurno.startDate && viewTurno.startDate !== viewTurno.date
+      ? `${fmtDate(viewTurno.startDate)} ${viewTurno.startTime} - ${fmtDate(viewTurno.date)} ${viewTurno.endTime}`
+      : `${fmtDate(viewTurno.date)} · ${viewTurno.startTime} - ${viewTurno.endTime}`;
+  const notasGenerales = viewTurno.entries.filter((entry) => entry.type === "nota");
+  const notasDetalladas = viewTurno.entries.filter(
+    (entry) => entry.type !== "nota" && entry.note && entry.note.trim()
+  );
+  const tieneNotas = notasGenerales.length > 0 || notasDetalladas.length > 0;
+```
+
+```tsx
+        <div style={{ flexShrink: 0, display: "flex", flexDirection: "column", gap: 10, marginTop: 4 }}>
+          <button
+            onClick={copyToClipboard}
+            style={{
+              padding: "16px 0",
+              borderRadius: 16,
+              background: copiado ? "rgba(80, 220, 140, 0.12)" : "rgba(255, 255, 255, 0.08)",
+              border: copiado ? `1px solid ${G}` : "1px solid rgba(255, 255, 255, 0.1)",
+              color: copiado ? G : "white",
+              fontSize: 19,
+              fontWeight: 700,
+              cursor: "pointer",
+              display: "flex",
+              justifyContent: "center",
+              alignItems: "center",
+              gap: 8,
+              transition: "all 0.2s"
+            }}
+          >
+            {copiado ? "¡Copiado! ✓" : "Copiar Liquidación"}
+          </button>
+
+          <button
+            onClick={() => replaceScreen("summary")}
+            style={{
+              padding: "16px 0",
+              borderRadius: 16,
+              border: "none",
+              background: "rgba(255, 255, 255, 0.04)",
+              color: "rgba(255, 255, 255, 0.6)",
+              fontSize: 19,
+              fontWeight: 700,
+              cursor: "pointer",
+              textAlign: "center"
+            }}
+          >
+            Volver
+          </button>
+        </div>
+```
+
+#### Por qué se cambió
+Un turno fuera de semana no tenía una pantalla equivalente a la liquidación semanal. La nueva pantalla calcula la liquidación desde `viewTurno` con `calcularTurnoContable`, genera el ticket digital, copia la liquidación, comparte la imagen y permite imprimir ticket sin depender de `selectedWeekId`.
+
+### Cambio 2 - Ruta de navegación de liquidación de turno
+
+#### Código anterior
+```tsx
+import { DetalleSemanaScreen } from "./screens/detalle-semana-screen";
+import { LiquidacionSemanaScreen } from "./screens/liquidacion-semana-screen";
+```
+
+```tsx
+  if (screen === "liquidacionSemana" && selectedWeekId) {
+    return (
+      <LiquidacionSemanaScreen
+        selectedWeekId={selectedWeekId}
+        setSelectedWeekId={setSelectedWeekId}
+        updateWeekOverride={updateWeekOverride}
+      />
+    );
+  }
+
+
+  if (screen === "PantallaTurnos") {
+```
+
+#### Código nuevo
+```tsx
+import { DetalleSemanaScreen } from "./screens/detalle-semana-screen";
+import { LiquidacionSemanaScreen } from "./screens/liquidacion-semana-screen";
+import { LiquidacionTurnoScreen } from "./screens/liquidacion-turno-screen";
+```
+
+```tsx
+  if (screen === "liquidacionSemana" && selectedWeekId) {
+    return (
+      <LiquidacionSemanaScreen
+        selectedWeekId={selectedWeekId}
+        setSelectedWeekId={setSelectedWeekId}
+        updateWeekOverride={updateWeekOverride}
+      />
+    );
+  }
+
+
+  if (screen === "liquidacionTurno" && viewTurno) {
+    return (
+      <LiquidacionTurnoScreen
+        viewTurno={viewTurno}
+        settings={settings}
+      />
+    );
+  }
+
+
+  if (screen === "PantallaTurnos") {
+```
+
+#### Por qué se cambió
+La aplicación solo renderizaba `liquidacionSemana` cuando existía `selectedWeekId`. Los turnos sueltos no tienen semana contable, por lo que necesitan una ruta que use `viewTurno`.
+
+### Cambio 3 - Botón Liquidación en turno fuera de semana
+
+#### Código anterior
+```tsx
+          <div style={{ flex: 1 }}>
+            <div style={{ fontSize: 20, fontWeight: 800, color: 'white' }}>Resumen del Turno</div>
+          </div>
+          <button style={{ ...iconBtnStyle, background: 'rgba(255,255,255,0.09)' }} onClick={() => {
+            setEditJ({ ...viewTurno, entries: [...viewTurno.entries] });
+            setScreen('editTurno');
+          }}>
+```
+
+#### Código nuevo
+```tsx
+          <div style={{ flex: 1 }}>
+            <div style={{ fontSize: 20, fontWeight: 800, color: 'white' }}>Resumen del Turno</div>
+          </div>
+          {isLooseAccountingTurno && (
+            <button
+              onClick={() => setScreen("liquidacionTurno")}
+              style={{
+                background: "rgba(80, 220, 140, 0.08)",
+                border: `1px solid ${G}`,
+                borderRadius: 12,
+                color: G,
+                padding: "8px 14px",
+                fontSize: 13,
+                fontWeight: 700,
+                cursor: "pointer",
+              }}
+            >
+              Liquidación
+            </button>
+          )}
+          <button style={{ ...iconBtnStyle, background: 'rgba(255,255,255,0.09)' }} onClick={() => {
+            setEditJ({ ...viewTurno, entries: [...viewTurno.entries] });
+            setScreen('editTurno');
+          }}>
+```
+
+#### Por qué se cambió
+El resumen de un turno suelto mostraba `Fuera de semana` y los importes contables, pero no ofrecía el mismo acceso a liquidación que sí tenía el detalle de una semana cerrada.
+
+### Cambio 4 - Tests de liquidación de turno suelto
+
+#### Código anterior
+```ts
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
+import { describe, expect, it } from "vitest";
+
+describe("Liquidación Semanal screen and typography", () => {
+  const mainSource = readFileSync(resolve("src/main.tsx"), "utf8");
+  const detalleSemanaSource = readFileSync(resolve("src/screens/detalle-semana-screen.tsx"), "utf8");
+  const liquidacionSemanaSource = readFileSync(resolve("src/screens/liquidacion-semana-screen.tsx"), "utf8");
+  const themeSource = readFileSync(resolve("src/shared/ui-theme.ts"), "utf8");
+```
+
+```ts
+  it("defines the navigation state liquidacionSemana", () => {
+    expect(mainSource).toContain('screen === "liquidacionSemana"');
+  });
+
+  it("contains the Liquidación button that triggers navigation", () => {
+    const combined = mainSource + detalleSemanaSource;
+    expect(combined).toMatch(/onClick=\{\(\)\s*=>\s*setScreen\("liquidacionSemana"\)\}/);
+  });
+```
+
+#### Código nuevo
+```ts
+import { existsSync, readFileSync } from "node:fs";
+import { resolve } from "node:path";
+import { describe, expect, it } from "vitest";
+
+describe("Liquidación Semanal screen and typography", () => {
+  const mainSource = readFileSync(resolve("src/main.tsx"), "utf8");
+  const summarySource = readFileSync(resolve("src/screens/summary-screen.tsx"), "utf8");
+  const detalleSemanaSource = readFileSync(resolve("src/screens/detalle-semana-screen.tsx"), "utf8");
+  const liquidacionSemanaSource = readFileSync(resolve("src/screens/liquidacion-semana-screen.tsx"), "utf8");
+  const liquidacionTurnoPath = resolve("src/screens/liquidacion-turno-screen.tsx");
+  const liquidacionTurnoSource = existsSync(liquidacionTurnoPath)
+    ? readFileSync(liquidacionTurnoPath, "utf8")
+    : "";
+  const themeSource = readFileSync(resolve("src/shared/ui-theme.ts"), "utf8");
+```
+
+```ts
+  it("defines the navigation state liquidacionSemana", () => {
+    expect(mainSource).toContain('screen === "liquidacionSemana"');
+  });
+
+  it("defines a dedicated navigation state for loose-turn liquidation", () => {
+    expect(mainSource).toContain('screen === "liquidacionTurno" && viewTurno');
+    expect(mainSource).toContain('from "./screens/liquidacion-turno-screen"');
+  });
+
+  it("contains the Liquidación button that triggers navigation", () => {
+    const combined = mainSource + detalleSemanaSource;
+    expect(combined).toMatch(/onClick=\{\(\)\s*=>\s*setScreen\("liquidacionSemana"\)\}/);
+  });
+
+  it("shows the Liquidación button for accounting turnos outside a week", () => {
+    expect(summarySource).toContain("isLooseAccountingTurno &&");
+    expect(summarySource).toMatch(/onClick=\{\(\)\s*=>\s*setScreen\("liquidacionTurno"\)\}/);
+    expect(summarySource).toContain("Liquidación");
+  });
+
+  it("builds a single-turn liquidation from viewTurno without selectedWeekId", () => {
+    expect(liquidacionTurnoSource).toContain("export function LiquidacionTurnoScreen");
+    expect(liquidacionTurnoSource).toContain("viewTurno: Turno;");
+    expect(liquidacionTurnoSource).toContain("const calculo = calcularTurnoContable(viewTurno, settings);");
+    expect(liquidacionTurnoSource).toContain("LIQUIDACIÓN DE TURNO");
+    expect(liquidacionTurnoSource).toContain('replaceScreen("summary")');
+    expect(liquidacionTurnoSource).not.toContain("selectedWeekId");
+    expect(liquidacionTurnoSource).not.toContain("groupTurnosByWeek");
+  });
+```
+
+#### Por qué se cambió
+Los tests existentes solo protegían la liquidación semanal. Se añadieron regresiones para exigir ruta, botón y pantalla específica de liquidación para turnos fuera de semana.
+
+### Cambio 5 - Inventario de pantallas
+
+#### Código anterior
+```md
+### `src/screens/` — 19 archivos
+```
+
+```md
+| `contabilidad-screen.tsx` | Detalle contable de un turno: cálculo de porcentajes y entrega. |
+| `liquidacion-semana-screen.tsx` | Liquidación semanal: semanas contables, entrega al jefe, marcar como entregada. |
+| `detalle-semana-screen.tsx` | Detalle de todos los turnos de una semana contable. |
+```
+
+#### Código nuevo
+```md
+### `src/screens/` — 20 archivos
+```
+
+```md
+| `contabilidad-screen.tsx` | Detalle contable de un turno: cálculo de porcentajes y entrega. |
+| `liquidacion-semana-screen.tsx` | Liquidación semanal: semanas contables, entrega al jefe, marcar como entregada. |
+| `liquidacion-turno-screen.tsx` | Liquidación de un turno suelto fuera de semana: genera ticket, copia liquidación e imprime ticket. |
+| `detalle-semana-screen.tsx` | Detalle de todos los turnos de una semana contable. |
+```
+
+#### Por qué se cambió
+Al añadirse `src/screens/liquidacion-turno-screen.tsx`, el inventario de `ESTRUCTURA.md` debía reflejar el nuevo archivo y el total real de pantallas.
+
 ## 2026-06-15 13:41 - Restaurar instalación de actualizaciones APK
 
 **Archivos modificados:** `android/app/src/main/java/com/mijornada/app/ApkInstallerPlugin.java`, `android/app/src/main/AndroidManifest.xml`, `android/app/src/main/java/com/mijornada/app/MainActivity.java`

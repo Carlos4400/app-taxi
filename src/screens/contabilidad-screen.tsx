@@ -12,7 +12,7 @@ import {
 } from "../components/calendar-icons";
 import { A, ABG, C, E, G } from "../shared/ui-theme";
 import { fmtDuration, fmtKmNumber, fmtMoneyNumber, fmt, fmtKm } from "../logic/formatters";
-import { getDiffMins, today } from "../logic/date-time";
+import { fmtDate, getDiffMins, today } from "../logic/date-time";
 import { getMesLabel } from "../logic/date-labels";
 import { getAccountingPeriodLabel } from "../logic/date-labels";
 import {
@@ -24,9 +24,8 @@ import {
   getWeekRange,
   groupTurnosByWeek,
   isWeekClosed,
-  selectAccountingHeroWeek,
 } from "../logic/week-logic";
-import { calcularResumenContableTurnos } from "../logic/accounting";
+import { calcularResumenContableTurnos, calcularTurnoContable } from "../logic/accounting";
 import { WEEK_LIST_CARD_TEXT_SIZES } from "../shared/card-styles";
 
 export interface ContabilidadScreenProps {
@@ -152,15 +151,12 @@ export function ContabilidadScreen({
 
   otros.sort((a, b) => (a.fechaOrden < b.fechaOrden ? 1 : -1));
 
-  const heroSelection = selectAccountingHeroWeek(
-    enCurso?.weekId || null,
-    otros.filter((e): e is ElemSemana => e.kind === "semana").map((e) => e.weekId)
-  );
-  const heroWeek = heroSelection
-    ? elementos.find((e): e is ElemSemana => e.kind === "semana" && e.weekId === heroSelection.weekId)
-    : undefined;
-  const otrosSinHero = heroSelection?.kind === "latest"
-    ? otros.filter((e) => e.kind !== "semana" || e.weekId !== heroSelection.weekId)
+  const heroElem = enCurso || otros[0];
+  const heroWeek = heroElem?.kind === "semana" ? heroElem : undefined;
+  const heroTurno = heroElem?.kind === "turno" ? heroElem.turno : undefined;
+  const heroKind = enCurso ? "current" : "latest";
+  const otrosSinHero = heroElem && heroElem !== enCurso
+    ? otros.filter((e) => e !== heroElem)
     : otros;
 
   const otrosConMes: ElemConMes[] = [];
@@ -299,11 +295,11 @@ export function ContabilidadScreen({
         </div>
 
         {/* === SEMANA DESTACADA === */}
-        {heroWeek && heroSelection && (() => {
+        {heroWeek && (() => {
           const totales = calcularResumenContableTurnos(heroWeek.turnos, settings);
           const totalTaximetroHero = (totales.dinero || 0) - (totales.totalN || 0);
           const range = getWeekRange(heroWeek.weekId);
-          const isCurrentHero = heroSelection.kind === "current";
+          const isCurrentHero = heroKind === "current";
           const dHoy = new Date(hoyISO + "T12:00:00");
           const dInicio = new Date(range.inicio + "T12:00:00");
           const diasTranscurridos = Math.min(
@@ -433,8 +429,142 @@ export function ContabilidadScreen({
           );
         })()}
 
+        {heroTurno && (() => {
+          const calculo = calcularTurnoContable(heroTurno, settings);
+          const totalTaximetroHero = calculo.dineroBase;
+          const entregadaHero = heroTurno.entregada || false;
+          const turnoTitle =
+            heroTurno.startDate && heroTurno.startDate !== heroTurno.date
+              ? `${fmtDate(heroTurno.startDate)} ${heroTurno.startTime} - ${fmtDate(heroTurno.date)} ${heroTurno.endTime}`
+              : `${fmtDate(heroTurno.date)} · ${heroTurno.startTime} - ${heroTurno.endTime}`;
+
+          let totalMinsHero = 0;
+          if (heroTurno.startTime && heroTurno.endTime) {
+            totalMinsHero = getDiffMins(heroTurno.startTime, heroTurno.endTime);
+            if (heroTurno.totalPausedMinutes) {
+              totalMinsHero = Math.max(0, totalMinsHero - heroTurno.totalPausedMinutes);
+            }
+          }
+          const durationStrHero = fmtDuration(totalMinsHero);
+
+          return (
+            <div
+              onClick={() => {
+                setReturnScreen("contabilidad");
+                setViewTurno(heroTurno);
+                setScreen("summary");
+              }}
+              style={{
+                background: "linear-gradient(135deg, rgba(180, 120, 255, 0.15) 0%, rgba(0, 210, 255, 0.15) 100%)",
+                borderRadius: 22,
+                padding: 20,
+                border: `2px solid ${entregadaHero ? G : E}`,
+                cursor: "pointer",
+                boxShadow: `0 8px 24px rgba(0,0,0,0.3), inset 0 0 20px ${entregadaHero ? G : E}11`,
+              }}
+            >
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12, marginBottom: 16 }}>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 8,
+                    flexWrap: "wrap",
+                    marginBottom: 12,
+                  }}>
+                    <span style={{
+                      fontSize: 11,
+                      fontWeight: 800,
+                      color: A,
+                      background: "rgba(0,0,0,0.3)",
+                      padding: "4px 10px",
+                      borderRadius: 8,
+                      letterSpacing: "0.8px",
+                    }}>
+                      ÚLTIMO TURNO
+                    </span>
+                    <span style={{
+                      fontSize: 11,
+                      fontWeight: 800,
+                      color: E,
+                      background: "rgba(0, 210, 255, 0.10)",
+                      padding: "4px 10px",
+                      borderRadius: 8,
+                      letterSpacing: "0.8px",
+                    }}>
+                      FUERA DE SEMANA
+                    </span>
+                  </div>
+
+                  <div style={{
+                    fontSize: 22,
+                    fontWeight: 900,
+                    color: "white",
+                    marginBottom: 4,
+                    letterSpacing: "-0.5px",
+                    lineHeight: 1.15,
+                  }}>
+                    {turnoTitle}
+                  </div>
+                  <div style={{
+                    fontSize: 13,
+                    color: entregadaHero ? G : "oklch(0.75 0.16 70)",
+                    fontWeight: 800,
+                    textTransform: "uppercase",
+                  }}>
+                    {entregadaHero ? "Entregado" : "Pendiente"}
+                  </div>
+                </div>
+
+                <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 10, flexShrink: 0, textAlign: "right" }}>
+                  <div>
+                    <div style={{ fontSize: 11, color: "rgba(255,255,255,0.5)", fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.6px", marginBottom: 2, display: "flex", alignItems: "center", gap: 5, justifyContent: "flex-end" }}>
+                      <IconMoneyBag s={24} c="oklch(0.78 0.18 150)" /> Mi Ganancia
+                    </div>
+                    <div style={{ fontSize: "clamp(22px, 6vw, 32px)", fontWeight: 900, color: "oklch(0.78 0.18 150)", letterSpacing: "-1px", lineHeight: 1 }}>
+                      {fmtMoneyNumber(calculo.miGanancia)} <span style={{ fontSize: 20, fontWeight: 700, opacity: 0.6 }}>€</span>
+                    </div>
+                  </div>
+                  <div>
+                    <div style={{ fontSize: 11, color: "rgba(255,255,255,0.5)", fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.6px", marginBottom: 2, marginTop: 4, display: "flex", alignItems: "center", gap: 5, justifyContent: "flex-end" }}>
+                      <IconTimer s={24} c="oklch(0.85 0.12 210)" /> Tiempo Trab.
+                    </div>
+                    <div style={{ fontSize: "clamp(22px, 6vw, 32px)", fontWeight: 900, color: "oklch(0.85 0.12 210)", letterSpacing: "-1px", lineHeight: 1 }}>
+                      {(() => { const [hPart, mPart] = durationStrHero.split(" "); const hNum = hPart.replace("h", ""); const mNum = mPart?.replace("m", "") ?? "0"; return <>{hNum}<span style={{ fontSize: 20, fontWeight: 700, opacity: 0.6, marginLeft: 2, marginRight: 6, letterSpacing: "normal" }}>h</span> {mNum}<span style={{ fontSize: 20, fontWeight: 700, opacity: 0.6, marginLeft: 2, letterSpacing: "normal" }}>m</span></>; })()}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div style={{
+                display: "flex",
+                alignItems: "baseline",
+                gap: 8,
+              }}>
+                <span style={{
+                  fontSize: 11,
+                  color: "rgba(255,255,255,0.5)",
+                  textTransform: "uppercase",
+                  letterSpacing: "0.6px",
+                  fontWeight: 700,
+                }}>
+                  TOTAL DEL TURNO
+                </span>
+              </div>
+              <div style={{ display: "flex", gap: 16, marginTop: 4 }}>
+                <div style={{ fontSize: "clamp(22px, 6vw, 32px)", fontWeight: 900, color: "oklch(0.85 0.18 85)", letterSpacing: "-1px" }}>
+                  {fmtMoneyNumber(totalTaximetroHero)} <span style={{ fontSize: 20, fontWeight: 700, opacity: 0.6 }}>€</span>
+                </div>
+                <div style={{ fontSize: "clamp(22px, 6vw, 32px)", fontWeight: 900, color: "oklch(0.80 0.14 220)", letterSpacing: "-1px" }}>
+                  {fmtKmNumber(heroTurno.km || 0)} <span style={{ fontSize: 20, fontWeight: 700, opacity: 0.6 }}>KM</span>
+                </div>
+              </div>
+            </div>
+          );
+        })()}
+
         {/* === SEMANAS ANTERIORES (agrupadas por mes) === */}
-        {grupos2.length === 0 && !heroWeek && (
+        {grupos2.length === 0 && !heroElem && (
           <div style={{
             textAlign: "center",
             color: "rgba(255,255,255,0.5)",
@@ -527,12 +657,12 @@ export function ContabilidadScreen({
                       color: "rgba(255,255,255,0.4)",
                       display: "flex",
                       alignItems: "center",
-                      gap: 6,
+                      gap: 8,
+                      flexWrap: "wrap",
                     }}>
                       <span>{numTurnos} {numTurnos === 1 ? "turno" : "turnos"}</span>
-                      <span style={{ opacity: 0.5 }}>•</span>
-                      <span style={{ color: entregada ? G : "oklch(0.75 0.16 70)", fontWeight: 800 }}>
-                        {entregada ? "Entregada" : "Pendiente"}
+                      <span style={weeklyStatusBadgeStyle(entregada)}>
+                        {entregada ? "ENTREGADA" : "PENDIENTE"}
                       </span>
                     </div>
                   </div>
@@ -652,3 +782,16 @@ const S = {
     justifyContent: "center",
   } as React.CSSProperties,
 };
+
+const weeklyStatusBadgeStyle = (entregada: boolean): React.CSSProperties => ({
+  alignSelf: "flex-start",
+  fontSize: 11,
+  fontWeight: 900,
+  color: entregada ? G : "oklch(0.75 0.16 70)",
+  background: entregada ? "rgba(80,220,140,0.12)" : "rgba(255,200,80,0.10)",
+  padding: "4px 10px",
+  borderRadius: 8,
+  letterSpacing: "0.6px",
+  textTransform: "uppercase",
+  lineHeight: 1.1,
+});

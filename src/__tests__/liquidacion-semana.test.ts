@@ -1,11 +1,17 @@
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 
 describe("Liquidación Semanal screen and typography", () => {
   const mainSource = readFileSync(resolve("src/main.tsx"), "utf8");
+  const summarySource = readFileSync(resolve("src/screens/summary-screen.tsx"), "utf8");
+  const contabilidadSource = readFileSync(resolve("src/screens/contabilidad-screen.tsx"), "utf8");
   const detalleSemanaSource = readFileSync(resolve("src/screens/detalle-semana-screen.tsx"), "utf8");
   const liquidacionSemanaSource = readFileSync(resolve("src/screens/liquidacion-semana-screen.tsx"), "utf8");
+  const liquidacionTurnoPath = resolve("src/screens/liquidacion-turno-screen.tsx");
+  const liquidacionTurnoSource = existsSync(liquidacionTurnoPath)
+    ? readFileSync(liquidacionTurnoPath, "utf8")
+    : "";
   const themeSource = readFileSync(resolve("src/shared/ui-theme.ts"), "utf8");
 
   it("applies fluid typography to the week detail title", () => {
@@ -19,9 +25,47 @@ describe("Liquidación Semanal screen and typography", () => {
     expect(mainSource).toContain('screen === "liquidacionSemana"');
   });
 
+  it("defines a dedicated navigation state for loose-turn liquidation", () => {
+    expect(mainSource).toContain('screen === "liquidacionTurno" && viewTurno');
+    expect(mainSource).toContain('from "./screens/liquidacion-turno-screen"');
+  });
+
   it("contains the Liquidación button that triggers navigation", () => {
     const combined = mainSource + detalleSemanaSource;
     expect(combined).toMatch(/onClick=\{\(\)\s*=>\s*setScreen\("liquidacionSemana"\)\}/);
+  });
+
+  it("shows the Liquidación button for accounting turnos outside a week", () => {
+    expect(summarySource).toContain("isLooseAccountingTurno &&");
+    expect(summarySource).toMatch(/onClick=\{\(\)\s*=>\s*setScreen\("liquidacionTurno"\)\}/);
+    expect(summarySource).toContain("Liquidación");
+  });
+
+  it("builds a single-turn liquidation from viewTurno without selectedWeekId", () => {
+    expect(liquidacionTurnoSource).toContain("export function LiquidacionTurnoScreen");
+    expect(liquidacionTurnoSource).toContain("viewTurno: Turno;");
+    expect(liquidacionTurnoSource).toContain("const calculo = calcularTurnoContable(viewTurno, settings);");
+    expect(liquidacionTurnoSource).toContain("LIQUIDACIÓN DE TURNO");
+    expect(liquidacionTurnoSource).toContain('replaceScreen("summary")');
+    expect(liquidacionTurnoSource).not.toContain("selectedWeekId");
+    expect(liquidacionTurnoSource).not.toContain("groupTurnosByWeek");
+  });
+
+  it("allows a loose turno newer than the latest closed week to become the accounting hero", () => {
+    expect(contabilidadSource).toContain("const heroElem = enCurso || otros[0];");
+    expect(contabilidadSource).toContain('const heroTurno = heroElem?.kind === "turno" ? heroElem.turno : undefined;');
+    expect(contabilidadSource).toContain("heroTurno && (() =>");
+    expect(contabilidadSource).toContain("ÚLTIMO TURNO");
+    expect(contabilidadSource).toContain("FUERA DE SEMANA");
+    expect(contabilidadSource).toContain('setReturnScreen("contabilidad");');
+    expect(contabilidadSource).toContain('setScreen("summary");');
+  });
+
+  it("shows weekly delivery status as a badge instead of inline text", () => {
+    expect(contabilidadSource).toContain("const weeklyStatusBadgeStyle = (entregada: boolean)");
+    expect(contabilidadSource).toContain("<span style={weeklyStatusBadgeStyle(entregada)}>");
+    expect(contabilidadSource).toContain('{entregada ? "ENTREGADA" : "PENDIENTE"}');
+    expect(contabilidadSource).not.toContain('{entregada ? "Entregada" : "Pendiente"}');
   });
 
   it("builds the ticket layout structure with dashed borders and monospace font for numbers", () => {
