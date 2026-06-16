@@ -13,8 +13,7 @@ import {
 import { A, ABG, C, E, G } from "../shared/ui-theme";
 import { fmtDuration, fmtKmNumber, fmtMoneyNumber, fmt, fmtKm } from "../logic/formatters";
 import { fmtDate, getDiffMins, today } from "../logic/date-time";
-import { getMesLabel } from "../logic/date-labels";
-import { getAccountingPeriodLabel } from "../logic/date-labels";
+import { getMesLabel, getAccountingPeriodLabel, MESES_COMPLETOS } from "../logic/date-labels";
 import {
   formatWeekRange,
   getCurrentOpenWeekId,
@@ -650,15 +649,15 @@ export function ContabilidadScreen({
                       fontWeight: 800,
                       color: "white",
                     }}>
-                      {formatWeekRange(sem.weekId)}
+                      {formatWeekRangeWithYear(sem.weekId)}
                     </div>
                     <div style={{
                       fontSize: WEEK_LIST_CARD_TEXT_SIZES.meta,
                       color: "rgba(255,255,255,0.4)",
                       display: "flex",
-                      alignItems: "center",
-                      gap: 8,
-                      flexWrap: "wrap",
+                      flexDirection: "column",
+                      alignItems: "flex-start",
+                      gap: 6,
                     }}>
                       <span>{numTurnos} {numTurnos === 1 ? "turno" : "turnos"}</span>
                       <span style={weeklyStatusBadgeStyle(entregada)}>
@@ -783,8 +782,22 @@ const S = {
   } as React.CSSProperties,
 };
 
+const formatWeekRangeWithYear = (weekId: string): string => {
+  const { inicio, fin } = getWeekRange(weekId);
+  const dInicio = new Date(inicio + "T12:00:00");
+  const dFin = new Date(fin + "T12:00:00");
+  if (dInicio.getFullYear() !== dFin.getFullYear()) {
+    return `${dInicio.getDate()} ${MESES_COMPLETOS[dInicio.getMonth()]} ${dInicio.getFullYear()} - ${dFin.getDate()} ${MESES_COMPLETOS[dFin.getMonth()]} ${dFin.getFullYear()}`;
+  }
+  if (dInicio.getMonth() === dFin.getMonth()) {
+    return `${dInicio.getDate()} - ${dFin.getDate()} ${MESES_COMPLETOS[dFin.getMonth()]} ${dFin.getFullYear()}`;
+  }
+  return `${dInicio.getDate()} ${MESES_COMPLETOS[dInicio.getMonth()]} - ${dFin.getDate()} ${MESES_COMPLETOS[dFin.getMonth()]} ${dFin.getFullYear()}`;
+};
+
 const weeklyStatusBadgeStyle = (entregada: boolean): React.CSSProperties => ({
   alignSelf: "flex-start",
+  width: "fit-content",
   fontSize: 11,
   fontWeight: 900,
   color: entregada ? G : "oklch(0.75 0.16 70)",

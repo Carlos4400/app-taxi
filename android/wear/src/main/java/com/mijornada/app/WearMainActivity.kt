@@ -33,6 +33,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.wear.compose.material.Text
 import androidx.wear.input.RemoteInputIntentHelper
+import com.google.android.gms.wearable.PutDataMapRequest
+import com.google.android.gms.wearable.Wearable
 import com.mijornada.app.screens.*
 import com.mijornada.app.theme.*
 import org.json.JSONArray
@@ -1099,9 +1101,48 @@ class WearMainActivity : ComponentActivity() {
             }
             MobileResponseService.enqueueOutboxRetry(this)
         }
+        // Los comandos de lectura (GET_STATUS, GET_TURNOS) no se persisten en la
+        // outbox, asi que OutboxWorker nunca los publica. Hay que enviarlos aqui
+        // directamente por DataClient para que el movil los reciba y responda.
+        if (!isRetry && !shouldPersistOutbox(commandJson)) {
+            publishReadCommand(commandJson)
+        }
         refreshPendingOpsCount()
-        scheduleResync(2500L)
+        // Solo se reprograma un resync tras un comando de escritura, para confirmar
+        // su resultado. Un comando de lectura no debe encadenar otro resync: eso
+        // convertiria GET_STATUS en un sondeo continuo que agota la bateria. El
+        // estado tambien llega por push (/turno/state) cuando el movil cambia Room.
+        if (shouldPersistOutbox(commandJson)) {
+            scheduleResync(2500L)
+        }
         return true
+    }
+
+    /**
+     * Publica un comando de solo lectura (GET_STATUS, GET_TURNOS) directamente por
+     * DataClient en /watch-command/<operationId>, replicando el formato que usa
+     * [OutboxWorker] para los comandos persistidos. Estos comandos no se guardan en
+     * la outbox porque no son criticos, pero sin publicarlos el movil nunca los
+     * recibe y la peticion se pierde (la pantalla de turnos queda "Cargando..."). El
+     * movil responde con STATUS/TURNOS_STATUS incluyendo el mismo operationId, y
+     * MobileResponseService elimina el DataItem tras procesar la respuesta, asi que
+     * no se acumulan items en el canal.
+     */
+    private fun publishReadCommand(commandJson: String) {
+        val operationId = try {
+            JSONObject(commandJson).optString("operationId", "")
+        } catch (e: Exception) {
+            ""
+        }
+        if (operationId.isBlank()) return
+        val request = PutDataMapRequest.create("/watch-command/$operationId")
+        request.dataMap.putString("command", commandJson)
+        request.dataMap.putLong("createdAt", System.currentTimeMillis())
+        val dataRequest = request.asPutDataRequest().setUrgent()
+        Wearable.getDataClient(this).putDataItem(dataRequest)
+            .addOnFailureListener { e ->
+                android.util.Log.w("WearMainActivity", "No se pudo enviar el comando de lectura $operationId: ${e.message}")
+            }
     }
 
     /**

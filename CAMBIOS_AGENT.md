@@ -1,3 +1,307 @@
+## 2026-06-16 23:15 - Corregir carga de turnos en el reloj Wear OS
+
+**Archivos modificados:** `android/wear/src/main/java/com/mijornada/app/WearMainActivity.kt`
+
+Contexto: en el reloj, la pantalla «Turnos» se quedaba en «Cargando turnos…» para siempre. Causa: `sendCommand` solo publica al móvil los comandos que se guardan en la outbox (`shouldPersistOutbox`), que son los 9 de escritura. Los comandos de lectura `GET_TURNOS` y `GET_STATUS` no se persisten, y el único transporte (`OutboxWorker`) solo publica lo que hay en la outbox, así que nunca salían del reloj. El móvil ya está preparado para recibirlos por `DataClient` en `/watch-command/<operationId>` y `MobileResponseService` ya limpia esos `DataItem` al recibir `STATUS`/`TURNOS_STATUS`; solo faltaba publicarlos.
+
+### Cambio 1 - Publicar los comandos de lectura por DataClient
+
+#### Código anterior
+```kotlin
+        refreshPendingOpsCount()
+        scheduleResync(2500L)
+        return true
+    }
+```
+
+#### Código nuevo
+```kotlin
+        // Los comandos de lectura (GET_STATUS, GET_TURNOS) no se persisten en la
+        // outbox, asi que OutboxWorker nunca los publica. Hay que enviarlos aqui
+        // directamente por DataClient para que el movil los reciba y responda.
+        if (!isRetry && !shouldPersistOutbox(commandJson)) {
+            publishReadCommand(commandJson)
+        }
+        refreshPendingOpsCount()
+        // Solo se reprograma un resync tras un comando de escritura, para confirmar
+        // su resultado. Un comando de lectura no debe encadenar otro resync: eso
+        // convertiria GET_STATUS en un sondeo continuo que agota la bateria. El
+        // estado tambien llega por push (/turno/state) cuando el movil cambia Room.
+        if (shouldPersistOutbox(commandJson)) {
+            scheduleResync(2500L)
+        }
+        return true
+    }
+```
+
+#### Por qué se cambió
+Sin publicar los reads, `GET_TURNOS` nunca llegaba al móvil, nunca se respondía `TURNOS_STATUS` y `turnosLoading` no pasaba a `false`. Se publican replicando el formato de `OutboxWorker`. El `scheduleResync` se condiciona a comandos de escritura para no convertir `GET_STATUS` en un sondeo continuo (decisión de ahorro de batería confirmada con el usuario).
+
+### Cambio 2 - Añadir el helper publishReadCommand
+
+#### Código anterior
+```kotlin
+No existía publishReadCommand en android/wear/src/main/java/com/mijornada/app/WearMainActivity.kt.
+```
+
+#### Código nuevo
+```kotlin
+    private fun publishReadCommand(commandJson: String) {
+        val operationId = try {
+            JSONObject(commandJson).optString("operationId", "")
+        } catch (e: Exception) {
+            ""
+        }
+        if (operationId.isBlank()) return
+        val request = PutDataMapRequest.create("/watch-command/$operationId")
+        request.dataMap.putString("command", commandJson)
+        request.dataMap.putLong("createdAt", System.currentTimeMillis())
+        val dataRequest = request.asPutDataRequest().setUrgent()
+        Wearable.getDataClient(this).putDataItem(dataRequest)
+            .addOnFailureListener { e ->
+                android.util.Log.w("WearMainActivity", "No se pudo enviar el comando de lectura $operationId: ${e.message}")
+            }
+    }
+```
+
+#### Por qué se cambió
+Encapsula la publicación del comando de lectura por `DataClient` en `/watch-command/<operationId>`, con el mismo `dataMap` (`command`, `createdAt`) y `setUrgent()` que usa `OutboxWorker`. Usa la API asíncrona (`addOnFailureListener`) porque `sendCommand` corre en el hilo principal y no debe bloquear. Requiere los imports nuevos `com.google.android.gms.wearable.PutDataMapRequest` y `com.google.android.gms.wearable.Wearable`.
+
+## 2026-06-16 23:08 - Mostrar año en semanas
+
+**Archivos modificados:** `src/__tests__/liquidacion-semana.test.ts`, `src/screens/contabilidad-screen.tsx`
+
+### Cambio 1 - Importar meses completos
+
+#### Código anterior
+```tsx
+import { getMesLabel } from "../logic/date-labels";
+import { getAccountingPeriodLabel } from "../logic/date-labels";
+```
+
+#### Código nuevo
+```tsx
+import { getMesLabel, getAccountingPeriodLabel, MESES_COMPLETOS } from "../logic/date-labels";
+```
+
+#### Por qué se cambió
+La tarjeta semanal de Contabilidad necesita mostrar el año manteniendo el formato de mes completo.
+
+### Cambio 2 - Fecha de semana con año
+
+#### Código anterior
+```tsx
+                      {formatWeekRange(sem.weekId)}
+```
+
+#### Código nuevo
+```tsx
+                      {formatWeekRangeWithYear(sem.weekId)}
+```
+
+#### Por qué se cambió
+La lista de semanas mostraba el rango sin año, por ejemplo `10 - 15 Junio`, y se pidió incluir el año.
+
+### Cambio 3 - Formateador local con año
+
+#### Código anterior
+`No existía formatWeekRangeWithYear en src/screens/contabilidad-screen.tsx.`
+
+#### Código nuevo
+```tsx
+const formatWeekRangeWithYear = (weekId: string): string => {
+  const { inicio, fin } = getWeekRange(weekId);
+  const dInicio = new Date(inicio + "T12:00:00");
+  const dFin = new Date(fin + "T12:00:00");
+  if (dInicio.getFullYear() !== dFin.getFullYear()) {
+    return `${dInicio.getDate()} ${MESES_COMPLETOS[dInicio.getMonth()]} ${dInicio.getFullYear()} - ${dFin.getDate()} ${MESES_COMPLETOS[dFin.getMonth()]} ${dFin.getFullYear()}`;
+  }
+  if (dInicio.getMonth() === dFin.getMonth()) {
+    return `${dInicio.getDate()} - ${dFin.getDate()} ${MESES_COMPLETOS[dFin.getMonth()]} ${dFin.getFullYear()}`;
+  }
+  return `${dInicio.getDate()} ${MESES_COMPLETOS[dInicio.getMonth()]} - ${dFin.getDate()} ${MESES_COMPLETOS[dFin.getMonth()]} ${dFin.getFullYear()}`;
+};
+```
+
+#### Por qué se cambió
+El formateador existente `formatWeekRange` se usa en otros sitios y no debía cambiarse globalmente; el helper local añade el año solo en la lista de Contabilidad.
+
+### Cambio 4 - Cobertura de fecha con año
+
+#### Código anterior
+`No existía test shows the year in weekly accounting list ranges en src/__tests__/liquidacion-semana.test.ts.`
+
+#### Código nuevo
+```ts
+  it("shows the year in weekly accounting list ranges", () => {
+    expect(contabilidadSource).toContain("const formatWeekRangeWithYear = (weekId: string)");
+    expect(contabilidadSource).toContain("{formatWeekRangeWithYear(sem.weekId)}");
+  });
+```
+
+#### Por qué se cambió
+La prueba fija que las tarjetas semanales de Contabilidad usen el rango con año.
+
+## 2026-06-16 23:05 - Compactar badge semanal
+
+**Archivos modificados:** `src/__tests__/liquidacion-semana.test.ts`, `src/screens/contabilidad-screen.tsx`
+
+### Cambio 1 - Layout compacto del estado semanal
+
+#### Código anterior
+```tsx
+                    <div style={{
+                      fontSize: WEEK_LIST_CARD_TEXT_SIZES.meta,
+                      color: "rgba(255,255,255,0.4)",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 8,
+                      flexWrap: "wrap",
+                    }}>
+                      <span>{numTurnos} {numTurnos === 1 ? "turno" : "turnos"}</span>
+                      <span style={weeklyStatusBadgeStyle(entregada)}>
+                        {entregada ? "ENTREGADA" : "PENDIENTE"}
+                      </span>
+                    </div>
+```
+
+#### Código nuevo
+```tsx
+                    <div style={{
+                      fontSize: WEEK_LIST_CARD_TEXT_SIZES.meta,
+                      color: "rgba(255,255,255,0.4)",
+                      display: "flex",
+                      flexDirection: "column",
+                      alignItems: "flex-start",
+                      gap: 6,
+                    }}>
+                      <span>{numTurnos} {numTurnos === 1 ? "turno" : "turnos"}</span>
+                      <span style={weeklyStatusBadgeStyle(entregada)}>
+                        {entregada ? "ENTREGADA" : "PENDIENTE"}
+                      </span>
+                    </div>
+```
+
+#### Por qué se cambió
+El contenedor con `flexWrap` dejaba la colocación del badge condicionada al ancho disponible; el layout en columna fija el número de turnos arriba y el badge debajo.
+
+### Cambio 2 - Ancho del badge semanal
+
+#### Código anterior
+```tsx
+const weeklyStatusBadgeStyle = (entregada: boolean): React.CSSProperties => ({
+  alignSelf: "flex-start",
+  flexBasis: "100%",
+  fontSize: 11,
+  fontWeight: 900,
+  color: entregada ? G : "oklch(0.75 0.16 70)",
+  background: entregada ? "rgba(80,220,140,0.12)" : "rgba(255,200,80,0.10)",
+  padding: "4px 10px",
+  borderRadius: 8,
+  letterSpacing: "0.6px",
+  textTransform: "uppercase",
+  lineHeight: 1.1,
+});
+```
+
+#### Código nuevo
+```tsx
+const weeklyStatusBadgeStyle = (entregada: boolean): React.CSSProperties => ({
+  alignSelf: "flex-start",
+  width: "fit-content",
+  fontSize: 11,
+  fontWeight: 900,
+  color: entregada ? G : "oklch(0.75 0.16 70)",
+  background: entregada ? "rgba(80,220,140,0.12)" : "rgba(255,200,80,0.10)",
+  padding: "4px 10px",
+  borderRadius: 8,
+  letterSpacing: "0.6px",
+  textTransform: "uppercase",
+  lineHeight: 1.1,
+});
+```
+
+#### Por qué se cambió
+`flexBasis: "100%"` hacía que `PENDIENTE` pareciera una barra larga; `width: "fit-content"` mantiene el badge como etiqueta compacta.
+
+### Cambio 3 - Test del badge compacto
+
+#### Código anterior
+```ts
+  it("keeps the weekly status badge below the turn count", () => {
+    expect(contabilidadSource).toContain('flexBasis: "100%"');
+  });
+```
+
+#### Código nuevo
+```ts
+  it("keeps the weekly status badge compact below the turn count", () => {
+    expect(contabilidadSource).toContain('flexDirection: "column"');
+    expect(contabilidadSource).toContain('width: "fit-content"');
+    expect(contabilidadSource).not.toContain('flexBasis: "100%"');
+  });
+```
+
+#### Por qué se cambió
+La cobertura anterior validaba el salto de línea pero permitía una etiqueta estirada; ahora valida que el badge quede debajo y compacto.
+
+## 2026-06-16 23:02 - Forzar badge bajo turnos
+
+**Archivos modificados:** `src/__tests__/liquidacion-semana.test.ts`, `src/screens/contabilidad-screen.tsx`
+
+### Cambio 1 - Salto de línea del badge semanal
+
+#### Código anterior
+```tsx
+const weeklyStatusBadgeStyle = (entregada: boolean): React.CSSProperties => ({
+  alignSelf: "flex-start",
+  fontSize: 11,
+  fontWeight: 900,
+  color: entregada ? G : "oklch(0.75 0.16 70)",
+  background: entregada ? "rgba(80,220,140,0.12)" : "rgba(255,200,80,0.10)",
+  padding: "4px 10px",
+  borderRadius: 8,
+  letterSpacing: "0.6px",
+  textTransform: "uppercase",
+  lineHeight: 1.1,
+});
+```
+
+#### Código nuevo
+```tsx
+const weeklyStatusBadgeStyle = (entregada: boolean): React.CSSProperties => ({
+  alignSelf: "flex-start",
+  flexBasis: "100%",
+  fontSize: 11,
+  fontWeight: 900,
+  color: entregada ? G : "oklch(0.75 0.16 70)",
+  background: entregada ? "rgba(80,220,140,0.12)" : "rgba(255,200,80,0.10)",
+  padding: "4px 10px",
+  borderRadius: 8,
+  letterSpacing: "0.6px",
+  textTransform: "uppercase",
+  lineHeight: 1.1,
+});
+```
+
+#### Por qué se cambió
+El badge `PENDIENTE` podía aparecer en la misma línea que el número de turnos cuando había espacio horizontal suficiente en la tarjeta semanal.
+
+### Cambio 2 - Cobertura del salto del badge
+
+#### Código anterior
+`No existía test keeps the weekly status badge below the turn count en src/__tests__/liquidacion-semana.test.ts.`
+
+#### Código nuevo
+```ts
+  it("keeps the weekly status badge below the turn count", () => {
+    expect(contabilidadSource).toContain('flexBasis: "100%"');
+  });
+```
+
+#### Por qué se cambió
+La prueba fija que el badge de estado semanal ocupe su propia línea debajo del número de turnos.
+
 ## 2026-06-16 22:30 - Reauditar arquitectura Wear OS en el doc canonico
 
 **Archivos modificados:** `ARQUITECTURA_RELOJ_WEAR_OS.md`

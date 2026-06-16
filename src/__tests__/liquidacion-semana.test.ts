@@ -68,6 +68,17 @@ describe("Liquidación Semanal screen and typography", () => {
     expect(contabilidadSource).not.toContain('{entregada ? "Entregada" : "Pendiente"}');
   });
 
+  it("keeps the weekly status badge compact below the turn count", () => {
+    expect(contabilidadSource).toContain('flexDirection: "column"');
+    expect(contabilidadSource).toContain('width: "fit-content"');
+    expect(contabilidadSource).not.toContain('flexBasis: "100%"');
+  });
+
+  it("shows the year in weekly accounting list ranges", () => {
+    expect(contabilidadSource).toContain("const formatWeekRangeWithYear = (weekId: string)");
+    expect(contabilidadSource).toContain("{formatWeekRangeWithYear(sem.weekId)}");
+  });
+
   it("builds the ticket layout structure with dashed borders and monospace font for numbers", () => {
     expect(liquidacionSemanaSource).not.toContain('Recibo Digital');
     expect(liquidacionSemanaSource).toContain('Comisión Bruta Jefe');
