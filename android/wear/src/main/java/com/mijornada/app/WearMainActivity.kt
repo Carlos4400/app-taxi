@@ -1056,7 +1056,7 @@ class WearMainActivity : ComponentActivity() {
         }
         val remoteInputs = listOf(
             RemoteInput.Builder(NOTE_KEY)
-                .setLabel(if (current.isBlank()) "Nota" else current.take(24))
+                .setLabel(if (current.isBlank()) "Nota" else current)
                 .build()
         )
         val intent: Intent = RemoteInputIntentHelper.createActionRemoteInputIntent()
@@ -1330,7 +1330,8 @@ private fun ConfirmDeleteScreen(
                 Text(fmtEur(entry.amount), color = ColorWhite, fontSize = 20.sp, fontWeight = FontWeight.Bold)
             }
             if (entry.note.isNotBlank()) {
-                Text(entry.note.take(32), color = ColorGrey, fontSize = 11.sp)
+                // Nota completa con salto de linea (antes se truncaba a 32 chars).
+                Text(entry.note, color = ColorGrey, fontSize = 11.sp)
             }
             Spacer(modifier = Modifier.height(14.dp))
             Row(

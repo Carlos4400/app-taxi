@@ -23,7 +23,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.wear.compose.material.Text
@@ -407,7 +406,7 @@ private fun TarjetaCategoria(
 @Composable
 private fun EntradaHistorial(entry: WatchEntry, bloqueado: Boolean = false, onClick: () -> Unit) {
     val meta = categoriaMeta(entry.type)
-    Row(
+    Column(
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(12.dp))
@@ -415,38 +414,40 @@ private fun EntradaHistorial(entry: WatchEntry, bloqueado: Boolean = false, onCl
             // Atenuar la fila mientras el cambio esta pendiente de confirmacion.
             .alpha(if (entry.pendiente) 0.55f else 1f)
             .clickable(enabled = !bloqueado) { onClick() }
-            .padding(horizontal = 12.dp, vertical = 9.dp),
-        verticalAlignment = Alignment.CenterVertically
+            .padding(horizontal = 12.dp, vertical = 9.dp)
     ) {
-        CategoriaIcon(entry.type, meta.color, 14.dp)
-        Spacer(modifier = Modifier.width(7.dp))
-        Text(categoriaLabelSingular(entry.type), color = meta.color, fontSize = 12.sp, fontWeight = FontWeight.Bold)
-        // Nota de la entrada visible como en la app móvil (antes no se mostraba).
+        // Nivel 1: icono + categoria + hora + (pendiente) + importe.
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            CategoriaIcon(entry.type, meta.color, 14.dp)
+            Spacer(modifier = Modifier.width(7.dp))
+            Text(categoriaLabelSingular(entry.type), color = meta.color, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+            Spacer(modifier = Modifier.weight(1f))
+            Text(entry.time, color = ColorGrey, fontSize = 10.sp)
+            Spacer(modifier = Modifier.width(8.dp))
+            // Icono de pendiente (reloj) mientras el movil no ha confirmado.
+            if (entry.pendiente) {
+                Text("⏱", color = ColorTaximetro, fontSize = 11.sp)
+                Spacer(modifier = Modifier.width(6.dp))
+            }
+            if (entry.type == "nota") {
+                Text("✎", color = ColorWhite, fontSize = 12.sp)
+            } else {
+                Text(fmtEurSigned(entry.amount), color = meta.color, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+            }
+        }
+        // Nivel 2: nota completa con salto de linea, como en "Terminar turno" y
+        // en la app movil (antes se truncaba a una linea con ellipsis).
         if (entry.note.isNotBlank()) {
-            Spacer(modifier = Modifier.width(6.dp))
+            Spacer(modifier = Modifier.height(4.dp))
             Text(
                 entry.note,
                 color = ColorGrey,
                 fontSize = 10.sp,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.weight(1f)
+                modifier = Modifier.fillMaxWidth()
             )
-            Spacer(modifier = Modifier.width(6.dp))
-        } else {
-            Spacer(modifier = Modifier.weight(1f))
-        }
-        Text(entry.time, color = ColorGrey, fontSize = 10.sp)
-        Spacer(modifier = Modifier.width(8.dp))
-        // Icono de pendiente (reloj) mientras el movil no ha confirmado.
-        if (entry.pendiente) {
-            Text("⏱", color = ColorTaximetro, fontSize = 11.sp)
-            Spacer(modifier = Modifier.width(6.dp))
-        }
-        if (entry.type == "nota") {
-            Text("✎", color = ColorWhite, fontSize = 12.sp)
-        } else {
-            Text(fmtEurSigned(entry.amount), color = meta.color, fontSize = 12.sp, fontWeight = FontWeight.Bold)
         }
     }
 }

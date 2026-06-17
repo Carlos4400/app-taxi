@@ -13,6 +13,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.wear.compose.material.Text
@@ -60,9 +61,13 @@ fun AddEntryScreen(
         contentAlignment = Alignment.Center
     ) {
         Column(
-            modifier = Modifier.fillMaxSize(),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center
+            modifier = Modifier
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState())
+                // bottom 44: que el último botón ("Eliminar entrada" en edición)
+                // no lo recorte la curva inferior del círculo al final del scroll.
+                .padding(top = 18.dp, bottom = 44.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth(0.78f),
@@ -113,8 +118,7 @@ fun AddEntryScreen(
             Spacer(modifier = Modifier.height(7.dp))
 
             NotaButton(
-                text = if (note.isBlank()) "+ Nota" else "✓ ${note.take(12)}",
-                selected = note.isNotBlank(),
+                note = note,
                 onClick = { onRequestNote(note) { result -> note = result } }
             )
 
@@ -179,25 +183,45 @@ private fun GuardarImporteButton(
 
 @Composable
 private fun NotaButton(
-    text: String,
-    selected: Boolean,
+    note: String,
     onClick: () -> Unit
 ) {
+    val selected = note.isNotBlank()
     Box(
         modifier = Modifier
             .fillMaxWidth(0.72f)
             .clip(RoundedCornerShape(12.dp))
             .background(ColorNuloBg)
             .clickable { onClick() }
-            .padding(vertical = 8.dp),
+            .padding(horizontal = 12.dp, vertical = 8.dp),
         contentAlignment = Alignment.Center
     ) {
-        Text(
-            text = text,
-            color = if (selected) ColorWhite else ColorGrey,
-            fontSize = 12.sp,
-            fontWeight = FontWeight.Bold
-        )
+        if (!selected) {
+            Text(
+                text = "+ Nota",
+                color = ColorGrey,
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Bold
+            )
+        } else {
+            // Nota completa con salto de linea (antes se mostraba "✓" + 12 chars).
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Text(
+                    text = "✎ Nota",
+                    color = ColorGrey,
+                    fontSize = 10.sp,
+                    fontWeight = FontWeight.Bold
+                )
+                Spacer(modifier = Modifier.height(3.dp))
+                Text(
+                    text = note,
+                    color = ColorWhite,
+                    fontSize = 12.sp,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+        }
     }
 }
 
