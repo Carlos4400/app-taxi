@@ -1,3 +1,194 @@
+## 2026-06-17 19:15 - Extraer el botón Atrás de Android a un hook y limpiar backups
+
+**Archivos modificados:** `src/main.tsx`, `src/hooks/use-android-back-button.ts`, `src/__tests__/use-android-back-button.test.tsx`, `antiguomain.tsx`, `mainAntiguo.tsx`
+
+Contexto: se aligera `src/main.tsx` sacando toda la gestión del botón físico «Atrás» de Android (snapshot de estado, registro de handlers locales y listener de Capacitor) a un hook dedicado `useAndroidBackButton`, conforme a `ESTRUCTURA.md` (los Custom Hooks viven en `src/hooks/`). La lógica pura de decisión sigue en `src/logic/android-back-button.ts` (intacta). Además se eliminan dos copias del `main.tsx` antiguo que quedaron sueltas en la raíz del repositorio.
+
+### Cambio 1 - Mover la lógica del botón Atrás de `main.tsx` al hook
+
+#### Código anterior
+```tsx
+  const androidBackButtonSnapshotRef = useRef<AndroidBackButtonSnapshot>({
+    adminMode,
+    confirmDialogOpen: false,
+    editEntryOpen: false,
+    endFieldOpen: false,
+    screen,
+    showBackupMenu: false,
+    showMonthPicker: false,
+    showNotaDialog: false,
+    showReservaDialog: false,
+  });
+  const localAndroidBackHandlerRef = useRef<(() => boolean) | null>(null);
+  const registerLocalAndroidBackHandler = useCallback((handler: () => boolean) => {
+    localAndroidBackHandlerRef.current = handler;
+    return () => {
+      if (localAndroidBackHandlerRef.current === handler) {
+        localAndroidBackHandlerRef.current = null;
+      }
+    };
+  }, []);
+
+  androidBackButtonSnapshotRef.current = {
+    adminMode,
+    confirmDialogOpen: confirmDialog !== null,
+    editEntryOpen: editEntry !== null,
+    endFieldOpen: endField !== null,
+    screen,
+    showBackupMenu,
+    showMonthPicker,
+    showNotaDialog,
+    showReservaDialog,
+  };
+
+  // Botón físico de retroceso de Android (Capacitor). Primero cierra capas
+  // abiertas; después recorre el stack y solo sale de la app en la raíz real.
+  useEffect(() => {
+    if (!Capacitor.isNativePlatform()) return;
+    let remove: (() => void) | undefined;
+    let cancelado = false;
+    import("@capacitor/app")
+      .then(({ App: CapApp }) =>
+        CapApp.addListener("backButton", () => {
+          if (localAndroidBackHandlerRef.current?.()) {
+            void hapticBackClose();
+            return;
+          }
+          const state = useAppStore.getState();
+          handleAndroidBackButton(androidBackButtonSnapshotRef.current, {
+            closeBackupMenu: () => setShowBackupMenu(false),
+            closeConfirmDialog: () => setConfirmDialog(null),
+            closeEditEntry: () => setEditEntry(null),
+            closeEndField: () => setEndField(null),
+            closeMonthPicker: () => setShowMonthPicker(false),
+            closeNotaDialog: () => setShowNotaDialog(false),
+            closeReservaDialog: () => setShowReservaDialog(false),
+            exitApp: () => {
+              void CapApp.exitApp();
+            },
+            goBack: state.goBack,
+            hapticBackClose,
+            resetNavigation: state.resetNavigation,
+            setAdminMode,
+          });
+        })
+      )
+      .then((handle) => {
+        if (cancelado) handle.remove();
+        else remove = () => handle.remove();
+      })
+      .catch((err) => console.error("backButton listener fallido:", err));
+    return () => {
+      cancelado = true;
+      remove?.();
+    };
+  }, []);
+```
+
+#### Código nuevo
+```tsx
+  // Botón físico de retroceso de Android (Capacitor). La snapshot, el
+  // listener y el registro de handlers locales viven ahora en
+  // `useAndroidBackButton`; aquí solo se le pasan los estados/setters
+  // necesarios y se reenvía `registerLocalAndroidBackHandler` a las pantallas
+  // que lo consumen.
+  const { registerLocalAndroidBackHandler } = useAndroidBackButton({
+    adminMode,
+    setAdminMode,
+    confirmDialogOpen: confirmDialog !== null,
+    setConfirmDialog,
+    editEntryOpen: editEntry !== null,
+    setEditEntry,
+    endFieldOpen: endField !== null,
+    setEndField,
+    showBackupMenu,
+    setShowBackupMenu,
+    showMonthPicker,
+    setShowMonthPicker,
+    showNotaDialog,
+    setShowNotaDialog,
+    showReservaDialog,
+    setShowReservaDialog,
+  });
+```
+
+#### Por qué se cambió
+Para adelgazar `main.tsx` (objetivo de la tarea) y aislar una responsabilidad clara —el botón Atrás— en su propio hook reutilizable y testeable, siguiendo `ESTRUCTURA.md`. El comportamiento es idéntico: misma snapshot, mismo orden (handler local → lógica global pura) y mismo ciclo de vida del listener.
+
+### Cambio 2 - Ajustar los imports de `main.tsx`
+
+#### Código anterior
+```tsx
+import { Capacitor } from "@capacitor/core";
+
+import { signOut } from "firebase/auth";
+import { auth } from "./services/firebase";
+import { AuthGate } from "./screens/auth-gate";
+import { useFirestoreSync } from "./hooks/use-firestore-sync";
+```
+y
+```tsx
+import { fmtDuration, fmtKm, fmt } from "./logic/formatters";
+import {
+  handleAndroidBackButton,
+  type AndroidBackButtonSnapshot,
+} from "./logic/android-back-button";
+```
+
+#### Código nuevo
+```tsx
+import { signOut } from "firebase/auth";
+import { auth } from "./services/firebase";
+import { AuthGate } from "./screens/auth-gate";
+import { useFirestoreSync } from "./hooks/use-firestore-sync";
+import { useAndroidBackButton } from "./hooks/use-android-back-button";
+```
+y
+```tsx
+import { fmtDuration, fmtKm, fmt } from "./logic/formatters";
+```
+
+#### Por qué se cambió
+`Capacitor`, `handleAndroidBackButton` y `AndroidBackButtonSnapshot` ya no se usan directamente en `main.tsx` (los consume el hook). Se añade el import de `useAndroidBackButton`.
+
+### Cambio 3 - Crear el hook `useAndroidBackButton`
+
+#### Código anterior
+`No existía src/hooks/use-android-back-button.ts.`
+
+#### Código nuevo
+Hook nuevo que encapsula el listener del botón Atrás. Expone la interfaz `UseAndroidBackButtonParams` y devuelve `{ registerLocalAndroidBackHandler }`. Lee `screen`, `goBack` y `resetNavigation` directamente del store Zustand dentro del callback (no como dependencias), de modo que el listener se registra una sola vez. Los tres setters que el hook solo usa para cerrar diálogos se tipan como setters de cierre:
+```tsx
+  setConfirmDialog: (value: null) => void;
+  setEditEntry: (value: null) => void;
+  setEndField: (value: null) => void;
+```
+
+#### Por qué se cambió
+Es la pieza que recibe la lógica extraída de `main.tsx`. Se tipan esos tres parámetros como `(value: null) => void` —en lugar de `any`— porque el hook únicamente los invoca con `null` para cerrar el diálogo; así se mantiene el type-safety sin acoplar el hook a los tipos de dominio de cada diálogo.
+
+### Cambio 4 - Crear el test del hook
+
+#### Código anterior
+`No existía src/__tests__/use-android-back-button.test.tsx.`
+
+#### Código nuevo
+Suite de 6 tests (Vitest + Testing Library) que monta el hook mediante un componente sonda `HookProbe` y verifica: que se invoca `handleAndroidBackButton` con un snapshot actualizado, que un handler local intercepta el back button antes que la lógica global, la limpieza del listener al desmontar, y el reenvío de `exitApp` al plugin de Capacitor. Mockea `../logic/android-back-button` y `@capacitor/app`.
+
+#### Por qué se cambió
+`ESTRUCTURA.md` pide un test por módulo nuevo. Cubre el comportamiento del hook recién extraído.
+
+### Cambio 5 - Eliminar las copias del `main.tsx` antiguo de la raíz
+
+#### Código anterior
+`Existían dos copias del main antiguo en la raíz del repositorio: antiguomain.tsx (copia exacta del src/main.tsx previo a la refactorización) y mainAntiguo.tsx (backup monolítico anterior).`
+
+#### Código nuevo
+`Ambos archivos eliminados. El historial de git conserva el código antiguo si se necesita recuperarlo.`
+
+#### Por qué se cambió
+Eran archivos muertos en la raíz, fuera de `src/` y de `ESTRUCTURA.md`. `antiguomain.tsx` no estaba en `.gitignore`, por lo que se habría subido a GitHub un duplicado de 1.966 líneas del archivo principal. Se eliminan para no exponer código duplicado ni ensuciar el repositorio.
+
 ## 2026-06-16 23:15 - Corregir carga de turnos en el reloj Wear OS
 
 **Archivos modificados:** `android/wear/src/main/java/com/mijornada/app/WearMainActivity.kt`

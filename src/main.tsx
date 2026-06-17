@@ -3,12 +3,11 @@ import ReactDOM from "react-dom/client";
 import { Filesystem, Directory, Encoding } from "@capacitor/filesystem";
 import { Share } from "@capacitor/share";
 
-import { Capacitor } from "@capacitor/core";
-
 import { signOut } from "firebase/auth";
 import { auth } from "./services/firebase";
 import { AuthGate } from "./screens/auth-gate";
 import { useFirestoreSync } from "./hooks/use-firestore-sync";
+import { useAndroidBackButton } from "./hooks/use-android-back-button";
 import { useAppStore } from "./services/store";
 import { registerServiceWorker } from "./services/service-worker-registration";
 import { hapticBackClose, hapticDanger, hapticInvalid, hapticOpen, hapticSave } from "./services/haptics";
@@ -34,10 +33,6 @@ import { SummaryScreen } from "./screens/summary-screen";
 import { EditTurnoScreen } from "./screens/edit-turno-screen";
 import { SettingsScreen } from "./screens/settings-screen";
 import { fmtDuration, fmtKm, fmt } from "./logic/formatters";
-import {
-  handleAndroidBackButton,
-  type AndroidBackButtonSnapshot,
-} from "./logic/android-back-button";
 import { ConfirmDialog, MainCard, SmallCard } from "./components/common";
 import { EditEntryDialog } from "./components/edit-entry-dialog";
 import { IconPlay, IconPause } from "./components/turno-control-icons";
@@ -309,81 +304,29 @@ function App({ uid }: { uid: string }) {
   // de localStorage y detección de rol admin), encapsulada en src/hooks/use-firestore-sync.ts.
   const { dataLoaded, loadTimedOut } = useFirestoreSync(uid);
 
-  const androidBackButtonSnapshotRef = useRef<AndroidBackButtonSnapshot>({
+  // Botón físico de retroceso de Android (Capacitor). La snapshot, el
+  // listener y el registro de handlers locales viven ahora en
+  // `useAndroidBackButton`; aquí solo se le pasan los estados/setters
+  // necesarios y se reenvía `registerLocalAndroidBackHandler` a las pantallas
+  // que lo consumen.
+  const { registerLocalAndroidBackHandler } = useAndroidBackButton({
     adminMode,
-    confirmDialogOpen: false,
-    editEntryOpen: false,
-    endFieldOpen: false,
-    screen,
-    showBackupMenu: false,
-    showMonthPicker: false,
-    showNotaDialog: false,
-    showReservaDialog: false,
-  });
-  const localAndroidBackHandlerRef = useRef<(() => boolean) | null>(null);
-  const registerLocalAndroidBackHandler = useCallback((handler: () => boolean) => {
-    localAndroidBackHandlerRef.current = handler;
-    return () => {
-      if (localAndroidBackHandlerRef.current === handler) {
-        localAndroidBackHandlerRef.current = null;
-      }
-    };
-  }, []);
-
-  androidBackButtonSnapshotRef.current = {
-    adminMode,
+    setAdminMode,
     confirmDialogOpen: confirmDialog !== null,
+    setConfirmDialog,
     editEntryOpen: editEntry !== null,
+    setEditEntry,
     endFieldOpen: endField !== null,
-    screen,
+    setEndField,
     showBackupMenu,
+    setShowBackupMenu,
     showMonthPicker,
+    setShowMonthPicker,
     showNotaDialog,
+    setShowNotaDialog,
     showReservaDialog,
-  };
-
-  // Botón físico de retroceso de Android (Capacitor). Primero cierra capas
-  // abiertas; después recorre el stack y solo sale de la app en la raíz real.
-  useEffect(() => {
-    if (!Capacitor.isNativePlatform()) return;
-    let remove: (() => void) | undefined;
-    let cancelado = false;
-    import("@capacitor/app")
-      .then(({ App: CapApp }) =>
-        CapApp.addListener("backButton", () => {
-          if (localAndroidBackHandlerRef.current?.()) {
-            void hapticBackClose();
-            return;
-          }
-          const state = useAppStore.getState();
-          handleAndroidBackButton(androidBackButtonSnapshotRef.current, {
-            closeBackupMenu: () => setShowBackupMenu(false),
-            closeConfirmDialog: () => setConfirmDialog(null),
-            closeEditEntry: () => setEditEntry(null),
-            closeEndField: () => setEndField(null),
-            closeMonthPicker: () => setShowMonthPicker(false),
-            closeNotaDialog: () => setShowNotaDialog(false),
-            closeReservaDialog: () => setShowReservaDialog(false),
-            exitApp: () => {
-              void CapApp.exitApp();
-            },
-            goBack: state.goBack,
-            hapticBackClose,
-            resetNavigation: state.resetNavigation,
-            setAdminMode,
-          });
-        })
-      )
-      .then((handle) => {
-        if (cancelado) handle.remove();
-        else remove = () => handle.remove();
-      })
-      .catch((err) => console.error("backButton listener fallido:", err));
-    return () => {
-      cancelado = true;
-      remove?.();
-    };
-  }, []);
+    setShowReservaDialog,
+  });
 
   // Helper: actualiza o crea un override para una semana
   function updateWeekOverride(weekId: string, partial: Partial<Omit<WeekOverride, "weekId">>) {
