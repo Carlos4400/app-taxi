@@ -8,7 +8,7 @@ Esta guía explica cómo está organizado el proyecto y dónde colocar cada cosa
 |---|---|---|
 | `src/main.tsx` | Punto de entrada de la app. No se mueve de la raíz. | `main.tsx` |
 | `src/logic/` | Lógica de negocio y utilidades **puras**: funciones que calculan, transforman o formatean datos. No tocan Firebase, ni el navegador, ni React. | Ver lista completa abajo |
-| `src/hooks/` | Custom Hooks de React. Todo código que use estados, efectos o referencias y encapsule lógica ligada a React sin renderizar UI. | `use-firestore-sync.ts`, `use-sync-status.ts` |
+| `src/hooks/` | Custom Hooks de React. Todo código que use estados, efectos o referencias y encapsule lógica ligada a React sin renderizar UI. | `use-firestore-sync.ts`, `use-sync-status.ts`, `use-android-back-button.ts` |
 | `src/services/` | Todo lo que habla con el exterior: Firebase, almacenamiento del dispositivo, plugins nativos, estado global. | Ver lista completa abajo |
 | `src/screens/` | Pantallas completas de la app. | Ver lista completa abajo |
 | `src/components/` | Piezas de interfaz reutilizables que se usan dentro de las pantallas. | Ver lista completa abajo |
@@ -39,10 +39,11 @@ Esta guía explica cómo está organizado el proyecto y dónde colocar cada cosa
 | `turno-notas-logic.ts` | Extrae del historial los turnos que tienen notas generales o notas detalladas por entrada. |
 | `update-flow.ts` | Lógica pura de actualización de la APK: compara versiones contra el último release de GitHub y devuelve la URL de descarga si hay novedad. |
 
-### `src/hooks/` — 2 archivos
+### `src/hooks/` — 3 archivos
 
 | Archivo | Qué hace |
 |---|---|
+| `use-android-back-button.ts` | Registra el listener del botón físico «Atrás» de Android (Capacitor) y mantiene el snapshot de estado para decidir qué cerrar (capas abiertas, navegación, salir de la app). Devuelve `registerLocalAndroidBackHandler` para que las pantallas instalen handlers locales. |
 | `use-firestore-sync.ts` | Hook principal de sincronización con Firestore. Escucha cambios en la nube y los aplica al store; gestiona la migración desde `localStorage`. |
 | `use-sync-status.ts` | Devuelve el estado de sincronización actual (`loading`, `offline`, `pending`, `synced`, `error`) combinando el estado de red, `dataLoaded` y los pendientes de sync. |
 
