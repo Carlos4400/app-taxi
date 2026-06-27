@@ -1,3 +1,972 @@
+## 2026-06-27 23:10 - Mejorar accesibilidad Wear OS
+
+**Archivos modificados:** `android/wear/src/main/java/com/mijornada/app/components/WatchActionButton.kt`, `android/wear/src/main/java/com/mijornada/app/components/WatchMetricCard.kt`, `android/wear/src/androidTest/java/com/mijornada/app/components/WatchInteractiveComponentsAccessibilityTest.kt`
+
+### Cambio 1 - Area tactil y rol de WatchActionButton
+
+#### Codigo anterior
+```kotlin
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
+```
+
+```kotlin
+import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.text.font.FontWeight
+```
+
+```kotlin
+    Box(
+        modifier = modifier
+            .background(backgroundColor, shape)   // <-- patron correcto: background CON shape primero
+            .then(borderMod)
+            .alpha(if (enabled) 1f else 0.5f)
+            .clip(shape)                         // <-- clip al final, solo recorta el ripple del clickable
+            .clickable(enabled = enabled) { onClick() }
+            .padding(contentPadding),
+        contentAlignment = Alignment.Center
+    ) {
+```
+
+#### Codigo nuevo
+```kotlin
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.sizeIn
+import androidx.compose.foundation.layout.width
+```
+
+```kotlin
+import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.text.font.FontWeight
+```
+
+```kotlin
+    Box(
+        modifier = Modifier
+            .sizeIn(minWidth = 48.dp, minHeight = 48.dp)
+            .then(modifier)
+            .background(backgroundColor, shape)   // <-- patron correcto: background CON shape primero
+            .then(borderMod)
+            .alpha(if (enabled) 1f else 0.5f)
+            .clip(shape)                         // <-- clip al final, solo recorta el ripple del clickable
+            .clickable(enabled = enabled, role = Role.Button) { onClick() }
+            .padding(contentPadding),
+        contentAlignment = Alignment.Center
+    ) {
+```
+
+#### Por que se cambio
+`WatchActionButton` era clickable, pero no declaraba rol semantico de boton ni garantizaba desde el componente un minimo tactil de 48dp. `sizeIn(minWidth = 48.dp, minHeight = 48.dp)` y `role = Role.Button` centralizan ese requisito para todos sus usos en Wear OS sin cambiar los callbacks.
+
+### Cambio 2 - Area tactil y rol de WatchMetricCard
+
+#### Codigo anterior
+```kotlin
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.padding
+```
+
+```kotlin
+import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.unit.Dp
+```
+
+```kotlin
+    Column(
+        modifier = modifier
+            .background(backgroundColor, shape)
+            .border(borderWidth, effectiveBorderColor, shape)
+            .alpha(if (enabled) 1f else 0.5f)
+            .clip(shape)
+            .clickable(enabled = enabled) { onClick() }
+            .padding(contentPadding),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+```
+
+#### Codigo nuevo
+```kotlin
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.sizeIn
+```
+
+```kotlin
+import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.unit.Dp
+```
+
+```kotlin
+    Column(
+        modifier = Modifier
+            .sizeIn(minWidth = 48.dp, minHeight = 48.dp)
+            .then(modifier)
+            .background(backgroundColor, shape)
+            .border(borderWidth, effectiveBorderColor, shape)
+            .alpha(if (enabled) 1f else 0.5f)
+            .clip(shape)
+            .clickable(enabled = enabled, role = Role.Button) { onClick() }
+            .padding(contentPadding),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+```
+
+#### Por que se cambio
+`WatchMetricCard` se usa como tarjeta interactiva, pero no imponia area tactil minima ni rol semantico de boton. El minimo de 48dp y el rol `Role.Button` hacen que las tarjetas clicables sean mas consistentes y accesibles en reloj.
+
+### Cambio 3 - Test de accesibilidad interactiva
+
+#### Codigo anterior
+`No existia WatchInteractiveComponentsAccessibilityTest en android/wear/src/androidTest/java/com/mijornada/app/components/WatchInteractiveComponentsAccessibilityTest.kt.`
+
+#### Codigo nuevo
+```kotlin
+package com.mijornada.app.components
+
+import androidx.activity.ComponentActivity
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.test.assert
+import androidx.compose.ui.test.junit4.createAndroidComposeRule
+import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.unit.dp
+import androidx.test.ext.junit.runners.AndroidJUnit4
+import androidx.wear.compose.material.Text
+import org.junit.Assert.assertTrue
+import org.junit.Rule
+import org.junit.Test
+import org.junit.runner.RunWith
+
+/**
+ * Test de accesibilidad para componentes interactivos Wear OS.
+ * Los botones/tarjetas deben conservar area tactil minima y rol de boton.
+ */
+@RunWith(AndroidJUnit4::class)
+class WatchInteractiveComponentsAccessibilityTest {
+
+    @get:Rule
+    val composeTestRule = createAndroidComposeRule<ComponentActivity>()
+
+    @Test
+    fun watch_action_button_expone_rol_y_area_tactil_minima() {
+        composeTestRule.setContent {
+            WatchActionButton(
+                label = "Accion",
+                textColor = Color.White,
+                backgroundColor = Color(0xFF15151C),
+                modifier = Modifier
+                    .size(width = 32.dp, height = 24.dp)
+                    .testTag("action_button"),
+                contentPadding = PaddingValues(0.dp),
+                shape = RoundedCornerShape(8.dp)
+            ) {}
+        }
+
+        composeTestRule.waitForIdle()
+
+        composeTestRule.onNodeWithTag("action_button")
+            .assert(hasButtonRole())
+
+        val bounds = composeTestRule.onNodeWithTag("action_button")
+            .fetchSemanticsNode()
+            .boundsInRoot
+
+        assertTrue("WatchActionButton debe medir al menos 48dp de ancho tactil.", bounds.width >= 48f)
+        assertTrue("WatchActionButton debe medir al menos 48dp de alto tactil.", bounds.height >= 48f)
+    }
+
+    @Test
+    fun watch_metric_card_expone_rol_y_area_tactil_minima() {
+        composeTestRule.setContent {
+            WatchMetricCard(
+                backgroundColor = Color(0xFF15151C),
+                borderColor = Color(0xFF36CFFF),
+                modifier = Modifier
+                    .size(width = 32.dp, height = 24.dp)
+                    .testTag("metric_card"),
+                contentPadding = PaddingValues(0.dp),
+                shape = RoundedCornerShape(8.dp),
+                onClick = {}
+            ) {
+                Column {
+                    Text("Dato", color = Color.White)
+                }
+            }
+        }
+
+        composeTestRule.waitForIdle()
+
+        composeTestRule.onNodeWithTag("metric_card")
+            .assert(hasButtonRole())
+
+        val bounds = composeTestRule.onNodeWithTag("metric_card")
+            .fetchSemanticsNode()
+            .boundsInRoot
+
+        assertTrue("WatchMetricCard debe medir al menos 48dp de ancho tactil.", bounds.width >= 48f)
+        assertTrue("WatchMetricCard debe medir al menos 48dp de alto tactil.", bounds.height >= 48f)
+    }
+
+    private fun hasButtonRole(): SemanticsMatcher =
+        SemanticsMatcher.expectValue(SemanticsProperties.Role, Role.Button)
+}
+```
+
+#### Por que se cambio
+El test fija que los componentes interactivos reutilizables mantengan `Role.Button` y area tactil minima aunque una pantalla intente renderizarlos con un tamano inferior. Esto protege la mejora de accesibilidad sin depender de revisar cada uso manualmente.
+
+## 2026-06-27 22:51 - Reducir boton de reanudar turno
+
+**Archivos modificados:** `android/wear/src/main/java/com/mijornada/app/screens/ActiveTurnoScreen.kt`, `android/wear/src/androidTest/java/com/mijornada/app/screens/PausedTurnoLayoutTest.kt`
+
+### Cambio 1 - Ancho seguro inferior
+
+#### Codigo anterior
+```kotlin
+private const val WatchSafeRowWidth = 0.84f
+private const val WatchSafeButtonWidth = 0.86f
+private const val PausedSafeWidth = 0.76f
+```
+
+#### Codigo nuevo
+```kotlin
+private const val WatchSafeRowWidth = 0.84f
+private const val WatchSafeButtonWidth = 0.86f
+private const val PausedSafeWidth = 0.66f
+```
+
+#### Por que se cambio
+`0.76f` hacia que el boton `Continuar Turno` se saliera visualmente por los bordes inferiores del reloj redondo. `0.66f` mantiene el boton mas grande que el estado original compacto, pero dentro de una anchura segura para la zona baja circular.
+
+### Cambio 2 - Altura y padding de Continuar Turno
+
+#### Codigo anterior
+```kotlin
+            WatchActionButton(
+                label = if (resuming) "Reanudando..." else "Continuar Turno",
+                textColor = ColorPause,
+                backgroundColor = ColorPauseBg,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = 52.dp),
+                borderColor = ColorPauseBorder,
+                borderWidth = 2.dp,
+                shape = RoundedCornerShape(18.dp),
+                fontSize = 13,
+                contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 10.dp, vertical = 11.dp),
+                leadingIcon = { PlayIcon(size = 21.dp, color = ColorPause) }
+            ) { resume() }
+```
+
+#### Codigo nuevo
+```kotlin
+            WatchActionButton(
+                label = if (resuming) "Reanudando..." else "Continuar Turno",
+                textColor = ColorPause,
+                backgroundColor = ColorPauseBg,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = 48.dp),
+                borderColor = ColorPauseBorder,
+                borderWidth = 2.dp,
+                shape = RoundedCornerShape(18.dp),
+                fontSize = 12,
+                contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 9.dp, vertical = 9.dp),
+                leadingIcon = { PlayIcon(size = 20.dp, color = ColorPause) }
+            ) { resume() }
+```
+
+#### Por que se cambio
+La combinacion `52.dp`, fuente `13`, icono `21.dp` y padding vertical `11.dp` dejaba el borde inferior demasiado cerca del marco. `48.dp`, fuente `12`, icono `20.dp` y padding `9.dp` conservan area tactil minima y reducen el riesgo de recorte en la esfera.
+
+### Cambio 3 - Limites del test pausado
+
+#### Codigo anterior
+```kotlin
+        assertTrue(
+            "Continuar Turno debe ocupar al menos el 70% del ancho visible para sentirse accion principal.",
+            buttonBounds.width >= rootBounds.width * 0.70f
+        )
+        assertTrue(
+            "Continuar Turno debe tener al menos 48dp/pixels de alto tactil en el reloj.",
+            buttonBounds.height >= 48f
+        )
+```
+
+#### Codigo nuevo
+```kotlin
+        assertTrue(
+            "Continuar Turno debe ocupar al menos el 60% del ancho visible para sentirse accion principal.",
+            buttonBounds.width >= rootBounds.width * 0.60f
+        )
+        assertTrue(
+            "Continuar Turno no debe superar el 68% del ancho visible porque queda en la zona baja circular.",
+            buttonBounds.width <= rootBounds.width * 0.68f
+        )
+        assertTrue(
+            "Continuar Turno debe dejar margen inferior dentro del reloj redondo.",
+            buttonBounds.bottom <= rootBounds.height * 0.88f
+        )
+        assertTrue(
+            "Continuar Turno debe tener al menos 48dp/pixels de alto tactil en el reloj.",
+            buttonBounds.height >= 48f
+        )
+```
+
+#### Por que se cambio
+El test anterior solo exigia que el boton fuera grande, pero no limitaba su anchura ni su posicion inferior. Los nuevos asserts fijan una banda de anchura segura y margen inferior para evitar que el boton vuelva a salirse de la curva baja del reloj.
+
+## 2026-06-27 22:36 - Mejorar boton de reanudar turno
+
+**Archivos modificados:** `android/wear/src/main/java/com/mijornada/app/screens/ActiveTurnoScreen.kt`, `android/wear/src/androidTest/java/com/mijornada/app/screens/PausedTurnoLayoutTest.kt`
+
+### Cambio 1 - Ancho seguro del estado pausado
+
+#### Codigo anterior
+```kotlin
+private const val WatchSafeRowWidth = 0.84f
+private const val WatchSafeButtonWidth = 0.86f
+private const val PausedSafeWidth = 0.70f
+```
+
+#### Codigo nuevo
+```kotlin
+private const val WatchSafeRowWidth = 0.84f
+private const val WatchSafeButtonWidth = 0.86f
+private const val PausedSafeWidth = 0.76f
+```
+
+#### Por que se cambio
+El estado pausado tenia una columna demasiado estrecha para que la accion principal `Continuar Turno` respirase visualmente. `0.76f` mantiene el contenido dentro del area segura del reloj redondo y permite que el boton tenga presencia de accion principal.
+
+### Cambio 2 - Boton Continuar Turno
+
+#### Codigo anterior
+```kotlin
+            WatchActionButton(
+                label = if (resuming) "Reanudando..." else "Continuar Turno",
+                textColor = ColorPause,
+                backgroundColor = ColorPauseBg,
+                borderColor = ColorPauseBorder,
+                borderWidth = 2.dp,
+                shape = RoundedCornerShape(18.dp),
+                fontSize = 12,
+                contentPadding = androidx.compose.foundation.layout.PaddingValues(vertical = 10.dp),
+                leadingIcon = { PlayIcon(size = 19.dp, color = ColorPause) }
+            ) { resume() }
+```
+
+#### Codigo nuevo
+```kotlin
+            WatchActionButton(
+                label = if (resuming) "Reanudando..." else "Continuar Turno",
+                textColor = ColorPause,
+                backgroundColor = ColorPauseBg,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = 52.dp),
+                borderColor = ColorPauseBorder,
+                borderWidth = 2.dp,
+                shape = RoundedCornerShape(18.dp),
+                fontSize = 13,
+                contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 10.dp, vertical = 11.dp),
+                leadingIcon = { PlayIcon(size = 21.dp, color = ColorPause) }
+            ) { resume() }
+```
+
+#### Por que se cambio
+El boton envolvia su contenido y quedaba visualmente compacto en la pantalla pausada. `fillMaxWidth()`, `heightIn(min = 52.dp)`, el texto a `13` y el icono a `21.dp` hacen que sea mas facil de pulsar y mas claro como accion principal sin cambiar la logica de reanudacion.
+
+### Cambio 3 - Test de layout pausado
+
+#### Codigo anterior
+`No existia PausedTurnoLayoutTest en android/wear/src/androidTest/java/com/mijornada/app/screens/PausedTurnoLayoutTest.kt.`
+
+#### Codigo nuevo
+```kotlin
+package com.mijornada.app.screens
+
+import androidx.activity.ComponentActivity
+import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.test.hasClickAction
+import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.junit4.createAndroidComposeRule
+import androidx.compose.ui.test.onRoot
+import androidx.test.ext.junit.runners.AndroidJUnit4
+import org.junit.Assert.assertTrue
+import org.junit.Rule
+import org.junit.Test
+import org.junit.runner.RunWith
+
+/**
+ * Test visual de layout para el estado pausado: la accion principal debe tener
+ * presencia de boton primario y area tactil comoda en reloj.
+ */
+@RunWith(AndroidJUnit4::class)
+class PausedTurnoLayoutTest {
+
+    @get:Rule
+    val composeTestRule = createAndroidComposeRule<ComponentActivity>()
+
+    @Test
+    fun boton_continuar_turno_es_ancho_y_comodo() {
+        composeTestRule.setContent {
+            ActiveTurnoScreen(
+                fechaTurno = "Sabado, 27 de junio",
+                startTime = "22:17",
+                isPaused = true,
+                totalsPorTipo = emptyMap(),
+                numPorTipo = emptyMap(),
+                entradas = emptyList(),
+                pauseStartTime = "22:17",
+                totalPausedMinutes = 1,
+                onSelectCategory = {},
+                onTogglePause = { true },
+                onAddNote = { true },
+                onEditEntry = {},
+                onEndTurno = {}
+            )
+        }
+
+        composeTestRule.waitForIdle()
+
+        val rootBounds = composeTestRule.onRoot()
+            .fetchSemanticsNode()
+            .boundsInRoot
+        val buttonBounds = composeTestRule.onNode(continuarTurnoButtonMatcher())
+            .fetchSemanticsNode()
+            .boundsInRoot
+
+        assertTrue(
+            "Continuar Turno debe ocupar al menos el 70% del ancho visible para sentirse accion principal.",
+            buttonBounds.width >= rootBounds.width * 0.70f
+        )
+        assertTrue(
+            "Continuar Turno debe tener al menos 48dp/pixels de alto tactil en el reloj.",
+            buttonBounds.height >= 48f
+        )
+    }
+
+    private fun continuarTurnoButtonMatcher(): SemanticsMatcher =
+        hasClickAction() and hasText("Continuar Turno", substring = false)
+}
+```
+
+#### Por que se cambio
+El test reproduce el estado pausado real de `ActiveTurnoScreen` y fija dos condiciones visuales: que `Continuar Turno` ocupe al menos el 70% del ancho visible y que tenga una altura tactil minima de 48. Antes del ajuste fallo por ancho insuficiente en el reloj.
+
+## 2026-06-27 22:11 - Corregir apilado de tarjetas Wear OS
+
+**Archivos modificados:** `android/wear/build.gradle`, `android/wear/src/main/java/com/mijornada/app/components/WatchTileBox.kt`, `android/wear/src/main/java/com/mijornada/app/screens/TurnosScreen.kt`, `android/wear/src/main/java/com/mijornada/app/screens/TurnoSummaryScreen.kt`, `android/wear/src/androidTest/java/com/mijornada/app/components/WatchTileBoxLayoutTest.kt`
+
+### Cambio 1 - Contenedor vertical de WatchTileBox
+
+#### Codigo anterior
+```kotlin
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.padding
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.Modifier
+```
+
+```kotlin
+    contentPadding: PaddingValues = PaddingValues(horizontal = 10.dp, vertical = 9.dp),
+    content: @Composable () -> Unit
+) {
+    val borderMod = if (borderColor != null) {
+        Modifier.border(borderWidth, borderColor, shape)
+    } else Modifier
+
+    Box(
+        modifier = modifier
+            .background(backgroundColor, shape)
+            .then(borderMod)
+            .padding(contentPadding)
+    ) {
+        content()
+    }
+}
+```
+
+#### Codigo nuevo
+```kotlin
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.padding
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+```
+
+```kotlin
+    contentPadding: PaddingValues = PaddingValues(horizontal = 10.dp, vertical = 9.dp),
+    horizontalAlignment: Alignment.Horizontal = Alignment.Start,
+    verticalArrangement: Arrangement.Vertical = Arrangement.Top,
+    content: @Composable ColumnScope.() -> Unit
+) {
+    val borderMod = if (borderColor != null) {
+        Modifier.border(borderWidth, borderColor, shape)
+    } else Modifier
+
+    Column(
+        modifier = modifier
+            .background(backgroundColor, shape)
+            .then(borderMod)
+            .padding(contentPadding),
+        horizontalAlignment = horizontalAlignment,
+        verticalArrangement = verticalArrangement
+    ) {
+        content()
+    }
+}
+```
+
+#### Por que se cambio
+`Box` coloca sus hijos sobre el mismo espacio por defecto. Las tarjetas de Wear OS que usan `WatchTileBox` contienen varios hijos (`Row`, `Spacer`, `Text`), por lo que los textos se superponian. `Column` mantiene el patron robusto `background(color, shape) -> border(shape) -> padding` y coloca el contenido en vertical.
+
+### Cambio 2 - Alineacion de tarjetas centradas
+
+#### Codigo anterior
+```kotlin
+        contentPadding = PaddingValues(horizontal = 7.dp, vertical = 7.dp)
+```
+
+```kotlin
+        contentPadding = PaddingValues(vertical = 9.dp)
+```
+
+```kotlin
+        contentPadding = PaddingValues(horizontal = 7.dp, vertical = 7.dp)
+```
+
+```kotlin
+        contentPadding = PaddingValues(horizontal = 5.dp, vertical = 7.dp)
+```
+
+#### Codigo nuevo
+```kotlin
+        contentPadding = PaddingValues(horizontal = 7.dp, vertical = 7.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+```
+
+```kotlin
+        contentPadding = PaddingValues(vertical = 9.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+```
+
+```kotlin
+        contentPadding = PaddingValues(horizontal = 7.dp, vertical = 7.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
+```
+
+```kotlin
+        contentPadding = PaddingValues(horizontal = 5.dp, vertical = 7.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
+```
+
+#### Por que se cambio
+Al convertir `WatchTileBox` en `Column`, las tarjetas que antes estaban centradas visualmente necesitaban declarar su alineacion de forma explicita para conservar el aspecto de `Turnos` y `Resumen` sin cambiar la logica de datos.
+
+### Cambio 3 - Test de regresion de WatchTileBox
+
+#### Codigo anterior
+`No existia WatchTileBoxLayoutTest en android/wear/src/androidTest/java/com/mijornada/app/components/WatchTileBoxLayoutTest.kt.`
+
+#### Codigo nuevo
+```kotlin
+package com.mijornada.app.components
+
+import androidx.activity.ComponentActivity
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.test.junit4.createAndroidComposeRule
+import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.test.ext.junit.runners.AndroidJUnit4
+import androidx.wear.compose.material.Text
+import org.junit.Assert.assertTrue
+import org.junit.Rule
+import org.junit.Test
+import org.junit.runner.RunWith
+
+/**
+ * Test de regresion para tarjetas estaticas Wear OS: el contenido de
+ * WatchTileBox debe colocarse en vertical, no superponerse.
+ */
+@RunWith(AndroidJUnit4::class)
+class WatchTileBoxLayoutTest {
+
+    @get:Rule
+    val composeTestRule = createAndroidComposeRule<ComponentActivity>()
+
+    @Test
+    fun watch_tile_box_coloca_los_hijos_en_vertical() {
+        composeTestRule.setContent {
+            Box(
+                modifier = Modifier
+                    .background(Color.Black)
+                    .padding(8.dp)
+            ) {
+                WatchTileBox(
+                    backgroundColor = Color(0xFF15151C),
+                    shape = RoundedCornerShape(12.dp),
+                    contentPadding = PaddingValues(0.dp)
+                ) {
+                    Text("Primero", color = Color.White, fontSize = 16.sp)
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text("Segundo", color = Color.White, fontSize = 16.sp)
+                }
+            }
+        }
+
+        composeTestRule.waitForIdle()
+
+        val primero = composeTestRule.onNodeWithText("Primero")
+            .fetchSemanticsNode()
+            .boundsInRoot
+        val segundo = composeTestRule.onNodeWithText("Segundo")
+            .fetchSemanticsNode()
+            .boundsInRoot
+
+        assertTrue(
+            "WatchTileBox debe apilar el contenido: 'Segundo' debe quedar debajo de 'Primero'.",
+            segundo.top >= primero.bottom
+        )
+    }
+}
+```
+
+#### Por que se cambio
+El test fija el comportamiento esperado de `WatchTileBox`: dos textos dentro de la misma tarjeta deben aparecer uno debajo del otro. Esto protege la correccion contra regresiones que vuelvan a superponer hijos en tarjetas estaticas.
+
+### Cambio 4 - Runner de tests instrumentados
+
+#### Codigo anterior
+```groovy
+        versionCode resolvedVersionCode
+        versionName resolvedVersionName
+        vectorDrawables {
+            useSupportLibrary true
+        }
+```
+
+```groovy
+    testImplementation 'junit:junit:4.13.2'
+    androidTestImplementation 'androidx.compose.ui:ui-test-junit4:1.6.1'
+    debugImplementation 'androidx.compose.ui:ui-test-manifest:1.6.1'
+```
+
+#### Codigo nuevo
+```groovy
+        versionCode resolvedVersionCode
+        versionName resolvedVersionName
+        testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
+        vectorDrawables {
+            useSupportLibrary true
+        }
+```
+
+```groovy
+    testImplementation 'junit:junit:4.13.2'
+    androidTestImplementation 'androidx.test:runner:1.5.2'
+    androidTestImplementation 'androidx.test.ext:junit:1.1.5'
+    androidTestImplementation 'androidx.compose.ui:ui-test-junit4:1.6.1'
+    debugImplementation 'androidx.compose.ui:ui-test-manifest:1.6.1'
+```
+
+#### Por que se cambio
+El APK de tests se instalaba con `android.test.InstrumentationTestRunner`, que no descubria la clase JUnit4 `WatchTileBoxLayoutTest`. `AndroidJUnitRunner` y sus dependencias permiten ejecutar los tests instrumentados de Compose definidos con `@RunWith(AndroidJUnit4::class)`.
+
+## 2026-06-27 15:43 - Corregir test real de WatchActionButton
+
+**Archivos modificados:** `android/wear/src/androidTest/java/com/mijornada/app/screens/WatchActionButtonBugReproTest.kt`
+
+### Cambio 1 - Imports del test instrumentado
+
+#### Codigo anterior
+```kotlin
+package com.mijornada.app.screens
+
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asAndroidBitmap
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.test.captureToImage
+import androidx.compose.ui.test.junit4.createAndroidComposeRule
+import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.wear.compose.material.Text
+import androidx.activity.ComponentActivity
+import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.mijornada.app.theme.ColorPauseBg
+import org.junit.Assert.assertEquals
+import org.junit.Rule
+import org.junit.Test
+import org.junit.runner.RunWith
+```
+
+#### Codigo nuevo
+```kotlin
+package com.mijornada.app.screens
+
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.size
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asAndroidBitmap
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.test.captureToImage
+import androidx.compose.ui.test.junit4.createAndroidComposeRule
+import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.unit.dp
+import androidx.activity.ComponentActivity
+import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.mijornada.app.components.WatchActionButton
+import com.mijornada.app.theme.ColorBackground
+import com.mijornada.app.theme.ColorPause
+import com.mijornada.app.theme.ColorPauseBg
+import org.junit.Assert.assertEquals
+import org.junit.Rule
+import org.junit.Test
+import org.junit.runner.RunWith
+```
+
+#### Por que se cambio
+El test ya no define ni renderiza `BuggyWatchButton`, por lo que se eliminan imports usados solo por el patron viejo `clip().background()` y se importan `WatchActionButton`, `ColorBackground` y `ColorPause` para validar el componente real.
+
+### Cambio 2 - Test de regresion sobre WatchActionButton
+
+#### Codigo anterior
+```kotlin
+/**
+ * Pixel test instrumentado que REPRODUCE el bug del patron fragil clip().background()
+ * en los botones del reloj (ver PLAN_FIX_BOTONES_WEAR.md, Fase 2).
+ *
+ * Antes del fix (estado actual): el test DEBE FALLAR. El pixel central del boton
+ * pasa de #101827 (ColorPauseBg) a #0D0D14 (fondo de pantalla) tras la recomposicion
+ * disparada por el cambio de alpha. Esto confirma que el bug existe.
+ *
+ * Tras el fix (Commit 5: usar WatchActionButton en lugar del dummy BuggyWatchButton):
+ * el test DEBE PASAR. El pixel central se mantiene estable en #101827.
+ *
+ * Requisitos para ejecutar este test:
+ * - Dispositivo Wear OS conectado por ADB (recomendado: Xiaomi Watch 5, mismo hardware
+ *   usado para verificar el fix del 2026-06-26).
+ * - O un emulador Wear OS corriendo.
+ *
+ * Comando: ./gradlew :wear:connectedDebugAndroidTest
+ *
+ * NO corre en `./gradlew :wear:testDebugUnitTest` porque requiere Activity real.
+ *
+ * Verificado en hardware real (Xiaomi Watch 5) con muestreo de pixeles:
+ * el fondo del boton "Pausar turno" pasa de #101827 (ColorPauseBg) a #0D0D14
+ * (fondo de pantalla) tras anadir una entrada. Ver CAMBIOS_AGENT1.md,
+ * entrada 2026-06-26 05:50.
+ */
+@RunWith(AndroidJUnit4::class)
+class WatchActionButtonBugReproTest {
+
+    @get:Rule
+    val composeTestRule = createAndroidComposeRule<ComponentActivity>()
+
+    /**
+     * Reproduccion EXACTA del patron viejo fragil que causa el bug.
+     * Usado solo en este test para confirmar que el patron existe.
+     * Sera eliminado en el Commit 5 cuando WatchActionButton (patron nuevo) lo sustituya.
+     */
+    @Composable
+    private fun BuggyWatchButton(
+        label: String,
+        textColor: Color,
+        backgroundColor: Color,
+        modifier: Modifier = Modifier,
+        enabled: Boolean = true,
+        onClick: () -> Unit
+    ) {
+        val shape = RoundedCornerShape(14.dp)
+        Box(
+            modifier = modifier
+                .clip(shape)                        // patron viejo: clip antes de background
+                .background(backgroundColor)        // patron viejo: background sin shape
+                .alpha(if (enabled) 1f else 0.5f)  // cambio de alpha = recomposicion
+                .clickable(enabled = enabled) { onClick() }
+                .padding(vertical = 10.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(label, color = textColor, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+        }
+    }
+
+    @Test
+    fun boton_pausar_turno_pierde_fondo_tras_recomposicion_con_patron_viejo() {
+        // Estado observable desde fuera del setContent para forzar recomposicion.
+        var toggleEnabled by mutableStateOf(true)
+
+        composeTestRule.setContent {
+            BuggyWatchButton(
+                label = "Pausar turno",
+                textColor = Color.White,
+                backgroundColor = ColorPauseBg,  // #101827
+                enabled = toggleEnabled,
+                modifier = Modifier
+                    .size(200.dp, 60.dp)
+                    .testTag("button")
+            ) {}
+        }
+
+        composeTestRule.waitForIdle()
+
+        // Primer render: el pixel central deberia ser ColorPauseBg (#101827).
+        val pixelInicial = composeTestRule.onNodeWithTag("button")
+            .captureToImage()
+            .asAndroidBitmap()
+            .getPixel(100, 30)
+        assertEquals(
+            "Primer render deberia pintar ColorPauseBg en el centro",
+            ColorPauseBg.toArgb(),
+            pixelInicial
+        )
+
+        // Forzar recomposicion cambiando enabled (alpha 1.0 -> 0.5).
+        // Esto reproduce la situacion del bug: tras anadir entrada, pendingOpsCount
+        // cambia brevemente y alpha varia, dejando el clip sin fondo pintado.
+        composeTestRule.runOnUiThread {
+            toggleEnabled = false
+        }
+        composeTestRule.waitForIdle()
+
+        // Segundo render: el pixel central deberia SEGUIR siendo ColorPauseBg.
+        // Si el bug existe, el pixel sera ColorBackground (#0D0D14) y este assert FALLARA.
+        val pixelTrasRecomposicion = composeTestRule.onNodeWithTag("button")
+            .captureToImage()
+            .asAndroidBitmap()
+            .getPixel(100, 30)
+        assertEquals(
+            "Tras recomposicion con alpha < 1, el pixel central deberia seguir siendo ColorPauseBg. " +
+                "Si falla con ColorBackground, el patron fragil esta reproducido.",
+            ColorPauseBg.toArgb(),
+            pixelTrasRecomposicion
+        )
+    }
+}
+```
+
+#### Codigo nuevo
+```kotlin
+/**
+ * Pixel test instrumentado de regresion para el componente real WatchActionButton.
+ *
+ * Requisitos para ejecutar este test:
+ * - Dispositivo Wear OS conectado por ADB (recomendado: Xiaomi Watch 5, mismo hardware
+ *   usado para verificar el fix del 2026-06-26).
+ * - O un emulador Wear OS corriendo.
+ *
+ * Comando: ./gradlew :wear:connectedDebugAndroidTest
+ *
+ * NO corre en `./gradlew :wear:testDebugUnitTest` porque requiere Activity real.
+ */
+@RunWith(AndroidJUnit4::class)
+class WatchActionButtonBugReproTest {
+
+    @get:Rule
+    val composeTestRule = createAndroidComposeRule<ComponentActivity>()
+
+    @Test
+    fun watch_action_button_mantiene_fondo_tras_recomposicion() {
+        // Estado observable desde fuera del setContent para forzar recomposicion.
+        var recompositionKey by mutableStateOf(0)
+
+        composeTestRule.setContent {
+            Box(modifier = Modifier.background(ColorBackground)) {
+                WatchActionButton(
+                    label = "Pausar turno $recompositionKey",
+                    textColor = ColorPause,
+                    backgroundColor = ColorPauseBg,
+                    modifier = Modifier
+                        .size(200.dp, 60.dp)
+                        .testTag("button")
+                ) {}
+            }
+        }
+
+        composeTestRule.waitForIdle()
+
+        // Pixel interior alejado del texto y de las esquinas redondeadas.
+        val pixelInicial = buttonPixel(x = 20, y = 30)
+        assertEquals(
+            "Primer render deberia pintar ColorPauseBg en el centro",
+            ColorPauseBg.toArgb(),
+            pixelInicial
+        )
+
+        // Forzar recomposicion sin cambiar enabled: si el fondo dependiera del
+        // patron fragil, este muestreo podria volver al color de pantalla.
+        composeTestRule.runOnUiThread {
+            recompositionKey++
+        }
+        composeTestRule.waitForIdle()
+
+        val pixelTrasRecomposicion = buttonPixel(x = 20, y = 30)
+        assertEquals(
+            "Tras recomposicion, el pixel interior debe seguir siendo ColorPauseBg.",
+            ColorPauseBg.toArgb(),
+            pixelTrasRecomposicion
+        )
+    }
+
+    private fun buttonPixel(x: Int, y: Int): Int =
+        composeTestRule.onNodeWithTag("button")
+            .captureToImage()
+            .asAndroidBitmap()
+            .getPixel(x, y)
+}
+```
+
+#### Por que se cambio
+El test anterior demostraba el fallo del patron antiguo en un composable falso, pero no verificaba que `WatchActionButton` conservara su fondo tras recomponer. El nuevo test renderiza el componente real, fuerza una recomposicion cambiando la etiqueta y comprueba que un pixel interior sigue siendo `ColorPauseBg`.
+
 ## 2026-06-27 14:50 - Cerrar el fix incompleto del patron fragil en el modulo Wear OS
 
 **Archivos modificados:**

@@ -18,6 +18,7 @@ android {
         targetSdk rootProject.ext.targetSdkVersion
         versionCode resolvedVersionCode
         versionName resolvedVersionName
+        testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
             useSupportLibrary true
         }
@@ -107,6 +108,8 @@ dependencies {
     //   dispositivo conectado (Xiaomi Watch 5 por ADB o emulador). Usados para los
     //   pixel tests del plan que verifican el fix del patron fragil clip().background().
     testImplementation 'junit:junit:4.13.2'
+    androidTestImplementation 'androidx.test:runner:1.5.2'
+    androidTestImplementation 'androidx.test.ext:junit:1.1.5'
     androidTestImplementation 'androidx.compose.ui:ui-test-junit4:1.6.1'
     debugImplementation 'androidx.compose.ui:ui-test-manifest:1.6.1'
 }

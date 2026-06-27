@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.sizeIn
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -14,6 +15,7 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.mijornada.app.theme.WatchTokens
@@ -49,12 +51,14 @@ fun WatchMetricCard(
     val effectiveBorderColor = if (active) borderColor else borderColor.copy(alpha = 0.5f)
 
     Column(
-        modifier = modifier
+        modifier = Modifier
+            .sizeIn(minWidth = 48.dp, minHeight = 48.dp)
+            .then(modifier)
             .background(backgroundColor, shape)
             .border(borderWidth, effectiveBorderColor, shape)
             .alpha(if (enabled) 1f else 0.5f)
             .clip(shape)
-            .clickable(enabled = enabled) { onClick() }
+            .clickable(enabled = enabled, role = Role.Button) { onClick() }
             .padding(contentPadding),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {

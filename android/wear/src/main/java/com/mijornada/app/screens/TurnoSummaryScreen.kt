@@ -114,7 +114,8 @@ private fun HeaderPill(turno: WatchTurno) {
         shape = RoundedCornerShape(15.dp),
         borderColor = Color(0xFF252631),
         borderWidth = 1.dp,
-        contentPadding = PaddingValues(vertical = 9.dp)
+        contentPadding = PaddingValues(vertical = 9.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Text(formatFechaResumen(turno.startDate.ifBlank { turno.date }), color = ColorWhite, fontSize = 13.sp, fontWeight = FontWeight.Bold)
         Text("${turno.startTime} - ${turno.endTime}", color = ColorGrey, fontSize = 10.sp)
@@ -135,7 +136,9 @@ private fun SummaryMetric(
         shape = RoundedCornerShape(13.dp),
         borderColor = style.border,
         borderWidth = 1.dp,
-        contentPadding = PaddingValues(horizontal = 7.dp, vertical = 7.dp)
+        contentPadding = PaddingValues(horizontal = 7.dp, vertical = 7.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
     ) {
         // Icono + etiqueta, como las tarjetas de métricas de la app móvil.
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -287,7 +290,9 @@ private fun BottomSummaryCard(
         shape = RoundedCornerShape(13.dp),
         borderColor = style.border,
         borderWidth = 1.dp,
-        contentPadding = PaddingValues(horizontal = 5.dp, vertical = 7.dp)
+        contentPadding = PaddingValues(horizontal = 5.dp, vertical = 7.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
     ) {
         Row(
             verticalAlignment = Alignment.CenterVertically,

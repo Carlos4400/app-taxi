@@ -110,7 +110,8 @@ private fun MiniMetric(
         shape = RoundedCornerShape(12.dp),
         borderColor = style.border,
         borderWidth = 1.dp,
-        contentPadding = PaddingValues(horizontal = 7.dp, vertical = 7.dp)
+        contentPadding = PaddingValues(horizontal = 7.dp, vertical = 7.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
     ) {
         // Icono + etiqueta, como las tarjetas de métricas de la app móvil.
         Row(verticalAlignment = Alignment.CenterVertically) {

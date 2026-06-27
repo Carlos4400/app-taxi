@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.sizeIn
 import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -16,6 +17,7 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -68,12 +70,14 @@ fun WatchActionButton(
     } else Modifier
 
     Box(
-        modifier = modifier
+        modifier = Modifier
+            .sizeIn(minWidth = 48.dp, minHeight = 48.dp)
+            .then(modifier)
             .background(backgroundColor, shape)   // <-- patron correcto: background CON shape primero
             .then(borderMod)
             .alpha(if (enabled) 1f else 0.5f)
             .clip(shape)                         // <-- clip al final, solo recorta el ripple del clickable
-            .clickable(enabled = enabled) { onClick() }
+            .clickable(enabled = enabled, role = Role.Button) { onClick() }
             .padding(contentPadding),
         contentAlignment = Alignment.Center
     ) {

@@ -2,10 +2,13 @@ package com.mijornada.app.components
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
@@ -33,17 +36,21 @@ fun WatchTileBox(
     borderColor: Color? = null,
     borderWidth: Dp = WatchTokens.CardBorderWidth,
     contentPadding: PaddingValues = PaddingValues(horizontal = 10.dp, vertical = 9.dp),
-    content: @Composable () -> Unit
+    horizontalAlignment: Alignment.Horizontal = Alignment.Start,
+    verticalArrangement: Arrangement.Vertical = Arrangement.Top,
+    content: @Composable ColumnScope.() -> Unit
 ) {
     val borderMod = if (borderColor != null) {
         Modifier.border(borderWidth, borderColor, shape)
     } else Modifier
 
-    Box(
+    Column(
         modifier = modifier
             .background(backgroundColor, shape)
             .then(borderMod)
-            .padding(contentPadding)
+            .padding(contentPadding),
+        horizontalAlignment = horizontalAlignment,
+        verticalArrangement = verticalArrangement
     ) {
         content()
     }

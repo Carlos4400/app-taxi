@@ -33,7 +33,7 @@ import com.mijornada.app.theme.*
 
 private const val WatchSafeRowWidth = 0.84f
 private const val WatchSafeButtonWidth = 0.86f
-private const val PausedSafeWidth = 0.70f
+private const val PausedSafeWidth = 0.66f
 
 @Composable
 fun ActiveTurnoScreen(
@@ -282,12 +282,15 @@ private fun PausedTurnoContent(
                 label = if (resuming) "Reanudando..." else "Continuar Turno",
                 textColor = ColorPause,
                 backgroundColor = ColorPauseBg,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = 48.dp),
                 borderColor = ColorPauseBorder,
                 borderWidth = 2.dp,
                 shape = RoundedCornerShape(18.dp),
                 fontSize = 12,
-                contentPadding = androidx.compose.foundation.layout.PaddingValues(vertical = 10.dp),
-                leadingIcon = { PlayIcon(size = 19.dp, color = ColorPause) }
+                contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 9.dp, vertical = 9.dp),
+                leadingIcon = { PlayIcon(size = 20.dp, color = ColorPause) }
             ) { resume() }
         }
     }
