@@ -26,6 +26,9 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.wear.compose.material.Text
+import com.mijornada.app.components.WatchActionButton
+import com.mijornada.app.components.WatchMetricCard
+import com.mijornada.app.components.WatchTileBox
 import com.mijornada.app.theme.*
 
 private const val WatchSafeRowWidth = 0.84f
@@ -130,55 +133,33 @@ fun ActiveTurnoScreen(
             Spacer(modifier = Modifier.height(8.dp))
 
             val notaBloqueada = pendingOpsCount > 0
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth(WatchSafeButtonWidth)
-                    .clip(RoundedCornerShape(14.dp))
-                    .background(if (notaBloqueada) ColorDisabledBg else ColorNuloBg)
-                    .clickable(enabled = !requestingNote && !notaBloqueada) {
-                        onAddNote()
-                    }
-                    .padding(vertical = 9.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    text = when {
-                        notaBloqueada -> "Sincronizando operación…"
-                        requestingNote -> "Abriendo..."
-                        else -> "✎  Añadir nota al turno"
-                    },
-                    color = if (notaBloqueada) ColorDisabledText else ColorWhite,
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.Bold
-                )
-            }
+            WatchActionButton(
+                label = when {
+                    notaBloqueada -> "Sincronizando operación…"
+                    requestingNote -> "Abriendo..."
+                    else -> "✎  Añadir nota al turno"
+                },
+                textColor = if (notaBloqueada) ColorDisabledText else ColorWhite,
+                backgroundColor = if (notaBloqueada) ColorDisabledBg else ColorNuloBg,
+                modifier = Modifier.fillMaxWidth(WatchSafeButtonWidth),
+                enabled = !requestingNote && !notaBloqueada,
+                fontSize = 11,
+                contentPadding = androidx.compose.foundation.layout.PaddingValues(vertical = 9.dp)
+            ) { onAddNote() }
 
             Spacer(modifier = Modifier.height(7.dp))
 
             var togglingPause by remember { mutableStateOf(false) }
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth(WatchSafeButtonWidth)
-                    .clip(RoundedCornerShape(14.dp))
-                    .background(ColorPauseBg)
-                    .alpha(if (accionesBloqueadas) 0.5f else 1f)
-                    .clickable(enabled = !togglingPause && !accionesBloqueadas) {
-                        togglingPause = onTogglePause()
-                    }
-                    .padding(vertical = 8.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    PauseIcon(size = 18.dp, color = ColorPause)
-                    Spacer(modifier = Modifier.width(7.dp))
-                    Text(
-                        text = if (togglingPause) "Procesando..." else "Pausar turno",
-                        color = ColorPause,
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Bold
-                    )
-                }
-            }
+            WatchActionButton(
+                label = if (togglingPause) "Procesando..." else "Pausar turno",
+                textColor = ColorPause,
+                backgroundColor = ColorPauseBg,
+                modifier = Modifier.fillMaxWidth(WatchSafeButtonWidth),
+                enabled = !togglingPause && !accionesBloqueadas,
+                fontSize = 11,
+                contentPadding = androidx.compose.foundation.layout.PaddingValues(vertical = 8.dp),
+                leadingIcon = { PauseIcon(size = 18.dp, color = ColorPause) }
+            ) { togglingPause = onTogglePause() }
 
             Spacer(modifier = Modifier.height(7.dp))
 
@@ -200,19 +181,18 @@ fun ActiveTurnoScreen(
 
             Spacer(modifier = Modifier.height(10.dp))
 
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth(WatchSafeButtonWidth)
-                    .clip(RoundedCornerShape(16.dp))
-                    .background(ColorGasolinaBg)
-                    .border(2.dp, ColorGasolina, RoundedCornerShape(16.dp))
-                    .alpha(if (accionesBloqueadas) 0.5f else 1f)
-                    .clickable(enabled = !accionesBloqueadas) { onEndTurno() }
-                    .padding(vertical = 11.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                Text("Terminar turno", color = ColorGasolina, fontSize = 13.sp, fontWeight = FontWeight.Bold)
-            }
+            WatchActionButton(
+                label = "Terminar turno",
+                textColor = ColorGasolina,
+                backgroundColor = ColorGasolinaBg,
+                modifier = Modifier.fillMaxWidth(WatchSafeButtonWidth),
+                enabled = !accionesBloqueadas,
+                borderColor = ColorGasolina,
+                borderWidth = 2.dp,
+                shape = RoundedCornerShape(16.dp),
+                fontSize = 13,
+                contentPadding = androidx.compose.foundation.layout.PaddingValues(vertical = 11.dp)
+            ) { onEndTurno() }
         }
     }
 }
@@ -274,15 +254,16 @@ private fun PausedTurnoContent(
                 fontSize = 10.sp
             )
             Spacer(modifier = Modifier.height(8.dp))
+            // Icono compacto: al añadir la línea del contador la columna
+            // (fija, sin scroll) se salía del círculo; se recupera la
+            // altura aquí y en el título, el resto queda igual.
+            // Patron robusto: background(color, shape) -> border(shape) -> clip(shape).
             Box(
-                // Icono compacto: al añadir la línea del contador la columna
-                // (fija, sin scroll) se salía del círculo; se recupera la
-                // altura aquí y en el título, el resto queda igual.
                 modifier = Modifier
                     .size(62.dp)
-                    .clip(RoundedCornerShape(18.dp))
-                    .background(ColorPauseBg)
+                    .background(ColorPauseBg, RoundedCornerShape(18.dp))
                     .border(3.dp, ColorPauseBorder, RoundedCornerShape(18.dp))
+                    .clip(RoundedCornerShape(18.dp))
                     .clickable(enabled = !resuming) { resume() },
                 contentAlignment = Alignment.Center
             ) {
@@ -297,26 +278,17 @@ private fun PausedTurnoContent(
                 fontWeight = FontWeight.Bold
             )
             Spacer(modifier = Modifier.height(10.dp))
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(18.dp))
-                    .background(ColorPauseBg)
-                    .border(2.dp, ColorPauseBorder, RoundedCornerShape(18.dp))
-                    .clickable(enabled = !resuming) { resume() }
-                    .padding(vertical = 10.dp),
-                horizontalArrangement = Arrangement.Center,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                PlayIcon(size = 19.dp, color = ColorPause)
-                Spacer(modifier = Modifier.width(8.dp))
-                Text(
-                    if (resuming) "Reanudando..." else "Continuar Turno",
-                    color = ColorPause,
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.Bold
-                )
-            }
+            WatchActionButton(
+                label = if (resuming) "Reanudando..." else "Continuar Turno",
+                textColor = ColorPause,
+                backgroundColor = ColorPauseBg,
+                borderColor = ColorPauseBorder,
+                borderWidth = 2.dp,
+                shape = RoundedCornerShape(18.dp),
+                fontSize = 12,
+                contentPadding = androidx.compose.foundation.layout.PaddingValues(vertical = 10.dp),
+                leadingIcon = { PlayIcon(size = 19.dp, color = ColorPause) }
+            ) { resume() }
         }
     }
 }
@@ -367,18 +339,21 @@ private fun TarjetaCategoria(
     val total = totalsPorTipo[type] ?: 0.0
     val count = numPorTipo[type] ?: 0
     val categoryTitleFontSize = if (type == "agencia_bono") 7.sp else if (grande) 11.sp else 10.sp
-    // El fondo se pinta con su propia forma (background(color, shape)) y el clip
-    // va despues, solo para recortar el ripple del clickable. El patron antiguo
-    // clip(shape).background(color) perdia el fondo al recomponer la tarjeta con
-    // entradas nuevas (la interaccion clip + alpha < 1 deja el nodo sin pintar).
-    Column(
-        modifier = modifier
-            .background(meta.bg, RoundedCornerShape(14.dp))
-            .border(1.dp, meta.border, RoundedCornerShape(14.dp))
-            .clip(RoundedCornerShape(14.dp))
-            .alpha(if (enabled) 1f else 0.5f)
-            .clickable(enabled = enabled) { onClick() }
-            .padding(horizontal = 8.dp, vertical = if (grande) 8.dp else 6.dp)
+    // Wrapper que encapsula la logica especifica de las tarjetas de categoria
+    // (icono + label + total + contador) sobre WatchMetricCard (patron robusto).
+    // Antes del fix del 2026-06-26 el patron fragil estaba inline aqui; ahora
+    // WatchMetricCard garantiza que el fondo se mantiene tras recomposiciones.
+    WatchMetricCard(
+        backgroundColor = meta.bg,
+        borderColor = meta.border,
+        modifier = modifier,
+        enabled = enabled,
+        shape = RoundedCornerShape(14.dp),
+        contentPadding = androidx.compose.foundation.layout.PaddingValues(
+            horizontal = 8.dp,
+            vertical = if (grande) 8.dp else 6.dp
+        ),
+        onClick = onClick
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             CategoriaIcon(type, meta.color, if (grande) 16.dp else 13.dp)
@@ -410,11 +385,13 @@ private fun TarjetaCategoria(
 @Composable
 private fun EntradaHistorial(entry: WatchEntry, bloqueado: Boolean = false, onClick: () -> Unit) {
     val meta = categoriaMeta(entry.type)
+    // Patron robusto: background(color, shape) -> clip(shape) (para ripple).
+    // Antes era clip().background() que perdia el fondo al recomponer.
     Column(
         modifier = Modifier
             .fillMaxWidth()
+            .background(Color(0xFF15151C), RoundedCornerShape(12.dp))
             .clip(RoundedCornerShape(12.dp))
-            .background(Color(0xFF15151C))
             // Atenuar la fila mientras el cambio esta pendiente de confirmacion.
             .alpha(if (entry.pendiente) 0.55f else 1f)
             .clickable(enabled = !bloqueado) { onClick() }
@@ -461,12 +438,11 @@ private fun SyncIndicator(
     count: Int,
     modifier: Modifier = Modifier
 ) {
-    Box(
-        modifier = modifier
-            .clip(RoundedCornerShape(8.dp))
-            .background(ColorPropinaBg)
-            .padding(horizontal = 6.dp, vertical = 1.dp),
-        contentAlignment = Alignment.Center
+    WatchTileBox(
+        modifier = modifier,
+        backgroundColor = ColorPropinaBg,
+        shape = RoundedCornerShape(8.dp),
+        contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 6.dp, vertical = 1.dp)
     ) {
         Text(
             text = if (count == 1) "↻ Sincronizando..." else "↻ Sincronizando $count",
