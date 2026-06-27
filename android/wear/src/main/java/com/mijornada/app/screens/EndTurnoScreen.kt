@@ -10,13 +10,15 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.wear.compose.material.Text
+import com.mijornada.app.components.WatchActionButton
+import com.mijornada.app.components.WatchMetricCard
+import com.mijornada.app.components.WatchTileBox
 import com.mijornada.app.theme.*
 
 @Composable
@@ -102,20 +104,29 @@ fun EndTurnoScreen(
 
             Spacer(modifier = Modifier.height(12.dp))
 
-            BotonPlano(
+            WatchActionButton(
                 label = if (saving) "Enviando..." else "Terminar Turno",
                 textColor = ColorGasolina,
-                bg = ColorGasolinaBg,
+                backgroundColor = ColorGasolinaBg,
                 modifier = Modifier.fillMaxWidth(0.86f),
                 enabled = !saving,
-                borderColor = ColorGasolina
+                borderColor = ColorGasolina,
+                fontSize = 12,
+                contentPadding = PaddingValues(vertical = 10.dp)
             ) {
                 if (!saving) {
                     saving = onConfirm(dinero, km)
                 }
             }
             Spacer(modifier = Modifier.height(7.dp))
-            BotonPlano("Cancelar", ColorGrey, ColorNuloBg, Modifier.fillMaxWidth(0.86f), onClick = onCancel)
+            WatchActionButton(
+                label = "Cancelar",
+                textColor = ColorGrey,
+                backgroundColor = ColorNuloBg,
+                modifier = Modifier.fillMaxWidth(0.86f),
+                fontSize = 12,
+                contentPadding = PaddingValues(vertical = 10.dp)
+            ) { onCancel() }
         }
 
         val field = activeField
@@ -145,17 +156,15 @@ private fun CampoCierre(
     modifier: Modifier = Modifier,
     onClick: () -> Unit
 ) {
-    val shape = RoundedCornerShape(14.dp)
-    Column(
-        modifier = modifier
-            .height(76.dp)
-            .clip(shape)
-            .background(style.bg)
-            .border(1.dp, if (active) style.color else style.border, shape)
-            .clickable { onClick() }
-            .padding(horizontal = 7.dp, vertical = 9.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center
+    // Patron robusto: delega en WatchMetricCard (background(color, shape) -> border(shape) -> clip(shape)).
+    WatchMetricCard(
+        backgroundColor = style.bg,
+        borderColor = if (active) style.color else style.border,
+        modifier = modifier.height(76.dp),
+        active = active,
+        shape = RoundedCornerShape(14.dp),
+        contentPadding = PaddingValues(horizontal = 7.dp, vertical = 9.dp),
+        onClick = onClick
     ) {
         Text(label, color = ColorGrey, fontSize = 8.sp, fontWeight = FontWeight.Bold)
         Spacer(modifier = Modifier.height(5.dp))
@@ -169,11 +178,12 @@ private fun ResumenHoyCard(
     numPorTipo: Map<String, Int>,
     notasTurno: List<WatchEntry>
 ) {
+    // Patron robusto: background(color, shape) -> border(shape) -> padding.
+    // Antes era clip().background().border() que perdia el fondo al recomponer.
     Column(
         modifier = Modifier
             .fillMaxWidth(0.88f)
-            .clip(RoundedCornerShape(18.dp))
-            .background(Color(0xFF15151C))
+            .background(Color(0xFF15151C), RoundedCornerShape(18.dp))
             .border(1.dp, Color(0xFF252631), RoundedCornerShape(18.dp))
             .padding(horizontal = 10.dp, vertical = 11.dp),
         horizontalAlignment = Alignment.CenterHorizontally
@@ -232,12 +242,13 @@ private fun ResumenCategoriaCard(
 ) {
     val meta = categoriaMeta(type)
     val label = if (type == "agencia_bono") "Agencias/Bonos" else meta.label
-    Column(
-        modifier = modifier
-            .clip(RoundedCornerShape(12.dp))
-            .background(meta.bg)
-            .border(1.dp, meta.border, RoundedCornerShape(12.dp))
-            .padding(horizontal = 7.dp, vertical = 8.dp)
+    WatchTileBox(
+        modifier = modifier,
+        backgroundColor = meta.bg,
+        shape = RoundedCornerShape(12.dp),
+        borderColor = meta.border,
+        borderWidth = 1.dp,
+        contentPadding = PaddingValues(horizontal = 7.dp, vertical = 8.dp)
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             CategoriaIcon(type, meta.color, 12.dp)
@@ -263,42 +274,43 @@ private fun SectionTitle(label: String, color: Color) {
 
 @Composable
 private fun NotaTurnoRow(entry: WatchEntry) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(10.dp))
-            .background(Color(0xFF1B1C23))
-            .padding(horizontal = 8.dp, vertical = 7.dp),
-        verticalAlignment = Alignment.CenterVertically
+    WatchTileBox(
+        modifier = Modifier.fillMaxWidth(),
+        backgroundColor = Color(0xFF1B1C23),
+        shape = RoundedCornerShape(10.dp),
+        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 7.dp)
     ) {
-        Text(entry.time, color = ColorGrey, fontSize = 8.sp, fontWeight = FontWeight.Bold)
-        Spacer(modifier = Modifier.width(6.dp))
-        Text("Nota", color = ColorWhite, fontSize = 10.sp, fontWeight = FontWeight.Bold)
-        Spacer(modifier = Modifier.width(6.dp))
-        // Nota completa, con salto de línea si es larga (antes se truncaba a 24).
-        Text(entry.note, color = ColorWhite, fontSize = 9.sp, modifier = Modifier.weight(1f))
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(entry.time, color = ColorGrey, fontSize = 8.sp, fontWeight = FontWeight.Bold)
+            Spacer(modifier = Modifier.width(6.dp))
+            Text("Nota", color = ColorWhite, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+            Spacer(modifier = Modifier.width(6.dp))
+            // Nota completa, con salto de línea si es larga (antes se truncaba a 24).
+            Text(entry.note, color = ColorWhite, fontSize = 9.sp, modifier = Modifier.weight(1f))
+        }
     }
 }
 
 @Composable
 private fun NotaDetalladaRow(entry: WatchEntry) {
     val meta = categoriaMeta(entry.type)
-    Row(
-        modifier = Modifier
-            .fillMaxWidth(0.88f)
-            .clip(RoundedCornerShape(12.dp))
-            .background(Color(0xFF15151C))
-            .border(1.dp, Color(0xFF252631), RoundedCornerShape(12.dp))
-            .padding(horizontal = 9.dp, vertical = 8.dp),
-        verticalAlignment = Alignment.CenterVertically
+    WatchTileBox(
+        modifier = Modifier.fillMaxWidth(0.88f),
+        backgroundColor = Color(0xFF15151C),
+        shape = RoundedCornerShape(12.dp),
+        borderColor = Color(0xFF252631),
+        borderWidth = 1.dp,
+        contentPadding = PaddingValues(horizontal = 9.dp, vertical = 8.dp)
     ) {
-        Text(entry.time, color = ColorGrey, fontSize = 8.sp, fontWeight = FontWeight.Bold)
-        Spacer(modifier = Modifier.width(6.dp))
-        Text(categoriaLabelSingular(entry.type), color = meta.color, fontSize = 10.sp, fontWeight = FontWeight.Bold)
-        Spacer(modifier = Modifier.width(6.dp))
-        // Nota completa, con salto de línea si es larga (antes se truncaba a 16).
-        Text(entry.note, color = ColorWhite, fontSize = 9.sp, modifier = Modifier.weight(1f))
-        Text(fmtEur(entry.amount), color = meta.color, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(entry.time, color = ColorGrey, fontSize = 8.sp, fontWeight = FontWeight.Bold)
+            Spacer(modifier = Modifier.width(6.dp))
+            Text(categoriaLabelSingular(entry.type), color = meta.color, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+            Spacer(modifier = Modifier.width(6.dp))
+            // Nota completa, con salto de línea si es larga (antes se truncaba a 16).
+            Text(entry.note, color = ColorWhite, fontSize = 9.sp, modifier = Modifier.weight(1f))
+            Text(fmtEur(entry.amount), color = meta.color, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+        }
     }
 }
 
@@ -348,32 +360,14 @@ private fun TecladoCierreOverlay(
                 rowSpacing = d * 0.016f
             )
             Spacer(modifier = Modifier.height(d * 0.018f))
-            BotonPlano("Guardar", ColorBackground, color, Modifier.fillMaxWidth(0.55f), onClick = onDone)
-        }
-    }
+            WatchActionButton(
+                label = "Guardar",
+                textColor = ColorBackground,
+                backgroundColor = color,
+                modifier = Modifier.fillMaxWidth(0.55f),
+                fontSize = 12,
+                contentPadding = PaddingValues(vertical = 10.dp)
+            ) { onDone() }
 }
-
-@Composable
-private fun BotonPlano(
-    label: String,
-    textColor: Color,
-    bg: Color,
-    modifier: Modifier = Modifier,
-    enabled: Boolean = true,
-    borderColor: Color? = null,
-    onClick: () -> Unit
-) {
-    val shape = RoundedCornerShape(14.dp)
-    val borderMod = if (borderColor != null) Modifier.border(2.dp, borderColor, shape) else Modifier
-    Box(
-        modifier = modifier
-            .clip(shape)
-            .background(bg)
-            .then(borderMod)
-            .clickable(enabled = enabled) { onClick() }
-            .padding(vertical = 10.dp),
-        contentAlignment = Alignment.Center
-    ) {
-        Text(label, color = if (enabled) textColor else ColorDisabledText, fontSize = 12.sp, fontWeight = FontWeight.Bold)
-    }
+}
 }
