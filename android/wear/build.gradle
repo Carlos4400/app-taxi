@@ -100,4 +100,10 @@ dependencies {
 
     // WorkManager para reintentos de outbox
     implementation 'androidx.work:work-runtime-ktx:2.9.0'
+
+    // Tests (Fase 0 de PLAN_FIX_BOTONES_WEAR.md: anadir infraestructura para pixel tests
+    // que detecten regresiones del patron fragil clip().background() en composables del reloj)
+    testImplementation 'junit:junit:4.13.2'
+    testImplementation 'androidx.compose.ui:ui-test-junit4:1.6.1'
+    debugImplementation 'androidx.compose.ui:ui-test-manifest:1.6.1'
 }
