@@ -8,7 +8,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -17,6 +16,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.wear.compose.material.Text
+import com.mijornada.app.components.WatchActionButton
 import com.mijornada.app.theme.*
 
 @Composable
@@ -124,17 +124,14 @@ fun AddEntryScreen(
 
             if (onDelete != null) {
                 Spacer(modifier = Modifier.height(5.dp))
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth(0.72f)
-                        .clip(RoundedCornerShape(12.dp))
-                        .background(ColorGasolinaBg)
-                        .clickable { onDelete() }
-                        .padding(vertical = 7.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text("Eliminar entrada", color = ColorGasolina, fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                }
+                WatchActionButton(
+                    label = "Eliminar entrada",
+                    textColor = ColorGasolina,
+                    backgroundColor = ColorGasolinaBg,
+                    modifier = Modifier.fillMaxWidth(0.72f),
+                    fontSize = 11,
+                    contentPadding = PaddingValues(vertical = 7.dp)
+                ) { onDelete() }
             }
         }
     }
@@ -164,11 +161,13 @@ private fun GuardarImporteButton(
     color: Color,
     onClick: () -> Unit
 ) {
+    // Patron robusto: background(color, shape) sin clip previo. No usa
+    // WatchActionButton porque tiene tamano fijo 42x34.dp (no flexible) y solo
+    // muestra el caracter '✓', no una etiqueta.
     Box(
         modifier = Modifier
             .size(width = 42.dp, height = 34.dp)
-            .clip(RoundedCornerShape(12.dp))
-            .background(if (enabled) color else ColorDisabledBg)
+            .background(if (enabled) color else ColorDisabledBg, RoundedCornerShape(12.dp))
             .clickable(enabled = enabled) { onClick() },
         contentAlignment = Alignment.Center
     ) {
@@ -187,11 +186,15 @@ private fun NotaButton(
     onClick: () -> Unit
 ) {
     val selected = note.isNotBlank()
+    // Patron robusto: background(color, shape) -> clickable -> padding. El clip
+    // se omite a proposito porque el ripple rectangular sobre un area pequena
+    // apenas se nota y asi evitamos el patron fragil clip().background().
+    // No usa WatchActionButton porque tiene contenido condicional (un Column
+    // con cabecera + nota multilinea cuando hay texto).
     Box(
         modifier = Modifier
             .fillMaxWidth(0.72f)
-            .clip(RoundedCornerShape(12.dp))
-            .background(ColorNuloBg)
+            .background(ColorNuloBg, RoundedCornerShape(12.dp))
             .clickable { onClick() }
             .padding(horizontal = 12.dp, vertical = 8.dp),
         contentAlignment = Alignment.Center
@@ -258,11 +261,12 @@ private fun NotaEditor(
 
             Spacer(modifier = Modifier.height(8.dp))
 
+            // Patron robusto: background(color, shape) -> clickable -> padding. No usa
+            // WatchTileBox porque necesita ser clickable.
             Box(
                 modifier = Modifier
                     .fillMaxWidth(0.86f)
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(Color(0xFF15151C))
+                    .background(Color(0xFF15151C), RoundedCornerShape(12.dp))
                     .clickable { onEditarTexto() }
                     .padding(12.dp),
                 contentAlignment = Alignment.Center
@@ -277,30 +281,25 @@ private fun NotaEditor(
 
             Spacer(modifier = Modifier.height(10.dp))
 
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth(0.86f)
-                    .clip(RoundedCornerShape(14.dp))
-                    .background(if (note.isNotBlank()) ColorPropina else ColorNuloBg)
-                    .clickable(enabled = note.isNotBlank()) { onSave() }
-                    .padding(vertical = 11.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                Text("Guardar", color = if (note.isNotBlank()) ColorBackground else ColorGrey, fontSize = 13.sp, fontWeight = FontWeight.Bold)
-            }
+            WatchActionButton(
+                label = "Guardar",
+                textColor = if (note.isNotBlank()) ColorBackground else ColorGrey,
+                backgroundColor = if (note.isNotBlank()) ColorPropina else ColorNuloBg,
+                modifier = Modifier.fillMaxWidth(0.86f),
+                enabled = note.isNotBlank(),
+                fontSize = 13,
+                contentPadding = PaddingValues(vertical = 11.dp)
+            ) { onSave() }
             if (onDelete != null) {
                 Spacer(modifier = Modifier.height(6.dp))
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth(0.86f)
-                        .clip(RoundedCornerShape(14.dp))
-                        .background(ColorGasolinaBg)
-                        .clickable { onDelete() }
-                        .padding(vertical = 10.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text("Eliminar nota", color = ColorGasolina, fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                }
+                WatchActionButton(
+                    label = "Eliminar nota",
+                    textColor = ColorGasolina,
+                    backgroundColor = ColorGasolinaBg,
+                    modifier = Modifier.fillMaxWidth(0.86f),
+                    fontSize = 12,
+                    contentPadding = PaddingValues(vertical = 10.dp)
+                ) { onDelete() }
             }
             Spacer(modifier = Modifier.height(20.dp))
         }
