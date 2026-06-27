@@ -13,13 +13,14 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.wear.compose.material.Text
 import com.mijornada.app.R
+import com.mijornada.app.components.WatchActionButton
+import com.mijornada.app.components.WatchTileBox
 import com.mijornada.app.theme.*
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
@@ -46,14 +47,14 @@ fun NoActiveTurnoScreen(
         contentAlignment = Alignment.Center
     ) {
         if (pendingOpsCount > 0) {
-            Box(
+            WatchTileBox(
                 modifier = Modifier
                     .align(Alignment.TopCenter)
-                    .padding(top = 6.dp)
-                    .clip(RoundedCornerShape(8.dp))
-                    .background(ColorPropinaBg)
-                    .padding(horizontal = 6.dp, vertical = 1.dp),
-                contentAlignment = Alignment.Center
+                    .padding(top = 6.dp),
+                backgroundColor = ColorPropinaBg,
+                shape = RoundedCornerShape(8.dp),
+                borderColor = null,
+                contentPadding = PaddingValues(horizontal = 6.dp, vertical = 1.dp)
             ) {
                 Text(
                     text = "↻ Sincronizando",
@@ -155,34 +156,34 @@ private fun HomeActionButton(
     // Debounce temporal en lugar de bloqueo permanente: el antiguo flag
     // `clicked` desactivaba el boton para siempre tras el primer toque,
     // dejando "Turnos" inutilizable si la navegacion no ocurria al instante.
+    // Mantenemos el debounce y delegamos en WatchActionButton para el render
+    // (icono + texto con border, patron robusto background(color, shape)).
     var lastClickMs by remember { mutableStateOf(0L) }
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(16.dp))
-            .background(bg)
-            .border(1.5.dp, borderColor, RoundedCornerShape(16.dp))
-            .clickable {
-                val now = android.os.SystemClock.elapsedRealtime()
-                if (now - lastClickMs > 600L) {
-                    lastClickMs = now
-                    onClick()
-                }
-            }
-            .padding(vertical = 10.dp),
-        contentAlignment = Alignment.Center
-    ) {
-        // Icono + texto como los botones de la home del móvil; el vector es
-        // blanco y se tinta con el color del botón.
-        Row(verticalAlignment = Alignment.CenterVertically) {
+    WatchActionButton(
+        label = label,
+        textColor = textColor,
+        backgroundColor = bg,
+        borderColor = borderColor,
+        modifier = Modifier.fillMaxWidth(),
+        borderWidth = 1.5.dp,
+        shape = RoundedCornerShape(16.dp),
+        contentPadding = PaddingValues(vertical = 10.dp),
+        fontSize = 13,
+        leadingIcon = {
+            // Icono + texto como los botones de la home del móvil; el vector es
+            // blanco y se tinta con el color del botón.
             Image(
                 painter = painterResource(id = iconRes),
                 contentDescription = null,
                 colorFilter = androidx.compose.ui.graphics.ColorFilter.tint(textColor),
                 modifier = Modifier.size(15.dp)
             )
-            Spacer(modifier = Modifier.width(6.dp))
-            Text(label, color = textColor, fontSize = 13.sp, fontWeight = androidx.compose.ui.text.font.FontWeight.Bold)
+        }
+    ) {
+        val now = android.os.SystemClock.elapsedRealtime()
+        if (now - lastClickMs > 600L) {
+            lastClickMs = now
+            onClick()
         }
     }
 }
