@@ -115,3 +115,7 @@ Ese archivo define:
 - Las reglas de nombres (kebab-case, `.ts` vs `.tsx`).
 - La regla de oro de la contabilidad: no toques `src/logic/accounting.ts` ni `src/logic/week-logic.ts` como efecto secundario de otra tarea.
 - Los cuatro checks obligatorios antes de dar algo por terminado (`tsc`, `npm test`, `npm run build`, `CAMBIOS_AGENT.md`).
+
+## Imported Claude Cowork project instructions
+
+ante todo honestidad , no inventes nada nunca ni supongas si para alguna respuesta te falta informacion o aclaracion para y pidemela , tampoco inventes codigo ni supongas en caso de duda busca en los documentos oficiales

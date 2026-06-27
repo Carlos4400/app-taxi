@@ -367,11 +367,15 @@ private fun TarjetaCategoria(
     val total = totalsPorTipo[type] ?: 0.0
     val count = numPorTipo[type] ?: 0
     val categoryTitleFontSize = if (type == "agencia_bono") 7.sp else if (grande) 11.sp else 10.sp
+    // El fondo se pinta con su propia forma (background(color, shape)) y el clip
+    // va despues, solo para recortar el ripple del clickable. El patron antiguo
+    // clip(shape).background(color) perdia el fondo al recomponer la tarjeta con
+    // entradas nuevas (la interaccion clip + alpha < 1 deja el nodo sin pintar).
     Column(
         modifier = modifier
-            .clip(RoundedCornerShape(14.dp))
-            .background(meta.bg)
+            .background(meta.bg, RoundedCornerShape(14.dp))
             .border(1.dp, meta.border, RoundedCornerShape(14.dp))
+            .clip(RoundedCornerShape(14.dp))
             .alpha(if (enabled) 1f else 0.5f)
             .clickable(enabled = enabled) { onClick() }
             .padding(horizontal = 8.dp, vertical = if (grande) 8.dp else 6.dp)

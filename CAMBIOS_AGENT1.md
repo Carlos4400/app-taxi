@@ -1,3 +1,48 @@
+## 2026-06-26 05:50 - Corregir fondo de tarjetas perdido al añadir entrada en el reloj
+
+**Archivos modificados:** `android/wear/src/main/java/com/mijornada/app/screens/ActiveTurnoScreen.kt`
+
+Contexto: al añadir una entrada desde el reloj, las tarjetas de categoría de la pantalla del turno activo perdían su fondo de color y su borde, y solo recuperaban el aspecto al salir y volver a entrar. Verificado en el reloj físico (Xiaomi Watch 5) muestreando píxeles: el fondo de la tarjeta Datáfono pasaba de `#0B082C` (azul correcto) a `#0D0D14` (negro, fundido con el fondo de la pantalla) justo tras guardar una entrada, y no se recuperaba solo.
+
+Diagnóstico: los logs confirmaron que el estado interno era correcto (`pendingOpsCount = 0`, `accionesBloqueadas = false`, recomposición ejecutándose), por lo que **no** era un problema de lógica ni del ACK. La causa era de render de Compose: el patrón `.clip(RoundedCornerShape)` seguido de `.background(color)` (sin forma) es frágil y, al recomponer la tarjeta con datos nuevos (entradas añadidas), el `clip` dejaba el nodo sin su fondo pintado. La forma canónica `.background(color, shape)` dibuja el fondo con la forma redondeada de manera robusta, sin depender del `clip`.
+
+### Cambio 1 - Dibujar el fondo de la tarjeta con su forma redondeada
+
+#### Código anterior
+```kotlin
+    Column(
+        modifier = modifier
+            .clip(RoundedCornerShape(14.dp))
+            .background(meta.bg)
+            .border(1.dp, meta.border, RoundedCornerShape(14.dp))
+            .alpha(if (enabled) 1f else 0.5f)
+            .clickable(enabled = enabled) { onClick() }
+            .padding(horizontal = 8.dp, vertical = if (grande) 8.dp else 6.dp)
+    ) {
+```
+
+#### Código nuevo
+```kotlin
+    // El fondo se pinta con su propia forma (background(color, shape)) y el clip
+    // va despues, solo para recortar el ripple del clickable. El patron antiguo
+    // clip(shape).background(color) perdia el fondo al recomponer la tarjeta con
+    // entradas nuevas (la interaccion clip + alpha < 1 deja el nodo sin pintar).
+    Column(
+        modifier = modifier
+            .background(meta.bg, RoundedCornerShape(14.dp))
+            .border(1.dp, meta.border, RoundedCornerShape(14.dp))
+            .clip(RoundedCornerShape(14.dp))
+            .alpha(if (enabled) 1f else 0.5f)
+            .clickable(enabled = enabled) { onClick() }
+            .padding(horizontal = 8.dp, vertical = if (grande) 8.dp else 6.dp)
+    ) {
+```
+
+#### Por qué se cambió
+Para que el fondo de color de las tarjetas de categoría se dibuje de forma robusta tras cualquier recomposición (incluida la que añade una entrada), en lugar de perderse. `Modifier.background(color, shape)` es la API oficial de Compose para pintar el fondo con su forma (está documentada en [Graphics modifiers](https://developer.android.com/develop/ui/compose/graphics/draw/modifiers)); al pasarle la forma redondeada, el fondo se dibuja de forma autónoma y no depende del `clip`. El `clip` se mantiene después, solo para recortar el ripple del `clickable` a la esquina redondeada. El comentario explica el motivo para que no se revierta al patrón antiguo. Verificado en el reloj físico (Xiaomi Watch 5): tras añadir entradas sucesivas (Datáfono, Propinas, Extra), las cuatro tarjetas visibles mantuvieron su fondo correcto (`#0B082C`, `#001900`, `#260F00`, `#001A1D`) sin necesidad de salir y volver a entrar.
+
+Nota: una primera hipótesis atribuyó el fallo al hilo del ACK y se modificó `WearMainActivity.kt` (`mainHandler.post { pollResponseState() }`). Esa hipótesis se descartó al comprobar con logs que el estado era correcto; ese cambio se revirtió y no forma parte de esta entrada.
+
 ## 2026-06-17 19:35 - Actualizar el inventario de hooks en ESTRUCTURA.md
 
 **Archivos modificados:** `ESTRUCTURA.md`
