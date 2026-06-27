@@ -15,7 +15,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
@@ -23,6 +22,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.wear.compose.material.Text
+import com.mijornada.app.components.WatchActionButton
+import com.mijornada.app.components.WatchMetricCard
 import com.mijornada.app.theme.*
 
 /**
@@ -209,7 +210,13 @@ fun EditTurnoDatosScreen(
             }
         }
         Spacer(modifier = Modifier.height(6.dp))
-        BotonAncho("✎ Añadir nota", ColorWhite, ColorNuloBg) {
+        WatchActionButton(
+            label = "✎ Añadir nota",
+            textColor = ColorWhite,
+            backgroundColor = ColorNuloBg,
+            modifier = Modifier.fillMaxWidth(0.84f),
+            contentPadding = PaddingValues(vertical = 9.dp)
+        ) {
             onRequestNote("") { texto ->
                 if (texto.isNotBlank()) {
                     entradas = entradas + WatchEntry(
@@ -225,16 +232,24 @@ fun EditTurnoDatosScreen(
 
         // ── Guardar / Cancelar ──
         Spacer(modifier = Modifier.height(12.dp))
-        BotonAncho(
-            if (enviando) "Guardando..." else "Guardar cambios",
-            if (valido && !enviando) ColorPropina else ColorGrey.copy(alpha = 0.5f),
-            ColorPropinaBg,
-            enabled = valido && !enviando
+        WatchActionButton(
+            label = if (enviando) "Guardando..." else "Guardar cambios",
+            textColor = if (valido && !enviando) ColorPropina else ColorGrey.copy(alpha = 0.5f),
+            backgroundColor = ColorPropinaBg,
+            modifier = Modifier.fillMaxWidth(0.84f),
+            enabled = valido && !enviando,
+            contentPadding = PaddingValues(vertical = 9.dp)
         ) {
             enviando = onConfirm(dinero, km, entradas)
         }
         Spacer(modifier = Modifier.height(6.dp))
-        BotonAncho("Cancelar", ColorGrey, ColorNuloBg) { onCancel() }
+        WatchActionButton(
+            label = "Cancelar",
+            textColor = ColorGrey,
+            backgroundColor = ColorNuloBg,
+            modifier = Modifier.fillMaxWidth(0.84f),
+            contentPadding = PaddingValues(vertical = 9.dp)
+        ) { onCancel() }
     }
 }
 
@@ -247,11 +262,13 @@ private fun SeccionTitulo(titulo: String) {
 @Composable
 private fun FilaEntrada(entry: WatchEntry, onClick: () -> Unit) {
     val meta = categoriaMeta(entry.type)
+    // Patron robusto: background(color, shape) -> clickable -> padding. No usa
+    // WatchTileBox ni WatchActionButton porque es una Row compleja con icono +
+    // label + nota + importe.
     Row(
         modifier = Modifier
             .fillMaxWidth(0.92f)
-            .clip(RoundedCornerShape(11.dp))
-            .background(Color(0xFF15151C))
+            .background(Color(0xFF15151C), RoundedCornerShape(11.dp))
             .clickable { onClick() }
             .padding(horizontal = 10.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically
@@ -272,11 +289,12 @@ private fun FilaEntrada(entry: WatchEntry, onClick: () -> Unit) {
 
 @Composable
 private fun FilaNota(nota: WatchEntry, onEdit: () -> Unit, onDelete: () -> Unit) {
+    // Patron robusto: background(color, shape) -> padding. No usa WatchTileBox
+    // porque tiene un Text con clickable interno (para editar).
     Row(
         modifier = Modifier
             .fillMaxWidth(0.92f)
-            .clip(RoundedCornerShape(11.dp))
-            .background(Color(0xFF15151C))
+            .background(Color(0xFF15151C), RoundedCornerShape(11.dp))
             .padding(horizontal = 10.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -306,10 +324,11 @@ private fun FilaNota(nota: WatchEntry, onEdit: () -> Unit, onDelete: () -> Unit)
 @Composable
 private fun BotonCategoria(tipo: String, modifier: Modifier = Modifier, onClick: () -> Unit) {
     val meta = categoriaMeta(tipo)
+    // Patron robusto: background(color, shape) -> clickable -> padding. No usa
+    // WatchActionButton porque solo muestra un icono, no texto.
     Box(
         modifier = modifier
-            .clip(RoundedCornerShape(10.dp))
-            .background(meta.bg)
+            .background(meta.bg, RoundedCornerShape(10.dp))
             .clickable { onClick() }
             .padding(vertical = 7.dp),
         contentAlignment = Alignment.Center
@@ -318,26 +337,9 @@ private fun BotonCategoria(tipo: String, modifier: Modifier = Modifier, onClick:
     }
 }
 
-@Composable
-private fun BotonAncho(
-    etiqueta: String,
-    color: Color,
-    bg: Color,
-    enabled: Boolean = true,
-    onClick: () -> Unit
-) {
-    Box(
-        modifier = Modifier
-            .fillMaxWidth(0.84f)
-            .clip(RoundedCornerShape(14.dp))
-            .background(bg)
-            .clickable(enabled = enabled) { onClick() }
-            .padding(vertical = 9.dp),
-        contentAlignment = Alignment.Center
-    ) {
-        Text(etiqueta, color = color, fontSize = 12.sp, fontWeight = FontWeight.Bold)
-    }
-}
+// BotonAncho eliminado: los 3 usos ahora llaman directamente a WatchActionButton
+// (componente reutilizable en components/WatchActionButton.kt), que encapsula
+// el patron robusto background(color, shape) -> border(shape) -> clip(shape) -> clickable.
 
 @Composable
 private fun CampoEditable(
@@ -349,14 +351,17 @@ private fun CampoEditable(
     modifier: Modifier = Modifier,
     onClick: () -> Unit
 ) {
-    Column(
-        modifier = modifier
-            .clip(RoundedCornerShape(12.dp))
-            .background(bg)
-            .border(if (activo) 1.5.dp else 1.dp, if (activo) color else color.copy(alpha = 0.3f), RoundedCornerShape(12.dp))
-            .clickable { onClick() }
-            .padding(horizontal = 8.dp, vertical = 7.dp),
-        horizontalAlignment = Alignment.CenterHorizontally
+    // Patron robusto: delega en WatchMetricCard (background(color, shape) -> border(shape) -> clip(shape)).
+    // El parametro active controla el alpha del borde (WatchMetricCard atenua al 50% cuando no esta activo).
+    WatchMetricCard(
+        backgroundColor = bg,
+        borderColor = color,
+        modifier = modifier,
+        active = activo,
+        shape = RoundedCornerShape(12.dp),
+        borderWidth = if (activo) 1.5.dp else 1.dp,
+        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 7.dp),
+        onClick = onClick
     ) {
         Text(etiqueta, color = ColorGrey, fontSize = 8.sp, fontWeight = FontWeight.Bold)
         Spacer(modifier = Modifier.height(2.dp))
