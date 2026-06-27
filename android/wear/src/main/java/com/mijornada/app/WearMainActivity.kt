@@ -18,7 +18,6 @@ import androidx.activity.result.ActivityResultLauncher
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.animation.Crossfade
@@ -35,6 +34,7 @@ import androidx.wear.compose.material.Text
 import androidx.wear.input.RemoteInputIntentHelper
 import com.google.android.gms.wearable.PutDataMapRequest
 import com.google.android.gms.wearable.Wearable
+import com.mijornada.app.components.WatchActionButton
 import com.mijornada.app.screens.*
 import com.mijornada.app.theme.*
 import org.json.JSONArray
@@ -1232,27 +1232,29 @@ private fun ConfirmPauseTurnoScreen(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                ConfirmDeleteButton(
+                WatchActionButton(
                     label = "Cancelar",
                     textColor = ColorGrey,
-                    bg = ColorNuloBg,
+                    backgroundColor = ColorNuloBg,
                     modifier = Modifier.weight(1f),
-                    onClick = onCancel
-                )
+                    borderWidth = 1.5.dp,
+                    contentPadding = PaddingValues(vertical = 11.dp)
+                ) { onCancel() }
                 var pausing by remember { mutableStateOf(false) }
-                ConfirmDeleteButton(
+                WatchActionButton(
                     label = "Pausar",
                     textColor = ColorPause,
-                    bg = ColorPauseBg,
+                    backgroundColor = ColorPauseBg,
                     borderColor = ColorPauseBorder,
                     enabled = !pausing,
                     modifier = Modifier.weight(1f),
-                    onClick = {
-                        if (!pausing) {
-                            pausing = onConfirm()
-                        }
+                    borderWidth = 1.5.dp,
+                    contentPadding = PaddingValues(vertical = 11.dp)
+                ) {
+                    if (!pausing) {
+                        pausing = onConfirm()
                     }
-                )
+                }
             }
         }
     }
@@ -1281,26 +1283,28 @@ private fun ConfirmStartTurnoScreen(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                ConfirmDeleteButton(
+                WatchActionButton(
                     label = "Cancelar",
                     textColor = ColorGrey,
-                    bg = ColorNuloBg,
+                    backgroundColor = ColorNuloBg,
                     modifier = Modifier.weight(1f),
-                    onClick = onCancel
-                )
+                    borderWidth = 1.5.dp,
+                    contentPadding = PaddingValues(vertical = 11.dp)
+                ) { onCancel() }
                 var starting by remember { mutableStateOf(false) }
-                ConfirmDeleteButton(
+                WatchActionButton(
                     label = if (starting) "Iniciando..." else "Iniciar",
                     textColor = ColorPropina,
-                    bg = ColorPropinaBg,
+                    backgroundColor = ColorPropinaBg,
                     enabled = !starting,
                     modifier = Modifier.weight(1f),
-                    onClick = {
-                        if (!starting) {
-                            starting = onConfirm()
-                        }
+                    borderWidth = 1.5.dp,
+                    contentPadding = PaddingValues(vertical = 11.dp)
+                ) {
+                    if (!starting) {
+                        starting = onConfirm()
                     }
-                )
+                }
             }
         }
     }
@@ -1338,53 +1342,34 @@ private fun ConfirmDeleteScreen(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                ConfirmDeleteButton(
+                WatchActionButton(
                     label = "Cancelar",
                     textColor = ColorGrey,
-                    bg = ColorNuloBg,
+                    backgroundColor = ColorNuloBg,
                     modifier = Modifier.weight(1f),
-                    onClick = onCancel
-                )
+                    borderWidth = 1.5.dp,
+                    contentPadding = PaddingValues(vertical = 11.dp)
+                ) { onCancel() }
                 var deleting by remember { mutableStateOf(false) }
-                ConfirmDeleteButton(
+                WatchActionButton(
                     label = if (deleting) "Borrando..." else "Borrar",
                     textColor = ColorWhite,
-                    bg = ColorGasolina,
+                    backgroundColor = ColorGasolina,
                     enabled = !deleting,
                     modifier = Modifier.weight(1f),
-                    onClick = {
-                        if (!deleting) {
-                            deleting = onConfirm()
-                        }
+                    borderWidth = 1.5.dp,
+                    contentPadding = PaddingValues(vertical = 11.dp)
+                ) {
+                    if (!deleting) {
+                        deleting = onConfirm()
                     }
-                )
+                }
             }
         }
     }
 }
 
-@Composable
-private fun ConfirmDeleteButton(
-    label: String,
-    textColor: Color,
-    bg: Color,
-    borderColor: Color? = null,
-    enabled: Boolean = true,
-    modifier: Modifier = Modifier,
-    onClick: () -> Unit
-) {
-    Box(
-        modifier = modifier
-            .clip(RoundedCornerShape(14.dp))
-            .background(bg)
-            .then(
-                if (borderColor != null) Modifier.border(1.5.dp, borderColor, RoundedCornerShape(14.dp))
-                else Modifier
-            )
-            .clickable(enabled = enabled) { onClick() }
-            .padding(vertical = 11.dp),
-        contentAlignment = Alignment.Center
-    ) {
-        Text(label, color = textColor, fontSize = 12.sp, fontWeight = FontWeight.Bold)
-    }
-}
+// ConfirmDeleteButton eliminado: las 6 llamadas en este archivo ahora usan
+// directamente WatchActionButton (componente reutilizable en
+// components/WatchActionButton.kt), que encapsula el patron robusto
+// background(color, shape) -> border(shape) -> clip(shape) -> clickable.
