@@ -10,12 +10,12 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.wear.compose.material.Text
+import com.mijornada.app.components.WatchTileBox
 import com.mijornada.app.theme.*
 
 @Composable
@@ -61,11 +61,12 @@ fun TurnosScreen(
 
 @Composable
 private fun TurnoCard(turno: WatchTurno, onClick: () -> Unit) {
+    // Patron robusto: background(color, shape) -> border(shape) -> clickable -> padding.
+    // No usa WatchTileBox porque necesita ser clickable y WatchTileBox no soporta clickable.
     Column(
         modifier = Modifier
             .fillMaxWidth(0.90f)
-            .clip(RoundedCornerShape(16.dp))
-            .background(Color(0xFF15151C))
+            .background(Color(0xFF15151C), RoundedCornerShape(16.dp))
             .border(1.dp, Color(0xFF252631), RoundedCornerShape(16.dp))
             .clickable { onClick() }
             .padding(horizontal = 11.dp, vertical = 10.dp)
@@ -103,13 +104,13 @@ private fun MiniMetric(
     style: CardVisualStyle,
     modifier: Modifier = Modifier
 ) {
-    Column(
-        modifier = modifier
-            .clip(RoundedCornerShape(12.dp))
-            .background(style.bg)
-            .border(1.dp, style.border, RoundedCornerShape(12.dp))
-            .padding(horizontal = 7.dp, vertical = 7.dp),
-        horizontalAlignment = Alignment.CenterHorizontally
+    WatchTileBox(
+        modifier = modifier,
+        backgroundColor = style.bg,
+        shape = RoundedCornerShape(12.dp),
+        borderColor = style.border,
+        borderWidth = 1.dp,
+        contentPadding = PaddingValues(horizontal = 7.dp, vertical = 7.dp)
     ) {
         // Icono + etiqueta, como las tarjetas de métricas de la app móvil.
         Row(verticalAlignment = Alignment.CenterVertically) {
