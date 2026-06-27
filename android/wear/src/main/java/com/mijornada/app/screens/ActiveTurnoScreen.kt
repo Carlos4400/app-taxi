@@ -305,8 +305,8 @@ private fun PauseIcon(size: androidx.compose.ui.unit.Dp, color: Color) {
                 modifier = Modifier
                     .width(size * 0.24f)
                     .height(size * 0.66f)
-                    .clip(RoundedCornerShape(size * 0.10f))
-                    .background(color)
+                    // Patron robusto: background(color, shape) sin clip previo.
+                    .background(color, RoundedCornerShape(size * 0.10f))
             )
         }
     }
