@@ -10,13 +10,14 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.wear.compose.material.Text
+import com.mijornada.app.components.WatchActionButton
+import com.mijornada.app.components.WatchTileBox
 import com.mijornada.app.theme.*
 
 private val CardTitleFontSize = 9.sp
@@ -94,30 +95,26 @@ fun TurnoSummaryScreen(
             )
         }
         Spacer(modifier = Modifier.height(10.dp))
-        Box(
-            modifier = Modifier
-                .fillMaxWidth(0.88f)
-                .clip(RoundedCornerShape(16.dp))
-                .background(Color(0xFF1B1C23))
-                .clickable { onHome() }
-                .padding(vertical = 11.dp),
-            contentAlignment = Alignment.Center
-        ) {
-            Text("Volver al inicio", color = ColorGrey, fontSize = 12.sp, fontWeight = FontWeight.Bold)
-        }
+        WatchActionButton(
+            label = "Volver al inicio",
+            textColor = ColorGrey,
+            backgroundColor = Color(0xFF1B1C23),
+            modifier = Modifier.fillMaxWidth(0.88f),
+            shape = RoundedCornerShape(16.dp),
+            contentPadding = PaddingValues(vertical = 11.dp)
+        ) { onHome() }
     }
 }
 
 @Composable
 private fun HeaderPill(turno: WatchTurno) {
-    Column(
-        modifier = Modifier
-            .fillMaxWidth(0.88f)
-            .clip(RoundedCornerShape(15.dp))
-            .background(Color(0xFF15151C))
-            .border(1.dp, Color(0xFF252631), RoundedCornerShape(15.dp))
-            .padding(vertical = 9.dp),
-        horizontalAlignment = Alignment.CenterHorizontally
+    WatchTileBox(
+        modifier = Modifier.fillMaxWidth(0.88f),
+        backgroundColor = Color(0xFF15151C),
+        shape = RoundedCornerShape(15.dp),
+        borderColor = Color(0xFF252631),
+        borderWidth = 1.dp,
+        contentPadding = PaddingValues(vertical = 9.dp)
     ) {
         Text(formatFechaResumen(turno.startDate.ifBlank { turno.date }), color = ColorWhite, fontSize = 13.sp, fontWeight = FontWeight.Bold)
         Text("${turno.startTime} - ${turno.endTime}", color = ColorGrey, fontSize = 10.sp)
@@ -132,15 +129,13 @@ private fun SummaryMetric(
     style: CardVisualStyle,
     modifier: Modifier = Modifier
 ) {
-    Column(
-        modifier = modifier
-            .height(64.dp)
-            .clip(RoundedCornerShape(13.dp))
-            .background(style.bg)
-            .border(1.dp, style.border, RoundedCornerShape(13.dp))
-            .padding(horizontal = 7.dp, vertical = 7.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center
+    WatchTileBox(
+        modifier = modifier.height(64.dp),
+        backgroundColor = style.bg,
+        shape = RoundedCornerShape(13.dp),
+        borderColor = style.border,
+        borderWidth = 1.dp,
+        contentPadding = PaddingValues(horizontal = 7.dp, vertical = 7.dp)
     ) {
         // Icono + etiqueta, como las tarjetas de métricas de la app móvil.
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -155,13 +150,13 @@ private fun SummaryMetric(
 
 @Composable
 private fun CategorySummary(turno: WatchTurno, notasTurno: List<WatchEntry>) {
-    Column(
-        modifier = Modifier
-            .fillMaxWidth(0.88f)
-            .clip(RoundedCornerShape(18.dp))
-            .background(Color(0xFF15151C))
-            .border(1.dp, Color(0xFF252631), RoundedCornerShape(18.dp))
-            .padding(horizontal = 10.dp, vertical = 11.dp)
+    WatchTileBox(
+        modifier = Modifier.fillMaxWidth(0.88f),
+        backgroundColor = Color(0xFF15151C),
+        shape = RoundedCornerShape(18.dp),
+        borderColor = Color(0xFF252631),
+        borderWidth = 1.dp,
+        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 11.dp)
     ) {
         listOf(
             listOf("datafono", "propina"),
@@ -188,12 +183,13 @@ private fun CategorySummary(turno: WatchTurno, notasTurno: List<WatchEntry>) {
 private fun CategoryBox(type: String, total: Double, count: Int, modifier: Modifier = Modifier) {
     val meta = categoriaMeta(type)
     val categoryTitleFontSize = if (type == "agencia_bono") 7.sp else CardTitleFontSize
-    Column(
-        modifier = modifier
-            .clip(RoundedCornerShape(12.dp))
-            .background(meta.bg)
-            .border(1.dp, meta.border, RoundedCornerShape(12.dp))
-            .padding(horizontal = 7.dp, vertical = 8.dp)
+    WatchTileBox(
+        modifier = modifier,
+        backgroundColor = meta.bg,
+        shape = RoundedCornerShape(12.dp),
+        borderColor = meta.border,
+        borderWidth = 1.dp,
+        contentPadding = PaddingValues(horizontal = 7.dp, vertical = 8.dp)
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             CategoriaIcon(type, meta.color, 11.dp)
@@ -250,29 +246,30 @@ private fun CategoryNotes(entries: List<WatchEntry>) {
 
 @Composable
 private fun BottomSummary(turno: WatchTurno) {
-    Row(
-        horizontalArrangement = Arrangement.spacedBy(7.dp),
-        modifier = Modifier
-            .fillMaxWidth(0.88f)
-            .clip(RoundedCornerShape(18.dp))
-            .background(Color(0xFF15151C))
-            .border(1.dp, Color(0xFF252631), RoundedCornerShape(18.dp))
-            .padding(10.dp)
+    WatchTileBox(
+        modifier = Modifier.fillMaxWidth(0.88f),
+        backgroundColor = Color(0xFF15151C),
+        shape = RoundedCornerShape(18.dp),
+        borderColor = Color(0xFF252631),
+        borderWidth = 1.dp,
+        contentPadding = PaddingValues(10.dp)
     ) {
-        BottomSummaryCard(
-            iconType = "descontar",
-            label = "Total a descontar",
-            value = if (turno.contablePendiente) "Pendiente" else fmtEur(turno.totalADescontar),
-            style = metricCardStyle("descontar"),
-            modifier = Modifier.weight(1f)
-        )
-        BottomSummaryCard(
-            iconType = "dar",
-            label = "Total a dar",
-            value = if (turno.contablePendiente) "Pendiente" else fmtEur(turno.totalADar),
-            style = metricCardStyle("dar"),
-            modifier = Modifier.weight(1f)
-        )
+        Row(horizontalArrangement = Arrangement.spacedBy(7.dp), modifier = Modifier.fillMaxWidth()) {
+            BottomSummaryCard(
+                iconType = "descontar",
+                label = "Total a descontar",
+                value = if (turno.contablePendiente) "Pendiente" else fmtEur(turno.totalADescontar),
+                style = metricCardStyle("descontar"),
+                modifier = Modifier.weight(1f)
+            )
+            BottomSummaryCard(
+                iconType = "dar",
+                label = "Total a dar",
+                value = if (turno.contablePendiente) "Pendiente" else fmtEur(turno.totalADar),
+                style = metricCardStyle("dar"),
+                modifier = Modifier.weight(1f)
+            )
+        }
     }
 }
 
@@ -284,15 +281,13 @@ private fun BottomSummaryCard(
     style: CardVisualStyle,
     modifier: Modifier = Modifier
 ) {
-    Column(
-        modifier = modifier
-            .height(70.dp)
-            .clip(RoundedCornerShape(13.dp))
-            .background(style.bg)
-            .border(1.dp, style.border, RoundedCornerShape(13.dp))
-            .padding(horizontal = 5.dp, vertical = 7.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center
+    WatchTileBox(
+        modifier = modifier.height(70.dp),
+        backgroundColor = style.bg,
+        shape = RoundedCornerShape(13.dp),
+        borderColor = style.border,
+        borderWidth = 1.dp,
+        contentPadding = PaddingValues(horizontal = 5.dp, vertical = 7.dp)
     ) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
@@ -315,13 +310,13 @@ private fun BottomSummaryCard(
 
 @Composable
 private fun DetailedNotesBlock(entries: List<WatchEntry>) {
-    Column(
-        modifier = Modifier
-            .fillMaxWidth(0.88f)
-            .clip(RoundedCornerShape(16.dp))
-            .background(Color(0xFF15151C))
-            .border(1.dp, Color(0xFF252631), RoundedCornerShape(16.dp))
-            .padding(horizontal = 10.dp, vertical = 10.dp)
+    WatchTileBox(
+        modifier = Modifier.fillMaxWidth(0.88f),
+        backgroundColor = Color(0xFF15151C),
+        shape = RoundedCornerShape(16.dp),
+        borderColor = Color(0xFF252631),
+        borderWidth = 1.dp,
+        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 10.dp)
     ) {
         Text("Notas detalladas", color = ColorGasolina, fontSize = 9.sp, fontWeight = FontWeight.Bold)
         Spacer(modifier = Modifier.height(6.dp))
@@ -335,20 +330,21 @@ private fun DetailedNotesBlock(entries: List<WatchEntry>) {
 @Composable
 private fun NoteRow(entry: WatchEntry, general: Boolean) {
     val meta = categoriaMeta(entry.type)
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(10.dp))
-            .background(Color(0xFF1B1C23))
-            .padding(horizontal = 8.dp, vertical = 7.dp),
-        verticalAlignment = Alignment.CenterVertically
+    WatchTileBox(
+        modifier = Modifier.fillMaxWidth(),
+        backgroundColor = Color(0xFF1B1C23),
+        shape = RoundedCornerShape(10.dp),
+        borderColor = null,
+        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 7.dp)
     ) {
-        Text(entry.time, color = ColorGrey, fontSize = 8.sp, fontWeight = FontWeight.Bold)
-        Spacer(modifier = Modifier.width(6.dp))
-        Text(if (general) "Nota" else categoriaLabelSingular(entry.type), color = if (general) ColorWhite else meta.color, fontSize = 9.sp, fontWeight = FontWeight.Bold)
-        Spacer(modifier = Modifier.width(6.dp))
-        // Nota completa, con salto de línea si es larga (antes se truncaba a 18).
-        Text(entry.note, color = ColorWhite, fontSize = 8.sp, modifier = Modifier.weight(1f))
-        if (!general) Text(fmtEur(entry.amount), color = meta.color, fontSize = 9.sp, fontWeight = FontWeight.Bold)
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(entry.time, color = ColorGrey, fontSize = 8.sp, fontWeight = FontWeight.Bold)
+            Spacer(modifier = Modifier.width(6.dp))
+            Text(if (general) "Nota" else categoriaLabelSingular(entry.type), color = if (general) ColorWhite else meta.color, fontSize = 9.sp, fontWeight = FontWeight.Bold)
+            Spacer(modifier = Modifier.width(6.dp))
+            // Nota completa, con salto de línea si es larga (antes se truncaba a 18).
+            Text(entry.note, color = ColorWhite, fontSize = 8.sp, modifier = Modifier.weight(1f))
+            if (!general) Text(fmtEur(entry.amount), color = meta.color, fontSize = 9.sp, fontWeight = FontWeight.Bold)
+        }
     }
 }
