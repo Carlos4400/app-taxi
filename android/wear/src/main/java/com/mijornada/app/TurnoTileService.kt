@@ -1,5 +1,6 @@
 package com.mijornada.app
 
+import androidx.compose.ui.graphics.toArgb
 import androidx.concurrent.futures.CallbackToFutureAdapter
 import androidx.wear.protolayout.ActionBuilders
 import androidx.wear.protolayout.ColorBuilders.argb
@@ -12,6 +13,7 @@ import androidx.wear.tiles.RequestBuilders
 import androidx.wear.tiles.TileBuilders
 import androidx.wear.tiles.TileService
 import com.google.common.util.concurrent.ListenableFuture
+import com.mijornada.app.theme.ColorPropina
 
 private const val RESOURCES_VERSION = "4"
 private const val ID_LOGO = "logo_taxi"
@@ -202,9 +204,12 @@ class TurnoTileService : TileService() {
             .build()
 
     companion object {
-        // Paleta de la app (home del reloj / móvil).
-        private const val COLOR_VERDE = 0xFF3CFF64.toInt()
-        private val COLOR_VERDE_BG = 0x2E3CFF64.toInt()
+        // Paleta de la app (home del reloj / movil). El verde sale del tema
+        // (ColorPropina) para que un cambio de paleta en el tema se propague
+        // a la Tile sin tocar este archivo. Los fondos translucidos conservan
+        // el alpha 0x2E (~18%) del estilo del boton translucido del tile.
+        private val COLOR_VERDE = ColorPropina.toArgb()
+        private val COLOR_VERDE_BG = ColorPropina.copy(alpha = 0.18f).toArgb()
         private const val COLOR_AZUL = 0xFF3B82F6.toInt()
         private val COLOR_AZUL_BG = 0x2E3B82F6.toInt()
         private const val COLOR_MORADO = 0xFF7C5CFF.toInt()

@@ -187,7 +187,7 @@ describe("Android Wear bridge", () => {
     expect(source).toContain("WatchOutbox.remove(this, operationId)");
     expect(outbox).toContain("getSharedPreferences");
     expect(outbox).toContain("pendingCommands");
-    expect(worker).toContain("WatchOutbox.unpublishedCommands");
+    expect(worker).toContain("WatchOutbox.publishableCommands");
     expect(worker).toContain("WatchOutbox.markPublished");
   });
 
@@ -487,8 +487,8 @@ describe("Android Wear bridge", () => {
     expect(colors).toContain("val ColorPause = Color(0xFF7EB6FF)");
     expect(colors).toContain("val ColorPauseBorder = Color(0xFF3B82F6)");
     expect(colors).toContain("val ColorPauseBg = Color(0xFF101827)");
-    expect(screen).toContain(".border(2.dp, ColorPauseBorder");
-    expect(screen).toContain(".background(ColorPauseBg)");
+    expect(screen).toContain("borderColor = ColorPauseBorder");
+    expect(screen).toContain("backgroundColor = ColorPauseBg");
     expect(screen).toContain('"Pausar turno"');
   });
 
@@ -498,13 +498,14 @@ describe("Android Wear bridge", () => {
       "utf8",
     );
 
-    expect(screen).toContain("PausedSafeWidth = 0.70f");
+    expect(screen).toContain("PausedSafeWidth = 0.66f");
     expect(screen).toContain(".fillMaxWidth(PausedSafeWidth)");
     expect(screen).toContain("offset(y = (-8).dp)");
     // Icono compacto (2026-06-12): con la línea del contador de pausa la
     // columna fija se salía del círculo; 82dp→62dp y título a 13sp.
     expect(screen).toContain(".size(62.dp)");
-    expect(screen).toContain(".padding(vertical = 10.dp)");
+    expect(screen).toContain(".heightIn(min = 48.dp)");
+    expect(screen).toContain("vertical = 9.dp");
     expect(screen).not.toContain("Modifier.fillMaxWidth(0.82f)");
   });
 
@@ -891,10 +892,10 @@ describe("Android Wear bridge", () => {
     expect(resumen).toContain("onHome: () -> Unit");
     expect(resumen).toContain("CategorySummary(turno, notasTurno)");
     expect(resumen).toContain("private fun CategorySummary(turno: WatchTurno, notasTurno: List<WatchEntry>)");
-    expect(resumen).toContain("CategoryNotes(notasTurno)");
-    expect(resumen).toContain("private fun CategoryNotes(entries: List<WatchEntry>)");
+    expect(resumen).toContain("CategoryNotes(generalNote, notasTurno)");
+    expect(resumen).toContain("private fun CategoryNotes(generalNote: String, entries: List<WatchEntry>)");
     expect(resumen).toContain("private fun BottomSummary(");
-    expect(resumen).toContain('Text("Volver al inicio"');
+    expect(resumen).toContain('label = "Volver al inicio"');
     expect(resumen).toContain("private val CardTitleFontSize = 9.sp");
     expect(resumen.match(/fontSize = CardTitleFontSize/g)).toHaveLength(1);
     expect(resumen).not.toContain("Modifier.offset(y = (-2).dp)");
@@ -945,6 +946,10 @@ describe("Android Wear bridge", () => {
     expect(source).toContain("ScreenState.ADD_ENTRY -> currentScreen.value = ScreenState.ACTIVE_TURNO");
     expect(source).toContain("ScreenState.EDIT_ENTRY -> currentScreen.value = ScreenState.ACTIVE_TURNO");
     expect(source).toContain("ScreenState.END_TURNO -> currentScreen.value = ScreenState.ACTIVE_TURNO");
+    expect(source).toContain("ScreenState.HOME -> NoActiveTurnoScreen(");
+    expect(source).toContain("ScreenState.ACTIVE_TURNO -> currentScreen.value = ScreenState.HOME");
+    expect(source).toContain("ScreenState.HOME -> Unit");
+    expect(source).not.toContain("PAUSED_MENU");
   });
 
   it("muestra feedback visible y haptico despues de respuestas del movil", () => {
@@ -984,7 +989,7 @@ describe("Android Wear bridge", () => {
 
   it("compacta el teclado numerico para que no corte botones en pantalla redonda", () => {
     const source = readFileSync(
-      resolve(root, "android/wear/src/main/java/com/mijornada/app/screens/NumericKeypad.kt"),
+      resolve(root, "android/wear/src/main/java/com/mijornada/app/components/NumericKeypad.kt"),
       "utf8",
     );
 
@@ -995,7 +1000,7 @@ describe("Android Wear bridge", () => {
 
   it("deja el teclado de entrada con borrar cero coma en la ultima fila", () => {
     const source = readFileSync(
-      resolve(root, "android/wear/src/main/java/com/mijornada/app/screens/NumericKeypad.kt"),
+      resolve(root, "android/wear/src/main/java/com/mijornada/app/components/NumericKeypad.kt"),
       "utf8",
     );
 
@@ -1036,7 +1041,7 @@ describe("Android Wear bridge", () => {
       "utf8",
     );
 
-    expect(source).toContain(`Text("Eliminar entrada", color = ColorGasolina`);
+    expect(source).toContain(`label = "Eliminar entrada"`);
     expect(source).not.toContain(`Text("Borrar entrada"`);
   });
 
@@ -1059,7 +1064,7 @@ describe("Android Wear bridge", () => {
     expect(source).toContain("NumericKeypadRedondo(");
     expect(source).toContain("keyHeight = d * 0.105f");
     expect(source).not.toContain("0xDD000000");
-    expect(source).toContain("verticalScroll(rememberScrollState())");
+    expect(source).toContain("verticalScroll(scrollState)");
     expect(source).not.toContain("var confirming");
     expect(source).not.toContain("ConfirmarCierre(");
     expect(source).not.toContain("Revisar");
@@ -1090,10 +1095,56 @@ describe("Android Wear bridge", () => {
     // bottom 44 (2026-06-12): con 22 el último botón quedaba recortado por
     // la curva inferior del círculo al final del scroll.
     expect(source).toContain("bottom = 44.dp");
-    expect(source).toContain(`Text("Terminar turno"`);
-    expect(source).toContain("verticalScroll(rememberScrollState())");
+    expect(source).toContain(`label = "Terminar turno"`);
+    expect(source).toContain("verticalScroll(scrollState)");
     expect(source).not.toContain("align(Alignment.BottomCenter)");
     expect(source).not.toContain("ScalingLazyColumn");
+  });
+
+  it("permite desplazarse con la corona en el turno activo Wear", () => {
+    const source = readFileSync(
+      resolve(root, "android/wear/src/main/java/com/mijornada/app/screens/ActiveTurnoScreen.kt"),
+      "utf8",
+    );
+
+    expect(source).toContain("val scrollState = rememberScrollState()");
+    expect(source).toContain("import com.mijornada.app.components.wearRotaryScroll");
+    expect(source).toContain(".wearRotaryScroll(scrollState)");
+    expect(source).toContain(".verticalScroll(scrollState)");
+  });
+
+  it("usa soporte de corona en todas las pantallas Wear con scroll vertical", () => {
+    const helper = readFileSync(
+      resolve(root, "android/wear/src/main/java/com/mijornada/app/components/WearRotaryScroll.kt"),
+      "utf8",
+    );
+    const scrollableFiles = [
+      "ActiveTurnoScreen.kt",
+      "AddEntryScreen.kt",
+      "EndTurnoScreen.kt",
+      "EditTurnoDatosScreen.kt",
+      "TurnoSummaryScreen.kt",
+      "TurnosScreen.kt",
+    ];
+
+    expect(helper).toContain("fun Modifier.wearRotaryScroll(scrollState: ScrollState): Modifier");
+    expect(helper).toContain("onRotaryScrollEvent");
+    expect(helper).toContain("scrollState.scrollBy(it.verticalScrollPixels)");
+    expect(helper).toContain("focusRequester.requestFocus()");
+    expect(helper).toContain("focusable()");
+
+    for (const file of scrollableFiles) {
+      const source = readFileSync(
+        resolve(root, `android/wear/src/main/java/com/mijornada/app/screens/${file}`),
+        "utf8",
+      );
+      const verticalScrollCount = (source.match(/\.verticalScroll\(/g) ?? []).length;
+      const rotaryScrollCount = (source.match(/\.wearRotaryScroll\(/g) ?? []).length;
+
+      expect(verticalScrollCount, file).toBeGreaterThan(0);
+      expect(rotaryScrollCount, file).toBe(verticalScrollCount);
+      expect(source, file).not.toContain("verticalScroll(rememberScrollState())");
+    }
   });
 
   it("espeja la contabilidad de la app en el reloj sin recalcularla en nativo", () => {
@@ -1145,6 +1196,133 @@ describe("Android Wear bridge", () => {
     expect(activity).toContain("selectedTurno.value = list.firstOrNull { it.id == abierto.id } ?: abierto");
   });
 
+  it("mantiene nullable la contabilidad pendiente en la UI Wear", () => {
+    const watchModels = readFileSync(
+      resolve(root, "android/wear/src/main/java/com/mijornada/app/screens/WatchModels.kt"),
+      "utf8",
+    );
+    const activity = readFileSync(
+      resolve(root, "android/wear/src/main/java/com/mijornada/app/WearMainActivity.kt"),
+      "utf8",
+    );
+    const turnosScreen = readFileSync(
+      resolve(root, "android/wear/src/main/java/com/mijornada/app/screens/TurnosScreen.kt"),
+      "utf8",
+    );
+    const summaryScreen = readFileSync(
+      resolve(root, "android/wear/src/main/java/com/mijornada/app/screens/TurnoSummaryScreen.kt"),
+      "utf8",
+    );
+    const sharedTypes = readFileSync(resolve(root, "src/shared/watch-commands.ts"), "utf8");
+
+    expect(watchModels).toContain("val totalTaximetro: Double?");
+    expect(watchModels).toContain("val miGanancia: Double?");
+    expect(watchModels).toContain("val totalADescontar: Double?");
+    expect(watchModels).toContain("val totalADar: Double?");
+    expect(sharedTypes).toContain("totalTaximetro: number | null;");
+    expect(sharedTypes).toContain("miGanancia: number | null;");
+    expect(sharedTypes).toContain("totalADescontar: number | null;");
+    expect(sharedTypes).toContain("totalADar: number | null;");
+
+    expect(activity).toContain('private fun nullableDouble(json: JSONObject, key: String): Double?');
+    expect(activity).toContain('totalTaximetro = nullableDouble(o, "totalTaximetro")');
+    expect(activity).toContain('miGanancia = nullableDouble(o, "miGanancia")');
+    expect(activity).toContain('totalADescontar = nullableDouble(o, "totalADescontar")');
+    expect(activity).toContain('totalADar = nullableDouble(o, "totalADar")');
+    expect(activity).not.toContain('miGanancia = o.optDouble("miGanancia", 0.0)');
+    expect(activity).toContain("miGanancia = null");
+    expect(activity).toContain("totalADescontar = null");
+    expect(activity).toContain("totalADar = null");
+
+    expect(turnosScreen).toContain("turnoTaximetroLabel(turno)");
+    expect(turnosScreen).toContain("turnoAccountingLabel(turno.contablePendiente, turno.miGanancia)");
+    expect(summaryScreen).toContain("turnoTaximetroLabel(turno)");
+    expect(summaryScreen).toContain("turnoAccountingLabel(turno.contablePendiente, turno.totalADar)");
+  });
+
+  it("mantiene la excepcion de totalTaximetro y propaga notas generales a Wear", () => {
+    const responseJson = readFileSync(
+      resolve(root, "android/app/src/main/java/com/mijornada/app/watch/WatchResponseJson.kt"),
+      "utf8",
+    );
+    const watchModels = readFileSync(
+      resolve(root, "android/wear/src/main/java/com/mijornada/app/screens/WatchModels.kt"),
+      "utf8",
+    );
+    const activity = readFileSync(
+      resolve(root, "android/wear/src/main/java/com/mijornada/app/WearMainActivity.kt"),
+      "utf8",
+    );
+    const summaryScreen = readFileSync(
+      resolve(root, "android/wear/src/main/java/com/mijornada/app/screens/TurnoSummaryScreen.kt"),
+      "utf8",
+    );
+    const sharedTypes = readFileSync(resolve(root, "src/shared/watch-commands.ts"), "utf8");
+    const processor = readFileSync(
+      resolve(root, "src/logic/watch-command-processor.ts"),
+      "utf8",
+    );
+
+    expect(responseJson).toContain('.put("totalTaximetro", turno.totalTaximetro ?: (turno.dinero - totalNulo))');
+    expect(responseJson).toContain('.put("notes", turno.notes)');
+    expect(sharedTypes).toContain("notes: string;");
+    expect(processor).toContain("notes: turno.notes ?? \"\"");
+    expect(watchModels).toContain("val notes: String = \"\"");
+    expect(activity).toContain('notes = o.optString("notes", "")');
+    expect(summaryScreen).toContain("turno.notes.trim()");
+    expect(summaryScreen).toContain("GeneralNoteRow(generalNote)");
+  });
+
+  it("usa fondos opacos en metricas Taximetro y Tiempo del reloj", () => {
+    const colors = readFileSync(
+      resolve(root, "android/wear/src/main/java/com/mijornada/app/theme/Color.kt"),
+      "utf8",
+    );
+
+    expect(colors).toContain("val ColorTaximetroBg = Color(0xFF");
+    expect(colors).toContain("val ColorTiempoBg = Color(0xFF");
+    expect(colors).not.toContain("val ColorTaximetroBg = Color(0x0F");
+    expect(colors).not.toContain("val ColorTiempoBg = Color(0x0D");
+  });
+
+  it("cierra Room al limpiar el usuario preparado del bridge Wear", () => {
+    const plugin = readFileSync(
+      resolve(root, "android/app/src/main/java/com/mijornada/app/WearOsBridgePlugin.java"),
+      "utf8",
+    );
+    const clearPreparedBlock = plugin.slice(
+      plugin.indexOf("public void clearPrepared(PluginCall call)"),
+      plugin.indexOf("@PluginMethod", plugin.indexOf("public void clearPrepared(PluginCall call)") + 1),
+    );
+
+    expect(clearPreparedBlock).toContain("WatchDatabaseProvider.clear();");
+    expect(clearPreparedBlock.indexOf("WatchUserSession.clearIfMatches(getContext(), uid)"))
+      .toBeLessThan(clearPreparedBlock.indexOf("WatchDatabaseProvider.clear();"));
+  });
+
+  it("marca el estado Wear como no confirmado si GET_STATUS no responde", () => {
+    const activity = readFileSync(
+      resolve(root, "android/wear/src/main/java/com/mijornada/app/WearMainActivity.kt"),
+      "utf8",
+    );
+
+    expect(activity).toContain("private val statusTimeoutRunnable = Runnable { showDisconnectedIfUiActive() }");
+    expect(activity).toContain("private fun scheduleStatusTimeout()");
+    expect(activity).toContain("private fun cancelStatusTimeout()");
+    expect(activity).toContain("scheduleStatusTimeout()");
+    expect(activity).toContain("cancelStatusTimeout()");
+    const requestStatusBlock = activity.slice(
+      activity.indexOf("private fun requestStatus()"),
+      activity.indexOf("private fun sendStartTurno()"),
+    );
+    const statusHandlerBlock = activity.slice(
+      activity.indexOf("if (responseType == \"STATUS\")"),
+      activity.indexOf("} else if (\"TURNOS_STATUS\""),
+    );
+    expect(requestStatusBlock).toContain("scheduleStatusTimeout()");
+    expect(statusHandlerBlock).toContain("cancelStatusTimeout()");
+  });
+
   it("muestra las notas completas en el reloj sin truncarlas", () => {
     const active = readFileSync(
       resolve(root, "android/wear/src/main/java/com/mijornada/app/screens/ActiveTurnoScreen.kt"),
@@ -1160,7 +1338,7 @@ describe("Android Wear bridge", () => {
     );
 
     // La nota de cada entrada es visible en ULTIMAS ENTRADAS, como en la app movil.
-    expect(active).toContain("TextOverflow.Ellipsis");
+    expect(active).not.toContain("TextOverflow.Ellipsis");
     expect(active).toContain("if (entry.note.isNotBlank()) {");
     // Ninguna pantalla trunca notas a N caracteres.
     expect(active).not.toContain("entry.note.take(");
@@ -1193,8 +1371,8 @@ describe("Android Wear bridge", () => {
     expect(resumen).toContain('"dar"');
     expect(turnos).toContain('MiniMetric("taximetro"');
     // Sin notas: una sola linea en cursiva dentro del panel de categorias.
-    expect(resumen).toContain("CategoryNotes(notasTurno)");
-    expect(resumen).toContain("if (entries.isEmpty())");
+    expect(resumen).toContain("CategoryNotes(generalNote, notasTurno)");
+    expect(resumen).toContain("if (generalNote.isBlank() && entries.isEmpty())");
     expect(resumen).toContain("FontStyle.Italic");
     expect(cierre).toContain("FontStyle.Italic");
   });
@@ -1482,9 +1660,9 @@ describe("Android Wear bridge", () => {
     expect(turnos).toContain('"Tiempo trabajado"');
     expect(turnos).toContain('metricCardStyle("km")');
     expect(turnos).toContain('metricCardStyle("tiempo")');
-    expect(resumen).toContain(".border(1.dp, meta.border, RoundedCornerShape(12.dp))");
-    expect(activo).toContain(".border(1.dp, meta.border, RoundedCornerShape(14.dp))");
-    expect(cierre).toContain(".border(1.dp, meta.border, RoundedCornerShape(12.dp))");
+    expect(resumen).toContain("borderColor = meta.border");
+    expect(activo).toContain("borderColor = meta.border");
+    expect(cierre).toContain("borderColor = meta.border");
     expect(turnos).not.toContain("ColorExtra, ColorExtraBg");
     expect(turnos).not.toContain("ColorNulo, ColorNuloBg");
     expect(resumen).not.toContain("ColorExtra, ColorExtraBg");
@@ -1554,10 +1732,11 @@ describe("Android Wear bridge", () => {
 
     expect(outbox).toContain("val publishedAt: Long");
     expect(outbox).toContain("fun unpublishedCommands");
+    expect(outbox).toContain("fun publishableCommands");
     expect(outbox).toContain("fun markPublished");
     expect(outbox).toContain(".commit()");
     expect(outbox).not.toContain("removeCommandsFromOtherSessions");
-    expect(worker).toContain("WatchOutbox.unpublishedCommands");
+    expect(worker).toContain("WatchOutbox.publishableCommands");
     expect(worker).toContain("WatchOutbox.markPublished");
     expect(worker).not.toContain("MAX_RUN_ATTEMPTS");
     expect(activity).not.toContain("PowerManager.WakeLock");
@@ -1579,6 +1758,25 @@ describe("Android Wear bridge", () => {
     );
     expect(session).toContain(".commit()");
     expect(session).not.toContain(".apply()");
+  });
+
+  it("republica comandos Wear publicados que siguen sin respuesta terminal", () => {
+    const outbox = readFileSync(
+      resolve(root, "android/wear/src/main/java/com/mijornada/app/WatchOutbox.kt"),
+      "utf8",
+    );
+    const worker = readFileSync(
+      resolve(root, "android/wear/src/main/java/com/mijornada/app/OutboxWorker.kt"),
+      "utf8",
+    );
+
+    expect(outbox).toContain("const val PUBLISHED_STALE_MS");
+    expect(outbox).toContain("fun publishableCommands(context: Context, now: Long");
+    expect(outbox).toContain("it.publishedAt <= 0L || it.publishedAt < staleBefore");
+    expect(worker).toContain("val now = System.currentTimeMillis()");
+    expect(worker).toContain("WatchOutbox.publishableCommands(applicationContext, now)");
+    expect(worker).toContain("request.dataMap.putLong(\"createdAt\", now)");
+    expect(worker).not.toContain("WatchOutbox.unpublishedCommands(applicationContext).values.forEach");
   });
 
   it("notifica respuestas terminales cuando la interfaz Wear no esta visible", () => {

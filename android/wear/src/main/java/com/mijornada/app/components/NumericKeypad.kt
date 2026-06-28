@@ -1,4 +1,4 @@
-package com.mijornada.app.screens
+package com.mijornada.app.components
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -7,7 +7,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
@@ -123,8 +122,13 @@ private fun KeyButton(
     Box(
         modifier = modifier
             .height(keyHeight)
-            .clip(RoundedCornerShape(cornerRadius))
-            .background(Color(0xFF1C1C24))
+            // Patron robusto: background(color, shape) en una sola capa de pintado.
+            // Ya no usa .clip() antes del background (patron fragil del bug
+            // original que el PLAN excluyo y que en 2026-06-28 se elimina
+            // como excepcion: el componente no aplica alpha < 1, asi que el
+            // patron fragil nunca se manifestaba, pero mantenerlo perpetuaba
+            // el riesgo si en el futuro alguien aniade un alpha a esta cadena).
+            .background(Color(0xFF1C1C24), RoundedCornerShape(cornerRadius))
             .clickable { onClick() },
         contentAlignment = Alignment.Center
     ) {

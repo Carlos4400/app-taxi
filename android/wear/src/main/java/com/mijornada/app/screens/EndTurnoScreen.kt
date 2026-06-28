@@ -16,9 +16,14 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.wear.compose.material.Text
+import com.mijornada.app.components.NumericKeypadRedondo
 import com.mijornada.app.components.WatchActionButton
 import com.mijornada.app.components.WatchMetricCard
 import com.mijornada.app.components.WatchTileBox
+import com.mijornada.app.components.amountToText
+import com.mijornada.app.components.applyKey
+import com.mijornada.app.components.parseAmount
+import com.mijornada.app.components.wearRotaryScroll
 import com.mijornada.app.theme.*
 
 @Composable
@@ -38,6 +43,7 @@ fun EndTurnoScreen(
     val km = parseAmount(kmText)
     val notasTurno = entradas.filter { it.type == "nota" && it.note.isNotBlank() }
     val notasDetalladas = entradas.filter { it.type != "nota" && it.note.isNotBlank() }
+    val scrollState = rememberScrollState()
 
     Box(
         modifier = Modifier
@@ -47,7 +53,8 @@ fun EndTurnoScreen(
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .verticalScroll(rememberScrollState())
+                .wearRotaryScroll(scrollState)
+                .verticalScroll(scrollState)
                 // bottom 44: con 18 el último botón ("Cancelar") quedaba
                 // recortado por la curva inferior del círculo al final del scroll.
                 .padding(start = 18.dp, end = 18.dp, top = 20.dp, bottom = 44.dp),

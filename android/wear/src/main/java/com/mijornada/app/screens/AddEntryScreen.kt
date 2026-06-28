@@ -16,7 +16,12 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.wear.compose.material.Text
+import com.mijornada.app.components.NumericKeypad
 import com.mijornada.app.components.WatchActionButton
+import com.mijornada.app.components.amountToText
+import com.mijornada.app.components.applyKey
+import com.mijornada.app.components.parseAmount
+import com.mijornada.app.components.wearRotaryScroll
 import com.mijornada.app.theme.*
 
 @Composable
@@ -38,6 +43,7 @@ fun AddEntryScreen(
     var saving by remember { mutableStateOf(false) }
 
     val amount = parseAmount(amountText)
+    val scrollState = rememberScrollState()
 
     if (esNota) {
         NotaEditor(
@@ -63,7 +69,8 @@ fun AddEntryScreen(
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .verticalScroll(rememberScrollState())
+                .wearRotaryScroll(scrollState)
+                .verticalScroll(scrollState)
                 // bottom 44: que el último botón ("Eliminar entrada" en edición)
                 // no lo recorte la curva inferior del círculo al final del scroll.
                 .padding(top = 18.dp, bottom = 44.dp),
@@ -236,6 +243,8 @@ private fun NotaEditor(
     onCancel: () -> Unit,
     onDelete: (() -> Unit)?
 ) {
+    val scrollState = rememberScrollState()
+
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -245,7 +254,8 @@ private fun NotaEditor(
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .verticalScroll(rememberScrollState()),
+                .wearRotaryScroll(scrollState)
+                .verticalScroll(scrollState),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Spacer(modifier = Modifier.height(22.dp))

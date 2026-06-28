@@ -1,3 +1,1378 @@
+## 2026-06-28 23:12 - Eliminar excepcion del patron fragil y unificar paleta Tile
+
+**Archivos modificados:**
+- `PLAN_FIX_BOTONES_WEAR.md`
+- `android/wear/src/main/java/com/mijornada/app/components/NumericKeypad.kt` (nuevo, antes en `screens/`)
+- `android/wear/src/main/java/com/mijornada/app/screens/AddEntryScreen.kt`
+- `android/wear/src/main/java/com/mijornada/app/screens/EditTurnoDatosScreen.kt`
+- `android/wear/src/main/java/com/mijornada/app/screens/EndTurnoScreen.kt`
+- `android/wear/src/main/java/com/mijornada/app/TurnoTileService.kt`
+- `src/__tests__/android-wear-bridge.test.ts`
+
+### Cambio 1 - NumericKeypad reubicado a components/
+
+#### Codigo anterior
+```kotlin
+// android/wear/src/main/java/com/mijornada/app/screens/NumericKeypad.kt:1
+package com.mijornada.app.screens
+```
+
+`No existia android/wear/src/main/java/com/mijornada/app/components/NumericKeypad.kt.`
+
+#### Codigo nuevo
+```kotlin
+// android/wear/src/main/java/com/mijornada/app/components/NumericKeypad.kt:1
+package com.mijornada.app.components
+```
+
+#### Por que se cambio
+`NumericKeypad` y `NumericKeypadRedondo` se usan desde `AddEntryScreen`, `EditTurnoDatosScreen` y `EndTurnoScreen` (3 pantallas distintas). Segun la regla "Organizacion del codigo Wear OS" anadida en `ARQUITECTURA_RELOJ_WEAR_OS.md` el 2026-06-28 22:06, `components/` agrupa componentes reutilizables entre varias pantallas y `screens/` agrupa pantallas o composables privados de una pantalla. El archivo se mueve de `screens/` a `components/` para alinearse con esa regla.
+
+### Cambio 2 - KeyButton con patron robusto (sin clip)
+
+#### Codigo anterior
+```kotlin
+// android/wear/src/main/java/com/mijornada/app/components/NumericKeypad.kt:113-138
+@Composable
+private fun KeyButton(
+    label: String,
+    color: Color,
+    keyHeight: Dp,
+    keyFontSize: TextUnit,
+    cornerRadius: Dp = 9.dp,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit
+) {
+    Box(
+        modifier = modifier
+            .height(keyHeight)
+            .clip(RoundedCornerShape(cornerRadius))
+            .background(Color(0xFF1C1C24))
+            .clickable { onClick() },
+        contentAlignment = Alignment.Center
+    ) {
+        Text(
+            text = if (label == "DEL") "⌫" else label,
+            color = if (label == "DEL") color else ColorWhite,
+            fontSize = keyFontSize,
+            fontWeight = FontWeight.Bold
+        )
+    }
+}
+```
+
+```kotlin
+// android/wear/src/main/java/com/mijornada/app/components/NumericKeypad.kt:3
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+```
+
+#### Codigo nuevo
+```kotlin
+// android/wear/src/main/java/com/mijornada/app/components/NumericKeypad.kt:113-141
+@Composable
+private fun KeyButton(
+    label: String,
+    color: Color,
+    keyHeight: Dp,
+    keyFontSize: TextUnit,
+    cornerRadius: Dp = 9.dp,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit
+) {
+    Box(
+        modifier = modifier
+            .height(keyHeight)
+            // Patron robusto: background(color, shape) en una sola capa de pintado.
+            .background(Color(0xFF1C1C24), RoundedCornerShape(cornerRadius))
+            .clickable { onClick() },
+        contentAlignment = Alignment.Center
+    ) {
+        Text(
+            text = if (label == "DEL") "⌫" else label,
+            color = if (label == "DEL") color else ColorWhite,
+            fontSize = keyFontSize,
+            fontWeight = FontWeight.Bold
+        )
+    }
+}
+```
+
+```kotlin
+// android/wear/src/main/java/com/mijornada/app/components/NumericKeypad.kt:3
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+```
+
+#### Por que se cambio
+`PLAN_FIX_BOTONES_WEAR.md:347` declaraba `NumericKeypad.KeyButton` como excepcion "No tocar" porque el componente nunca aplica `alpha < 1` y por tanto el patron fragil `clip().background()` no se manifestaba en la practica. Mantenerlo perpetuaba el riesgo si en el futuro alguien aniadia un `.alpha(...)` a la cadena, reproduciendo el bug original del fondo perdido. Se elimina la excepcion y se aplica el patron robusto (`background(color, shape)` en una sola capa) ya usado en el resto del modulo Wear. Import `androidx.compose.ui.draw.clip` retirado al quedar sin uso.
+
+### Cambio 3 - Imports de NumericKeypad en pantallas
+
+#### Codigo anterior
+```kotlin
+// android/wear/src/main/java/com/mijornada/app/screens/AddEntryScreen.kt:19-20
+import com.mijornada.app.components.WatchActionButton
+import com.mijornada.app.components.wearRotaryScroll
+```
+
+```kotlin
+// android/wear/src/main/java/com/mijornada/app/screens/EditTurnoDatosScreen.kt:25-27
+import com.mijornada.app.components.WatchActionButton
+import com.mijornada.app.components.WatchMetricCard
+import com.mijornada.app.components.wearRotaryScroll
+```
+
+```kotlin
+// android/wear/src/main/java/com/mijornada/app/screens/EndTurnoScreen.kt:19-22
+import com.mijornada.app.components.WatchActionButton
+import com.mijornada.app.components.WatchMetricCard
+import com.mijornada.app.components.WatchTileBox
+import com.mijornada.app.components.wearRotaryScroll
+```
+
+#### Codigo nuevo
+```kotlin
+// android/wear/src/main/java/com/mijornada/app/screens/AddEntryScreen.kt:19-21
+import com.mijornada.app.components.NumericKeypad
+import com.mijornada.app.components.WatchActionButton
+import com.mijornada.app.components.wearRotaryScroll
+```
+
+```kotlin
+// android/wear/src/main/java/com/mijornada/app/screens/EditTurnoDatosScreen.kt:25-28
+import com.mijornada.app.components.NumericKeypad
+import com.mijornada.app.components.WatchActionButton
+import com.mijornada.app.components.WatchMetricCard
+import com.mijornada.app.components.wearRotaryScroll
+```
+
+```kotlin
+// android/wear/src/main/java/com/mijornada/app/screens/EndTurnoScreen.kt:19-23
+import com.mijornada.app.components.NumericKeypadRedondo
+import com.mijornada.app.components.WatchActionButton
+import com.mijornada.app.components.WatchMetricCard
+import com.mijornada.app.components.WatchTileBox
+import com.mijornada.app.components.wearRotaryScroll
+```
+
+#### Por que se cambio
+Al mover `NumericKeypad.kt` a `package com.mijornada.app.components`, las pantallas ya no resuelven los composables por estar en el mismo paquete (`com.mijornada.app.screens`). Se anade el import explicito en cada pantalla que los usa.
+
+### Cambio 4 - Plan elimina la excepcion de NumericKeypad
+
+#### Codigo anterior
+```md
+### 4.6. `NumericKeypad.kt`
+**No tocar.** El teclado numerico recompone intencionalmente con cada pulsacion y su layout ya esta optimizado.
+```
+
+#### Codigo nuevo
+```md
+### 4.6. `NumericKeypad.kt`
+Reubicado a `components/` por la regla de organizacion del codigo Wear
+(teclados son reutilizables, no composables privados de una pantalla).
+Su `KeyButton` privado adopta el patron robusto `background(color, shape)` para
+no perpetuar la excepcion del patron fragil. No hay cambio funcional: el
+componente nunca aplica `alpha < 1`, asi que el patron robusto es equivalente
+en practica y elimina el riesgo si alguien aniade un alpha en el futuro.
+```
+
+#### Por que se cambio
+El plan declaraba `NumericKeypad` como excepcion "no tocar" mientras el bug del patron fragil estuviera activo en su codigo. Tras aplicar el patron robusto (Cambio 2), la excepcion ya no aporta valor: no hay riesgo de regresion que vigilar. La nota del plan se reemplaza por una descripcion del estado actual para que el lector entienda que ya no es una excepcion pendiente.
+
+### Cambio 5 - Tile usa ColorPropina del tema
+
+#### Codigo anterior
+```kotlin
+// android/wear/src/main/java/com/mijornada/app/TurnoTileService.kt:13-14
+import androidx.wear.tiles.TileBuilders
+import androidx.wear.tiles.TileService
+import com.google.common.util.concurrent.ListenableFuture
+```
+
+```kotlin
+// android/wear/src/main/java/com/mijornada/app/TurnoTileService.kt:204-212
+    companion object {
+        // Paleta de la app (home del reloj / movil).
+        private const val COLOR_VERDE = 0xFF3CFF64.toInt()
+        private val COLOR_VERDE_BG = 0x2E3CFF64.toInt()
+        private const val COLOR_AZUL = 0xFF3B82F6.toInt()
+        private val COLOR_AZUL_BG = 0x2E3B82F6.toInt()
+        private const val COLOR_MORADO = 0xFF7C5CFF.toInt()
+        private val COLOR_MORADO_BG = 0x2E7C5CFF.toInt()
+    }
+```
+
+#### Codigo nuevo
+```kotlin
+// android/wear/src/main/java/com/mijornada/app/TurnoTileService.kt:13-15
+import androidx.compose.ui.graphics.toArgb
+import androidx.wear.tiles.TileBuilders
+import androidx.wear.tiles.TileService
+import com.google.common.util.concurrent.ListenableFuture
+import com.mijornada.app.theme.ColorPropina
+```
+
+```kotlin
+// android/wear/src/main/java/com/mijornada/app/TurnoTileService.kt:205-215
+    companion object {
+        // Paleta de la app (home del reloj / movil). El verde sale del tema
+        // (ColorPropina) para que un cambio de paleta en el tema se propague
+        // a la Tile sin tocar este archivo. Los fondos translucidos conservan
+        // el alpha 0x2E (~18%) del estilo del boton translucido del tile.
+        private val COLOR_VERDE = ColorPropina.toArgb()
+        private val COLOR_VERDE_BG = ColorPropina.copy(alpha = 0.18f).toArgb()
+        private const val COLOR_AZUL = 0xFF3B82F6.toInt()
+        private val COLOR_AZUL_BG = 0x2E3B82F6.toInt()
+        private const val COLOR_MORADO = 0xFF7C5CFF.toInt()
+        private val COLOR_MORADO_BG = 0x2E7C5CFF.toInt()
+    }
+```
+
+#### Por que se cambio
+La Tile del reloj declaraba `COLOR_VERDE = 0xFF3CFF64` como constante local mientras el tema `Color.kt` define `ColorPropina = 0xFF26B63D` para el mismo estado semantico ("turno va bien" / "tienes propinas"). Dos verdes para la misma idea: si se cambia el verde del tema, la Tile queda desincronizada. Se importa `ColorPropina` y se calcula `COLOR_VERDE` y `COLOR_VERDE_BG` (translucido con alpha 0x18 ≈ 0x2E original) a partir del tema. Los azules y morados quedan pendientes de un audit similar cuando se decida la paleta completa del modulo.
+
+### Cambio 6 - Tests del teclado apuntan al nuevo path
+
+#### Codigo anterior
+```ts
+// src/__tests__/android-wear-bridge.test.ts:992
+      resolve(root, "android/wear/src/main/java/com/mijornada/app/screens/NumericKeypad.kt"),
+```
+
+```ts
+// src/__tests__/android-wear-bridge.test.ts:1003
+      resolve(root, "android/wear/src/main/java/com/mijornada/app/screens/NumericKeypad.kt"),
+```
+
+#### Codigo nuevo
+```ts
+// src/__tests__/android-wear-bridge.test.ts:992
+      resolve(root, "android/wear/src/main/java/com/mijornada/app/components/NumericKeypad.kt"),
+```
+
+```ts
+// src/__tests__/android-wear-bridge.test.ts:1003
+      resolve(root, "android/wear/src/main/java/com/mijornada/app/components/NumericKeypad.kt"),
+```
+
+#### Por que se cambio
+Tras mover `NumericKeypad.kt` a `components/`, los tests `compacta el teclado numerico...` y `deja el teclado de entrada con borrar cero coma en la ultima fila` apuntan al path antiguo y fallarian con `ENOENT`. Se actualizan ambos paths para que sigan leyendo del archivo correcto.
+
+## 2026-06-28 22:06 - Documentar estructura Wear
+
+**Archivos modificados:** `ARQUITECTURA_RELOJ_WEAR_OS.md`
+
+### Cambio 1 - Organizacion del codigo Wear OS
+
+#### Codigo anterior
+`No existia la seccion "Organizacion del codigo Wear OS" en ARQUITECTURA_RELOJ_WEAR_OS.md.`
+
+#### Codigo nuevo
+```md
+## Organizacion del codigo Wear OS
+
+El modulo Wear se organiza por responsabilidad:
+
+- `android/wear/src/main/java/com/mijornada/app/screens/`: pantallas completas
+  y composables privados de una pantalla.
+- `android/wear/src/main/java/com/mijornada/app/components/`: componentes o
+  helpers reutilizables entre varias pantallas.
+- `android/wear/src/main/java/com/mijornada/app/theme/`: colores, tokens,
+  shapes y constantes visuales compartidas.
+- Raiz `android/wear/src/main/java/com/mijornada/app/`: Activity, servicios,
+  workers, outbox, tiles, complicaciones y coordinacion movil-reloj.
+
+Antes de crear una carpeta raiz nueva, comprobar si el codigo encaja en una de
+las raices existentes. No crear nuevas raices por comodidad ni por un unico
+archivo.
+
+Si una responsabilidad nueva no encaja en `screens/`, `components/`, `theme/`
+ni en la infraestructura raiz, se puede crear una nueva carpeta raiz. En ese
+caso, actualizar este documento explicando brevemente la responsabilidad de esa
+carpeta y por que no encaja en las raices existentes.
+```
+
+#### Por que se cambio
+La arquitectura Wear no dejaba una regla breve para decidir donde colocar codigo nuevo. La nueva seccion documenta las raices existentes y exige justificar en este documento cualquier raiz estructural nueva.
+
+## 2026-06-28 21:51 - Corregir contrato Wear pendiente
+
+**Archivos modificados:** `android/app/src/main/java/com/mijornada/app/WearOsBridgePlugin.java`, `android/app/src/main/java/com/mijornada/app/watch/WatchResponseJson.kt`, `android/wear/src/main/java/com/mijornada/app/WearMainActivity.kt`, `android/wear/src/main/java/com/mijornada/app/screens/TurnoSummaryScreen.kt`, `android/wear/src/main/java/com/mijornada/app/screens/WatchModels.kt`, `android/wear/src/main/java/com/mijornada/app/theme/Color.kt`, `src/__tests__/android-wear-bridge.test.ts`, `src/logic/watch-command-processor.ts`, `src/shared/watch-commands.ts`
+
+### Cambio 1 - Notas generales en TURNOS_STATUS
+
+#### Código anterior
+```kotlin
+                    .put("dinero", turno.dinero)
+                    .put("km", turno.km)
+                    .put("totalTaximetro", turno.totalTaximetro ?: (turno.dinero - totalNulo))
+```
+
+```kotlin
+    val km: Double,
+    val totalTaximetro: Double?,
+    val miGanancia: Double?,
+```
+
+```kotlin
+                    dinero = o.optDouble("dinero", 0.0),
+                    km = o.optDouble("km", 0.0),
+                    totalTaximetro = nullableDouble(o, "totalTaximetro"),
+```
+
+#### Código nuevo
+```kotlin
+                    .put("dinero", turno.dinero)
+                    .put("km", turno.km)
+                    .put("notes", turno.notes)
+                    .put("totalTaximetro", turno.totalTaximetro ?: (turno.dinero - totalNulo))
+```
+
+```kotlin
+    val km: Double,
+    val notes: String = "",
+    val totalTaximetro: Double?,
+    val miGanancia: Double?,
+```
+
+```kotlin
+                    dinero = o.optDouble("dinero", 0.0),
+                    km = o.optDouble("km", 0.0),
+                    notes = o.optString("notes", ""),
+                    totalTaximetro = nullableDouble(o, "totalTaximetro"),
+```
+
+#### Por qué se cambió
+El historial cerrado conservaba `notes` en el móvil, pero `TURNOS_STATUS` no lo enviaba ni el reloj lo parseaba. Se añade el campo al contrato para que las notas generales del turno lleguen al resumen Wear sin cambiar la excepción de `totalTaximetro`.
+
+### Cambio 2 - Notas generales visibles en el resumen Wear
+
+#### Código anterior
+```kotlin
+private fun CategorySummary(turno: WatchTurno, notasTurno: List<WatchEntry>) {
+    WatchTileBox(
+```
+
+```kotlin
+        CategoryNotes(notasTurno)
+```
+
+```kotlin
+private fun CategoryNotes(entries: List<WatchEntry>) {
+```
+
+```kotlin
+    if (entries.isEmpty()) {
+```
+
+`No existía GeneralNoteRow en android/wear/src/main/java/com/mijornada/app/screens/TurnoSummaryScreen.kt.`
+
+#### Código nuevo
+```kotlin
+private fun CategorySummary(turno: WatchTurno, notasTurno: List<WatchEntry>) {
+    val generalNote = turno.notes.trim()
+    WatchTileBox(
+```
+
+```kotlin
+        CategoryNotes(generalNote, notasTurno)
+```
+
+```kotlin
+private fun CategoryNotes(generalNote: String, entries: List<WatchEntry>) {
+```
+
+```kotlin
+    if (generalNote.isBlank() && entries.isEmpty()) {
+```
+
+```kotlin
+@Composable
+private fun GeneralNoteRow(note: String) {
+    WatchTileBox(
+        modifier = Modifier.fillMaxWidth(),
+        backgroundColor = Color(0xFF1B1C23),
+        shape = RoundedCornerShape(10.dp),
+        borderColor = null,
+        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 7.dp)
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text("Nota", color = ColorWhite, fontSize = 9.sp, fontWeight = FontWeight.Bold)
+            Spacer(modifier = Modifier.width(6.dp))
+            Text(note, color = ColorWhite, fontSize = 8.sp, modifier = Modifier.weight(1f))
+        }
+    }
+}
+```
+
+#### Por qué se cambió
+El resumen solo mostraba entradas `type == "nota"`. La nota general del turno viaja como `notes`, por lo que necesitaba una fila propia y la condición de vacío debía comprobar tanto `notes` como las notas de entrada.
+
+### Cambio 3 - Fondos opacos para taxímetro y tiempo
+
+#### Código anterior
+```kotlin
+val ColorTaximetroBg = Color(0x0FFFB400)
+```
+
+```kotlin
+val ColorTiempoBg = Color(0x0D00B4FF)
+```
+
+#### Código nuevo
+```kotlin
+val ColorTaximetroBg = Color(0xFF211700)
+```
+
+```kotlin
+val ColorTiempoBg = Color(0xFF001820)
+```
+
+#### Por qué se cambió
+Los valores anteriores tenían alpha casi transparente y debilitaban visualmente las tarjetas. Los nuevos fondos mantienen la familia cromática, pero con alpha opaco como el resto de fondos principales.
+
+### Cambio 4 - Cerrar Room al limpiar usuario Wear
+
+#### Código anterior
+```java
+        if (WatchUserSession.clearIfMatches(getContext(), uid)) {
+            TurnoForegroundService.stop(getContext());
+            deleteWatchState();
+        }
+```
+
+#### Código nuevo
+```java
+        if (WatchUserSession.clearIfMatches(getContext(), uid)) {
+            WatchDatabaseProvider.clear();
+            TurnoForegroundService.stop(getContext());
+            deleteWatchState();
+        }
+```
+
+#### Por qué se cambió
+`clearPrepared` eliminaba la sesión y el estado publicado, pero dejaba abierta la instancia Room cacheada. Se cierra la base al limpiar el usuario para no conservar recursos de una sesión cerrada.
+
+### Cambio 5 - Timeout acotado para STATUS perdido
+
+#### Código anterior
+```kotlin
+    private val mainHandler = Handler(Looper.getMainLooper())
+    private val resyncRunnable = Runnable { requestStatus() }
+    private fun scheduleResync(delayMs: Long) {
+        mainHandler.removeCallbacks(resyncRunnable)
+        mainHandler.postDelayed(resyncRunnable, delayMs)
+    }
+```
+
+```kotlin
+        mainHandler.removeCallbacks(resyncRunnable)
+        super.onPause()
+```
+
+```kotlin
+            if (responseType == "STATUS") {
+                refreshPendingOpsCount()
+```
+
+```kotlin
+        sendCommand(command.toString())
+```
+
+#### Código nuevo
+```kotlin
+    private val mainHandler = Handler(Looper.getMainLooper())
+    private val resyncRunnable = Runnable { requestStatus() }
+    private val statusTimeoutRunnable = Runnable { showDisconnectedIfUiActive() }
+    private fun scheduleResync(delayMs: Long) {
+        mainHandler.removeCallbacks(resyncRunnable)
+        mainHandler.postDelayed(resyncRunnable, delayMs)
+    }
+    private fun scheduleStatusTimeout() {
+        mainHandler.removeCallbacks(statusTimeoutRunnable)
+        mainHandler.postDelayed(statusTimeoutRunnable, 8000L)
+    }
+    private fun cancelStatusTimeout() {
+        mainHandler.removeCallbacks(statusTimeoutRunnable)
+    }
+```
+
+```kotlin
+        mainHandler.removeCallbacks(resyncRunnable)
+        cancelStatusTimeout()
+        super.onPause()
+```
+
+```kotlin
+            if (responseType == "STATUS") {
+                cancelStatusTimeout()
+                refreshPendingOpsCount()
+```
+
+```kotlin
+        if (sendCommand(command.toString())) {
+            scheduleStatusTimeout()
+        }
+```
+
+#### Por qué se cambió
+`GET_STATUS` podía perderse sin que la UI abandonara datos no confirmados. El timeout marca el estado como no conectado solo si la Activity sigue visible, se cancela al recibir `STATUS` y se elimina al pausar para no crear sondeo continuo ni trabajo en segundo plano.
+
+### Cambio 6 - Notes en contrato TypeScript
+
+#### Código anterior
+```ts
+  km: number;
+  totalTaximetro: number | null;
+```
+
+```ts
+      km: turno.km || 0,
+      totalTaximetro: calculo.dineroBase,
+```
+
+#### Código nuevo
+```ts
+  km: number;
+  notes: string;
+  totalTaximetro: number | null;
+```
+
+```ts
+      km: turno.km || 0,
+      notes: turno.notes ?? "",
+      totalTaximetro: calculo.dineroBase,
+```
+
+#### Por qué se cambió
+El tipo compartido y el constructor TypeScript de turnos no declaraban ni rellenaban `notes`. Se alinea el contrato TypeScript con el contrato nativo para que cualquier ruta que construya `TURNOS_STATUS` transporte la nota general.
+
+### Cambio 7 - Tests de contrato Wear pendientes
+
+#### Código anterior
+`No existían los tests "mantiene la excepcion de totalTaximetro y propaga notas generales a Wear", "usa fondos opacos en metricas Taximetro y Tiempo del reloj", "cierra Room al limpiar el usuario preparado del bridge Wear" ni "marca el estado Wear como no confirmado si GET_STATUS no responde" en src/__tests__/android-wear-bridge.test.ts.`
+
+#### Código nuevo
+```ts
+  it("mantiene la excepcion de totalTaximetro y propaga notas generales a Wear", () => {
+    const responseJson = readFileSync(
+      resolve(root, "android/app/src/main/java/com/mijornada/app/watch/WatchResponseJson.kt"),
+      "utf8",
+    );
+    const watchModels = readFileSync(
+      resolve(root, "android/wear/src/main/java/com/mijornada/app/screens/WatchModels.kt"),
+      "utf8",
+    );
+    const activity = readFileSync(
+      resolve(root, "android/wear/src/main/java/com/mijornada/app/WearMainActivity.kt"),
+      "utf8",
+    );
+    const summaryScreen = readFileSync(
+      resolve(root, "android/wear/src/main/java/com/mijornada/app/screens/TurnoSummaryScreen.kt"),
+      "utf8",
+    );
+    const sharedTypes = readFileSync(resolve(root, "src/shared/watch-commands.ts"), "utf8");
+    const processor = readFileSync(
+      resolve(root, "src/logic/watch-command-processor.ts"),
+      "utf8",
+    );
+
+    expect(responseJson).toContain('.put("totalTaximetro", turno.totalTaximetro ?: (turno.dinero - totalNulo))');
+    expect(responseJson).toContain('.put("notes", turno.notes)');
+    expect(sharedTypes).toContain("notes: string;");
+    expect(processor).toContain("notes: turno.notes ?? \"\"");
+    expect(watchModels).toContain("val notes: String = \"\"");
+    expect(activity).toContain('notes = o.optString("notes", "")');
+    expect(summaryScreen).toContain("turno.notes.trim()");
+    expect(summaryScreen).toContain("GeneralNoteRow(generalNote)");
+  });
+
+  it("usa fondos opacos en metricas Taximetro y Tiempo del reloj", () => {
+    const colors = readFileSync(
+      resolve(root, "android/wear/src/main/java/com/mijornada/app/theme/Color.kt"),
+      "utf8",
+    );
+
+    expect(colors).toContain("val ColorTaximetroBg = Color(0xFF");
+    expect(colors).toContain("val ColorTiempoBg = Color(0xFF");
+    expect(colors).not.toContain("val ColorTaximetroBg = Color(0x0F");
+    expect(colors).not.toContain("val ColorTiempoBg = Color(0x0D");
+  });
+```
+
+```ts
+  it("cierra Room al limpiar el usuario preparado del bridge Wear", () => {
+    const plugin = readFileSync(
+      resolve(root, "android/app/src/main/java/com/mijornada/app/WearOsBridgePlugin.java"),
+      "utf8",
+    );
+    const clearPreparedBlock = plugin.slice(
+      plugin.indexOf("public void clearPrepared(PluginCall call)"),
+      plugin.indexOf("@PluginMethod", plugin.indexOf("public void clearPrepared(PluginCall call)") + 1),
+    );
+
+    expect(clearPreparedBlock).toContain("WatchDatabaseProvider.clear();");
+    expect(clearPreparedBlock.indexOf("WatchUserSession.clearIfMatches(getContext(), uid)"))
+      .toBeLessThan(clearPreparedBlock.indexOf("WatchDatabaseProvider.clear();"));
+  });
+
+  it("marca el estado Wear como no confirmado si GET_STATUS no responde", () => {
+    const activity = readFileSync(
+      resolve(root, "android/wear/src/main/java/com/mijornada/app/WearMainActivity.kt"),
+      "utf8",
+    );
+
+    expect(activity).toContain("private val statusTimeoutRunnable = Runnable { showDisconnectedIfUiActive() }");
+    expect(activity).toContain("private fun scheduleStatusTimeout()");
+    expect(activity).toContain("private fun cancelStatusTimeout()");
+    expect(activity).toContain("scheduleStatusTimeout()");
+    expect(activity).toContain("cancelStatusTimeout()");
+    const requestStatusBlock = activity.slice(
+      activity.indexOf("private fun requestStatus()"),
+      activity.indexOf("private fun sendStartTurno()"),
+    );
+    const statusHandlerBlock = activity.slice(
+      activity.indexOf("if (responseType == \"STATUS\")"),
+      activity.indexOf("} else if (\"TURNOS_STATUS\""),
+    );
+    expect(requestStatusBlock).toContain("scheduleStatusTimeout()");
+    expect(statusHandlerBlock).toContain("cancelStatusTimeout()");
+  });
+```
+
+#### Por qué se cambió
+Los fallos verificados necesitaban protección automatizada. Los tests fijan que `totalTaximetro` conserva su excepción, que `notes` viaja por las rutas nativa y TypeScript, que los fondos no vuelven a alpha casi transparente, que `clearPrepared` cierra Room y que `GET_STATUS` tiene watchdog acotado.
+
+## 2026-06-28 21:13 - Extender corona a scrolls Wear
+
+**Archivos modificados:** `android/wear/src/main/java/com/mijornada/app/components/WearRotaryScroll.kt`, `android/wear/src/main/java/com/mijornada/app/screens/ActiveTurnoScreen.kt`, `android/wear/src/main/java/com/mijornada/app/screens/AddEntryScreen.kt`, `android/wear/src/main/java/com/mijornada/app/screens/EndTurnoScreen.kt`, `android/wear/src/main/java/com/mijornada/app/screens/EditTurnoDatosScreen.kt`, `android/wear/src/main/java/com/mijornada/app/screens/TurnoSummaryScreen.kt`, `android/wear/src/main/java/com/mijornada/app/screens/TurnosScreen.kt`, `src/__tests__/android-wear-bridge.test.ts`
+
+### Cambio 1 - Helper comun de corona
+
+#### Codigo anterior
+`No existia WearRotaryScroll.kt en android/wear/src/main/java/com/mijornada/app/components.`
+
+#### Codigo nuevo
+```kotlin
+package com.mijornada.app.components
+
+import androidx.compose.foundation.ScrollState
+import androidx.compose.foundation.focusable
+import androidx.compose.foundation.gestures.scrollBy
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.input.rotary.onRotaryScrollEvent
+import kotlinx.coroutines.launch
+
+@Composable
+fun Modifier.wearRotaryScroll(scrollState: ScrollState): Modifier {
+    val focusRequester = remember { FocusRequester() }
+    val coroutineScope = rememberCoroutineScope()
+
+    LaunchedEffect(Unit) {
+        focusRequester.requestFocus()
+    }
+
+    return this
+        .onRotaryScrollEvent {
+            coroutineScope.launch {
+                scrollState.scrollBy(it.verticalScrollPixels)
+            }
+            true
+        }
+        .focusRequester(focusRequester)
+        .focusable()
+}
+```
+
+#### Por que se cambio
+El soporte de corona estaba inline solo en `ActiveTurnoScreen`. El helper concentra el patron oficial de foco + `onRotaryScrollEvent` + `ScrollState` compartido para aplicarlo igual en todas las pantallas Wear con scroll.
+
+### Cambio 2 - Scrolls Wear con helper comun
+
+#### Codigo anterior
+```kotlin
+                .verticalScroll(rememberScrollState())
+```
+
+```kotlin
+            .verticalScroll(rememberScrollState())
+```
+
+```kotlin
+    val scrollState = rememberScrollState()
+    val focusRequester = remember { FocusRequester() }
+    val coroutineScope = rememberCoroutineScope()
+    LaunchedEffect(Unit) {
+        focusRequester.requestFocus()
+    }
+```
+
+```kotlin
+                .onRotaryScrollEvent {
+                    coroutineScope.launch {
+                        scrollState.scrollBy(it.verticalScrollPixels)
+                    }
+                    true
+                }
+                .focusRequester(focusRequester)
+                .focusable()
+                .verticalScroll(scrollState)
+```
+
+#### Codigo nuevo
+```kotlin
+    val scrollState = rememberScrollState()
+```
+
+```kotlin
+                .wearRotaryScroll(scrollState)
+                .verticalScroll(scrollState)
+```
+
+```kotlin
+            .wearRotaryScroll(scrollState)
+            .verticalScroll(scrollState)
+```
+
+#### Por que se cambio
+Las pantallas `AddEntryScreen`, `EndTurnoScreen`, `EditTurnoDatosScreen`, `TurnoSummaryScreen` y `TurnosScreen` seguian aceptando solo scroll tactil. `ActiveTurnoScreen` ya tenia corona, pero con codigo duplicado. Todas pasan a usar el mismo helper con un `ScrollState` local.
+
+### Cambio 3 - Contrato de scroll con corona en todas las pantallas
+
+#### Codigo anterior
+```ts
+  it("permite desplazarse con la corona en el turno activo Wear", () => {
+    const source = readFileSync(
+      resolve(root, "android/wear/src/main/java/com/mijornada/app/screens/ActiveTurnoScreen.kt"),
+      "utf8",
+    );
+
+    expect(source).toContain("val scrollState = rememberScrollState()");
+    expect(source).toContain("val focusRequester = remember { FocusRequester() }");
+    expect(source).toContain("val coroutineScope = rememberCoroutineScope()");
+    expect(source).toContain("focusRequester.requestFocus()");
+    expect(source).toContain(".onRotaryScrollEvent");
+    expect(source).toContain("scrollState.scrollBy(it.verticalScrollPixels)");
+    expect(source).toContain(".focusRequester(focusRequester)");
+    expect(source).toContain(".focusable()");
+    expect(source).toContain(".verticalScroll(scrollState)");
+  });
+```
+
+`No existia el test "usa soporte de corona en todas las pantallas Wear con scroll vertical" en src/__tests__/android-wear-bridge.test.ts.`
+
+#### Codigo nuevo
+```ts
+  it("permite desplazarse con la corona en el turno activo Wear", () => {
+    const source = readFileSync(
+      resolve(root, "android/wear/src/main/java/com/mijornada/app/screens/ActiveTurnoScreen.kt"),
+      "utf8",
+    );
+
+    expect(source).toContain("val scrollState = rememberScrollState()");
+    expect(source).toContain("import com.mijornada.app.components.wearRotaryScroll");
+    expect(source).toContain(".wearRotaryScroll(scrollState)");
+    expect(source).toContain(".verticalScroll(scrollState)");
+  });
+```
+
+```ts
+  it("usa soporte de corona en todas las pantallas Wear con scroll vertical", () => {
+    const helper = readFileSync(
+      resolve(root, "android/wear/src/main/java/com/mijornada/app/components/WearRotaryScroll.kt"),
+      "utf8",
+    );
+    const scrollableFiles = [
+      "ActiveTurnoScreen.kt",
+      "AddEntryScreen.kt",
+      "EndTurnoScreen.kt",
+      "EditTurnoDatosScreen.kt",
+      "TurnoSummaryScreen.kt",
+      "TurnosScreen.kt",
+    ];
+
+    expect(helper).toContain("fun Modifier.wearRotaryScroll(scrollState: ScrollState): Modifier");
+    expect(helper).toContain("onRotaryScrollEvent");
+    expect(helper).toContain("scrollState.scrollBy(it.verticalScrollPixels)");
+    expect(helper).toContain("focusRequester.requestFocus()");
+    expect(helper).toContain("focusable()");
+
+    for (const file of scrollableFiles) {
+      const source = readFileSync(
+        resolve(root, `android/wear/src/main/java/com/mijornada/app/screens/${file}`),
+        "utf8",
+      );
+      const verticalScrollCount = (source.match(/\.verticalScroll\(/g) ?? []).length;
+      const rotaryScrollCount = (source.match(/\.wearRotaryScroll\(/g) ?? []).length;
+
+      expect(verticalScrollCount, file).toBeGreaterThan(0);
+      expect(rotaryScrollCount, file).toBe(verticalScrollCount);
+      expect(source, file).not.toContain("verticalScroll(rememberScrollState())");
+    }
+  });
+```
+
+#### Por que se cambio
+El contrato anterior solo cubria `ActiveTurnoScreen` y comprobaba el patron inline. El nuevo test exige helper comun y paridad entre cada `verticalScroll` y `wearRotaryScroll` en todas las pantallas Wear scrolleables.
+
+## 2026-06-28 21:06 - Añadir scroll con corona Wear
+
+**Archivos modificados:** `android/wear/src/main/java/com/mijornada/app/screens/ActiveTurnoScreen.kt`, `src/__tests__/android-wear-bridge.test.ts`
+
+### Cambio 1 - Rotary input en turno activo
+
+#### Codigo anterior
+```kotlin
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState())
+                // bottom 44: con 22 el Ãºltimo botÃ³n ("Terminar turno") quedaba
+                // recortado por la curva inferior del cÃ­rculo al final del scroll.
+                .padding(start = 18.dp, end = 18.dp, top = 26.dp, bottom = 44.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+```
+
+#### Codigo nuevo
+```kotlin
+    val scrollState = rememberScrollState()
+    val focusRequester = remember { FocusRequester() }
+    val coroutineScope = rememberCoroutineScope()
+    LaunchedEffect(Unit) {
+        focusRequester.requestFocus()
+    }
+```
+
+```kotlin
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .onRotaryScrollEvent {
+                    coroutineScope.launch {
+                        scrollState.scrollBy(it.verticalScrollPixels)
+                    }
+                    true
+                }
+                .focusRequester(focusRequester)
+                .focusable()
+                .verticalScroll(scrollState)
+                // bottom 44: con 22 el Ãºltimo botÃ³n ("Terminar turno") quedaba
+                // recortado por la curva inferior del cÃ­rculo al final del scroll.
+                .padding(start = 18.dp, end = 18.dp, top = 26.dp, bottom = 44.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+```
+
+#### Por que se cambio
+La pantalla de turno activo era scrolleable solo con el dedo. `onRotaryScrollEvent` permite que la corona del reloj desplace el mismo `ScrollState`; `focusRequester` y `focusable` dan foco al contenedor para recibir esos eventos.
+
+### Cambio 2 - Contrato de corona Wear
+
+#### Codigo anterior
+`No existia el test "permite desplazarse con la corona en el turno activo Wear" en src/__tests__/android-wear-bridge.test.ts.`
+
+```ts
+    expect(source).toContain("verticalScroll(rememberScrollState())");
+```
+
+#### Codigo nuevo
+```ts
+    expect(source).toContain("verticalScroll(scrollState)");
+```
+
+```ts
+  it("permite desplazarse con la corona en el turno activo Wear", () => {
+    const source = readFileSync(
+      resolve(root, "android/wear/src/main/java/com/mijornada/app/screens/ActiveTurnoScreen.kt"),
+      "utf8",
+    );
+
+    expect(source).toContain("val scrollState = rememberScrollState()");
+    expect(source).toContain("val focusRequester = remember { FocusRequester() }");
+    expect(source).toContain("val coroutineScope = rememberCoroutineScope()");
+    expect(source).toContain("focusRequester.requestFocus()");
+    expect(source).toContain(".onRotaryScrollEvent");
+    expect(source).toContain("scrollState.scrollBy(it.verticalScrollPixels)");
+    expect(source).toContain(".focusRequester(focusRequester)");
+    expect(source).toContain(".focusable()");
+    expect(source).toContain(".verticalScroll(scrollState)");
+  });
+```
+
+#### Por que se cambio
+El test anterior solo comprobaba que el boton "Terminar turno" estuviera dentro de un scroll tactil. El nuevo contrato verifica que el turno activo mantenga scroll y acepte desplazamiento por corona con foco y `ScrollState` compartido.
+
+## 2026-06-28 20:34 - Renombrar home Wear
+
+**Archivos modificados:** `android/wear/src/main/java/com/mijornada/app/WearMainActivity.kt`, `src/__tests__/android-wear-bridge.test.ts`
+
+### Cambio 1 - Estado home del reloj
+
+#### Codigo anterior
+```kotlin
+    PAUSED_MENU
+```
+
+```kotlin
+            // Menu de pausa: misma pantalla de inicio reutilizada como espejo
+            // del tile (Turno Pausado / Volver al turno + Turnos). Se llega con
+            // el gesto atras estando pausado.
+            ScreenState.PAUSED_MENU -> NoActiveTurnoScreen(
+```
+
+```kotlin
+            ScreenState.ACTIVE_TURNO -> currentScreen.value = ScreenState.PAUSED_MENU
+            // Si el turno se cerro desde el movil mientras se estaba en el menu,
+            // volver a inicio en vez de mostrar un ACTIVE_TURNO vacio (mismo
+            // criterio que la rama TURNOS).
+            ScreenState.PAUSED_MENU -> currentScreen.value =
+                if (activeTurno.value) ScreenState.ACTIVE_TURNO else ScreenState.NO_ACTIVE_TURNO
+```
+
+#### Codigo nuevo
+```kotlin
+    HOME
+```
+
+```kotlin
+            // Home del reloj. Si existe un turno abierto, el boton principal se
+            // adapta a Continuar Turno / Turno Pausado para no iniciar otro.
+            ScreenState.HOME -> NoActiveTurnoScreen(
+```
+
+```kotlin
+            ScreenState.ACTIVE_TURNO -> currentScreen.value = ScreenState.HOME
+            ScreenState.HOME -> Unit
+```
+
+#### Por que se cambio
+`PAUSED_MENU` no representaba el home real del reloj. El destino del gesto atras desde `ACTIVE_TURNO` pasa a ser `HOME`, manteniendo la pantalla de inicio y dejando que su boton principal se adapte al estado real del turno.
+
+### Cambio 2 - Contrato sin PAUSED_MENU
+
+#### Codigo anterior
+```ts
+    expect(source).toContain("ScreenState.ACTIVE_TURNO -> currentScreen.value = ScreenState.PAUSED_MENU");
+```
+
+#### Codigo nuevo
+```ts
+    expect(source).toContain("ScreenState.HOME -> NoActiveTurnoScreen(");
+    expect(source).toContain("ScreenState.ACTIVE_TURNO -> currentScreen.value = ScreenState.HOME");
+    expect(source).toContain("ScreenState.HOME -> Unit");
+    expect(source).not.toContain("PAUSED_MENU");
+```
+
+#### Por que se cambio
+El test no debe aceptar `PAUSED_MENU` como home. La expectativa fija el estado `HOME` y verifica que la navegación Wear ya no conserve el nombre ni el destino `PAUSED_MENU`.
+
+## 2026-06-28 20:26 - Corregir regreso nativo Wear
+
+**Archivos modificados:** `android/wear/src/main/java/com/mijornada/app/WearMainActivity.kt`, `src/__tests__/android-wear-bridge.test.ts`
+
+### Cambio 1 - Gesto atras desde turno activo
+
+#### Codigo anterior
+```kotlin
+            // Estando pausado, el gesto atras lleva al menu de pausa (espejo del
+            // tile). En el turno activo sin pausar no hace nada para no salir
+            // por accidente.
+            ScreenState.ACTIVE_TURNO -> if (isPaused.value) { currentScreen.value = ScreenState.PAUSED_MENU }
+```
+
+#### Codigo nuevo
+```kotlin
+            // El gesto atras desde el turno abierto vuelve a la home del reloj
+            // (boton Continuar Turno / Turno Pausado), no cierra la app.
+            ScreenState.ACTIVE_TURNO -> currentScreen.value = ScreenState.PAUSED_MENU
+```
+
+#### Por que se cambio
+El gesto nativo atras en la pantalla de turno activo no devolvia a la home del reloj. La rama `ACTIVE_TURNO` no hacia nada cuando el turno no estaba pausado; ahora abre `PAUSED_MENU`, que reutiliza la home con el boton `Continuar Turno` o `Turno Pausado` segun el estado.
+
+### Cambio 2 - Contrato del boton atras Wear
+
+#### Codigo anterior
+```ts
+    expect(source).toContain("ScreenState.ADD_ENTRY -> currentScreen.value = ScreenState.ACTIVE_TURNO");
+    expect(source).toContain("ScreenState.EDIT_ENTRY -> currentScreen.value = ScreenState.ACTIVE_TURNO");
+    expect(source).toContain("ScreenState.END_TURNO -> currentScreen.value = ScreenState.ACTIVE_TURNO");
+```
+
+#### Codigo nuevo
+```ts
+    expect(source).toContain("ScreenState.ADD_ENTRY -> currentScreen.value = ScreenState.ACTIVE_TURNO");
+    expect(source).toContain("ScreenState.EDIT_ENTRY -> currentScreen.value = ScreenState.ACTIVE_TURNO");
+    expect(source).toContain("ScreenState.END_TURNO -> currentScreen.value = ScreenState.ACTIVE_TURNO");
+    expect(source).toContain("ScreenState.ACTIVE_TURNO -> currentScreen.value = ScreenState.PAUSED_MENU");
+```
+
+#### Por que se cambio
+El test existente comprobaba que el boton atras nativo no cerrara flujos de trabajo, pero no fijaba el comportamiento de la pantalla `ACTIVE_TURNO`. La nueva expectativa protege que el gesto vuelva a la home del reloj.
+
+## 2026-06-28 20:20 - Corregir contabilidad y outbox Wear
+
+**Archivos modificados:**
+- `ARQUITECTURA_RELOJ_WEAR_OS.md`
+- `android/app/src/main/java/com/mijornada/app/watch/WatchResponseJson.kt`
+- `android/wear/src/main/java/com/mijornada/app/MobileResponseService.kt`
+- `android/wear/src/main/java/com/mijornada/app/OutboxWorker.kt`
+- `android/wear/src/main/java/com/mijornada/app/WatchOutbox.kt`
+- `android/wear/src/main/java/com/mijornada/app/WearMainActivity.kt`
+- `android/wear/src/main/java/com/mijornada/app/screens/TurnoSummaryScreen.kt`
+- `android/wear/src/main/java/com/mijornada/app/screens/TurnosScreen.kt`
+- `android/wear/src/main/java/com/mijornada/app/screens/WatchModels.kt`
+- `src/__tests__/android-wear-bridge.test.ts`
+- `src/shared/watch-commands.ts`
+
+### Cambio 1 - Nullabilidad contable Wear
+
+#### Codigo anterior
+```kotlin
+    val totalTaximetro: Double,
+    val miGanancia: Double,
+    val totalADescontar: Double,
+    val totalADar: Double,
+```
+
+```ts
+  totalTaximetro: number;
+  miGanancia: number;
+  totalADescontar: number;
+  totalADar: number;
+```
+
+```kotlin
+                    totalTaximetro = o.optDouble("totalTaximetro", 0.0),
+                    miGanancia = o.optDouble("miGanancia", 0.0),
+                    totalADescontar = o.optDouble("totalADescontar", 0.0),
+                    totalADar = o.optDouble("totalADar", 0.0),
+```
+
+```kotlin
+                    totalTaximetro = dinero - nulos,
+                    miGanancia = 0.0,
+                    totalADescontar = 0.0,
+                    totalADar = 0.0,
+```
+
+#### Codigo nuevo
+```kotlin
+    val totalTaximetro: Double?,
+    val miGanancia: Double?,
+    val totalADescontar: Double?,
+    val totalADar: Double?,
+```
+
+```ts
+  totalTaximetro: number | null;
+  miGanancia: number | null;
+  totalADescontar: number | null;
+  totalADar: number | null;
+```
+
+```kotlin
+                    totalTaximetro = nullableDouble(o, "totalTaximetro"),
+                    miGanancia = nullableDouble(o, "miGanancia"),
+                    totalADescontar = nullableDouble(o, "totalADescontar"),
+                    totalADar = nullableDouble(o, "totalADar"),
+```
+
+```kotlin
+    private fun nullableDouble(json: JSONObject, key: String): Double? {
+        if (!json.has(key) || json.isNull(key)) return null
+        val value = json.optDouble(key, Double.NaN)
+        return if (value.isNaN()) null else value
+    }
+```
+
+```kotlin
+                    totalTaximetro = null,
+                    miGanancia = null,
+                    totalADescontar = null,
+                    totalADar = null,
+```
+
+#### Por que se cambio
+Los campos contables del turno pueden estar pendientes. `Double`/`number` y `optDouble(..., 0.0)` convertian un valor ausente en `0.0`, creando numeros inventados dentro del modelo aunque la UI intentara ocultarlos. La nullabilidad preserva la diferencia entre un cero real y contabilidad pendiente.
+
+### Cambio 2 - Presentacion de importes pendientes
+
+#### Codigo anterior
+```kotlin
+            MiniMetric("taximetro", "Total Taxímetro", fmtEur(turno.totalTaximetro), metricCardStyle("taximetro"), Modifier.weight(1f))
+```
+
+```kotlin
+                if (turno.contablePendiente) "Pendiente" else fmtEur(turno.miGanancia),
+```
+
+```kotlin
+                value = if (turno.contablePendiente) "Pendiente" else fmtEur(turno.totalADar),
+```
+
+#### Codigo nuevo
+```kotlin
+fun turnoTaximetroLabel(turno: WatchTurno): String {
+    val nulos = turno.totals.porTipo["nulo"] ?: 0.0
+    return fmtEur(turno.totalTaximetro ?: (turno.dinero - nulos))
+}
+
+fun turnoAccountingLabel(contablePendiente: Boolean, value: Double?): String =
+    if (contablePendiente || value == null) "Pendiente" else fmtEur(value)
+```
+
+```kotlin
+            MiniMetric("taximetro", "Total Taxímetro", turnoTaximetroLabel(turno), metricCardStyle("taximetro"), Modifier.weight(1f))
+```
+
+```kotlin
+                turnoAccountingLabel(turno.contablePendiente, turno.miGanancia),
+```
+
+```kotlin
+                value = turnoAccountingLabel(turno.contablePendiente, turno.totalADar),
+```
+
+#### Por que se cambio
+La UI ya no puede llamar `fmtEur` directamente sobre importes contables nullable. `turnoAccountingLabel` centraliza la regla "Pendiente si falta contabilidad"; `turnoTaximetroLabel` conserva el fallback visual permitido de `dinero - nulos` solo para el taximetro.
+
+### Cambio 3 - JSON contable sin ceros falsos
+
+#### Codigo anterior
+```kotlin
+            val contablePendiente = turno.miGanancia == null ||
+                turno.totalADescontar == null ||
+                turno.totalADar == null
+```
+
+```kotlin
+                    .put("miGanancia", turno.miGanancia ?: 0.0)
+                    .put("totalADescontar", turno.totalADescontar ?: 0.0)
+                    .put("totalADar", turno.totalADar ?: 0.0)
+```
+
+#### Codigo nuevo
+```kotlin
+            val contablePendiente = turno.totalTaximetro == null ||
+                turno.miGanancia == null ||
+                turno.totalADescontar == null ||
+                turno.totalADar == null
+```
+
+```kotlin
+                    .put("miGanancia", turno.miGanancia ?: JSONObject.NULL)
+                    .put("totalADescontar", turno.totalADescontar ?: JSONObject.NULL)
+                    .put("totalADar", turno.totalADar ?: JSONObject.NULL)
+```
+
+#### Por que se cambio
+El movil debe serializar la contabilidad pendiente como `null`, no como `0.0`. Tambien se incluye `totalTaximetro` en la marca `contablePendiente` para que la bandera refleje que falta cualquier campo contable, aunque el reloj pueda mostrar un fallback visual para taximetro.
+
+### Cambio 4 - Republicacion de outbox vencido
+
+#### Codigo anterior
+```kotlin
+    fun unpublishedCommands(context: Context): Map<String, PendingCommand> =
+        pendingCommands(context).filterValues { it.publishedAt <= 0L }
+```
+
+```kotlin
+        WatchOutbox.unpublishedCommands(applicationContext).values.forEach { command ->
+```
+
+```kotlin
+                request.dataMap.putLong("createdAt", System.currentTimeMillis())
+```
+
+```kotlin
+        return if (WatchOutbox.unpublishedCommands(applicationContext).isEmpty()) {
+```
+
+#### Codigo nuevo
+```kotlin
+    const val PUBLISHED_STALE_MS = 5L * 60L * 1000L
+```
+
+```kotlin
+    fun publishableCommands(context: Context, now: Long = System.currentTimeMillis()): Map<String, PendingCommand> {
+        val staleBefore = now - PUBLISHED_STALE_MS
+        return pendingCommands(context).filterValues {
+            it.publishedAt <= 0L || it.publishedAt < staleBefore
+        }
+    }
+```
+
+```kotlin
+        val now = System.currentTimeMillis()
+        WatchOutbox.publishableCommands(applicationContext, now).values.forEach { command ->
+```
+
+```kotlin
+                request.dataMap.putLong("createdAt", now)
+```
+
+```kotlin
+        return if (WatchOutbox.publishableCommands(applicationContext).isEmpty()) {
+```
+
+#### Por que se cambio
+Un comando con `publishedAt > 0` podia quedarse en outbox sin respuesta terminal y no volver a entrar en `unpublishedCommands`. `publishableCommands` mantiene los comandos nuevos y republica los publicados hace mas de cinco minutos sin cerrar, reutilizando el mismo `operationId`.
+
+### Cambio 5 - Reprogramacion del worker con comandos publicables
+
+#### Codigo anterior
+```kotlin
+        if (WatchOutbox.unpublishedCommands(this).isNotEmpty()) {
+            MobileResponseService.enqueueOutboxRetry(this)
+        }
+```
+
+```kotlin
+                if (WatchOutbox.unpublishedCommands(this).isNotEmpty()) {
+                    enqueueOutboxRetry(this)
+                } else {
+```
+
+#### Codigo nuevo
+```kotlin
+        if (WatchOutbox.publishableCommands(this).isNotEmpty()) {
+            MobileResponseService.enqueueOutboxRetry(this)
+        }
+```
+
+```kotlin
+                if (WatchOutbox.publishableCommands(this).isNotEmpty()) {
+                    enqueueOutboxRetry(this)
+                } else {
+```
+
+#### Por que se cambio
+Las rutas que reactivan WorkManager al volver a primer plano, al recibir estado o tras cerrar una respuesta terminal deben mirar tambien comandos publicados vencidos, no solo comandos nunca publicados.
+
+### Cambio 6 - Arquitectura Wear actualizada
+
+#### Codigo anterior
+```md
+   `outbox-retry-unique`) reenvia solo los comandos con `publishedAt <= 0`
+   (`WatchOutbox.unpublishedCommands`). El envio usa `DataClient` con
+   `setUrgent()`.
+4. Si `putDataItem` confirma, el comando se marca `publishedAt = now` y
+   `DataClient` lo entrega al movil cuando se restablezca la comunicacion,
+   sin retransmisiones periodicas adicionales.
+```
+
+```md
+WorkManager es el unico responsable del backoff entre reintentos. `WatchOutbox`
+conserva el comando pendiente hasta recibir una respuesta terminal, pero no
+mantiene un segundo temporizador ni elimina comandos por numero de intentos.
+```
+
+#### Codigo nuevo
+```md
+   `outbox-retry-unique`) reenvia los comandos publicables
+   (`WatchOutbox.publishableCommands`): comandos con `publishedAt <= 0` o
+   comandos publicados hace mas de `PUBLISHED_STALE_MS` sin respuesta
+   terminal. El envio usa `DataClient` con `setUrgent()`.
+4. Si `putDataItem` confirma, el comando se marca `publishedAt = now`. Ese
+   timestamp representa el ultimo intento publicado localmente; no cierra el
+   outbox ni sustituye la respuesta terminal del movil.
+```
+
+```md
+WorkManager es el unico responsable del backoff entre reintentos. `WatchOutbox`
+conserva el comando pendiente hasta recibir una respuesta terminal, no elimina
+comandos por numero de intentos y permite republicar comandos vencidos con el
+mismo `operationId`.
+```
+
+#### Por que se cambio
+La documentacion local describia que no habia retransmisiones tras `publishedAt = now`, pero la invariante exige que un comando critico no desaparezca del outbox sin respuesta terminal. La arquitectura queda alineada con la republicacion vencida.
+
+### Cambio 7 - Tests de contrato Wear
+
+#### Codigo anterior
+`No existia el test "mantiene nullable la contabilidad pendiente en la UI Wear" en src/__tests__/android-wear-bridge.test.ts.`
+
+`No existia el test "republica comandos Wear publicados que siguen sin respuesta terminal" en src/__tests__/android-wear-bridge.test.ts.`
+
+```ts
+    expect(worker).toContain("WatchOutbox.unpublishedCommands");
+```
+
+```ts
+    expect(screen).toContain(".border(2.dp, ColorPauseBorder");
+    expect(screen).toContain(".background(ColorPauseBg)");
+```
+
+#### Codigo nuevo
+```ts
+  it("mantiene nullable la contabilidad pendiente en la UI Wear", () => {
+    const watchModels = readFileSync(
+      resolve(root, "android/wear/src/main/java/com/mijornada/app/screens/WatchModels.kt"),
+      "utf8",
+    );
+    const activity = readFileSync(
+      resolve(root, "android/wear/src/main/java/com/mijornada/app/WearMainActivity.kt"),
+      "utf8",
+    );
+    const turnosScreen = readFileSync(
+      resolve(root, "android/wear/src/main/java/com/mijornada/app/screens/TurnosScreen.kt"),
+      "utf8",
+    );
+    const summaryScreen = readFileSync(
+      resolve(root, "android/wear/src/main/java/com/mijornada/app/screens/TurnoSummaryScreen.kt"),
+      "utf8",
+    );
+    const sharedTypes = readFileSync(resolve(root, "src/shared/watch-commands.ts"), "utf8");
+```
+
+```ts
+  it("republica comandos Wear publicados que siguen sin respuesta terminal", () => {
+    const outbox = readFileSync(
+      resolve(root, "android/wear/src/main/java/com/mijornada/app/WatchOutbox.kt"),
+      "utf8",
+    );
+    const worker = readFileSync(
+      resolve(root, "android/wear/src/main/java/com/mijornada/app/OutboxWorker.kt"),
+      "utf8",
+    );
+```
+
+```ts
+    expect(worker).toContain("WatchOutbox.publishableCommands");
+```
+
+```ts
+    expect(screen).toContain("borderColor = ColorPauseBorder");
+    expect(screen).toContain("backgroundColor = ColorPauseBg");
+```
+
+#### Por que se cambio
+Se añadieron contratos para impedir que la contabilidad pendiente vuelva a transformarse en ceros y para cubrir comandos publicados sin respuesta terminal. Tambien se actualizaron expectativas visuales antiguas para validar el patron actual delegado en componentes `WatchActionButton`, `WatchTileBox` y `WatchMetricCard`.
+
 ## 2026-06-27 23:10 - Mejorar accesibilidad Wear OS
 
 **Archivos modificados:** `android/wear/src/main/java/com/mijornada/app/components/WatchActionButton.kt`, `android/wear/src/main/java/com/mijornada/app/components/WatchMetricCard.kt`, `android/wear/src/androidTest/java/com/mijornada/app/components/WatchInteractiveComponentsAccessibilityTest.kt`

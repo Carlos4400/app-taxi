@@ -22,8 +22,13 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.wear.compose.material.Text
+import com.mijornada.app.components.NumericKeypad
 import com.mijornada.app.components.WatchActionButton
 import com.mijornada.app.components.WatchMetricCard
+import com.mijornada.app.components.amountToText
+import com.mijornada.app.components.applyKey
+import com.mijornada.app.components.parseAmount
+import com.mijornada.app.components.wearRotaryScroll
 import com.mijornada.app.theme.*
 
 /**
@@ -51,6 +56,7 @@ fun EditTurnoDatosScreen(
     val dinero = parseAmount(dineroText)
     val km = parseAmount(kmText)
     val valido = dinero > 0.0 && km > 0.0
+    val scrollState = rememberScrollState()
 
     // Gesto atras dentro de la edicion: cierra solo la subpantalla abierta
     // (editor de entrada) en vez de expulsar de toda la edicion. Compose
@@ -120,7 +126,8 @@ fun EditTurnoDatosScreen(
         modifier = Modifier
             .fillMaxSize()
             .background(ColorBackground)
-            .verticalScroll(rememberScrollState())
+            .wearRotaryScroll(scrollState)
+            .verticalScroll(scrollState)
             .padding(start = 18.dp, end = 18.dp, top = 26.dp, bottom = 36.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {

@@ -345,7 +345,12 @@ Migrar caso por caso a los 3 composables nuevos.
 Audit caso por caso. Algunos pueden requerir un `WatchTileBox` extendido o quedarse con fix minimo inline.
 
 ### 4.6. `NumericKeypad.kt`
-**No tocar.** El teclado numerico recompone intencionalmente con cada pulsacion y su layout ya esta optimizado.
+Reubicado a `components/` por la regla de organizacion del codigo Wear
+(teclados son reutilizables, no composables privados de una pantalla).
+Su `KeyButton` privado adopta el patron robusto `background(color, shape)` para
+no perpetuar la excepcion del patron fragil. No hay cambio funcional: el
+componente nunca aplica `alpha < 1`, asi que el patron robusto es equivalente
+en practica y elimina el riesgo si alguien aniade un alpha en el futuro.
 
 ---
 
